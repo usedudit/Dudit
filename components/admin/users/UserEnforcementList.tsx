@@ -368,20 +368,18 @@ interface UserDetailsSheetProps {
 
 function UserDetailsSheet({ user, isOpen, onClose }: UserDetailsSheetProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    if (!user) return null
-
-    const content = (
+    const content = user ? (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes do Usuário</h2>
+            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Usuário</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                 {/* Header Info */}
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-brand-green/10 flex items-center justify-center border border-brand-green/20">
@@ -455,7 +453,7 @@ function UserDetailsSheet({ user, isOpen, onClose }: UserDetailsSheetProps) {
                 </div>
             </div>
         </div>
-    )
+    ) : null
 
     if (isMobile) {
         return (
@@ -472,7 +470,7 @@ function UserDetailsSheet({ user, isOpen, onClose }: UserDetailsSheetProps) {
                 onClick={onClose}
             >
                 <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {content}

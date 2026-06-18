@@ -3334,12 +3334,10 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
             .maybeSingle()
 
         if (linkedAppointment) {
-            const nextStatus = nextSituation === "paid" ? "Pago" : "Pago Parcialmente"
             await supabase
                 .from("appointments")
                 .update({
                     payment_status: nextSituation === "paid" ? "paid" : "partially_paid",
-                    status: nextStatus,
                     paid_amount: nextPaidAmount,
                 })
                 .eq("id", linkedAppointment.id)
@@ -3352,7 +3350,8 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 userId: user.id,
                 appointment: {
                     id: linkedAppointment.id,
-                    status: nextStatus,
+                    status: linkedAppointment.status,
+                    payment_status: nextSituation === "paid" ? "paid" : "partially_paid",
                     price: order.total_amount,
                     paid_amount: nextPaidAmount,
                     marketplace_order_id: payload.orderId,

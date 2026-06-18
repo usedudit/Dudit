@@ -370,23 +370,21 @@ function SubscriptionDetailsSheet({ item, isOpen, onClose }: SubscriptionDetails
         }
     };
 
-    if (!item) return null
-
-    const content = (
+    const content = item ? (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes da Assinatura</h2>
+            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da Assinatura</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                 {/* Store Header */}
                 <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-heading">
+                    <div className="w-16 h-16 rounded-xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-heading">
                         <StoreIcon size={32} />
                     </div>
                     <div>
@@ -396,7 +394,7 @@ function SubscriptionDetailsSheet({ item, isOpen, onClose }: SubscriptionDetails
                 </div>
 
                 {/* Plan Card */}
-                <div className="bg-gray-50 dark:bg-dark-background/50 p-5 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
+                <div className="bg-brand-gray dark:bg-dark-border/20 p-5 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
                     <div className="flex justify-between items-start">
                         <div>
                             <span className="text-[11px] font-bold text-brand-inactive-text block mb-1">Plano Atual</span>
@@ -419,7 +417,7 @@ function SubscriptionDetailsSheet({ item, isOpen, onClose }: SubscriptionDetails
                 <div className="space-y-3">
                     <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Método de Pagamento</h4>
                     <div className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30">
-                        <div className="w-12 h-8 bg-white dark:bg-gray-800 rounded border border-brand-border/50 flex items-center justify-center text-[10px] font-black text-brand-inactive-text">
+                        <div className="w-12 h-8 bg-white dark:bg-dark-border rounded border border-brand-border/50 flex items-center justify-center text-[10px] font-black text-brand-inactive-text">
                             CARD
                         </div>
                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{item.paymentMethod}</span>
@@ -431,7 +429,7 @@ function SubscriptionDetailsSheet({ item, isOpen, onClose }: SubscriptionDetails
                     <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Faturas Recentes</h4>
                     <div className="space-y-2">
                         {item.history.length > 0 ? item.history.map((inv: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 transition-colors">
+                            <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-brand-gray transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className={`w-2.5 h-2.5 rounded-full ${inv.status === 'Paid' ? 'bg-brand-green shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-brand-red shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`} />
                                     <div>
@@ -464,7 +462,7 @@ function SubscriptionDetailsSheet({ item, isOpen, onClose }: SubscriptionDetails
                 </div>
             </div>
         </div>
-    )
+    ) : null
 
     if (isMobile) {
         return (

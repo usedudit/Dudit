@@ -133,62 +133,62 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   >
     {onView && (
       <DropdownItem onClick={onView}>
-        <EyeIcon className="w-4 h-4" /> Ver Detalhes
+        <EyeIcon size={18} /> Ver Detalhes
       </DropdownItem>
     )}
     {onEdit && (
       <DropdownItem onClick={onEdit}>
-        <EditIcon className="w-4 h-4" /> Editar
+        <EditIcon size={18} /> Editar
       </DropdownItem>
     )}
     {onDuplicate && (
       <DropdownItem onClick={onDuplicate}>
-        <DuplicateIcon className="w-4 h-4" /> Duplicar
+        <DuplicateIcon size={18} /> Duplicar
       </DropdownItem>
     )}
     {onUndo && (
       <DropdownItem onClick={onUndo}>
-        <ReloadIcon className="w-4 h-4" /> Desfazer
+        <ReloadIcon size={18} /> Desfazer
       </DropdownItem>
     )}
     {onShare && (
       <DropdownItem onClick={onShare}>
-        <ShareIcon className="w-4 h-4" /> Compartilhar
+        <ShareIcon size={18} /> Compartilhar
       </DropdownItem>
     )}
     {onPrint && (
       <DropdownItem onClick={onPrint}>
-        <PrinterIcon className="w-4 h-4" /> Imprimir
+        <PrinterIcon size={18} /> Imprimir
       </DropdownItem>
     )}
     {onEmail && (
       <DropdownItem onClick={onEmail}>
-        <MailIcon className="w-4 h-4" /> Enviar por E-mail
+        <MailIcon size={18} /> Enviar por E-mail
       </DropdownItem>
     )}
     {onArchive && (
       <DropdownItem onClick={onArchive} className="text-brand-orange">
-        <ArchiveIcon className="w-4 h-4" /> Arquivar
+        <ArchiveIcon size={18} /> Arquivar
       </DropdownItem>
     )}
     {onDelete && (
       <DropdownItem onClick={onDelete} className="text-brand-red">
-        <TrashIcon className="w-4 h-4" /> Excluir
+        <TrashIcon size={18} /> Excluir
       </DropdownItem>
     )}
     {onCancel && (
       <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red" : ""}>
-        <BlockedIcon className="w-4 h-4" /> {cancelLabel}
+        <BlockedIcon size={18} /> {cancelLabel}
       </DropdownItem>
     )}
     {onPaymentStatus && (
       <DropdownItem onClick={onPaymentStatus}>
-        <MoneyIcon className="w-4 h-4" /> Alterar status de pagamento
+        <MoneyIcon size={18} /> Alterar status de pagamento
       </DropdownItem>
     )}
     {onDeliveryStatus && (
       <DropdownItem onClick={onDeliveryStatus}>
-        <MotorbikeIcon className="w-4 h-4" /> Alterar status de entrega
+        <MotorbikeIcon size={18} /> Alterar status de entrega
       </DropdownItem>
     )}
     {children}

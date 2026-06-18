@@ -11,7 +11,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useRouter } from "next/navigation"
 import { useStore } from "@/lib/store-context"
-import { uploadXMLAction, confirmImportAction, getImportPreviewAction, listImportsAction } from "@/app/actions/erp/xml-import"
+import { uploadXMLAction, confirmImportAction, getImportPreviewAction, listImportsAction, revertImportAction, getImportFinanceAction, getImportStockMovementsAction } from "@/app/actions/erp/xml-import"
 import {
   UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
   SearchIcon, PlusIcon, FileIcon, ClockIcon, GridIcon, ListIcon,
@@ -47,6 +47,7 @@ const STATUS_META: Record<string, { label: string; variant: "green" | "orange" |
   pending: { label: "Pendente", variant: "gray" },
   failed: { label: "Erro", variant: "red" },
   reprocessing: { label: "Reprocessando", variant: "orange" },
+  reversed: { label: "Revertido", variant: "gray" },
 }
 
 const COLUMNS = [
@@ -109,7 +110,7 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
   const handleComplete = useCallback(() => {
     setPendingUploadId(null)
     setViewingImportId(null)
-    listImportsAction(partnerId, 50).then((res) => {
+    listImportsAction(partnerId, { limit: 50 }).then((res) => {
       if (res.success && res.imports) setImports(res.imports as ImportItem[])
     })
     router.refresh()
@@ -634,7 +635,14 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
   const [loading, setLoading] = useState(true)
   const [isConfirming, setIsConfirming] = useState(false)
   const [decisions, setDecisions] = useState<Record<string, any>>({})
+  const [supplierActions, setSupplierActions] = useState<Record<string, string>>({})
   const [isScrolled, setIsScrolled] = useState(false)
+  const [createPayables, setCreatePayables] = useState(true)
+  const [isReverting, setIsReverting] = useState(false)
+  const [showRevertModal, setShowRevertModal] = useState(false)
+  const [revertReason, setRevertReason] = useState("")
+  const [financeData, setFinanceData] = useState<any[] | null>(null)
+  const [stockData, setStockData] = useState<any[] | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const { success: notifySuccess, error: notifyError } = useNotification()
 
@@ -649,13 +657,29 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
       if (res.success && res.preview) {
         setPreview(res.preview)
         const initial: Record<string, any> = {}
+        const initialSupplier: Record<string, string> = {}
         for (const item of res.preview.items) {
           initial[item.id] = {
             decision: item.match_status === "new" ? "create_product" : item.match_status === "similar" ? "keep_product" : "keep_product",
             stock_action: "add", cost_action: "update",
           }
+          const hasSupplierConflict = (item.conflicts || []).some((c: any) => c.campo === "fornecedor_diferente")
+          if (hasSupplierConflict) {
+            initialSupplier[item.id] = "keep"
+          }
         }
         setDecisions(initial)
+        setSupplierActions(initialSupplier)
+        // Load finance + stock data for completed/reversed imports
+        const status = res.preview.status
+        if (status === "completed" || status === "reversed") {
+          getImportFinanceAction(importId, partnerId).then(fr => {
+            if (!cancelled && fr.success) setFinanceData(fr.transactions || [])
+          })
+          getImportStockMovementsAction(importId, partnerId).then(sr => {
+            if (!cancelled && sr.success) setStockData(sr.movements || [])
+          })
+        }
       }
       setLoading(false)
     }).catch(() => { if (!cancelled) setLoading(false) })
@@ -668,9 +692,17 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
     setIsConfirming(true)
     const arr = preview.items.map((item: any) => {
       const d = getDecision(item.id)
-      return { item_id: item.id, decision: d.decision, product_id: item.matched_product_id || undefined, stock_action: d.stock_action, cost_action: d.cost_action }
+      const hasSupplierConflict = (item.conflicts || []).some((c: any) => c.campo === "fornecedor_diferente")
+      return {
+        item_id: item.id,
+        decision: d.decision,
+        product_id: item.matched_product_id || undefined,
+        stock_action: d.stock_action,
+        cost_action: d.cost_action,
+        supplier_action: hasSupplierConflict ? (supplierActions[item.id] || "keep") : undefined,
+      }
     })
-    const result = await confirmImportAction(importId, partnerId, storeId, arr)
+    const result = await confirmImportAction(importId, partnerId, storeId, arr, createPayables)
     if (result.success) {
       notifySuccess("Importação concluída!", `${result.imported} produto(s) importados.`)
       onComplete()
@@ -678,6 +710,20 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
       notifyError("Erro", result.error || "Falha ao importar")
     }
     setIsConfirming(false)
+  }
+
+  const handleRevert = async () => {
+    setIsReverting(true)
+    const result = await revertImportAction(importId, partnerId, revertReason)
+    if (result.success) {
+      notifySuccess("Importação revertida!", result.message)
+      setShowRevertModal(false)
+      setRevertReason("")
+      window.location.reload()
+    } else {
+      notifyError("Erro", result.error || "Falha ao reverter")
+    }
+    setIsReverting(false)
   }
 
   if (loading) {
@@ -696,6 +742,16 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
   const isFailed = preview.status === "failed"
   const isPreview = preview.status === "preview" || preview.status === "pending"
   const isCompleted = preview.status === "completed"
+  const isReversed = preview.status === "reversed"
+
+  const summaryCounts = {
+    total: preview.items?.length || 0,
+    novos: preview.items?.filter((i: any) => i.match_status === "new").length || 0,
+    existentes: preview.items?.filter((i: any) => i.match_status === "matched" || i.match_status === "similar").length || 0,
+    conflitos: preview.items?.filter((i: any) => i.match_status === "similar").length || 0,
+    estoque: preview.items?.filter((i: any) => i.match_status !== "skipped").reduce((s: number, i: any) => s + (i.raw_quantity || 0), 0) || 0,
+    duplicatas: preview.duplicatas?.length || 0,
+  }
 
   const safeDate = (d: string) => {
     if (!d) return "—"
@@ -735,7 +791,8 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                   <span className="truncate">NF-e {preview.invoice.numero || "—"}</span>
                   {isPreview && <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">Preview</Badge>}
                   {isFailed && <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">Erro</Badge>}
-                  {isCompleted && <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">Importado</Badge>}
+                  {isCompleted && !isReversed && <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">Importado</Badge>}
+                  {isReversed && <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">Revertido</Badge>}
                 </h1>
                 <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                   <div className="flex items-center gap-2">
@@ -753,6 +810,13 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                   </Button>
                 </div>
               )}
+              {isCompleted && !isReversed && (
+                <div className="flex items-center gap-3 shrink-0 ml-3">
+                  <Button variant="outline" onClick={() => setShowRevertModal(true)} className="h-[42px] text-red-600 border-red-300 hover:bg-red-50">
+                    Desfazer Importação
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -764,7 +828,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
 
               <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                 <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
-                  <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
                       Série {preview.invoice.serie || "—"} | N° {preview.invoice.numero || "—"}
                     </div>
@@ -774,6 +838,13 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                         <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">R$ {preview.invoice.valor_total.toFixed(2)}</p>
                       </div>
                     )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-2">
+                    {preview.invoice.modelo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Mod {preview.invoice.modelo}</span>}
+                    {preview.invoice.protocolo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Prot {preview.invoice.protocolo}</span>}
+                    {preview.invoice.ambiente === "1" && <span className="text-xs bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded text-green-700 dark:text-green-400">Produção</span>}
+                    {preview.invoice.ambiente === "2" && <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded text-yellow-700 dark:text-yellow-400">Homologação</span>}
+                    {preview.invoice.data_saida && <span className="text-xs text-brand-inactive-text">Saída: {safeDate(preview.invoice.data_saida)}</span>}
                   </div>
                 </div>
 
@@ -844,10 +915,46 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                               {item.match_method && <p className="text-xs text-brand-green mt-1">Match por {item.match_method}</p>}
                               {conflicts.map((c: any, i: number) => (
                                 <div key={i} className="flex items-center gap-1.5 mt-1 text-xs">
-                                  <span className="font-bold text-brand-dark">{c.campo}:</span>
-                                  <span className="text-yellow-600 line-through">{c.valor_atual}</span>
-                                  <ArrowRightIcon className="w-3 h-3 text-brand-inactive-text" />
-                                  <span className="text-brand-green">{c.valor_xml}</span>
+                                  {c.campo === "fornecedor_diferente" ? (
+                                    <div className="flex flex-col gap-1 w-full">
+                                      <span className="text-orange-600 font-semibold">
+                                        Produto já vinculado a outro fornecedor ({c.valor_atual_name || "desconhecido"})
+                                      </span>
+                                      <div className="flex gap-3 mt-1">
+                                        <label className="flex items-center gap-1 cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`supplier_${item.id}`}
+                                            value="add"
+                                            checked={supplierActions[item.id] === "add"}
+                                            onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "add" }))}
+                                            className="accent-brand-orange"
+                                          />
+                                          <span className="text-brand-dark text-xs">
+                                            Adicionar {preview?.supplier.name || "novo"} como fornecedor
+                                          </span>
+                                        </label>
+                                        <label className="flex items-center gap-1 cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`supplier_${item.id}`}
+                                            value="keep"
+                                            checked={supplierActions[item.id] === "keep"}
+                                            onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "keep" }))}
+                                            className="accent-brand-orange"
+                                          />
+                                          <span className="text-brand-dark text-xs">Manter vínculo atual</span>
+                                        </label>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span className="font-bold text-brand-dark">{c.campo}:</span>
+                                      <span className="text-yellow-600 line-through">{String(c.valor_atual ?? "")}</span>
+                                      <ArrowRightIcon className="w-3 h-3 text-brand-inactive-text" />
+                                      <span className="text-brand-green">{String(c.valor_xml ?? "")}</span>
+                                    </>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -931,10 +1038,37 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
               <SidebarCard>
                 <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo</h3>
                 <div className="space-y-3 text-sm">
+                  {/* Itens */}
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
-                    <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.length}</span>
+                    <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.total}</span>
                   </div>
+                  {isPreview && (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Novos</span>
+                        <span className="font-bold text-blue-600">{summaryCounts.novos}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Existentes</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.existentes}</span>
+                      </div>
+                      {summaryCounts.conflitos > 0 && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-brand-inactive-text dark:text-dark-body">Conflitos</span>
+                          <span className="font-bold text-orange-500">{summaryCounts.conflitos}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Movimentações</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.filter((i: any) => i.match_status !== "skipped").length}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Parcelas</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.duplicatas || "1"}</span>
+                      </div>
+                    </>
+                  )}
                   {preview.invoice.valor_total > 0 && (
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-brand-inactive-text dark:text-dark-body">Valor Total</span>
@@ -957,10 +1091,91 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                       <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
                     </div>
                   )}
+                  {/* Duplicatas / contas a pagar */}
+                  {isPreview && preview.duplicatas?.length > 0 && (
+                    <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
+                      <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Duplicatas</span>
+                      <div className="space-y-1">
+                        {preview.duplicatas.map((d: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <span className="text-brand-dark dark:text-dark-heading">Parcela {d.numero || i + 1}</span>
+                            <div className="text-right">
+                              <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number(d.valor || 0).toFixed(2)}</span>
+                              <span className="text-brand-inactive-text ml-1">{d.vencimento ? safeDate(d.vencimento) : ""}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {isPreview && (
+                    <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox checked={createPayables} onChange={setCreatePayables} />
+                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Criar contas a pagar</span>
+                      </label>
+                      <p className="text-xs text-brand-inactive-text mt-1 ml-6">
+                        {preview.duplicatas?.length > 0
+                          ? `${preview.duplicatas.length} parcela(s) da NF-e`
+                          : "Uma conta com vencimento em 30 dias"}
+                      </p>
+                    </div>
+                  )}
                   {preview.invoice.chave && (
                     <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
                       <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Chave NF-e</span>
                       <span className="text-xs font-mono text-brand-dark dark:text-dark-heading break-all">{preview.invoice.chave}</span>
+                    </div>
+                  )}
+                  {/* Finance data for completed/reversed imports */}
+                  {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
+                    <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
+                      <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
+                      <div className="space-y-1">
+                        {financeData.map((t: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1">
+                              <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                              <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
+                                {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
+                              </Badge>
+                            </div>
+                            <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Stock movements for completed/reversed imports */}
+                  {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
+                    <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
+                      <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Movimentações de Estoque</span>
+                      <div className="space-y-1">
+                        {stockData.map((m: any, i: number) => (
+                          <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
+                            <span className="font-medium">
+                              {m.movement_type === "adjustment" ? "Ajuste (reversão)" : "Entrada"}:
+                            </span>{' '}
+                            {m.stock_movement_items?.map((smi: any, j: number) => (
+                              <span key={j}>
+                                {smi.quantity > 0 ? "+" : ""}{smi.quantity} un
+                              </span>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {isReversed && preview.reversed_at && (
+                    <div className="pt-2 border-t border-red-200 dark:border-red-800">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-red-600 font-bold">Revertido em</span>
+                        <span className="font-bold text-red-600">{safeDateTime(preview.reversed_at)}</span>
+                      </div>
+                      {preview.reversal_reason && (
+                        <p className="text-xs text-red-500 mt-1">{preview.reversal_reason}</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -979,6 +1194,33 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
             {isConfirming ? <span className="flex items-center gap-2"><Spinner className="w-4 h-4" /> Importando...</span> : "Confirmar"}
           </Button>
         </div>
+      )}
+
+      {/* Reversal confirmation modal */}
+      {showRevertModal && (
+        <DefaultModal isOpen={showRevertModal} onClose={() => { setShowRevertModal(false); setRevertReason("") }} title="Desfazer Importação">
+          <div className="space-y-4">
+            <InfoCard color="red" title="Atenção" message="Esta ação irá desfazer toda a importação, incluindo movimentações de estoque e contas a pagar geradas. Esta operação é irreversível." />
+            <div>
+              <label className="block text-sm font-medium text-brand-dark mb-1">Motivo da reversão (opcional)</label>
+              <textarea
+                value={revertReason}
+                onChange={(e) => setRevertReason(e.target.value)}
+                className="w-full border border-brand-border rounded-lg px-3 py-2 text-sm bg-transparent text-brand-dark resize-none"
+                rows={3}
+                placeholder="Ex: Nota duplicada, erro nos valores..."
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => { setShowRevertModal(false); setRevertReason("") }}>
+                Cancelar
+              </Button>
+              <Button onClick={handleRevert} disabled={isReverting} className="bg-red-600 hover:bg-red-700 text-white">
+                {isReverting ? <span className="flex items-center gap-2"><Spinner className="w-4 h-4" /> Revertendo...</span> : "Confirmar Reversão"}
+              </Button>
+            </div>
+          </div>
+        </DefaultModal>
       )}
     </FadeIn>
   )

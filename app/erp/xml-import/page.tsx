@@ -9,7 +9,7 @@ export default async function XmlImportPage() {
   const context = await getCurrentPartnerContext()
   if (!context) redirect("")
 
-  const imports = await listImportsAction(context.partnerId, 10)
+  const imports = await listImportsAction(context.partnerId, { limit: 10 })
 
   return (
     <>

@@ -257,6 +257,7 @@ export async function syncAppointmentReceivable(params: {
 }) {
   const ref = `appointment:${params.appointment.id}:receivable`
   const status = String(params.appointment.status || "")
+  const paymentStatus = String(params.appointment.payment_status || "")
   const totalAmount = Number(params.appointment.price || 0)
 
   // Guard: não criar receivable para agendamentos sem valor (R$0)
@@ -264,7 +265,8 @@ export async function syncAppointmentReceivable(params: {
 
   const paidAmount = Number(params.appointment.paid_amount || 0)
   const remaining = Math.max(0, totalAmount - paidAmount)
-  const shouldBePending = !isPaidStatus(status) && remaining > 0.009
+  const isActuallyPaid = isPaidStatus(status) || paymentStatus === 'paid'
+  const shouldBePending = !isActuallyPaid && remaining > 0.009
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
 
   let saleNumber = `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
@@ -803,6 +805,9 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       .single()
     if (currentError || !current) throw currentError || new Error("Agendamento não encontrado")
 
+    const paymentStatusValue = (payload as any)?.paymentStatus ?? current.payment_status
+    const paidAmountValue = Math.max(0, Number((payload as any)?.paidAmount ?? current.paid_amount ?? 0))
+
     const mapped = toDbPayload(
       {
         customerName: payload.customerName ?? current.customer_name,
@@ -861,13 +866,10 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
 
     const paidAmountFromPayload = Math.max(0, Number((payload as any)?.paidAmount ?? updated.paid_amount ?? 0))
     const normalizedStatus = String(updated.status || "")
-    const isPartial = isPartialStatus(normalizedStatus)
-    const isPaid = isPaidStatus(normalizedStatus)
-    const effectivePaidAmount = isPaid
-      ? Number(updated.price || 0)
-      : isPartial
-        ? Math.min(Number(updated.price || 0), paidAmountFromPayload > 0 ? paidAmountFromPayload : Number(updated.price || 0) / 2)
-        : Math.max(0, Number(updated.paid_amount || 0))
+    const normalizedPaymentStatus = String(paymentStatusValue || "")
+    const isPartial = isPartialStatus(normalizedStatus) || normalizedPaymentStatus === 'partially_paid'
+    const isPaid = isPaidStatus(normalizedStatus) || normalizedPaymentStatus === 'paid'
+    const effectivePaidAmount = paidAmountValue
 
     let saleId: string | null = updated.sale_id || null
     let paymentTransactionId: string | null = updated.payment_transaction_id || null
@@ -887,17 +889,28 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       supabase,
       partnerId,
       userId: user.id,
-      appointment: { ...updated, paid_amount: effectivePaidAmount },
+      appointment: { ...updated, payment_status: normalizedPaymentStatus, paid_amount: effectivePaidAmount },
       currentReceivableId: updated.receivable_transaction_id || null,
     })
+
+    // Update payment_status and paid_amount directly
+    const paymentUpdatePayload: Record<string, any> = {
+      paid_amount: effectivePaidAmount,
+    }
+    if (paymentStatusValue) {
+      paymentUpdatePayload.payment_status = paymentStatusValue
+    }
+    if ((payload as any)?.saleId) {
+      paymentUpdatePayload.sale_id = (payload as any).saleId
+    }
 
     const { data: syncedAppointment } = await supabase
       .from("appointments")
       .update({
-        sale_id: saleId,
+        ...paymentUpdatePayload,
+        sale_id: saleId || (payload as any)?.saleId || updated.sale_id,
         payment_transaction_id: paymentTransactionId,
         receivable_transaction_id: receivableTransactionId,
-        paid_amount: effectivePaidAmount,
       })
       .eq("id", appointmentId)
       .eq("partner_id", partnerId)

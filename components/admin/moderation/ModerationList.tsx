@@ -83,13 +83,11 @@ function ProductModerationSheet({
         })
     }
 
-    if (!item) return null
-
-    const content = (
+    const content = item ? (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold dark:text-dark-heading">Revisar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}</h2>
+            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Revisar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
@@ -318,7 +316,7 @@ function ProductModerationSheet({
                 </div>
             </DefaultModal>
         </div>
-    )
+    ) : null
 
     if (isMobile) {
         return (
@@ -344,6 +342,9 @@ function ProductModerationSheet({
         </Portal>
     )
 }
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 

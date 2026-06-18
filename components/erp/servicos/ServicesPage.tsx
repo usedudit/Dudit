@@ -714,7 +714,7 @@ export default function ServicesPage({
                     onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}
                 >
                     <Button variant="ghost" onClick={() => setConfirmations(p => ({ ...p, bulkInactive: true }))}>
-                        {selectedProds.every(p => !p.is_active) ? <CheckCircleIcon size={16} /> : <BlockedIcon size={16} />}
+                        {selectedProds.every(p => !p.is_active) ? <CheckCircleIcon size={18} /> : <BlockedIcon size={18} />}
                         {selectedProds.every(p => !p.is_active) ? "Ativar Todos" : "Inativar Todos"}
                     </Button>
                     <Button

@@ -55,8 +55,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
             ? { lat: userProfile.latitude, lng: userProfile.longitude }
             : null
 
-        const isAnon = !user || !userProfile?.latitude
-        const scope = isDefaultSP && isAnon
+        const scope = isDefaultSP
             ? "country"
             : coords
                 ? "city"
@@ -183,8 +182,8 @@ export default async function HomePage() {
             state: citySlug.split("-").pop()?.toUpperCase(),
         } : null)
 
-    // Country scope (anonymous, no cookie): override header to show "Brasil"
-    if (isDefaultStateSP && !user && userProfile) {
+    // Country scope (no real location context): override header to show "Brasil"
+    if (isDefaultStateSP && userProfile) {
         userProfile = { ...userProfile, address: "Brasil", city: "Brasil", state: "BR" }
     }
 

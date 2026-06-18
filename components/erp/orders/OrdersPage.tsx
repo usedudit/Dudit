@@ -1021,7 +1021,7 @@ export default function OrdersPage({
                 <Button
                     variant="ghost"
                     onClick={() => setBulkEditModal({ isOpen: true })}
-                    leftIcon={<EditIcon className="w-4 h-4" />}
+                    leftIcon={<EditIcon size={18} />}
                     className="h-10 px-3"
                 >
                     Ações em massa
@@ -1030,7 +1030,7 @@ export default function OrdersPage({
                 <Button
                     variant="ghost"
                     onClick={() => setConfirmations((p) => ({ ...p, bulkCancel: true }))}
-                    leftIcon={<BlockedIcon className="w-4 h-4" />}
+                    leftIcon={<BlockedIcon size={18} />}
                     className="h-10 px-3"
                 >
                     Cancelar

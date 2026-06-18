@@ -568,13 +568,11 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
         }
     }, [report, isOpen])
 
-    if (!report) return null
-
-    const content = (
+    const content = report ? (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes da Denúncia</h2>
+            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da Denúncia</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
@@ -629,7 +627,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                                     </div>
                                     <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
                                         <StoreIcon size={12} className="text-brand-inactive-text" />
-                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">Vendedor: {targetDetails.partner?.business_name || "Desconhecido"}</span>
+                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">Vendedor: {targetDetails.partner?.business_type || "Desconhecido"}</span>
                                     </div>
                                 </div>
                             </div>
@@ -645,7 +643,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                                     )}
                                 </div>
                                 <div className="flex flex-col gap-1 min-w-0">
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.business_name}</span>
+                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.business_type}</span>
                                     <span className="text-xs font-medium text-brand-inactive-text font-mono">ID: {targetDetails.id}</span>
                                     <span className="text-xs font-medium text-brand-inactive-text">Entrou em: {new Date(targetDetails.created_at).toLocaleDateString("pt-BR")}</span>
                                 </div>
@@ -719,7 +717,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                 </div>
             </div>
         </div>
-    )
+    ) : null
 
     if (isMobile) {
         return (
@@ -770,9 +768,9 @@ function AuditHistorySheet({ targetId, isOpen, onClose }: { targetId: string, is
     const content = (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex flex-col gap-0.5">
-                    <h2 className="text-xl font-bold dark:text-dark-heading flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                         <ClockIcon size={20} className="text-brand-inactive-text" /> Histórico
                     </h2>
                     <p className="text-[10px] font-bold text-brand-inactive-text opacity-70 tracking-widest uppercase font-mono truncate max-w-[200px]">ID: {targetId}</p>

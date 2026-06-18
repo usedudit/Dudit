@@ -202,7 +202,7 @@ function sectionDisplay(
 type WithTier = { _tier: number }
 
 function determineDisplayScope(items: WithTier[], ctx: DiscoverCtx): "city" | "state" | "country" {
-    const min = 4
+    const min = 1
     const cityCount = items.filter(i => i._tier === 0).length
     const stateCount = items.filter(i => i._tier === 1).length
 
@@ -648,7 +648,7 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     }
 }
 
-// ─── 4. 🆕 Recém anunciados ──────────────────────────────────────────────────
+// ─── 4. 🆕 Recém anunciados (produtos + serviços) ───────────────────────────
 
 async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
@@ -658,43 +658,97 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    const { data, error } = await supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, created_at, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
-        .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
-        .order("created_at", { ascending: false })
-        .limit(60)
+    const [prodResult, servResult] = await Promise.all([
+        supabase
+            .from("products")
+            .select(`${BASE_FIELDS}, created_at, ${PARTNER_JOIN}`)
+            .eq("is_active", true)
+            .eq("show_in_marketplace", true)
+            .in("partner_id", allIds)
+            .order("created_at", { ascending: false })
+            .limit(60),
+        supabase
+            .from("services")
+            .select(`id, name, price, images, rating, created_at, ${PARTNER_JOIN}`)
+            .eq("is_active", true)
+            .eq("show_in_marketplace", true)
+            .in("partner_id", allIds)
+            .order("created_at", { ascending: false })
+            .limit(30),
+    ])
 
-    if (error) {
-        console.error(`[DISCOVER][RECENT] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP recent reason=error`)
+    if (prodResult.error) {
+        console.error(`[DISCOVER][RECENT] Products Error:`, prodResult.error, `city=${ctx.city} state=${ctx.state}`)
+    }
+    if (servResult.error) {
+        console.error(`[DISCOVER][RECENT] Services Error:`, servResult.error, `city=${ctx.city} state=${ctx.state}`)
+    }
+
+    const products = (prodResult.data || []) as RawProduct[]
+    const services = (servResult.data || []) as any[]
+
+    if (products.length === 0 && services.length === 0) {
+        console.log(`[Discover] SKIP recent reason=no_items`)
         return null
     }
 
-    if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP recent reason=no_products`)
-        return null
-    }
+    const taggedProducts = products.length > 0
+        ? applyTierSort(products, tiers, item => {
+            const r = item as RawProduct
+            return r.created_at ? new Date(r.created_at).getTime() : 0
+        })
+        : []
 
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
-        const r = item as RawProduct
-        return r.created_at ? new Date(r.created_at).getTime() : 0
+    const taggedServices = services.length > 0
+        ? applyTierSort(services, tiers, item => {
+            const r = item as any
+            return r.created_at ? new Date(r.created_at).getTime() : 0
+        })
+        : []
+
+    const merged = [
+        ...taggedProducts.map(item => ({ ...item, _itemType: "produto" as const })),
+        ...taggedServices.map(item => ({ ...item, _itemType: "servico" as const })),
+    ].sort((a, b) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
+        return bTime - aTime
     })
 
-    const displayScope = determineDisplayScope(tagged, ctx)
+    const displayScope = determineDisplayScope(merged, ctx)
     const display = sectionDisplay("recent", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => {
-        const raw = item as RawProduct
-        const isRecent = raw.created_at
-            ? Date.now() - new Date(raw.created_at).getTime() < 48 * 60 * 60 * 1000
+    const items = merged.slice(0, 20).map(item => {
+        const isRecent = item.created_at
+            ? Date.now() - new Date(item.created_at).getTime() < 48 * 60 * 60 * 1000
             : false
-        return processProduct(raw, {
-            _badgeLabel: isRecent ? "Saiu do forno" : "Novo na Dudit",
-            _badgeVariant: "green",
-        })
+        const badge = { _badgeLabel: isRecent ? "Saiu do forno" : "Novo na Dudit", _badgeVariant: "green" as const }
+
+        if (item._itemType === "servico") {
+            const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+            const partner = rawPartner ? {
+                id: rawPartner.id,
+                store_name: rawPartner.store_name || "Vendedor",
+                store_image_url: rawPartner.store_image_url,
+                store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                latitude: rawPartner.latitude,
+                longitude: rawPartner.longitude,
+                city: rawPartner.addresses?.[0]?.city ?? null,
+                state: rawPartner.addresses?.[0]?.state ?? null,
+            } : null
+            return {
+                id: item.id,
+                name: item.name,
+                price: Number(item.price || 0),
+                images: item.images || [],
+                rating: item.rating,
+                partners: partner,
+                itemType: "servico" as const,
+                ...badge,
+            }
+        }
+
+        return processProduct(item as RawProduct, badge)
     })
 
     return {
@@ -703,7 +757,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.recent,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: items,
         seeMoreLink: `/explorar/${ctx.citySlug}?section=recent`,
     }
 }
@@ -1236,7 +1290,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const { data, error } = await supabase
         .from("partners")
-        .select(`id, store_name, store_image_url, rating, addresses!inner(city, state)`)
+        .select(`id, store_name, store_image_url, banner_url, rating, latitude, longitude, addresses!inner(city, state)`)
         .eq("is_active", true)
         .in("id", allIds)
         .order("rating", { ascending: false, nulls: "last" })
@@ -1264,17 +1318,31 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topVitrines", ctx, displayScope)
 
-    const items = tagged.slice(0, 15).map((partner: any) => ({
-        id: partner.id,
-        name: partner.store_name,
-        store_name: partner.store_name,
-        store_image_url: partner.store_image_url,
-        store_avatar: partner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-        images: partner.store_image_url ? [partner.store_image_url] : [],
-        rating: partner.rating,
-        partnerId: partner.id,
-        itemType: "vitrine" as const,
-    }))
+    const items = tagged.slice(0, 15).map((partner: any) => {
+        const addr = Array.isArray(partner.addresses) ? partner.addresses[0] : partner.addresses
+        return {
+            id: partner.id,
+            name: partner.store_name,
+            store_name: partner.store_name,
+            store_image_url: partner.store_image_url,
+            banner_url: partner.banner_url || null,
+            images: partner.store_image_url ? [partner.store_image_url] : [],
+            rating: partner.rating,
+            reviewsCount: 0,
+            partners: {
+                id: partner.id,
+                store_name: partner.store_name,
+                store_image_url: partner.store_image_url,
+                banner_url: partner.banner_url || null,
+                store_avatar: partner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                latitude: partner.latitude,
+                longitude: partner.longitude,
+                city: addr?.city || "",
+                state: addr?.state || "",
+            },
+            itemType: "vitrine" as const,
+        }
+    })
 
     return {
         id: "topVitrines",

@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { MoreHorizontal, AlertTriangle } from 'lucide-react';
-import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon } from '@/lib/icons';
+import { AlertTriangle } from 'lucide-react';
+import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -25,7 +25,7 @@ import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
 import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
 import { fetchPartnerCustomersBucket } from '@/app/actions/erp/client-loaders';
 import { createServiceAction } from '@/app/actions/erp/servicos';
-import { confirmAppointmentOrderPaymentAction, createERPOrderAction, getOrderDetailsAction } from '@/app/actions/erp/orders';
+import { confirmAppointmentOrderPaymentAction, createERPOrderAction } from '@/app/actions/erp/orders';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
 import { getFinanceAccountsAction } from '@/app/actions/erp/finance-accounts';
 import { pickBankThenCashDefaultFinanceAccountId } from '@/lib/finance-utils';
@@ -144,7 +144,7 @@ export const AppointmentSheet = ({
     const handleViewSale = () => {
         const saleId = linkedOrderId || appointment?.marketplaceOrderId || appointment?.saleId || (appointment as any)?.sale_id;
         if (saleId) {
-            router.push(`/erp/orders/${saleId}`);
+            router.push(`/erp/orders?view=${saleId}`);
             onClose();
         } else {
             toast.warning("Venda não encontrada", "Não foi possível encontrar a venda associada a este agendamento.");
@@ -331,6 +331,7 @@ export const AppointmentSheet = ({
 
     // Determine if appointment is paid or absence
     const isPaid = ['paid', 'pago', 'partially paid', 'parcialmente pago'].includes((status || '').toLowerCase());
+    const isPaymentMade = appointment?.paymentStatus === 'paid' || appointment?.paymentStatus === 'partially_paid';
 
     // Helper to determine if we need Range Picker
     const needsRangePicker = useMemo(() => {
@@ -896,29 +897,12 @@ export const AppointmentSheet = ({
     }
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
     const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
-    const [linkedOrder, setLinkedOrder] = useState<any>(null);
     const [financeAccountId, setFinanceAccountId] = useState<string>('');
 
     const linkedOrderId = completedOrderId
         || appointment?.marketplaceOrderId
         || appointment?.saleId
         || null;
-
-    useEffect(() => {
-        if (!partnerId || !linkedOrderId) {
-            setLinkedOrder(null);
-            return;
-        }
-
-        let cancelled = false;
-        getOrderDetailsAction(linkedOrderId, partnerId).then((res) => {
-            if (!cancelled && res.success && res.data) {
-                setLinkedOrder(res.data);
-            }
-        });
-
-        return () => { cancelled = true; };
-    }, [partnerId, linkedOrderId]);
 
     // Fetch default finance account for order creation
     useEffect(() => {
@@ -960,16 +944,11 @@ export const AppointmentSheet = ({
                     return { error: result.error || 'Erro ao confirmar pagamento' };
                 }
 
-                const orderNumber = linkedOrder?.order_number || existingOrderId;
                 setCompletedOrderId(existingOrderId);
-
-                const newStatus = paymentStatus === 'paid' ? 'Pago' : paymentStatus === 'partially_paid' ? 'Pago Parcialmente' : 'Concluído';
-                setStatus(newStatus);
 
                 if (appointment?.id) {
                     try {
                         const updateRes = await updateAppointmentAction(appointment.id, {
-                            status: newStatus,
                             paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
                             paidAmount: paymentData.paidAmount,
                         } as any);
@@ -980,7 +959,7 @@ export const AppointmentSheet = ({
                 }
 
                 router.refresh();
-                return { success: true, orderNumber };
+                return { success: true, orderNumber: existingOrderId };
             }
 
             const items = selectedServices.map((s, idx) => {
@@ -1045,13 +1024,9 @@ export const AppointmentSheet = ({
 
             if (orderId) setCompletedOrderId(orderId);
 
-            const newStatus = 'Concluído';
-            setStatus(newStatus);
-
             if (appointment?.id) {
                 try {
                     const updateRes = await updateAppointmentAction(appointment.id, {
-                        status: newStatus,
                         paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
                         saleId: orderId,
                         paidAmount: paymentData.paidAmount,
@@ -1576,19 +1551,14 @@ export const AppointmentSheet = ({
                     {/* VIEW: SUMMARY */}
                     {currentView === 'summary' && (() => {
                         const isCompletedStatus = (status || '').toLowerCase() === 'concluído' || (status || '').toLowerCase() === 'concluido';
-                        const isLocked = isPaid || isCompletedStatus;
-                        const currentPaidAmount = completedOrderId
-                            ? calculatedPrice
-                            : Number(linkedOrder?.paid_amount ?? appointment?.paidAmount ?? 0);
-                        const remainingToPay = Math.max(0, calculatedPrice - currentPaidAmount);
-                        const displaySalesChannel = getSalesChannelLabel(
-                            appointment?.salesChannel || linkedOrder?.sales_channel || linkedOrder?.order_source
-                        );
-                        const displayPaymentStatus = getPaymentStatusLabel(
-                            appointment?.paymentStatus || linkedOrder?.situation
-                        );
+                        const isLocked = isPaid || isCompletedStatus || isPaymentMade;
+                        const salePaidAmount = Number(appointment?.paidAmount ?? 0);
+                        const saleTotal = Number(appointment?.price ?? calculatedPrice);
+                        const remainingToPay = Math.max(0, saleTotal - salePaidAmount);
+                        const displaySalesChannel = getSalesChannelLabel(appointment?.salesChannel);
+                        const displayPaymentStatus = getPaymentStatusLabel(appointment?.paymentStatus);
                         const displayFulfillmentMode = getFulfillmentModeLabel(appointment?.fulfillmentMode);
-                        const displayOrderNumber = linkedOrder?.order_number || null;
+                        const displayOrderNumber = linkedOrderId ? linkedOrderId.slice(0, 8).toUpperCase() : null;
 
                         const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
                         const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
@@ -1728,7 +1698,12 @@ export const AppointmentSheet = ({
                                                 <UserProfileImage fullName={selectedClient.name} imageUrl={selectedClient.avatar_url} className="w-10 h-10" />
                                                 <div className="flex flex-col">
                                                     <div className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{selectedClient.name}</div>
-                                                    <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
+                                                    {selectedClient.phone && (
+                                                        <div className="text-xs text-brand-inactive-text">{selectedClient.phone}</div>
+                                                    )}
+                                                    {selectedClient.email && (
+                                                        <div className="text-xs text-brand-inactive-text">{selectedClient.email}</div>
+                                                    )}
                                                 </div>
                                             </div>
                                             {!isLocked && (
@@ -1797,13 +1772,13 @@ export const AppointmentSheet = ({
 
                                 {mode === 'view' && (
                                     <div className="mt-4">
-                                        {remainingToPay <= 0.009 ? (
+                                        {appointment?.paymentStatus === 'paid' ? (
                                             <InfoCard
                                                 color="green"
                                                 title="Totalmente pago"
                                                 message="Valor total atingido!"
                                             />
-                                        ) : currentPaidAmount > 0 ? (
+                                        ) : appointment?.paymentStatus === 'partially_paid' ? (
                                             <InfoCard
                                                 color="orange"
                                                 title="Pago parcialmente"
@@ -1920,13 +1895,14 @@ export const AppointmentSheet = ({
 
                                 if (isFullyPaid) {
                                     return (
-                                        <div className="flex gap-3">
+                                        <div className="flex gap-2">
                                             <Dropdown
                                                 width="w-56"
                                                 align="left"
+                                                showChevron={false}
                                                 trigger={
-                                                    <Button variant="outline" className="px-3 h-12 shrink-0" type="button">
-                                                        <MoreHorizontal size={18} />
+                                                    <Button variant="outline" className="h-12 w-12 shrink-0 rounded-full border-brand-border bg-white p-0" type="button">
+                                                        <ThreeDotsIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
                                                     </Button>
                                                 }
                                             >
@@ -1957,13 +1933,14 @@ export const AppointmentSheet = ({
                                 }
 
                                 return (
-                                    <div className="flex gap-3">
+                                    <div className="flex gap-2">
                                         <Dropdown
                                             width="w-56"
                                             align="left"
+                                            showChevron={false}
                                             trigger={
-                                                <Button variant="outline" className="px-3 h-12 shrink-0" type="button">
-                                                    <MoreHorizontal size={18} />
+                                                <Button variant="outline" className="h-12 w-12 shrink-0 rounded-full border-brand-border bg-white p-0" type="button">
+                                                    <ThreeDotsIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
                                                 </Button>
                                             }
                                         >
@@ -2763,8 +2740,8 @@ export const AppointmentSheet = ({
                             };
                         })}
                         amountDue={calculatedPrice}
-                        existingPaidAmount={Number(linkedOrder?.paid_amount ?? appointment?.paidAmount ?? 0)}
-                        existingPaymentBreakdown={linkedOrder?.payment_breakdown || []}
+                        existingPaidAmount={Number(appointment?.paidAmount ?? 0)}
+                        existingPaymentBreakdown={[]}
                         customer={{ id: selectedClient?.id, name: selectedClient?.name }}
                         headerSubtitle="Agendamento de Serviço"
                         hidePendingDelivery

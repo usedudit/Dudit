@@ -14,6 +14,7 @@ CREATE OR REPLACE FUNCTION public.execute_xml_import(
   p_partner_id UUID,
   p_store_id UUID,
   p_items JSONB, -- array de decisões do usuário
+  p_supplier_actions JSONB DEFAULT NULL, -- { item_id: 'add' | 'keep' }
   p_created_by UUID DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
@@ -22,6 +23,7 @@ DECLARE
   v_decision TEXT;
   v_stock_action TEXT;
   v_cost_action TEXT;
+  v_supplier_action TEXT;
   v_existing_product_id UUID;
   v_created_product_id UUID;
   v_fiscal_data JSONB;
@@ -44,6 +46,9 @@ DECLARE
 
   v_previous_stock INTEGER;
   v_new_stock INTEGER;
+  v_previous_cost NUMERIC(14,2);
+  v_new_cost_value NUMERIC(14,2);
+  v_xml_unit_cost NUMERIC(14,2);
   v_movement_id UUID;
   v_total_imported INTEGER := 0;
   v_total_skipped INTEGER := 0;
@@ -62,6 +67,10 @@ DECLARE
   v_valor_xml TEXT;
   v_has_fiscal BOOLEAN;
   v_has_logistics BOOLEAN;
+
+  v_supplier_id UUID;
+  v_invoice_key TEXT;
+  v_now TIMESTAMPTZ := NOW();
 BEGIN
   -- Verifica permissão
   IF NOT EXISTS (
@@ -84,6 +93,11 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Importação não encontrada ou já processada' USING ERRCODE = 'P0002';
   END IF;
+
+  -- Busca dados fixos da importação
+  SELECT supplier_id, access_key INTO v_supplier_id, v_invoice_key
+  FROM public.xml_imports
+  WHERE id = p_xml_import_id;
 
   -- Processa cada item
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
@@ -170,13 +184,27 @@ BEGIN
 
         -- Vincula fornecedor
         INSERT INTO public.product_suppliers (
-          product_id, supplier_id, supplier_sku, cost_price
+          product_id, supplier_id, supplier_sku, cost_price,
+          last_purchase_price, last_purchase_date, last_invoice_key
         ) VALUES (
-          v_created_product_id,
-          (SELECT supplier_id FROM public.xml_imports WHERE id = p_xml_import_id),
-          v_raw_sku,
-          v_raw_unit_cost
-        ) ON CONFLICT DO NOTHING;
+          v_created_product_id, v_supplier_id,
+          v_raw_sku, v_raw_unit_cost,
+          v_raw_unit_cost, v_now, v_invoice_key
+        ) ON CONFLICT (product_id, supplier_id) DO UPDATE SET
+          cost_price = EXCLUDED.cost_price,
+          last_purchase_price = EXCLUDED.last_purchase_price,
+          last_purchase_date = EXCLUDED.last_purchase_date,
+          last_invoice_key = EXCLUDED.last_invoice_key,
+          supplier_sku = COALESCE(EXCLUDED.supplier_sku, product_suppliers.supplier_sku);
+
+        -- Registra custo inicial no histórico
+        INSERT INTO public.purchase_cost_history (
+          product_id, supplier_id, xml_import_id, invoice_key,
+          previous_cost, new_cost, unit_cost_from_xml, changed_at, created_by
+        ) VALUES (
+          v_created_product_id, v_supplier_id, p_xml_import_id, v_invoice_key,
+          0, v_raw_unit_cost, v_raw_unit_cost, v_now, COALESCE(p_created_by, auth.uid())
+        );
 
         v_existing_product_id := v_created_product_id;
       ELSE
@@ -306,22 +334,34 @@ BEGIN
         SET stock_quantity = v_new_stock, updated_at = NOW()
         WHERE id = v_existing_product_id;
       ELSIF v_stock_action = 'weighted_average' THEN
-        SELECT stock_quantity, cost_price INTO v_previous_stock, v_raw_unit_cost
+        -- Salva custo do XML antes de sobrescrever v_raw_unit_cost
+        v_xml_unit_cost := v_raw_unit_cost;
+        SELECT stock_quantity, cost_price INTO v_previous_stock, v_previous_cost
         FROM public.products WHERE id = v_existing_product_id
         FOR UPDATE;
 
         v_new_stock := v_previous_stock + v_raw_quantity::INTEGER;
+        v_new_cost_value := ROUND(
+          ((COALESCE(v_previous_cost, 0) * v_previous_stock) + (v_xml_unit_cost * v_raw_quantity::INTEGER))
+          / NULLIF(v_new_stock, 0),
+          2
+        );
 
         UPDATE public.products
         SET
           stock_quantity = v_new_stock,
-          cost_price = ROUND(
-            ((COALESCE(cost_price, 0) * v_previous_stock) + (v_raw_unit_cost * v_raw_quantity::INTEGER))
-            / NULLIF(v_new_stock, 0),
-            2
-          ),
+          cost_price = v_new_cost_value,
           updated_at = NOW()
         WHERE id = v_existing_product_id;
+
+        -- Registra histórico de custo
+        INSERT INTO public.purchase_cost_history (
+          product_id, supplier_id, xml_import_id, invoice_key,
+          previous_cost, new_cost, unit_cost_from_xml, changed_at, created_by
+        ) VALUES (
+          v_existing_product_id, v_supplier_id, p_xml_import_id, v_invoice_key,
+          v_previous_cost, v_new_cost_value, v_xml_unit_cost, v_now, COALESCE(p_created_by, auth.uid())
+        );
       ELSE
         -- stock_action = 'ignore' - mantém estoque atual
         SELECT stock_quantity INTO v_previous_stock
@@ -332,22 +372,31 @@ BEGIN
 
       -- Aplica ação de custo (separada do estoque)
       IF v_cost_action = 'update' AND v_decision = 'create_product' THEN
-        -- Já foi definido na criação
+        -- Já foi definido na criação; histórico já registrado acima
         NULL;
       ELSIF v_cost_action = 'update' THEN
+        SELECT cost_price INTO v_previous_cost
+        FROM public.products WHERE id = v_existing_product_id;
+
         UPDATE public.products
         SET cost_price = v_raw_unit_cost, updated_at = NOW()
         WHERE id = v_existing_product_id;
+
+        INSERT INTO public.purchase_cost_history (
+          product_id, supplier_id, xml_import_id, invoice_key,
+          previous_cost, new_cost, unit_cost_from_xml, changed_at, created_by
+        ) VALUES (
+          v_existing_product_id, v_supplier_id, p_xml_import_id, v_invoice_key,
+          v_previous_cost, v_raw_unit_cost, v_raw_unit_cost, v_now, COALESCE(p_created_by, auth.uid())
+        );
       END IF;
 
       -- Registra movimentação de estoque
       IF v_stock_action IN ('add', 'weighted_average') AND v_raw_quantity > 0 THEN
         INSERT INTO public.stock_movements (
-          partner_id, product_id, movement_type, quantity,
-          previous_quantity, new_quantity, reference_type, reason, notes, created_by
+          partner_id, movement_type, reference_type, reason, notes, created_by
         ) VALUES (
-          p_partner_id, v_existing_product_id, 'purchase', v_raw_quantity::INTEGER,
-          v_previous_stock, v_new_stock, 'supplier',
+          p_partner_id, 'purchase', 'supplier',
           'Importação XML NF-e',
           (SELECT invoice_number FROM public.xml_imports WHERE id = p_xml_import_id),
           COALESCE(p_created_by, auth.uid())
@@ -360,6 +409,24 @@ BEGIN
           v_movement_id, v_existing_product_id, v_raw_quantity::INTEGER,
           v_previous_stock, v_new_stock
         );
+      END IF;
+
+      -- Atualiza/vincula fornecedor ao produto (existente ou novo)
+      v_supplier_action := COALESCE(p_supplier_actions->>v_item_id, 'add');
+      IF v_decision != 'ignore' AND v_supplier_id IS NOT NULL AND v_supplier_action = 'add' THEN
+        INSERT INTO public.product_suppliers (
+          product_id, supplier_id, supplier_sku, cost_price,
+          last_purchase_price, last_purchase_date, last_invoice_key
+        ) VALUES (
+          v_existing_product_id, v_supplier_id,
+          v_raw_sku, v_raw_unit_cost,
+          v_raw_unit_cost, v_now, v_invoice_key
+        ) ON CONFLICT (product_id, supplier_id) DO UPDATE SET
+          supplier_sku = COALESCE(EXCLUDED.supplier_sku, product_suppliers.supplier_sku),
+          cost_price = EXCLUDED.cost_price,
+          last_purchase_price = EXCLUDED.last_purchase_price,
+          last_purchase_date = EXCLUDED.last_purchase_date,
+          last_invoice_key = EXCLUDED.last_invoice_key;
       END IF;
 
       -- Atualiza o item da importação
@@ -410,5 +477,5 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grants
-REVOKE EXECUTE ON FUNCTION public.execute_xml_import(UUID, UUID, UUID, JSONB, UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.execute_xml_import(UUID, UUID, UUID, JSONB, UUID) TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.execute_xml_import(UUID, UUID, UUID, JSONB, JSONB, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.execute_xml_import(UUID, UUID, UUID, JSONB, JSONB, UUID) TO authenticated, service_role;

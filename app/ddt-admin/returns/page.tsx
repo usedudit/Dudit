@@ -52,7 +52,7 @@ export default async function AdminReturnsPage({ searchParams }: { searchParams?
                                         </td>
                                         <td className="p-3">{request.order_number_snapshot || request.orders?.order_number || "-"}</td>
                                         <td className="p-3">{request.customer_name_snapshot || "Cliente"}</td>
-                                        <td className="p-3">{request.partners?.store_name || request.partners?.business_name || "-"}</td>
+                                        <td className="p-3">{request.partners?.store_name || request.partners?.business_type || "-"}</td>
                                         <td className="p-3">{request.request_type || "-"}</td>
                                         <td className="p-3">{getReturnStatusLabel(request.status)}</td>
                                         <td className="p-3">{getReturnResolutionLabel(request.resolution_type || request.approved_resolution || request.desired_resolution)}</td>

@@ -13,6 +13,13 @@ export interface ProductFromXML {
   largura?: number
   altura?: number
   comprimento?: number
+  cfop?: string
+  cst?: string
+  csosn?: string
+  pis_cst?: string
+  cofins_cst?: string
+  ipi_code?: string
+  fiscal_detail?: Record<string, any>
 }
 
 export interface EmitenteFromXML {
@@ -21,6 +28,10 @@ export interface EmitenteFromXML {
   nome: string
   nome_fantasia?: string
   ie?: string
+  ie_st?: string
+  crt?: string
+  email?: string
+  fone?: string
   endereco?: {
     logradouro: string
     numero: string
@@ -28,6 +39,8 @@ export interface EmitenteFromXML {
     cidade: string
     uf: string
     cep: string
+    pais?: string
+    codigo_municipio?: string
   }
 }
 
@@ -36,7 +49,36 @@ export interface InvoiceInfo {
   numero: string
   serie: string
   data_emissao: string
+  data_saida?: string
+  modelo?: string
+  protocolo?: string
+  ambiente?: string
+  finalidade?: string
+  tipo_operacao?: string
+  cstat?: string
   valor_total: number
+}
+
+export interface DuplicataFromXML {
+  numero: string
+  vencimento: string
+  valor: number
+}
+
+export interface TransporteFromXML {
+  modalidade_frete?: string
+  transportadora?: string
+  cnpj?: string
+  cpf?: string
+  ie?: string
+  rntrc?: string
+  placa?: string
+  placa_uf?: string
+  qtd_volumes?: number
+  especie?: string
+  marca?: string
+  peso_bruto?: number
+  peso_liquido?: number
 }
 
 export interface NFMetadata {
@@ -48,6 +90,11 @@ export interface NFMetadata {
   }
   invoice: InvoiceInfo
   produtos: ProductFromXML[]
+  duplicatas?: DuplicataFromXML[]
+  transporte?: TransporteFromXML
+  inf_cpl?: string
+  inf_ad_fisco?: string
+  fiscal_totals?: Record<string, number>
 }
 
 const MONOPHASIC_PREFIXES = [
@@ -79,6 +126,20 @@ export function parseNFeXML(xmlContent: string): ProductFromXML[] {
   return metadata.produtos
 }
 
+function extractAllDet(tag: string, content: string): { [key: string]: string } {
+  const obj: { [key: string]: string } = {}
+  const regex = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i")
+  const match = content.match(regex)
+  if (!match) return obj
+  const inner = match[1]
+  const fieldRegex = /<(\w+)>([^<]*)<\/\1>/g
+  let m
+  while ((m = fieldRegex.exec(inner)) !== null) {
+    obj[m[1]] = m[2].trim()
+  }
+  return obj
+}
+
 export function parseNFeFull(xmlContent: string): NFMetadata {
   const cleanXml = xmlContent.replace(/xmlns[^=]*="[^"]*"/g, "")
 
@@ -96,6 +157,10 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
     nome: getTagValue("xNome", emitBlock) || "Emitente não identificado",
     nome_fantasia: getTagValue("xFant", emitBlock) || undefined,
     ie: getTagValue("IE", emitBlock) || undefined,
+    ie_st: getTagValue("IEST", emitBlock) || undefined,
+    crt: getTagValue("CRT", emitBlock) || undefined,
+    email: getTagValue("email", emitBlock) || undefined,
+    fone: getTagValue("fone", emitBlock) || undefined,
   }
 
   const enderecoEmit = extractBlock("enderEmit", emitBlock)
@@ -107,6 +172,8 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
       cidade: getTagValue("xMun", enderecoEmit) || "",
       uf: getTagValue("UF", enderecoEmit) || "",
       cep: getTagValue("CEP", enderecoEmit) || "",
+      pais: getTagValue("xPais", enderecoEmit) || undefined,
+      codigo_municipio: getTagValue("cMun", enderecoEmit) || undefined,
     }
   }
 
@@ -129,17 +196,90 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
     numero: getTagValue("nNF", ideBlock || "") || "",
     serie: getTagValue("serie", ideBlock || "") || "",
     data_emissao: getTagValue("dhEmi", ideBlock || "") || getTagValue("dEmi", ideBlock || "") || "",
+    data_saida: getTagValue("dhSaiEnt", ideBlock || "") || getTagValue("dSaiEnt", ideBlock || "") || undefined,
+    modelo: getTagValue("mod", ideBlock || "") || undefined,
+    protocolo: getTagValue("nProt", cleanXml) || undefined,
+    cstat: getTagValue("cStat", cleanXml) || undefined,
+    ambiente: getTagValue("tpAmb", ideBlock || "") || undefined,
+    finalidade: getTagValue("finNFe", ideBlock || "") || undefined,
+    tipo_operacao: getTagValue("tpNF", ideBlock || "") || undefined,
     valor_total: 0,
   }
 
   const totalBlock = extractBlock("total", cleanXml)
+  let fiscalTotals: Record<string, number> = {}
   if (totalBlock) {
     const icmsTotBlock = extractBlock("ICMSTot", totalBlock)
     if (icmsTotBlock) {
-      const vNF = getTagValue("vNF", icmsTotBlock)
-      invoice.valor_total = vNF ? Number.parseFloat(vNF) : 0
+      const extractVal = (tag: string) => {
+        const v = getTagValue(tag, icmsTotBlock)
+        return v ? Number.parseFloat(v) : 0
+      }
+      invoice.valor_total = extractVal("vNF")
+      fiscalTotals = {
+        vProd: extractVal("vProd"),
+        vFrete: extractVal("vFrete"),
+        vSeg: extractVal("vSeg"),
+        vDesc: extractVal("vDesc"),
+        vOutro: extractVal("vOutro"),
+        vBC: extractVal("vBC"),
+        vICMS: extractVal("vICMS"),
+        vBCST: extractVal("vBCST"),
+        vST: extractVal("vST"),
+        vIPI: extractVal("vIPI"),
+        vPIS: extractVal("vPIS"),
+        vCOFINS: extractVal("vCOFINS"),
+      }
     }
   }
+
+  // Duplicatas (cobr/fat/dup)
+  const duplicatas: DuplicataFromXML[] = []
+  const cobrBlock = extractBlock("cobr", cleanXml)
+  if (cobrBlock) {
+    const fatBlock = extractBlock("fat", cobrBlock)
+    const dupRegex = /<dup>([\s\S]*?)<\/dup>/g
+    let dupMatch
+    while ((dupMatch = dupRegex.exec(cobrBlock)) !== null) {
+      const dupContent = dupMatch[1]
+      duplicatas.push({
+        numero: getTagValue("nDup", dupContent) || "",
+        vencimento: getTagValue("dVenc", dupContent) || "",
+        valor: Number.parseFloat(getTagValue("vDup", dupContent) || "0"),
+      })
+    }
+  }
+
+  // Transporte
+  const transpBlock = extractBlock("transp", cleanXml)
+  let transporte: TransporteFromXML | undefined
+  if (transpBlock) {
+    const transportaBlock = extractBlock("transporta", transpBlock)
+    const volBlock = extractBlock("vol", transpBlock)
+    transporte = {
+      modalidade_frete: getTagValue("modFrete", transpBlock) || undefined,
+    }
+    if (transportaBlock) {
+      transporte.transportadora = getTagValue("xNome", transportaBlock) || undefined
+      transporte.cnpj = getTagValue("CNPJ", transportaBlock) || undefined
+      transporte.cpf = getTagValue("CPF", transportaBlock) || undefined
+      transporte.ie = getTagValue("IE", transportaBlock) || undefined
+      transporte.placa = getTagValue("placa", transportaBlock) || undefined
+      transporte.placa_uf = getTagValue("UF", transportaBlock) || undefined
+      transporte.rntrc = getTagValue("RNTRC", transportaBlock) || undefined
+    }
+    if (volBlock) {
+      transporte.qtd_volumes = Number.parseInt(getTagValue("qVol", volBlock) || "0", 10) || undefined
+      transporte.especie = getTagValue("esp", volBlock) || undefined
+      transporte.marca = getTagValue("marca", volBlock) || undefined
+      transporte.peso_bruto = Number.parseFloat(getTagValue("pesoB", volBlock) || "0") || undefined
+      transporte.peso_liquido = Number.parseFloat(getTagValue("pesoL", volBlock) || "0") || undefined
+    }
+  }
+
+  // Informações complementares
+  const infCpl = getTagValue("infCpl", cleanXml) || undefined
+  const infAdFisco = getTagValue("infAdFisco", cleanXml) || undefined
 
   const produtos: ProductFromXML[] = []
   const detRegex = /<det\s+nItem="(\d+)">([\s\S]*?)<\/det>/g
@@ -156,6 +296,7 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
     const xProd = getTagValue("xProd", prodContent)
     const ncm = getTagValue("NCM", prodContent)
     const cest = getTagValue("CEST", prodContent)
+    const cfop = getTagValue("CFOP", prodContent)
     const uCom = getTagValue("uCom", prodContent)
     const qCom = getTagValue("qCom", prodContent)
     const vUnCom = getTagValue("vUnCom", prodContent)
@@ -176,6 +317,7 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
       unidade: uCom || "UN",
       ncm: ncm || undefined,
       cest: cest || undefined,
+      cfop: cfop || undefined,
       origem: orig || "0",
       gtin: cEAN && cEAN !== "SEM GTIN" && cEAN !== "" ? cEAN : undefined,
       peso_bruto: pesoB ? Number.parseFloat(pesoB) : undefined,
@@ -187,25 +329,74 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
 
     const impostoBlock = extractBlock("imposto", detContent)
     if (impostoBlock) {
+      const fiscalDetail: Record<string, any> = {}
+
       const icmsBlock = extractBlock("ICMS", impostoBlock)
       if (icmsBlock) {
-        const icmsContent = icmsBlock
-        const ufContent = extractBlock("ICMSUFDest", icmsBlock) || ""
+        const icmsData = extractAllDet("ICMS", impostoBlock)
+        const icmsUfBlock = extractBlock("ICMSUFDest", icmsBlock) || ""
 
         const vBC = getTagValue("vBC", icmsBlock)
         const vICMS = getTagValue("vICMS", icmsBlock)
         const pICMS = getTagValue("pICMS", icmsBlock)
+        const origTag = getTagValue("orig", icmsBlock)
+
+        fiscalDetail.icms_orig = origTag || orig
+        fiscalDetail.icms_cst = getTagValue("CST", icmsBlock) || getTagValue("CSOSN", icmsBlock) || undefined
+        fiscalDetail.icms_csosn = getTagValue("CSOSN", icmsBlock) || undefined
+        fiscalDetail.icms_vbc = vBC || undefined
+        fiscalDetail.icms_vicms = vICMS || undefined
+        fiscalDetail.icms_picms = pICMS || undefined
+        fiscalDetail.icms_modalidade_bc = getTagValue("modBC", icmsBlock) || undefined
+        fiscalDetail.icms_vbcst = getTagValue("vBCST", icmsBlock) || undefined
+        fiscalDetail.icms_vst = getTagValue("vST", icmsBlock) || undefined
+        fiscalDetail.icms_picmsst = getTagValue("pICMSST", icmsBlock) || undefined
+        fiscalDetail.icms_pmva = getTagValue("pMVAST", icmsBlock) || undefined
+        fiscalDetail.icms_vfcp = getTagValue("vFCP", icmsBlock) || undefined
+        fiscalDetail.icms_vfcpst = getTagValue("vFCPST", icmsBlock) || undefined
 
         if (vBC && vICMS && Number.parseFloat(vBC) > 0) {
           product.preco_custo -= Number.parseFloat(vICMS) / Number.parseFloat(qCom || "1")
         }
       }
+
+      const ipiBlock = extractBlock("IPI", impostoBlock)
+      if (ipiBlock) {
+        fiscalDetail.ipi_cst = getTagValue("CST", ipiBlock) || undefined
+        fiscalDetail.ipi_vbc = getTagValue("vBC", ipiBlock) || undefined
+        fiscalDetail.ipi_pipi = getTagValue("pIPI", ipiBlock) || undefined
+        fiscalDetail.ipi_vipi = getTagValue("vIPI", ipiBlock) || undefined
+        fiscalDetail.ipi_codigo = getTagValue("cEnq", ipiBlock) || undefined
+        product.ipi_code = fiscalDetail.ipi_codigo
+      }
+
+      const pisBlock = extractBlock("PIS", impostoBlock)
+      if (pisBlock) {
+        fiscalDetail.pis_cst = getTagValue("CST", pisBlock) || undefined
+        fiscalDetail.pis_vbc = getTagValue("vBC", pisBlock) || undefined
+        fiscalDetail.pis_ppis = getTagValue("pPIS", pisBlock) || undefined
+        fiscalDetail.pis_vpis = getTagValue("vPIS", pisBlock) || undefined
+        product.pis_cst = fiscalDetail.pis_cst
+      }
+
+      const cofinsBlock = extractBlock("COFINS", impostoBlock)
+      if (cofinsBlock) {
+        fiscalDetail.cofins_cst = getTagValue("CST", cofinsBlock) || undefined
+        fiscalDetail.cofins_vbc = getTagValue("vBC", cofinsBlock) || undefined
+        fiscalDetail.cofins_pcofins = getTagValue("pCOFINS", cofinsBlock) || undefined
+        fiscalDetail.cofins_vcofins = getTagValue("vCOFINS", cofinsBlock) || undefined
+        product.cofins_cst = fiscalDetail.cofins_cst
+      }
+
+      product.cst = fiscalDetail.icms_cst
+      product.csosn = fiscalDetail.icms_csosn
+      product.fiscal_detail = fiscalDetail
     }
 
     produtos.push(product)
   }
 
-  return { emitente, destinatario, invoice, produtos }
+  return { emitente, destinatario, invoice, produtos, duplicatas, transporte, inf_cpl: infCpl, inf_ad_fisco: infAdFisco, fiscal_totals: fiscalTotals }
 }
 
 export function mapNFeToProductData(product: ProductFromXML) {

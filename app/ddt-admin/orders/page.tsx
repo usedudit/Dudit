@@ -41,7 +41,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
                                             <div className="text-xs text-brand-inactive-text">{formatDate(order.created_at)}</div>
                                         </td>
                                         <td className="p-3">{order.customer_name || "Cliente"}</td>
-                                        <td className="p-3">{order.partners?.store_name || order.partners?.business_name || "-"}</td>
+                                        <td className="p-3">{order.partners?.store_name || order.partners?.business_type || "-"}</td>
                                         <td className="p-3">
                                             <div>{order.situation || "-"}</div>
                                             <div className="text-xs text-brand-inactive-text">{order.payment_method || order.payment_provider || "-"}</div>

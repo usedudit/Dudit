@@ -273,20 +273,18 @@ interface AuditLogDetailsSheetProps {
 
 function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    if (!log) return null
-
-    const content = (
+    const content = log ? (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes do Log</h2>
+            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Log</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                 {/* Status/Type Header */}
                 <div className="space-y-4">
                     <div className="flex items-center gap-2">
@@ -370,7 +368,7 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
                 </div>
             </div>
         </div>
-    )
+    ) : null
 
     if (isMobile) {
         return (

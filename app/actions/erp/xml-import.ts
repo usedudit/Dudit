@@ -1,7 +1,9 @@
 "use server"
 
+import crypto from "crypto"
+import { headers } from "next/headers"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { parseNFeFull, type NFMetadata, type ProductFromXML } from "@/lib/xml-parser"
+import { parseNFeFull, type NFMetadata, type ProductFromXML, type DuplicataFromXML } from "@/lib/xml-parser"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -24,10 +26,23 @@ interface ImportPreview {
     serie: string
     data_emissao: string
     valor_total: number
+    modelo?: string
+    protocolo?: string
+    ambiente?: string
+    finalidade?: string
+    data_saida?: string
   }
   items: ImportItemPreview[]
   errors?: any[] | null
   created_at?: string
+  duplicatas?: DuplicataFromXML[]
+  fiscal_totals?: Record<string, number>
+  transport_data?: Record<string, any>
+  inf_cpl?: string
+  inf_ad_fisco?: string
+  reversed_at?: string
+  reversal_reason?: string
+  supplier_names?: Record<string, string>
 }
 
 interface ImportItemPreview {
@@ -80,10 +95,30 @@ async function findOrCreateSupplier(
   return { id: null, isNew: true, document: doc, documentType: docType }
 }
 
+async function loadProductDetails(supabase: any, productId: string, xmlSupplierId?: string): Promise<{
+  fiscal?: { ncm?: string; cest?: string }
+  logistics?: { weight_gross?: number; weight_net?: number; width?: number; height?: number; length?: number }
+  existingSuppliers?: { supplier_id: string; name?: string }[]
+}> {
+  const [fiscalRes, logisticsRes, suppliersRes] = await Promise.all([
+    supabase.from("product_fiscal_profiles").select("ncm, cest").eq("product_id", productId).maybeSingle(),
+    supabase.from("product_logistics").select("weight_gross, weight_net, width, height, length").eq("product_id", productId).maybeSingle(),
+    xmlSupplierId
+      ? supabase.from("product_suppliers").select("supplier_id").eq("product_id", productId).neq("supplier_id", xmlSupplierId).limit(1)
+      : Promise.resolve({ data: [] }),
+  ])
+  return {
+    fiscal: fiscalRes.data || undefined,
+    logistics: logisticsRes.data || undefined,
+    existingSuppliers: suppliersRes?.data || [],
+  }
+}
+
 async function matchProduct(
   supabase: any,
   partnerId: string,
   product: ProductFromXML,
+  xmlSupplierId?: string,
 ): Promise<{
   productId: string | null
   productName: string | null
@@ -106,7 +141,8 @@ async function matchProduct(
         .maybeSingle()
 
       if (data) {
-        const conflicts = detectConflicts(product, data)
+        const details = await loadProductDetails(supabase, data.id, xmlSupplierId)
+        const conflicts = detectConflicts(product, data, details, xmlSupplierId)
         return {
           productId: data.id,
           productName: data.name,
@@ -127,7 +163,8 @@ async function matchProduct(
         .maybeSingle()
 
       if (data) {
-        const conflicts = detectConflicts(product, data)
+        const details = await loadProductDetails(supabase, data.id, xmlSupplierId)
+        const conflicts = detectConflicts(product, data, details, xmlSupplierId)
         return {
           productId: data.id,
           productName: data.name,
@@ -148,7 +185,8 @@ async function matchProduct(
 
       if (data) {
         const prod = data.products as any
-        const conflicts = detectConflicts(product, prod)
+        const details = await loadProductDetails(supabase, prod.id, xmlSupplierId)
+        const conflicts = detectConflicts(product, prod, details, xmlSupplierId)
         return {
           productId: prod.id,
           productName: prod.name,
@@ -177,7 +215,8 @@ async function matchProduct(
           .maybeSingle()
 
         if (fiscal) {
-          const conflicts = detectConflicts(product, data)
+          const details = await loadProductDetails(supabase, data.id, xmlSupplierId)
+          const conflicts = detectConflicts(product, data, details, xmlSupplierId)
           return {
             productId: data.id,
             productName: data.name,
@@ -209,7 +248,8 @@ async function matchProduct(
           if (fiscal) {
             const sim = similarity(product.nome, prod.name)
             if (sim > 0.6) {
-              const conflicts = detectConflicts(product, prod)
+              const details = await loadProductDetails(supabase, prod.id, xmlSupplierId)
+              const conflicts = detectConflicts(product, prod, details, xmlSupplierId)
               return {
                 productId: prod.id,
                 productName: prod.name,
@@ -228,7 +268,7 @@ async function matchProduct(
   return { productId: null, productName: null, method: null, confidence: null, matchStatus: "new", conflicts: null }
 }
 
-function detectConflicts(product: ProductFromXML, dbProduct: any): any[] {
+function detectConflicts(product: ProductFromXML, dbProduct: any, details?: { fiscal?: { ncm?: string; cest?: string }; logistics?: { weight_gross?: number; weight_net?: number; width?: number; height?: number; length?: number }; existingSuppliers?: { supplier_id: string }[] }, xmlSupplierId?: string): any[] {
   const conflicts: any[] = []
 
   if (product.nome && dbProduct.name) {
@@ -256,6 +296,56 @@ function detectConflicts(product: ProductFromXML, dbProduct: any): any[] {
 
   if (product.unidade && dbProduct.unit && product.unidade !== dbProduct.unit) {
     conflicts.push({ campo: "unidade", valor_xml: product.unidade, valor_atual: dbProduct.unit })
+  }
+
+  // CEST conflict (from fiscal_profiles)
+  const dbCest = details?.fiscal?.cest
+  if (product.cest && dbCest) {
+    const xmlCest = product.cest.replace(/\D/g, "")
+    const dbCestClean = String(dbCest).replace(/\D/g, "")
+    if (xmlCest !== dbCestClean) {
+      conflicts.push({ campo: "cest", valor_xml: product.cest, valor_atual: dbCest })
+    }
+  }
+
+  // Weight conflicts (from logistics)
+  const log = details?.logistics
+  if (product.peso_bruto != null && log?.weight_gross != null) {
+    if (Math.abs(product.peso_bruto - log.weight_gross) > 0.01) {
+      conflicts.push({ campo: "peso_bruto", valor_xml: product.peso_bruto, valor_atual: log.weight_gross })
+    }
+  }
+  if (product.peso_liquido != null && log?.weight_net != null) {
+    if (Math.abs(product.peso_liquido - log.weight_net) > 0.01) {
+      conflicts.push({ campo: "peso_liquido", valor_xml: product.peso_liquido, valor_atual: log.weight_net })
+    }
+  }
+
+  // Dimension conflicts
+  if (product.largura != null && log?.width != null) {
+    if (Math.abs(product.largura - log.width) > 0.1) {
+      conflicts.push({ campo: "largura", valor_xml: product.largura, valor_atual: log.width })
+    }
+  }
+  if (product.altura != null && log?.height != null) {
+    if (Math.abs(product.altura - log.height) > 0.1) {
+      conflicts.push({ campo: "altura", valor_xml: product.altura, valor_atual: log.height })
+    }
+  }
+  if (product.comprimento != null && log?.length != null) {
+    if (Math.abs(product.comprimento - log.length) > 0.1) {
+      conflicts.push({ campo: "comprimento", valor_xml: product.comprimento, valor_atual: log.length })
+    }
+  }
+
+  // Fornecedor diferente: produto já vinculado a outro fornecedor
+  if (xmlSupplierId && details?.existingSuppliers && details.existingSuppliers.length > 0) {
+    conflicts.push({
+      campo: "fornecedor_diferente",
+      valor_xml: xmlSupplierId,
+      valor_atual: details.existingSuppliers[0].supplier_id,
+      tipo: "supplier_conflict",
+    })
   }
 
   return conflicts
@@ -341,7 +431,56 @@ export async function uploadXMLAction(
       return { success: false, error: "Chave da NF-e não encontrada no XML" }
     }
 
-    // 2. Validar CPF/CNPJ do parceiro (destinatário)
+    // 2. Bloqueios fiscais obrigatórios
+    if (metadata.invoice.modelo === "65") {
+      return { success: false, error: "NFC-e (modelo 65) não é suportada. Aceitamos apenas NF-e modelo 55." }
+    }
+
+    if (metadata.invoice.tipo_operacao === "1") {
+      return { success: false, error: "NF-e de saída (tpNF=1) não pode ser importada como nota de entrada." }
+    }
+
+    // 3. Validar autorização SEFAZ
+    if (!metadata.invoice.protocolo) {
+      return { success: false, error: "NF-e sem protocolo de autorização (nProt). A nota precisa estar autorizada pela SEFAZ." }
+    }
+
+    if (metadata.invoice.cstat && metadata.invoice.cstat !== "100") {
+      const situacoes: Record<string, string> = {
+        "101": "NF-e cancelada",
+        "102": "NF-e denegada",
+        "103": "NF-e denegada",
+        "150": "NF-e denegada",
+        "151": "NF-e denegada",
+        "107": "NF-e denegada",
+      }
+      const motivo = situacoes[metadata.invoice.cstat] || `NF-e com situação não autorizada (cStat=${metadata.invoice.cstat})`
+      return { success: false, error: motivo }
+    }
+
+    // 4. Validar situação da NF-e (warnings)
+    const warnings: string[] = []
+
+    // Warning para NF emitida há mais de 180 dias
+    if (metadata.invoice.data_emissao) {
+      try {
+        const emissao = new Date(metadata.invoice.data_emissao)
+        const diffMs = Date.now() - emissao.getTime()
+        const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+        if (diffDias > 180) {
+          warnings.push(`Esta NF foi emitida há mais de 180 dias (${diffDias} dias). Verifique se os dados ainda são válidos antes de importar.`)
+        }
+      } catch { /* ignore invalid date */ }
+    }
+
+    if (metadata.invoice.finalidade) {
+      const fin = metadata.invoice.finalidade
+      if (fin === "2") warnings.push("NF-e complementar — verifique se os valores estão corretos")
+      if (fin === "3") warnings.push("NF-e de ajuste — verifique se deseja importar")
+      if (fin === "4") warnings.push("NF-e de devolução — verifique os valores")
+    }
+
+    // 5. Validar destinatário da NF
     const { data: partner } = await supabase
       .from("partners")
       .select("id, cpf, cnpj, business_type")
@@ -365,17 +504,37 @@ export async function uploadXMLAction(
 
     const xmlDocDest = (metadata.destinatario.cnpj || metadata.destinatario.cpf || "").replace(/\D/g, "")
 
-    const docsMatch = partnerDoc && xmlDocDest && partnerDoc === xmlDocDest
+    if (!partnerDoc || !xmlDocDest) {
+      return { success: false, error: "Não foi possível identificar o CNPJ/CPF do destinatário na NF-e ou do parceiro logado." }
+    }
 
-    // 3. Verificar idempotência
+    if (partnerDoc !== xmlDocDest) {
+      return {
+        success: false,
+        error: `Esta NF-e não pertence à sua empresa. O destinatário na nota é CNPJ/CPF ${xmlDocDest}, mas seu cadastro possui CNPJ/CPF ${partnerDoc}.`,
+      }
+    }
+
+    const docsMatch = true
+
+    // 6. Calcular hash do XML antes de inserir
+    const xmlHash = crypto.createHash("sha256").update(xmlContent).digest("hex")
+
+    // 7. Verificar idempotência + hash divergente
     const { data: existingImport } = await supabase
       .from("xml_imports")
-      .select("id, status, created_at")
+      .select("id, status, xml_hash, created_at")
       .eq("partner_id", partnerId)
       .eq("access_key", metadata.invoice.chave)
       .maybeSingle()
 
     if (existingImport) {
+      if (existingImport.xml_hash && existingImport.xml_hash !== xmlHash) {
+        return {
+          success: false,
+          error: "CONFLITO CRÍTICO: Já existe uma importação registrada para esta chave NF-e, mas com conteúdo XML diferente. Reprocessamento divergente bloqueado por segurança.",
+        }
+      }
       if (existingImport.status === "completed") {
         return {
           success: false,
@@ -391,7 +550,29 @@ export async function uploadXMLAction(
       }
     }
 
-    // 4. Buscar ou preparar fornecedor
+    // 8. Validar consistência fiscal (soma dos itens vs vNF)
+    const ft = metadata.fiscal_totals
+    const vNF = metadata.invoice.valor_total
+    if (ft && ft.vProd != null && vNF != null && vNF > 0) {
+      const somaCalculada = (ft.vProd || 0) + (ft.vFrete || 0) + (ft.vSeg || 0) + (ft.vOutro || 0) - (ft.vDesc || 0)
+      const diferenca = Math.abs(somaCalculada - vNF)
+      if (diferenca > 0.01) {
+        warnings.push(
+          `Divergência nos totais fiscais: a soma dos valores (R$ ${somaCalculada.toFixed(2)}) difere do valor total da NF (R$ ${vNF.toFixed(2)}) em R$ ${diferenca.toFixed(2)}. Verifique se os dados estão corretos.`
+        )
+      }
+    }
+
+    // 9. Capturar IP
+    let ip: string | null = null
+    try {
+      const h = await headers()
+      ip = h.get("x-forwarded-for") || h.get("x-real-ip") || null
+    } catch {
+      // headers() pode falhar em alguns ambientes
+    }
+
+    // 10. Buscar ou preparar fornecedor
     const supplier = await findOrCreateSupplier(supabase, partnerId, metadata.emitente)
 
     // 5. Se fornecedor não existe, precisamos criar
@@ -407,6 +588,9 @@ export async function uploadXMLAction(
           cpf: supplier.documentType === "cpf" ? supplier.document : null,
           person_type: supplier.documentType === "cnpj" ? "pj" : "pf",
           inscricao_estadual: metadata.emitente.ie || null,
+          regime_tributario: metadata.emitente.crt || null,
+          email: metadata.emitente.email || null,
+          phone: metadata.emitente.fone || null,
         })
         .select("id")
         .single()
@@ -416,9 +600,26 @@ export async function uploadXMLAction(
       }
 
       supplierId = newSupplier.id
+
+      // Criar endereço do fornecedor a partir do XML
+      if (metadata.emitente.endereco) {
+        const addr = metadata.emitente.endereco
+        await supabase.from("addresses").insert({
+          supplier_id: newSupplier.id,
+          zip_code: addr.cep || null,
+          street: addr.logradouro || null,
+          number: addr.numero || null,
+          neighborhood: addr.bairro || null,
+          city: addr.cidade || null,
+          state: addr.uf || null,
+          country: addr.pais || "BR",
+          municipio_codigo_ibge: addr.codigo_municipio || null,
+          is_default: true,
+        }).maybeSingle()
+      }
     }
 
-    // 6. Criar xml_imports
+    // 11. Criar xml_imports
     const { data: xmlImport, error: importErr } = await supabase
       .from("xml_imports")
       .insert({
@@ -428,6 +629,13 @@ export async function uploadXMLAction(
         invoice_number: metadata.invoice.numero,
         invoice_series: metadata.invoice.serie,
         invoice_date: metadata.invoice.data_emissao || null,
+        data_saida: metadata.invoice.data_saida || null,
+        modelo: metadata.invoice.modelo || null,
+        protocolo: metadata.invoice.protocolo || null,
+        cstat: metadata.invoice.cstat || null,
+        ambiente: metadata.invoice.ambiente || null,
+        finalidade: metadata.invoice.finalidade || null,
+        tipo_operacao: metadata.invoice.tipo_operacao || null,
         total_value: metadata.invoice.valor_total,
         supplier_name: metadata.emitente.nome,
         supplier_document: supplier.document,
@@ -435,8 +643,16 @@ export async function uploadXMLAction(
         supplier_ie: metadata.emitente.ie || null,
         status: "preview",
         raw_xml: xmlContent,
+        xml_hash: xmlHash,
+        xml_size: Buffer.byteLength(xmlContent, "utf-8"),
+        fiscal_totals: metadata.fiscal_totals || null,
+        transport_data: metadata.transporte || null,
+        inf_cpl: metadata.inf_cpl || null,
+        inf_ad_fisco: metadata.inf_ad_fisco || null,
+        duplicatas: metadata.duplicatas?.length ? metadata.duplicatas : null,
         items_count: metadata.produtos.length,
         created_by: user.id,
+        created_by_ip: ip,
       })
       .select("id")
       .single()
@@ -449,7 +665,7 @@ export async function uploadXMLAction(
     const items: ImportItemPreview[] = []
 
     for (const prod of metadata.produtos) {
-      const match = await matchProduct(supabase, partnerId, prod)
+      const match = await matchProduct(supabase, partnerId, prod, supplierId ?? undefined)
 
       const { data: item, error: itemErr } = await supabase
         .from("xml_import_items")
@@ -460,6 +676,19 @@ export async function uploadXMLAction(
           raw_ean: prod.gtin || null,
           raw_ncm: prod.ncm || null,
           raw_cest: prod.cest || null,
+          raw_cfop: prod.cfop || null,
+          raw_cst: prod.cst || null,
+          raw_csosn: prod.csosn || null,
+          raw_pis_cst: prod.pis_cst || null,
+          raw_cofins_cst: prod.cofins_cst || null,
+          raw_ipi_code: prod.ipi_code || null,
+          raw_fiscal_detail: prod.fiscal_detail || null,
+          raw_fiscal_data: (prod.ncm || prod.cest || prod.cfop || prod.cst || prod.csosn || prod.origem || prod.pis_cst || prod.cofins_cst || prod.ipi_code)
+            ? { ncm: prod.ncm, cest: prod.cest, cfop: prod.cfop, cst: prod.cst, csosn: prod.csosn, origem: prod.origem, pis_cst: prod.pis_cst, cofins_cst: prod.cofins_cst, ipi_code: prod.ipi_code }
+            : null,
+          raw_logistics_data: (prod.peso_bruto != null || prod.peso_liquido != null || prod.largura != null || prod.altura != null || prod.comprimento != null)
+            ? { peso_bruto: prod.peso_bruto, peso_liquido: prod.peso_liquido, largura: prod.largura, altura: prod.altura, comprimento: prod.comprimento }
+            : null,
           raw_unit: prod.unidade || "UN",
           raw_quantity: prod.estoque_entrada,
           raw_unit_cost: prod.preco_custo,
@@ -530,11 +759,21 @@ export async function uploadXMLAction(
         serie: metadata.invoice.serie,
         data_emissao: metadata.invoice.data_emissao,
         valor_total: metadata.invoice.valor_total,
+        modelo: metadata.invoice.modelo,
+        protocolo: metadata.invoice.protocolo,
+        ambiente: metadata.invoice.ambiente,
+        finalidade: metadata.invoice.finalidade,
+        data_saida: metadata.invoice.data_saida,
       },
       items,
+      duplicatas: metadata.duplicatas,
+      fiscal_totals: metadata.fiscal_totals,
+      transport_data: metadata.transporte,
+      inf_cpl: metadata.inf_cpl,
+      inf_ad_fisco: metadata.inf_ad_fisco,
     }
 
-    return { success: true, preview, validation: { docsMatch } }
+    return { success: true, preview, validation: { docsMatch, warnings } }
   } catch (error: any) {
     console.error("Erro no upload XML:", error)
     return { success: false, error: friendlyError(error.message) }
@@ -555,7 +794,9 @@ export async function confirmImportAction(
       update_fields?: string[]
       keep_fields?: string[]
     }
+    supplier_action?: "add" | "keep"
   }>,
+  createPayables = true,
 ): Promise<{ success: boolean; imported?: number; skipped?: number; errors?: string[]; error?: string }> {
   try {
     await requirePartnerAccessWithPermission(partnerId, "products", "create")
@@ -565,7 +806,7 @@ export async function confirmImportAction(
 
     const { data: xmlImport, error: fetchErr } = await supabase
       .from("xml_imports")
-      .select("id, status")
+      .select("id, status, total_value, supplier_id, duplicatas, partner_id, invoice_number")
       .eq("id", xmlImportId)
       .eq("partner_id", partnerId)
       .single()
@@ -578,11 +819,20 @@ export async function confirmImportAction(
       return { success: false, error: "Importação já foi processada" }
     }
 
+    // Build supplier_actions map for RPC
+    const supplierActions: Record<string, string> = {}
+    for (const d of decisions) {
+      if (d.supplier_action) {
+        supplierActions[d.item_id] = d.supplier_action
+      }
+    }
+
     const { data: result, error: rpcErr } = await supabase.rpc("execute_xml_import", {
       p_xml_import_id: xmlImportId,
       p_partner_id: partnerId,
       p_store_id: storeId,
       p_items: decisions,
+      p_supplier_actions: Object.keys(supplierActions).length > 0 ? supplierActions : null,
       p_created_by: user.id,
     })
 
@@ -601,6 +851,39 @@ export async function confirmImportAction(
         imported: result.imported || 0,
         skipped: result.skipped || 0,
         errors: result.errors?.length > 0 ? result.errors.map((e: any) => e.error) : undefined,
+      }
+    }
+
+    // Criar contas a pagar se solicitado
+    if (createPayables && xmlImport.total_value && xmlImport.supplier_id) {
+      const duplicatas: any[] = (xmlImport.duplicatas as any[]) || []
+      const transactions = duplicatas.length > 0
+        ? duplicatas.map((d: any) => ({
+            partner_id: partnerId,
+            supplier_id: xmlImport.supplier_id,
+            transaction_type: "expense" as const,
+            category: "purchasing",
+            amount: d.valor,
+            description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
+            due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
+            status: "pending",
+            created_by_user_id: user.id,
+          }))
+        : [{
+            partner_id: partnerId,
+            supplier_id: xmlImport.supplier_id,
+            transaction_type: "expense" as const,
+            category: "purchasing",
+            amount: xmlImport.total_value,
+            description: `NF ${xmlImport.invoice_number || ""}`,
+            due_date: new Date(Date.now() + 30 * 86400000).toISOString(),
+            status: "pending",
+            created_by_user_id: user.id,
+          }]
+
+      const { error: txErr } = await supabase.from("transactions").insert(transactions)
+      if (txErr) {
+        console.error("Erro ao criar contas a pagar:", txErr)
       }
     }
 
@@ -645,7 +928,31 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
       return { success: false, error: "Erro ao carregar itens" }
     }
 
-    const preview: ImportPreview & { errors?: any[]; created_at?: string } = {
+    // Resolve supplier names for fornecedor_diferente conflicts
+    const supplierIds = new Set<string>()
+    for (const item of items) {
+      const conflicts = typeof item.conflicts === "string" ? JSON.parse(item.conflicts) : (item.conflicts || [])
+      for (const c of conflicts) {
+        if (c.campo === "fornecedor_diferente") {
+          if (c.valor_xml) supplierIds.add(c.valor_xml)
+          if (c.valor_atual) supplierIds.add(c.valor_atual)
+        }
+      }
+    }
+    const supplierNameMap: Record<string, string> = {}
+    if (supplierIds.size > 0) {
+      const { data: supplierRows } = await supabase
+        .from("suppliers")
+        .select("id, name")
+        .in("id", [...supplierIds])
+      if (supplierRows) {
+        for (const s of supplierRows) {
+          supplierNameMap[s.id] = s.name
+        }
+      }
+    }
+
+    const preview: ImportPreview & { errors?: any[]; created_at?: string; supplier_names?: Record<string, string> } = {
       xml_import_id: xmlImport.id,
       status: xmlImport.status,
       supplier: {
@@ -661,28 +968,51 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
         serie: xmlImport.invoice_series || "",
         data_emissao: xmlImport.invoice_date || "",
         valor_total: xmlImport.total_value || 0,
+        modelo: xmlImport.modelo || undefined,
+        protocolo: xmlImport.protocolo || undefined,
+        ambiente: xmlImport.ambiente || undefined,
+        finalidade: xmlImport.finalidade || undefined,
+        data_saida: xmlImport.data_saida || undefined,
       },
-      items: items.map((item: any) => ({
-        id: item.id,
-        raw_sku: item.raw_sku || "",
-        raw_name: item.raw_name,
-        raw_ean: item.raw_ean,
-        raw_ncm: item.raw_ncm,
-        raw_cest: item.raw_cest,
-        raw_unit: item.raw_unit || "UN",
-        raw_quantity: item.raw_quantity || 0,
-        raw_unit_cost: item.raw_unit_cost || 0,
-        raw_weight_gross: item.raw_weight_gross,
-        raw_weight_net: item.raw_weight_net,
-        match_status: item.match_status,
-        matched_product_id: item.matched_product_id,
-        matched_product_name: item.matched_product_name || null,
-        match_method: item.match_method,
-        match_confidence: item.match_confidence,
-        conflicts: typeof item.conflicts === "string" ? JSON.parse(item.conflicts) : item.conflicts,
-      })),
+      items: items.map((item: any) => {
+        const conflicts = typeof item.conflicts === "string" ? JSON.parse(item.conflicts) : (item.conflicts || [])
+        // Enrich fornecedor_diferente conflicts with supplier names
+        for (const c of conflicts) {
+          if (c.campo === "fornecedor_diferente") {
+            c.valor_xml_name = supplierNameMap[c.valor_xml] || c.valor_xml
+            c.valor_atual_name = supplierNameMap[c.valor_atual] || c.valor_atual
+          }
+        }
+        return {
+          id: item.id,
+          raw_sku: item.raw_sku || "",
+          raw_name: item.raw_name,
+          raw_ean: item.raw_ean,
+          raw_ncm: item.raw_ncm,
+          raw_cest: item.raw_cest,
+          raw_unit: item.raw_unit || "UN",
+          raw_quantity: item.raw_quantity || 0,
+          raw_unit_cost: item.raw_unit_cost || 0,
+          raw_weight_gross: item.raw_weight_gross,
+          raw_weight_net: item.raw_weight_net,
+          match_status: item.match_status,
+          matched_product_id: item.matched_product_id,
+          matched_product_name: item.matched_product_name || null,
+          match_method: item.match_method,
+          match_confidence: item.match_confidence,
+          conflicts,
+        }
+      }),
       errors: xmlImport.errors,
       created_at: xmlImport.created_at,
+      duplicatas: xmlImport.duplicatas,
+      fiscal_totals: xmlImport.fiscal_totals,
+      transport_data: xmlImport.transport_data,
+      inf_cpl: xmlImport.inf_cpl,
+      inf_ad_fisco: xmlImport.inf_ad_fisco,
+      reversed_at: xmlImport.reversed_at,
+      reversal_reason: xmlImport.reversal_reason,
+      supplier_names: supplierNameMap,
     }
 
     return { success: true, preview }
@@ -693,28 +1023,150 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
 
 export async function listImportsAction(
   partnerId: string,
-  limit = 20,
-): Promise<{ success: boolean; imports?: any[]; error?: string }> {
+  options?: {
+    limit?: number
+    offset?: number
+    startDate?: string
+    endDate?: string
+    supplierId?: string
+    status?: string
+    invoiceNumber?: string
+    accessKey?: string
+  },
+): Promise<{ success: boolean; imports?: any[]; total?: number; error?: string }> {
   try {
     const supabase = await getSupabaseServerClient()
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("xml_imports")
       .select(`
         id, access_key, invoice_number, invoice_series, total_value,
         supplier_name, supplier_document, status,
         items_count, imported_items, skipped_items,
-        created_at
-      `)
+        xml_hash, created_by_ip,
+        created_at, updated_at, reversed_at, reversal_reason
+      `, { count: "exact" })
       .eq("partner_id", partnerId)
+
+    if (options?.startDate) {
+      query = query.gte("created_at", options.startDate)
+    }
+    if (options?.endDate) {
+      query = query.lte("created_at", options.endDate)
+    }
+    if (options?.supplierId) {
+      query = query.eq("supplier_id", options.supplierId)
+    }
+    if (options?.status) {
+      query = query.eq("status", options.status)
+    }
+    if (options?.invoiceNumber) {
+      query = query.ilike("invoice_number", `%${options.invoiceNumber}%`)
+    }
+    if (options?.accessKey) {
+      query = query.ilike("access_key", `%${options.accessKey}%`)
+    }
+
+    const { data, error, count } = await query
       .order("created_at", { ascending: false })
-      .limit(limit)
+      .limit(options?.limit || 20)
+      .range(options?.offset || 0, (options?.offset || 0) + (options?.limit || 20) - 1)
 
     if (error) {
       return { success: false, error: error.message }
     }
 
-    return { success: true, imports: data }
+    return { success: true, imports: data, total: count || undefined }
+  } catch (error: any) {
+    return { success: false, error: friendlyError(error.message) }
+  }
+}
+
+export async function revertImportAction(
+  xmlImportId: string,
+  partnerId: string,
+  reason?: string,
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    await requirePartnerAccessWithPermission(partnerId, "products", "create")
+
+    const supabase = await getSupabaseServerClient()
+    const user = await requireUser()
+
+    const { data: result, error: rpcErr } = await supabase.rpc("revert_xml_import", {
+      p_xml_import_id: xmlImportId,
+      p_reason: reason || null,
+      p_created_by: user.id,
+    })
+
+    if (rpcErr) {
+      return { success: false, error: friendlyError(rpcErr.message) }
+    }
+
+    if (!result.success) {
+      return { success: false, error: result.error || "Erro ao reverter importação" }
+    }
+
+    return { success: true, message: result.message || "Importação revertida com sucesso" }
+  } catch (error: any) {
+    return { success: false, error: friendlyError(error.message) }
+  }
+}
+
+export async function getImportFinanceAction(
+  xmlImportId: string,
+  partnerId: string,
+): Promise<{ success: boolean; transactions?: any[]; error?: string }> {
+  try {
+    const supabase = await getSupabaseServerClient()
+
+    const { data: xmlImport } = await supabase
+      .from("xml_imports")
+      .select("supplier_id, invoice_number")
+      .eq("id", xmlImportId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (!xmlImport) return { success: false, error: "Importação não encontrada" }
+
+    const { data: transactions } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("supplier_id", xmlImport.supplier_id)
+      .ilike("description", `%${xmlImport.invoice_number || ""}%`)
+      .order("due_date")
+
+    return { success: true, transactions: transactions || [] }
+  } catch (error: any) {
+    return { success: false, error: friendlyError(error.message) }
+  }
+}
+
+export async function getImportStockMovementsAction(
+  xmlImportId: string,
+  partnerId: string,
+): Promise<{ success: boolean; movements?: any[]; error?: string }> {
+  try {
+    const supabase = await getSupabaseServerClient()
+
+    const { data: items } = await supabase
+      .from("xml_import_items")
+      .select("stock_movement_id, match_status, matched_product_id, created_product_id, raw_name, raw_quantity, raw_unit_cost")
+      .eq("xml_import_id", xmlImportId)
+
+    if (!items) return { success: true, movements: [] }
+
+    const movementIds = items
+      .map((i: any) => i.stock_movement_id)
+      .filter(Boolean)
+
+    const { data: movements } = await supabase
+      .from("stock_movements")
+      .select("*, stock_movement_items(*)")
+      .in("id", movementIds)
+
+    return { success: true, movements: movements || [] }
   } catch (error: any) {
     return { success: false, error: friendlyError(error.message) }
   }

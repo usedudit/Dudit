@@ -568,510 +568,510 @@ export default function PromotionsPage({
               )}
 
               {!planGate && (
-              <>
-              {/* Tabs */}
-              <div className="mb-6 px-4 md:px-8 flex-none">
-                <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)}>
-                  <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                    <TabsTrigger value="list" icon={TagIcon}>
-                      Campanhas e Regras
-                    </TabsTrigger>
-                    <TabsTrigger value="simulator" icon={SparklesIcon}>
-                      Simulador de Promoções
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-
-              {activeTab === "list" ? (
                 <>
-                  {/* Page Controls */}
-                  <PromotionPageControls
-                    search={search}
-                    onSearchChange={setSearch}
-                    onOpenFilter={() => setIsFilterSheetOpen(true)}
-                    filters={filters}
-                    setFilters={setFilters}
-                    viewMode={viewMode}
-                    onViewModeChange={(mode) => setViewModeState(mode)}
-                    hasActiveFilters={hasActiveFilters}
-                    onAddCampaign={() => openEntity('create')}
-                  />
-
-                  {/* List and Table Content */}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                    {campaigns.length === 0 ? (
-                      <IconPlaceholder
-                        placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
-                        imageAlt="Sem campanhas"
-                        title="Nenhuma campanha cadastrada"
-                        subtitle="Crie campanhas de marketing para oferecer descontos e brindes."
-                        itemButton={{
-                          text: "Cadastrar Nova Campanha",
-                          action: () => openEntity('create')
-                        }}
-                      />
-                    ) : filteredCampaigns.length === 0 ? (
-                      <IconPlaceholder
-                        placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                        imageAlt="Nenhuma campanha encontrada"
-                        title="Nenhuma campanha encontrada"
-                        subtitle="Ajuste os termos de busca."
-                        itemButton={{
-                          text: "Limpar filtros",
-                          action: () => {
-                            setSearch("")
-                            setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })
-                          }
-                        }}
-                      />
-                    ) : (
-                      <>
-                        <SelectionBanner
-                          selectedCount={selection.ids.size}
-                          totalCount={filteredCampaigns.length}
-                          onSelectAll={() => setSelection({ ids: new Set(filteredCampaigns.map(c => c.id)) })}
-                          onClearSelection={() => setSelection({ ids: new Set() })}
-                          itemName="campanhas"
-                          singularItemName="campanha"
-                        />
-
-                        {effectiveViewMode === "grid" ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                            {paginatedCampaigns.map((camp: any) => {
-                              const isSelected = selection.ids.has(camp.id)
-                              const campPromos = promotions.filter(p => p.campaign_id === camp.id)
-                              return (
-                                <PromotionGridCard
-                                  key={camp.id}
-                                  campaign={camp}
-                                  campaignPromotions={campPromos}
-                                  selected={isSelected}
-                                  onSelect={() => {
-                                    setSelection(p => {
-                                      const s = new Set(p.ids)
-                                      s.has(camp.id) ? s.delete(camp.id) : s.add(camp.id)
-                                      return { ids: s }
-                                    })
-                                  }}
-                                  onDetails={() => openEntity('view', camp.id)}
-                                  onEdit={() => openEntity('edit', camp.id)}
-                                  onDelete={() => handleDeleteCampaign(camp)}
-                                />
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <div className="w-full overflow-hidden rounded-xl relative">
-                            <div className="overflow-x-auto pb-4 custom-scrollbar">
-                              <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
-                                <thead>
-                                  <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                    <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                      <Checkbox
-                                        checked={paginatedCampaigns.length > 0 && paginatedCampaigns.every(x => selection.ids.has(x.id))}
-                                        onChange={(checked) => {
-                                          setSelection({ ids: checked ? new Set(paginatedCampaigns.map(x => x.id)) : new Set() })
-                                        }}
-                                        className="bg-white dark:bg-dark-background"
-                                      />
-                                    </th>
-
-                                    {/* Campanha column (sortable) */}
-                                    <th
-                                      className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
-                                      onClick={() => {
-                                        setSortConfig((prev) => ({
-                                          key: "name",
-                                          direction: prev?.key === "name" && prev.direction === "asc" ? "desc" : "asc",
-                                        }))
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-1.5">
-                                        Campanha
-                                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                                          <ArrowUpDownIcon
-                                            size={14}
-                                            className={`transition-all duration-200 ${sortConfig?.key === "name" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "name" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                          />
-                                        </div>
-                                      </div>
-                                    </th>
-
-                                    {/* Vigência column (sortable) */}
-                                    <th
-                                      className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
-                                      onClick={() => {
-                                        setSortConfig((prev) => ({
-                                          key: "starts_at",
-                                          direction: prev?.key === "starts_at" && prev.direction === "asc" ? "desc" : "asc",
-                                        }))
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-1.5">
-                                        Vigência
-                                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                                          <ArrowUpDownIcon
-                                            size={14}
-                                            className={`transition-all duration-200 ${sortConfig?.key === "starts_at" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "starts_at" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                          />
-                                        </div>
-                                      </div>
-                                    </th>
-
-                                    {/* Escopo column */}
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                      Escopo
-                                    </th>
-
-                                    {/* Regras column */}
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                      Regras
-                                    </th>
-
-                                    {/* Status column (sortable) */}
-                                    <th
-                                      className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
-                                      onClick={() => {
-                                        setSortConfig((prev) => ({
-                                          key: "is_active",
-                                          direction: prev?.key === "is_active" && prev.direction === "asc" ? "desc" : "asc",
-                                        }))
-                                      }}
-                                    >
-                                      <div className="flex items-center justify-center gap-1.5">
-                                        Status
-                                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                                          <ArrowUpDownIcon
-                                            size={14}
-                                            className={`transition-all duration-200 ${sortConfig?.key === "is_active" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "is_active" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                          />
-                                        </div>
-                                      </div>
-                                    </th>
-
-                                    {/* Ações column */}
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">
-                                      Ações
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {paginatedCampaigns.map((camp: any) => {
-                                    const isSelected = selection.ids.has(camp.id)
-                                    const campPromos = promotions.filter(p => p.campaign_id === camp.id)
-                                    return (
-                                      <tr
-                                        key={camp.id}
-                                        className="group hover:bg-brand-gray dark:hover:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
-                                        onClick={() => openEntity('view', camp.id)}
-                                      >
-                                        <td className="py-3 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14" onClick={(e) => e.stopPropagation()}>
-                                          <Checkbox checked={isSelected} onChange={() => {
-                                            setSelection(p => {
-                                              const s = new Set(p.ids)
-                                              s.has(camp.id) ? s.delete(camp.id) : s.add(camp.id)
-                                              return { ids: s }
-                                            })
-                                          }} />
-                                        </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                          <div className="flex flex-col">
-                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{camp.name}</span>
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body truncate max-w-[250px] font-semibold mt-0.5">
-                                              {getPromotionTypeLabel(campPromos[0])}
-                                            </span>
-                                          </div>
-                                        </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                          {camp.starts_at && camp.ends_at ? (
-                                            <div className="flex flex-col text-[13px] text-brand-inactive-text dark:text-dark-body">
-                                              <span>{new Date(camp.starts_at).toLocaleDateString()}</span>
-                                              <span className="text-xs text-gray-400">{new Date(camp.ends_at).toLocaleDateString()}</span>
-                                            </div>
-                                          ) : (
-                                            <span className="text-[13px] text-brand-inactive-text dark:text-dark-body">Indeterminado</span>
-                                          )}
-                                        </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                          <div className="flex flex-col text-[13px]">
-                                            <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                              Público: {camp.customer_scope === "specific" ? "Segmentado" : "Geral"}
-                                            </span>
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                              Abrangência: {getApplyScopeLabel(campPromos[0]?.apply_scope || "entire_cart")}
-                                            </span>
-                                          </div>
-                                        </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                          {(() => {
-                                            const details = formatRuleDetails(campPromos[0])
-                                            return (
-                                              <div className="flex flex-col text-[13px]">
-                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">{details.above}</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5">{details.below}</span>
-                                              </div>
-                                            )
-                                          })()}
-                                        </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                                          <Badge variant={camp.is_active ? "green" : "gray"}>
-                                            {camp.is_active ? "Ativa" : "Rascunho/Inativa"}
-                                          </Badge>
-                                        </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border text-center" onClick={(e) => e.stopPropagation()}>
-                                          <ActionsDropdown
-                                            onEdit={() => openEntity('edit', camp.id)}
-                                            onDuplicate={() => openEntity('duplicate', camp.id)}
-                                            onDelete={() => handleDeleteCampaign(camp)}
-                                          />
-                                        </td>
-                                      </tr>
-                                    )
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
+                  {/* Tabs */}
+                  <div className="mb-6 px-4 md:px-8 flex-none">
+                    <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)}>
+                      <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                        <TabsTrigger value="list" icon={TagIcon}>
+                          Campanhas e Regras
+                        </TabsTrigger>
+                        <TabsTrigger value="simulator" icon={SparklesIcon}>
+                          Simulador de Promoções
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   </div>
 
-                  {totalPages > 1 && (
-                    <div className="flex-none py-4">
-                      <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        onPageChange={setPage}
+                  {activeTab === "list" ? (
+                    <>
+                      {/* Page Controls */}
+                      <PromotionPageControls
+                        search={search}
+                        onSearchChange={setSearch}
+                        onOpenFilter={() => setIsFilterSheetOpen(true)}
+                        filters={filters}
+                        setFilters={setFilters}
+                        viewMode={viewMode}
+                        onViewModeChange={(mode) => setViewModeState(mode)}
+                        hasActiveFilters={hasActiveFilters}
+                        onAddCampaign={() => openEntity('create')}
                       />
+
+                      {/* List and Table Content */}
+                      <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                        {campaigns.length === 0 ? (
+                          <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                            imageAlt="Sem campanhas"
+                            title="Nenhuma campanha cadastrada"
+                            subtitle="Crie campanhas de marketing para oferecer descontos e brindes."
+                            itemButton={{
+                              text: "Cadastrar Nova Campanha",
+                              action: () => openEntity('create')
+                            }}
+                          />
+                        ) : filteredCampaigns.length === 0 ? (
+                          <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                            imageAlt="Nenhuma campanha encontrada"
+                            title="Nenhuma campanha encontrada"
+                            subtitle="Ajuste os termos de busca."
+                            itemButton={{
+                              text: "Limpar filtros",
+                              action: () => {
+                                setSearch("")
+                                setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })
+                              }
+                            }}
+                          />
+                        ) : (
+                          <>
+                            <SelectionBanner
+                              selectedCount={selection.ids.size}
+                              totalCount={filteredCampaigns.length}
+                              onSelectAll={() => setSelection({ ids: new Set(filteredCampaigns.map(c => c.id)) })}
+                              onClearSelection={() => setSelection({ ids: new Set() })}
+                              itemName="campanhas"
+                              singularItemName="campanha"
+                            />
+
+                            {effectiveViewMode === "grid" ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                {paginatedCampaigns.map((camp: any) => {
+                                  const isSelected = selection.ids.has(camp.id)
+                                  const campPromos = promotions.filter(p => p.campaign_id === camp.id)
+                                  return (
+                                    <PromotionGridCard
+                                      key={camp.id}
+                                      campaign={camp}
+                                      campaignPromotions={campPromos}
+                                      selected={isSelected}
+                                      onSelect={() => {
+                                        setSelection(p => {
+                                          const s = new Set(p.ids)
+                                          s.has(camp.id) ? s.delete(camp.id) : s.add(camp.id)
+                                          return { ids: s }
+                                        })
+                                      }}
+                                      onDetails={() => openEntity('view', camp.id)}
+                                      onEdit={() => openEntity('edit', camp.id)}
+                                      onDelete={() => handleDeleteCampaign(camp)}
+                                    />
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <div className="w-full overflow-hidden rounded-xl relative">
+                                <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                  <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                                    <thead>
+                                      <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                          <Checkbox
+                                            checked={paginatedCampaigns.length > 0 && paginatedCampaigns.every(x => selection.ids.has(x.id))}
+                                            onChange={(checked) => {
+                                              setSelection({ ids: checked ? new Set(paginatedCampaigns.map(x => x.id)) : new Set() })
+                                            }}
+                                            className="bg-white dark:bg-dark-background"
+                                          />
+                                        </th>
+
+                                        {/* Campanha column (sortable) */}
+                                        <th
+                                          className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
+                                          onClick={() => {
+                                            setSortConfig((prev) => ({
+                                              key: "name",
+                                              direction: prev?.key === "name" && prev.direction === "asc" ? "desc" : "asc",
+                                            }))
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-1.5">
+                                            Campanha
+                                            <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                              <ArrowUpDownIcon
+                                                size={14}
+                                                className={`transition-all duration-200 ${sortConfig?.key === "name" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "name" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                              />
+                                            </div>
+                                          </div>
+                                        </th>
+
+                                        {/* Vigência column (sortable) */}
+                                        <th
+                                          className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
+                                          onClick={() => {
+                                            setSortConfig((prev) => ({
+                                              key: "starts_at",
+                                              direction: prev?.key === "starts_at" && prev.direction === "asc" ? "desc" : "asc",
+                                            }))
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-1.5">
+                                            Vigência
+                                            <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                              <ArrowUpDownIcon
+                                                size={14}
+                                                className={`transition-all duration-200 ${sortConfig?.key === "starts_at" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "starts_at" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                              />
+                                            </div>
+                                          </div>
+                                        </th>
+
+                                        {/* Escopo column */}
+                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                          Escopo
+                                        </th>
+
+                                        {/* Regras column */}
+                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                          Regras
+                                        </th>
+
+                                        {/* Status column (sortable) */}
+                                        <th
+                                          className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
+                                          onClick={() => {
+                                            setSortConfig((prev) => ({
+                                              key: "is_active",
+                                              direction: prev?.key === "is_active" && prev.direction === "asc" ? "desc" : "asc",
+                                            }))
+                                          }}
+                                        >
+                                          <div className="flex items-center justify-center gap-1.5">
+                                            Status
+                                            <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                              <ArrowUpDownIcon
+                                                size={14}
+                                                className={`transition-all duration-200 ${sortConfig?.key === "is_active" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "is_active" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                              />
+                                            </div>
+                                          </div>
+                                        </th>
+
+                                        {/* Ações column */}
+                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">
+                                          Ações
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {paginatedCampaigns.map((camp: any) => {
+                                        const isSelected = selection.ids.has(camp.id)
+                                        const campPromos = promotions.filter(p => p.campaign_id === camp.id)
+                                        return (
+                                          <tr
+                                            key={camp.id}
+                                            className="group hover:bg-brand-gray dark:hover:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                                            onClick={() => openEntity('view', camp.id)}
+                                          >
+                                            <td className="py-3 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14" onClick={(e) => e.stopPropagation()}>
+                                              <Checkbox checked={isSelected} onChange={() => {
+                                                setSelection(p => {
+                                                  const s = new Set(p.ids)
+                                                  s.has(camp.id) ? s.delete(camp.id) : s.add(camp.id)
+                                                  return { ids: s }
+                                                })
+                                              }} />
+                                            </td>
+                                            <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                              <div className="flex flex-col">
+                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{camp.name}</span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body truncate max-w-[250px] font-semibold mt-0.5">
+                                                  {getPromotionTypeLabel(campPromos[0])}
+                                                </span>
+                                              </div>
+                                            </td>
+                                            <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                              {camp.starts_at && camp.ends_at ? (
+                                                <div className="flex flex-col text-[13px] text-brand-inactive-text dark:text-dark-body">
+                                                  <span>{new Date(camp.starts_at).toLocaleDateString()}</span>
+                                                  <span className="text-xs text-gray-400">{new Date(camp.ends_at).toLocaleDateString()}</span>
+                                                </div>
+                                              ) : (
+                                                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body">Indeterminado</span>
+                                              )}
+                                            </td>
+                                            <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                              <div className="flex flex-col text-[13px]">
+                                                <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                  Público: {camp.customer_scope === "specific" ? "Segmentado" : "Geral"}
+                                                </span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                  Abrangência: {getApplyScopeLabel(campPromos[0]?.apply_scope || "entire_cart")}
+                                                </span>
+                                              </div>
+                                            </td>
+                                            <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                              {(() => {
+                                                const details = formatRuleDetails(campPromos[0])
+                                                return (
+                                                  <div className="flex flex-col text-[13px]">
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">{details.above}</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5">{details.below}</span>
+                                                  </div>
+                                                )
+                                              })()}
+                                            </td>
+                                            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                              <Badge variant={camp.is_active ? "green" : "gray"}>
+                                                {camp.is_active ? "Ativa" : "Rascunho/Inativa"}
+                                              </Badge>
+                                            </td>
+                                            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center" onClick={(e) => e.stopPropagation()}>
+                                              <ActionsDropdown
+                                                onEdit={() => openEntity('edit', camp.id)}
+                                                onDuplicate={() => openEntity('duplicate', camp.id)}
+                                                onDelete={() => handleDeleteCampaign(camp)}
+                                              />
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {totalPages > 1 && (
+                        <div className="flex-none py-4">
+                          <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Simulator Tab */
+                    <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-8 custom-scrollbar">
+                      <Div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
+                        <Div className="lg:col-span-2 space-y-6">
+                          <Div className="rounded-2xl border border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface shadow-sm space-y-4">
+                            <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                              <SparklesIcon className="text-brand-primary h-5 w-5" /> Montar Sacola de Simulação
+                            </h3>
+
+                            <Div className="space-y-2">
+                              <label className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Adicionar Produto à Sacola</label>
+                              <select
+                                onChange={(e) => {
+                                  if (!e.target.value) return
+                                  const prod = scopeData.products.find(p => p.id === e.target.value)
+                                  if (prod) {
+                                    const existing = simCart.find(item => item.product.id === prod.id)
+                                    if (existing) {
+                                      setSimCart(simCart.map(item => item.product.id === prod.id ? { ...item, quantity: item.quantity + 1 } : item))
+                                    } else {
+                                      setSimCart([...simCart, { product: prod, quantity: 1 }])
+                                    }
+                                  }
+                                  e.target.value = ""
+                                }}
+                                className="w-full p-3 rounded-xl border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface dark:text-white"
+                              >
+                                <option value="">Selecione um produto...</option>
+                                {scopeData.products.map(p => (
+                                  <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
+                                ))}
+                              </select>
+                            </Div>
+
+                            <Div className="space-y-3">
+                              <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Itens na Sacola ({simCart.length})</h3>
+                              {simCart.length > 0 ? (
+                                <Div className="space-y-2">
+                                  {simCart.map((item, idx) => (
+                                    <Div key={idx} className="flex items-center justify-between border border-brand-border dark:border-dark-border p-3 rounded-xl">
+                                      <Div>
+                                        <P className="font-semibold text-sm text-brand-dark dark:text-dark-heading">{item.product.name}</P>
+                                        <P className="text-xs text-brand-inactive-text">{formatCurrency(item.product.price)} x {item.quantity}</P>
+                                      </Div>
+                                      <Div className="flex items-center gap-3">
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          value={item.quantity}
+                                          onChange={(e) => {
+                                            const val = Math.max(1, parseInt(e.target.value) || 1)
+                                            setSimCart(simCart.map((it, i) => i === idx ? { ...it, quantity: val } : it))
+                                          }}
+                                          className="w-16 p-1 text-center rounded border border-brand-border dark:border-dark-border dark:bg-dark-surface"
+                                        />
+                                        <button
+                                          onClick={() => setSimCart(simCart.filter((_, i) => i !== idx))}
+                                          className="text-red-500 hover:bg-red-50 p-1.5 rounded"
+                                        >
+                                          <TrashIcon className="h-4 w-4" />
+                                        </button>
+                                      </Div>
+                                    </Div>
+                                  ))}
+                                </Div>
+                              ) : (
+                                <P className="text-sm text-brand-inactive-text py-4">A sacola de simulação está vazia.</P>
+                              )}
+                            </Div>
+
+                            <Div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <Div className="space-y-1">
+                                <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Cupom (Opcional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="DIGITEOCUPOM"
+                                  value={simCoupon}
+                                  onChange={e => setSimCoupon(e.target.value.toUpperCase())}
+                                  className="w-full p-3 rounded-xl border border-brand-border dark:border-dark-border dark:bg-dark-surface uppercase"
+                                />
+                              </Div>
+                              <Div className="space-y-1">
+                                <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Valor da Entrega</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0.00"
+                                  value={simShipping}
+                                  onChange={e => setSimShipping(Math.max(0, parseFloat(e.target.value) || 0))}
+                                  className="w-full p-3 rounded-xl border border-brand-border dark:border-dark-border dark:bg-dark-surface"
+                                />
+                              </Div>
+                            </Div>
+
+                            <Button
+                              variant="filled"
+                              className="w-full h-12"
+                              onClick={handleRunSimulation}
+                              isLoading={isSimulating}
+                            >
+                              <PlayIcon className="mr-2 h-5 w-5" /> Executar Simulação
+                            </Button>
+                          </Div>
+                        </Div>
+
+                        <Div className="lg:col-span-1">
+                          <Div className="rounded-2xl border border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface shadow-sm space-y-6 h-full flex flex-col justify-between">
+                            <Div className="space-y-4">
+                              <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Resultado da Simulação</h3>
+
+                              {simResult ? (
+                                <Div className="space-y-4">
+                                  <Div className="space-y-2 text-sm border-b border-brand-border dark:border-dark-border pb-4">
+                                    <Div className="flex justify-between">
+                                      <Span className="text-brand-inactive-text">Subtotal</Span>
+                                      <Span className="font-semibold">{formatCurrency(simResult.subtotal)}</Span>
+                                    </Div>
+
+                                    {simResult.promotionSavings > 0 && (
+                                      <Div className="flex justify-between text-green-600">
+                                        <Span>Promoção Produto (Original vs Promo)</Span>
+                                        <Span>-{formatCurrency(simResult.promotionSavings)}</Span>
+                                      </Div>
+                                    )}
+
+                                    {simResult.promotionDiscountAmount > 0 && (
+                                      <Div className="flex justify-between text-green-600 font-bold">
+                                        <Span>Desconto Campanhas</Span>
+                                        <Span>-{formatCurrency(simResult.promotionDiscountAmount)}</Span>
+                                      </Div>
+                                    )}
+
+                                    {simResult.couponDiscountAmount > 0 && (
+                                      <Div className="flex justify-between text-green-600">
+                                        <Span>Desconto Cupom</Span>
+                                        <Span>-{formatCurrency(simResult.couponDiscountAmount)}</Span>
+                                      </Div>
+                                    )}
+
+                                    {simResult.manualDiscountAmount > 0 && (
+                                      <Div className="flex justify-between text-green-600">
+                                        <Span>Desconto Manual</Span>
+                                        <Span>-{formatCurrency(simResult.manualDiscountAmount)}</Span>
+                                      </Div>
+                                    )}
+
+                                    <Div className="flex justify-between">
+                                      <Span className="text-brand-inactive-text">Entrega</Span>
+                                      <Span className={simResult.freeShippingApplied ? "line-through text-brand-inactive-text" : "font-semibold"}>
+                                        {formatCurrency(simResult.shipping)}
+                                      </Span>
+                                    </Div>
+
+                                    {simResult.freeShippingApplied && (
+                                      <Div className="flex justify-between text-green-600 font-semibold text-xs">
+                                        <Span>Entrega Grátis Aplicada</Span>
+                                        <Span>Grátis</Span>
+                                      </Div>
+                                    )}
+                                  </Div>
+
+                                  <Div className="flex justify-between text-lg font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border pb-4">
+                                    <Span>Total Final</Span>
+                                    <Span className="text-brand-primary">{formatCurrency(simResult.finalTotal)}</Span>
+                                  </Div>
+
+                                  <Div className="space-y-3">
+                                    <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Promoções Aplicadas ({simResult.appliedPromotionIds.length})</h3>
+                                    {simResult.appliedPromotionIds.length > 0 ? (
+                                      <Div className="flex flex-wrap gap-2">
+                                        {simResult.appliedPromotionIds.map((pId: string) => {
+                                          const p = promotions.find(promo => promo.id === pId)
+                                          return (
+                                            <Badge key={pId} variant="green">
+                                              {p?.name || "Regra Aplicada"}
+                                            </Badge>
+                                          )
+                                        })}
+                                      </Div>
+                                    ) : (
+                                      <P className="text-xs text-brand-inactive-text">Nenhuma regra de campanha foi qualificada.</P>
+                                    )}
+                                  </Div>
+
+                                  <Div className="space-y-3 pt-2">
+                                    <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Brindes Conquistados ({simResult.appliedGiftProductIds.length})</h3>
+                                    {simResult.appliedGiftProductIds.length > 0 ? (
+                                      <Div className="space-y-1">
+                                        {simResult.appliedGiftProductIds.map((gId: string, idx: number) => {
+                                          const prod = scopeData.products.find(p => p.id === gId)
+                                          return (
+                                            <Div key={idx} className="text-xs text-green-700 bg-green-50 p-2 rounded-lg border border-green-200 flex items-center gap-2">
+                                              <SparklesIcon size={14} />
+                                              <Span className="font-semibold">{prod?.name || "Brinde Especial"}</Span>
+                                            </Div>
+                                          )
+                                        })}
+                                      </Div>
+                                    ) : (
+                                      <P className="text-xs text-brand-inactive-text">Nenhum brinde conquistado nesta compra.</P>
+                                    )}
+                                  </Div>
+                                </Div>
+                              ) : (
+                                <Div className="text-center py-12 text-brand-inactive-text">
+                                  <PlayIcon className="mx-auto h-12 w-12 opacity-30 mb-2" />
+                                  <P className="text-sm">Configure a sacola de teste e clique em "Executar Simulação" para ver os resultados.</P>
+                                </Div>
+                              )}
+                            </Div>
+                            {simResult && (
+                              <Button variant="outline" className="w-full mt-4" onClick={() => setSimResult(null)}>
+                                Limpar Simulação
+                              </Button>
+                            )}
+                          </Div>
+                        </Div>
+                      </Div>
                     </div>
                   )}
                 </>
-              ) : (
-                /* Simulator Tab */
-                <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-8 custom-scrollbar">
-                  <Div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
-                    <Div className="lg:col-span-2 space-y-6">
-                      <Div className="rounded-2xl border border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface shadow-sm space-y-4">
-                        <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                          <SparklesIcon className="text-brand-primary h-5 w-5" /> Montar Sacola de Simulação
-                        </h3>
-
-                        <Div className="space-y-2">
-                          <label className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Adicionar Produto à Sacola</label>
-                          <select
-                            onChange={(e) => {
-                              if (!e.target.value) return
-                              const prod = scopeData.products.find(p => p.id === e.target.value)
-                              if (prod) {
-                                const existing = simCart.find(item => item.product.id === prod.id)
-                                if (existing) {
-                                  setSimCart(simCart.map(item => item.product.id === prod.id ? { ...item, quantity: item.quantity + 1 } : item))
-                                } else {
-                                  setSimCart([...simCart, { product: prod, quantity: 1 }])
-                                }
-                              }
-                              e.target.value = ""
-                            }}
-                            className="w-full p-3 rounded-xl border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface dark:text-white"
-                          >
-                            <option value="">Selecione um produto...</option>
-                            {scopeData.products.map(p => (
-                              <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
-                            ))}
-                          </select>
-                        </Div>
-
-                        <Div className="space-y-3">
-                          <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Itens na Sacola ({simCart.length})</h3>
-                          {simCart.length > 0 ? (
-                            <Div className="space-y-2">
-                              {simCart.map((item, idx) => (
-                                <Div key={idx} className="flex items-center justify-between border border-brand-border dark:border-dark-border p-3 rounded-xl">
-                                  <Div>
-                                    <P className="font-semibold text-sm text-brand-dark dark:text-dark-heading">{item.product.name}</P>
-                                    <P className="text-xs text-brand-inactive-text">{formatCurrency(item.product.price)} x {item.quantity}</P>
-                                  </Div>
-                                  <Div className="flex items-center gap-3">
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      value={item.quantity}
-                                      onChange={(e) => {
-                                        const val = Math.max(1, parseInt(e.target.value) || 1)
-                                        setSimCart(simCart.map((it, i) => i === idx ? { ...it, quantity: val } : it))
-                                      }}
-                                      className="w-16 p-1 text-center rounded border border-brand-border dark:border-dark-border dark:bg-dark-surface"
-                                    />
-                                    <button
-                                      onClick={() => setSimCart(simCart.filter((_, i) => i !== idx))}
-                                      className="text-red-500 hover:bg-red-50 p-1.5 rounded"
-                                    >
-                                      <TrashIcon className="h-4 w-4" />
-                                    </button>
-                                  </Div>
-                                </Div>
-                              ))}
-                            </Div>
-                          ) : (
-                            <P className="text-sm text-brand-inactive-text py-4">A sacola de simulação está vazia.</P>
-                          )}
-                        </Div>
-
-                        <Div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Div className="space-y-1">
-                            <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Cupom (Opcional)</label>
-                            <input
-                              type="text"
-                              placeholder="DIGITEOCUPOM"
-                              value={simCoupon}
-                              onChange={e => setSimCoupon(e.target.value.toUpperCase())}
-                              className="w-full p-3 rounded-xl border border-brand-border dark:border-dark-border dark:bg-dark-surface uppercase"
-                            />
-                          </Div>
-                          <Div className="space-y-1">
-                            <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Valor da Entrega</label>
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="0.00"
-                              value={simShipping}
-                              onChange={e => setSimShipping(Math.max(0, parseFloat(e.target.value) || 0))}
-                              className="w-full p-3 rounded-xl border border-brand-border dark:border-dark-border dark:bg-dark-surface"
-                            />
-                          </Div>
-                        </Div>
-
-                        <Button
-                          variant="filled"
-                          className="w-full h-12"
-                          onClick={handleRunSimulation}
-                          isLoading={isSimulating}
-                        >
-                          <PlayIcon className="mr-2 h-5 w-5" /> Executar Simulação
-                        </Button>
-                      </Div>
-                    </Div>
-
-                    <Div className="lg:col-span-1">
-                      <Div className="rounded-2xl border border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface shadow-sm space-y-6 h-full flex flex-col justify-between">
-                        <Div className="space-y-4">
-                          <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Resultado da Simulação</h3>
-
-                          {simResult ? (
-                            <Div className="space-y-4">
-                              <Div className="space-y-2 text-sm border-b border-brand-border dark:border-dark-border pb-4">
-                                <Div className="flex justify-between">
-                                  <Span className="text-brand-inactive-text">Subtotal</Span>
-                                  <Span className="font-semibold">{formatCurrency(simResult.subtotal)}</Span>
-                                </Div>
-
-                                {simResult.promotionSavings > 0 && (
-                                  <Div className="flex justify-between text-green-600">
-                                    <Span>Promoção Produto (Original vs Promo)</Span>
-                                    <Span>-{formatCurrency(simResult.promotionSavings)}</Span>
-                                  </Div>
-                                )}
-
-                                {simResult.promotionDiscountAmount > 0 && (
-                                  <Div className="flex justify-between text-green-600 font-bold">
-                                    <Span>Desconto Campanhas</Span>
-                                    <Span>-{formatCurrency(simResult.promotionDiscountAmount)}</Span>
-                                  </Div>
-                                )}
-
-                                {simResult.couponDiscountAmount > 0 && (
-                                  <Div className="flex justify-between text-green-600">
-                                    <Span>Desconto Cupom</Span>
-                                    <Span>-{formatCurrency(simResult.couponDiscountAmount)}</Span>
-                                  </Div>
-                                )}
-
-                                {simResult.manualDiscountAmount > 0 && (
-                                  <Div className="flex justify-between text-green-600">
-                                    <Span>Desconto Manual</Span>
-                                    <Span>-{formatCurrency(simResult.manualDiscountAmount)}</Span>
-                                  </Div>
-                                )}
-
-                                <Div className="flex justify-between">
-                                  <Span className="text-brand-inactive-text">Entrega</Span>
-                                  <Span className={simResult.freeShippingApplied ? "line-through text-brand-inactive-text" : "font-semibold"}>
-                                    {formatCurrency(simResult.shipping)}
-                                  </Span>
-                                </Div>
-
-                                {simResult.freeShippingApplied && (
-                                  <Div className="flex justify-between text-green-600 font-semibold text-xs">
-                                    <Span>Entrega Grátis Aplicada</Span>
-                                    <Span>Grátis</Span>
-                                  </Div>
-                                )}
-                              </Div>
-
-                              <Div className="flex justify-between text-lg font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border pb-4">
-                                <Span>Total Final</Span>
-                                <Span className="text-brand-primary">{formatCurrency(simResult.finalTotal)}</Span>
-                              </Div>
-
-                              <Div className="space-y-3">
-                                <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Promoções Aplicadas ({simResult.appliedPromotionIds.length})</h3>
-                                {simResult.appliedPromotionIds.length > 0 ? (
-                                  <Div className="flex flex-wrap gap-2">
-                                    {simResult.appliedPromotionIds.map((pId: string) => {
-                                      const p = promotions.find(promo => promo.id === pId)
-                                      return (
-                                        <Badge key={pId} variant="green">
-                                          {p?.name || "Regra Aplicada"}
-                                        </Badge>
-                                      )
-                                    })}
-                                  </Div>
-                                ) : (
-                                  <P className="text-xs text-brand-inactive-text">Nenhuma regra de campanha foi qualificada.</P>
-                                )}
-                              </Div>
-
-                              <Div className="space-y-3 pt-2">
-                                <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Brindes Conquistados ({simResult.appliedGiftProductIds.length})</h3>
-                                {simResult.appliedGiftProductIds.length > 0 ? (
-                                  <Div className="space-y-1">
-                                    {simResult.appliedGiftProductIds.map((gId: string, idx: number) => {
-                                      const prod = scopeData.products.find(p => p.id === gId)
-                                      return (
-                                        <Div key={idx} className="text-xs text-green-700 bg-green-50 p-2 rounded-lg border border-green-200 flex items-center gap-2">
-                                          <SparklesIcon size={14} />
-                                          <Span className="font-semibold">{prod?.name || "Brinde Especial"}</Span>
-                                        </Div>
-                                      )
-                                    })}
-                                  </Div>
-                                ) : (
-                                  <P className="text-xs text-brand-inactive-text">Nenhum brinde conquistado nesta compra.</P>
-                                )}
-                              </Div>
-                            </Div>
-                          ) : (
-                            <Div className="text-center py-12 text-brand-inactive-text">
-                              <PlayIcon className="mx-auto h-12 w-12 opacity-30 mb-2" />
-                              <P className="text-sm">Configure a sacola de teste e clique em "Executar Simulação" para ver os resultados.</P>
-                            </Div>
-                          )}
-                        </Div>
-                        {simResult && (
-                          <Button variant="outline" className="w-full mt-4" onClick={() => setSimResult(null)}>
-                            Limpar Simulação
-                          </Button>
-                        )}
-                      </Div>
-                    </Div>
-                  </Div>
-                </div>
-              )}
-              </>
               )}
             </div>
           </FadeIn>
@@ -1085,8 +1085,8 @@ export default function PromotionsPage({
         <Button
           variant="ghost"
           onClick={() => setShowBulkEditModal(true)}
-          leftIcon={<EditIcon className="w-4 h-4" />}
-          className="h-10 px-3 font-semibold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/50"
+          leftIcon={<EditIcon size={18} />}
+          className="h-10 px-3"
         >
           Ações em massa
         </Button>
@@ -1100,10 +1100,10 @@ export default function PromotionsPage({
           }}
           leftIcon={
             paginatedCampaigns.filter(c => selection.ids.has(c.id)).every(c => !c.is_active)
-              ? <CheckCircleIcon className="w-4 h-4 text-green-600" />
-              : <BlockedIcon className="w-4 h-4 text-orange-500" />
+              ? <CheckCircleIcon size={18} />
+              : <BlockedIcon size={18} />
           }
-          className="h-10 px-3 font-semibold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/50"
+          className="h-10 px-3"
         >
           {paginatedCampaigns.filter(c => selection.ids.has(c.id)).every(c => !c.is_active) ? "Ativar" : "Desativar"}
         </Button>
