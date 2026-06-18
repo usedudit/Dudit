@@ -21,7 +21,8 @@ export default function HelpSidebar({
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
         "boas-vindas": true,
         "login-registro": true,
-        "gestao": true
+        "gestao": true,
+        "vendas": true
     })
 
     const toggleCategory = (id: string) => {
@@ -42,6 +43,7 @@ export default function HelpSidebar({
         if (id === "login-registro") return "🔐"
         if (id === "gestao") return "📊"
         if (id === "pedidos") return "📦"
+        if (id === "vendas") return "🛒"
         if (id === "financeiro") return "💰"
         return "📁"
     }

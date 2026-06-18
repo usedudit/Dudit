@@ -369,6 +369,11 @@ export async function createQuoteAction(data: {
             const user = await requireUser()
             await requirePartnerAccessWithPermission(data.partnerId, "quotes", "create", user)
 
+            // Validate discount permission if a discount is being applied
+            if ((data.discountValue || 0) > 0) {
+                await requirePartnerAccessWithPermission(data.partnerId, "quotes", "can_apply_discount")
+            }
+
             const limitCheck = await checkLimit(data.partnerId, "monthly_quotes")
             if (!limitCheck.allowed) {
                 return errorResponse(limitCheck.message || "Limite mensal de orçamentos atingido para este plano.")
@@ -477,6 +482,11 @@ export async function updateQuoteAction(data: {
         try {
             const user = await requireUser()
             await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
+
+            // Validate discount permission if discount fields are being changed
+            if ((data.discountValue !== undefined && data.discountValue > 0) || data.discountType) {
+                await requirePartnerAccessWithPermission(data.partnerId, "quotes", "can_apply_discount")
+            }
 
             const supabase = await getSupabaseServerClient()
             const existingItemsResult = await getQuoteItemsForValidation(data.quoteId, data.partnerId, supabase)

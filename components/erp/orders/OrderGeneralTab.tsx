@@ -104,7 +104,7 @@ interface OrderGeneralTabProps {
     setDiscountType: (val: 'fixed' | 'percentage' | 'coupon') => void
     setCouponCode?: (val: string) => void
     onApplyCoupon?: () => void
-    onOpenDiscount: () => void
+    onOpenDiscount?: () => void
     onOpenShipping: () => void
     setSelectedCustomer: (val: any) => void
     setIsCustomerSheetOpen: (val: boolean) => void
@@ -720,13 +720,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                 {!isQuickMode && (
                                     <>
-                                        <ListItem
-                                            icon={TagIcon}
-                                            title="Aplicar desconto"
-                                            description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
-                                            onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
-                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                        />
+                                        {onOpenDiscount && (
+                                            <ListItem
+                                                icon={TagIcon}
+                                                title="Aplicar desconto"
+                                                description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
+                                                onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
+                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                            />
+                                        )}
                                         <ListItem
                                             icon={TruckIcon}
                                             title="Adicionar entrega"
@@ -1286,13 +1288,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {!isQuickMode && (
                                     <>
-                                        <ListItem
-                                            icon={TagIcon}
-                                            title="Aplicar desconto"
-                                            description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
-                                            onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
-                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                        />
+                                        {onOpenDiscount && (
+                                            <ListItem
+                                                icon={TagIcon}
+                                                title="Aplicar desconto"
+                                                description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
+                                                onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
+                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                            />
+                                        )}
                                         <ListItem
                                             icon={TruckIcon}
                                             title="Adicionar entrega"

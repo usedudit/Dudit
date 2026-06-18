@@ -55,11 +55,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
             ? { lat: userProfile.latitude, lng: userProfile.longitude }
             : null
 
-        const scope = isDefaultSP
-            ? "country"
-            : coords
-                ? "city"
-                : "state"
+        const scope = isDefaultSP ? "country" : "city"
 
         // Country scope: override display values to "Brasil"
         const ctxCity = scope === "country" ? "Brasil" : cityName

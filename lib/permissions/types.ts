@@ -10,6 +10,10 @@ export interface ResourcePermissions {
     delete: boolean
 }
 
+export interface QuotesPermissions extends ResourcePermissions {
+    can_apply_discount: boolean
+}
+
 export interface AppointmentsPermissions extends ResourcePermissions {
     can_apply_discount: boolean
 }
@@ -111,7 +115,7 @@ export interface PartnerPermissions {
     stock_movements: StockMovementsPermissions
     pdv: PdvPermissions
     services: ResourcePermissions
-    quotes: ResourcePermissions
+    quotes: QuotesPermissions
     financial: FinancialPermissions
     categories: ResourcePermissions
     coupons: ResourcePermissions

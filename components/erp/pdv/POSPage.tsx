@@ -116,7 +116,8 @@ function DesktopPOSSheet({
 export default function POSPage({ partnerId, initialData, initialActiveSession }: Props) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const { planSlug } = usePermissions()
+    const { planSlug, hasSpecific } = usePermissions()
+    const canDiscount = hasSpecific("pos", "can_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
     const isMobile = useMediaQuery("(max-width: 1024px)")
     const csrfToken = useCSRFToken()
@@ -1522,7 +1523,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                     canReset={cart.length > 0}
                                     onReset={() => setIsResetAlertOpen(true)}
                                     onOpenItems={() => { }}
-                                    onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
+                                    onOpenDiscount={canDiscount ? () => setIsGlobalDiscountModalOpen(true) : undefined}
                                     onContinue={handleOpenPaymentModal}
                                     onSaveDraft={saveDraftFromMenu}
                                     onAddShipping={handleOpenShippingSheet}
@@ -1615,7 +1616,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                     setIsMobileSummarySheetOpen(false)
                                     setIsMobileItemsSheetOpen(true)
                                 }}
-                                onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
+                                onOpenDiscount={canDiscount ? () => setIsGlobalDiscountModalOpen(true) : undefined}
                                 onContinue={handleOpenPaymentModal}
                                 onSaveDraft={saveDraftFromMenu}
                                 onAddShipping={handleOpenShippingSheet}

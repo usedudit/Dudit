@@ -1278,6 +1278,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const partnerId = data.partnerId
     await requirePartnerAccessWithPermission(partnerId, "orders", "create")
 
+    // Validate discount permission if a discount is being applied
+    if (data.discountValue > 0 || data.couponCode) {
+        await requirePartnerAccessWithPermission(partnerId, "orders", "can_apply_discount")
+    }
+
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
     const csrfValidation = await requireCSRF(data.csrf_token)
     if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
@@ -1915,6 +1920,11 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     if (!user) return { error: "Não autenticado" }
 
     const { roleId } = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
+
+    // Validate discount permission if a discount is being applied
+    if (data.discountValue > 0 || data.couponCode) {
+        await requirePartnerAccessWithPermission(data.partnerId, "orders", "can_apply_discount")
+    }
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
     const csrfValidation = await requireCSRF(data.csrf_token)

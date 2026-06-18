@@ -431,13 +431,15 @@ export async function uploadXMLAction(
       return { success: false, error: "Chave da NF-e não encontrada no XML" }
     }
 
-    // 2. Bloqueios fiscais obrigatórios
+    // 2. Warnings e bloqueios fiscais
+    const warnings: string[] = []
+
     if (metadata.invoice.modelo === "65") {
       return { success: false, error: "NFC-e (modelo 65) não é suportada. Aceitamos apenas NF-e modelo 55." }
     }
 
     if (metadata.invoice.tipo_operacao === "1") {
-      return { success: false, error: "NF-e de saída (tpNF=1) não pode ser importada como nota de entrada." }
+      warnings.push("NF-e de saída (tpNF=1) — o emissor registrou como saída, mas como você é o destinatário, será tratada como entrada normalmente.")
     }
 
     // 3. Validar autorização SEFAZ
@@ -458,8 +460,7 @@ export async function uploadXMLAction(
       return { success: false, error: motivo }
     }
 
-    // 4. Validar situação da NF-e (warnings)
-    const warnings: string[] = []
+    // 4. Validar situação da NF-e (warnings adicionais)
 
     // Warning para NF emitida há mais de 180 dias
     if (metadata.invoice.data_emissao) {

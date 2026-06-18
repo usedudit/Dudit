@@ -222,7 +222,8 @@ function normalizeCustomerForCard(customer: any) {
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const { planSlug, role } = usePermissions()
+    const { planSlug, role, hasSpecific } = usePermissions()
+    const canDiscount = hasSpecific("orders", "can_apply_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
@@ -1451,7 +1452,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             setCouponCode={setCouponCode}
                                             couponDiscountAmount={isPaidOrder ? originalCouponDiscountAmount : effectiveCouponDiscountAmount}
                                             onApplyCoupon={handleApplyCoupon}
-                                            onOpenDiscount={() => setIsDiscountModalOpen(true)}
+                                                onOpenDiscount={canDiscount ? () => setIsDiscountModalOpen(true) : undefined}
                                             onOpenShipping={handleOpenShippingSheet}
                                             setSelectedCustomer={setSelectedCustomer}
                                             setIsCustomerSheetOpen={setIsCustomerSheetOpen}

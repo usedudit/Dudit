@@ -60,7 +60,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const debouncedRefresh = useDebouncedRefresh();
     const { selectedStore } = useStore();
     const { setHeaderOverride } = useSidebar();
-    const { planSlug } = usePermissions()
+    const { planSlug, hasSpecific } = usePermissions()
+    const canDiscount = hasSpecific("quotes", "can_apply_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
     const { user: authUser } = useSupabase();
     const [isSaving, setIsSaving] = useState(false);
@@ -1112,6 +1113,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             salespersonId={salespersonId}
                                             setSalespersonId={setSalespersonId}
                                             salespeople={salespeople}
+                                            canApplyDiscount={canDiscount}
                                         />
                                     </div>
                                 </div>

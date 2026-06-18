@@ -211,6 +211,14 @@ function determineDisplayScope(items: WithTier[], ctx: DiscoverCtx): "city" | "s
     return "country"
 }
 
+// ─── Filter items to match display scope ────────────────────────────────────
+
+function filterByScope<T extends WithTier>(items: T[], displayScope: "city" | "state" | "country"): T[] {
+    if (displayScope === "city") return items.filter(i => i._tier === 0)
+    if (displayScope === "state") return items.filter(i => i._tier === 0 || i._tier === 1)
+    return items
+}
+
 // ─── Partner IDs by tier (city → state → country) ───────────────────────────
 
 const getPartnerIdsByTier = cache(async (
@@ -394,7 +402,13 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const displayScope = determineDisplayScope(withSignals, ctx)
     const display = sectionDisplay("trending", ctx, displayScope)
 
-    const items = withSignals.slice(0, 20).map(item => {
+    const scoped = filterByScope(withSignals, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP trending reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const proof: string[] = []
         if ((raw.views_last_30_days ?? 0) >= 10) proof.push(`${raw.views_last_30_days} visualizações`)
@@ -409,7 +423,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.trending,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=trending`,
     }
 }
@@ -515,7 +529,13 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("endingSoon", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => {
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP endingSoon reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const endsAt = endsAtMap.get(campaignIds[0])
         let timeLeft = "Acaba hoje"
@@ -536,7 +556,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.endingSoon,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=ending-soon`,
     }
 }
@@ -718,7 +738,13 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     const displayScope = determineDisplayScope(merged, ctx)
     const display = sectionDisplay("recent", ctx, displayScope)
 
-    const items = merged.slice(0, 20).map(item => {
+    const scoped = filterByScope(merged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP recent reason=no_items_in_scope`)
+        return null
+    }
+
+    const recentMapper = (item: any) => {
         const isRecent = item.created_at
             ? Date.now() - new Date(item.created_at).getTime() < 48 * 60 * 60 * 1000
             : false
@@ -749,7 +775,9 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         }
 
         return processProduct(item as RawProduct, badge)
-    })
+    }
+
+    const items = scoped.slice(0, 20).map(recentMapper)
 
     return {
         id: "recent",
@@ -757,7 +785,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.recent,
         items,
-        _allItems: items,
+        _allItems: scoped.map(recentMapper),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=recent`,
     }
 }
@@ -822,7 +850,13 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("gems", ctx, displayScope)
 
-    const items = diverseItems.slice(0, 20).map(item => {
+    const scoped = filterByScope(diverseItems, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP gems reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const hasPromo = raw.promotional_price && Number(raw.promotional_price) < Number(raw.price)
         const discountPct = hasPromo
@@ -841,7 +875,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.gems,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=gems`,
     }
 }
@@ -947,7 +981,13 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
     const displayScope = determineDisplayScope(filtered, ctx)
     const display = sectionDisplay("personalized", ctx, displayScope)
 
-    const items = filtered.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const scoped = filterByScope(filtered, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP personalized reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "personalized",
@@ -955,7 +995,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.personalized,
         items,
-        _allItems: filtered.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=for-you`,
     }
 }
@@ -998,7 +1038,13 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("bestSellers", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => {
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP bestSellers reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
         return processProduct(raw, {
             _socialProof: (raw.sales_last_30_days ?? 0) > 0
@@ -1013,7 +1059,7 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.bestSellers,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=best-sellers`,
     }
 }
@@ -1056,7 +1102,13 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topRated", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => {
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP topRated reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
         return processProduct(raw, {
             _badgeLabel: (raw.rating ?? 0) >= 4.5 ? "★★★" : "★",
@@ -1070,7 +1122,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.topRated,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=top-rated`,
     }
 }
@@ -1118,7 +1170,13 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("promos", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => {
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP promos reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const discountPct = Math.round(
             ((Number(raw.price) - Number(raw.promotional_price)) / Number(raw.price)) * 100,
@@ -1135,7 +1193,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.promos,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=promos`,
     }
 }
@@ -1177,7 +1235,13 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("mostViewed", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => {
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP mostViewed reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => {
         const raw = item as RawProduct
         return processProduct(raw, {
             _socialProof: (raw.views_last_30_days ?? 0) > 0
@@ -1192,7 +1256,7 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.mostViewed,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=most-viewed`,
     }
 }
@@ -1241,7 +1305,13 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const titleScope = !ctx.coords && displayScope === "city" ? "state" : displayScope
     const display = sectionDisplay("services", ctx, titleScope)
 
-    const items = tagged.slice(0, 20).map((item: any) => {
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP services reason=no_items_in_scope`)
+        return null
+    }
+
+    const serviceMapper = (item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const partner = rawPartner
             ? {
@@ -1265,7 +1335,9 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             partners: partner,
             itemType: "servico" as const,
         }
-    })
+    }
+
+    const items = scoped.slice(0, 20).map(serviceMapper)
 
     return {
         id: "services",
@@ -1273,7 +1345,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.services,
         items,
-        _allItems: items,
+        _allItems: scoped.map(serviceMapper),
         seeMoreLink: `/explorar/${ctx.citySlug}?type=servicos`,
     }
 }
@@ -1318,7 +1390,13 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topVitrines", ctx, displayScope)
 
-    const items = tagged.slice(0, 15).map((partner: any) => {
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP topVitrines reason=no_items_in_scope`)
+        return null
+    }
+
+    const vitrineMapper = (partner: any) => {
         const addr = Array.isArray(partner.addresses) ? partner.addresses[0] : partner.addresses
         return {
             id: partner.id,
@@ -1342,7 +1420,9 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             },
             itemType: "vitrine" as const,
         }
-    })
+    }
+
+    const items = scoped.slice(0, 15).map(vitrineMapper)
 
     return {
         id: "topVitrines",
@@ -1350,7 +1430,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.topVitrines,
         items,
-        _allItems: items,
+        _allItems: scoped.map(vitrineMapper),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=vendors`,
     }
 }
@@ -1392,7 +1472,13 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("popular", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP popular reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "popular",
@@ -1400,7 +1486,7 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.popular,
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=popular`,
     }
 }
@@ -1444,7 +1530,13 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     const title = isCountry ? "📦 Produtos na Dudit" : "📦 Produtos disponíveis"
     const subtitle = isCountry ? "Variedade para você" : "Variedade para você"
 
-    const items = tagged.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const scoped = filterByScope(tagged, displayScope)
+    if (scoped.length === 0) {
+        console.log(`[Discover] SKIP allProducts reason=no_items_in_scope`)
+        return null
+    }
+
+    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "allProducts",
@@ -1452,7 +1544,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         subtitle,
         gatilho: "variedade",
         items,
-        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        _allItems: scoped.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}`,
     }
 }

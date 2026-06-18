@@ -189,9 +189,17 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                     {(() => {
                         const catName = article.category.replace(/-/g, " ");
                         const formattedCat = catName.charAt(0).toUpperCase() + catName.slice(1);
+                        const categoryData = helpCategories.find(c => c.id === article.category);
+                        const catIcon = categoryData?.icon || (
+                            article.category === "login-registro" ? "🔐" :
+                            article.category === "gestao" ? "📊" :
+                            article.category === "pedidos" ? "📦" :
+                            article.category === "vendas" ? "🛒" :
+                            article.category === "financeiro" ? "💰" : "📁"
+                        );
                         return (
                             <Badge variant="green" icon={null} className="px-3">
-                                🚀 {formattedCat}
+                                {catIcon} {formattedCat}
                             </Badge>
                         );
                     })()}

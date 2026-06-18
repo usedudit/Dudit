@@ -94,6 +94,7 @@ interface QuoteEditorProps {
     setSalespersonId?: (val: string) => void;
     salespeople?: { id: string; name: string }[];
     quotePromotions?: any[];
+    canApplyDiscount?: boolean;
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
@@ -121,6 +122,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
     const issueDateLocked = Boolean(props.isReadOnly || (caps && !caps.canEditIssueDate))
     const expiryLocked = Boolean(props.isReadOnly || (caps && !caps.canEditExpirationDate))
     const financialLocked = Boolean(props.isReadOnly || (caps && !caps.canEditDiscountShipping))
+    const discountLocked = financialLocked || props.canApplyDiscount === false
     const proposalNotesLocked = Boolean(props.isReadOnly || (caps && !caps.canEditProposalNotes))
     const internalNotesLocked = Boolean(props.isReadOnly || (caps && !caps.canEditInternalNotes))
     const statusLocked = Boolean(props.isReadOnly || (caps && !caps.canChangeStatus))
@@ -655,6 +657,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
                         {/* Financial Inputs Row */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {!discountLocked && (
                             <div className="relative">
                                 {props.discountType === 'R$' ? (
                                     <MoneyInput
@@ -686,6 +689,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     />
                                 )}
                             </div>
+                        )}
 
                             <MoneyInput
                                 label="Entrega"

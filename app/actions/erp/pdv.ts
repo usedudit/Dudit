@@ -538,6 +538,11 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     await requireUser()
     await requirePartnerAccessWithPermission(input.partnerId, "pdv", "sell")
 
+    // Validate discount permission if a discount or coupon is being applied
+    if (input.discountAmount > 0 || input.couponCode || input.couponId) {
+        await requirePartnerAccessWithPermission(input.partnerId, "pdv", "can_apply_discount")
+    }
+
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
@@ -714,6 +719,21 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     // Pre-validate inputs before calling RPC
     if (!input.preSaleId) return { success: false as const, error: "ID da pré-venda é obrigatório." }
     const paidAmount = safeMoney(Number(input.paidAmount || 0))
+
+    // Validate discount permission if the pre-sale has a discount applied
+    const { data: draftCheck } = await supabase
+        .from("pre_sales")
+        .select("discount_amount, coupon_id")
+        .eq("id", input.preSaleId)
+        .eq("partner_id", input.partnerId)
+        .single()
+    if (draftCheck) {
+        const hasDiscount = Number(draftCheck.discount_amount || 0) > 0
+        const hasCoupon = !!draftCheck.coupon_id
+        if (hasDiscount || hasCoupon) {
+            await requirePartnerAccessWithPermission(input.partnerId, "pdv", "can_apply_discount")
+        }
+    }
 
     // Validate finance account belongs to partner
     if (input.financeAccountId) {

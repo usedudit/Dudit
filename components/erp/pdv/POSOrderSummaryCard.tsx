@@ -23,7 +23,7 @@ type SummaryProps = {
     canReset: boolean
     onReset: () => void
     onOpenItems: () => void
-    onOpenDiscount: () => void
+    onOpenDiscount?: () => void
     onContinue: () => void
     onSaveDraft: () => unknown | Promise<unknown>
     onAddShipping: () => void
@@ -64,9 +64,11 @@ function POSOrderActionsMenu({
             <DropdownItem onClick={onSaveDraft}>
                 <SaveIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Salvar Pedido
             </DropdownItem>
-            <DropdownItem onClick={onOpenDiscount}>
-                <TagIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Aplicar Desconto
-            </DropdownItem>
+            {onOpenDiscount && (
+                <DropdownItem onClick={onOpenDiscount}>
+                    <TagIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Aplicar Desconto
+                </DropdownItem>
+            )}
             <DropdownItem onClick={onAddShipping}>
                 <MotorbikeIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> {hasDelivery ? "Editar Entrega" : "Adicionar Entrega"}
             </DropdownItem>

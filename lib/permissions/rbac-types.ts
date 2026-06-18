@@ -25,7 +25,7 @@ export type PermissionTemplate = {
     can_add_delivery: boolean
   }
   services: { view: boolean; create: boolean; edit: boolean; delete: boolean }
-  quotes: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  quotes: { view: boolean; create: boolean; edit: boolean; delete: boolean; can_apply_discount: boolean }
   financial: { view: boolean; create: boolean; edit: boolean; cancel: boolean }
   categories: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   coupons: { view: boolean; create: boolean; edit: boolean; delete: boolean }
