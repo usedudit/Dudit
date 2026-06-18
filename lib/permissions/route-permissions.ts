@@ -535,7 +535,10 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             manage: cashRegister.edit,
         },
         services: mapRoute("services"),
-        quotes: mapRoute("quotes"),
+        quotes: {
+            ...mapRoute("quotes"),
+            can_apply_discount: hasSpecificPermission(routePerms, "pos", "can_discount"),
+        },
         stock_movements: {
             view: mapRoute("stock_movements").view,
             create: mapRoute("stock_movements").create,

@@ -17,7 +17,9 @@ const PUBLIC_PATHS = [
   "/quote",
 ]
 
-// Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout
+// Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout.
+// Note: /institucional and /ajuda are now excluded from the middleware matcher entirely,
+// but we keep the header for any edge cases where dynamic routing might reach here.
 const STATIC_INSTITUTIONAL_PATHS = ["/institucional", "/ajuda"]
 
 // Rotas da API que possuem seu próprio rate limit interno e devem ser isentas do rate limit global no middleware
@@ -379,64 +381,71 @@ export async function middleware(request: NextRequest) {
           requestHeaders.set("x-user-email", user.email || "")
 
           // ================================================================
-          // BAN CHECK: Verifica se o usuário está banido antes de permitir acesso
+          // PARALLEL: Ban check + Partner status check
+          // These are independent queries — run them concurrently to save ~30-50ms
           // ================================================================
           const isAllowedWhenBanned = 
             pathname === "/banned" || pathname.startsWith("/banned/") ||
-            pathname === "/institucional" || pathname.startsWith("/institucional/") ||
-            pathname === "/ajuda" || pathname.startsWith("/ajuda/") ||
             pathname === "/auth/sign-out" || pathname.startsWith("/auth/sign-out/") ||
             pathname === "/auth/callback" || pathname.startsWith("/auth/callback/")
 
-          if (!isAllowedWhenBanned) {
-            const { data: profile } = await supabase
-              .from("user_profiles")
-              .select("banned_at, banned_until")
-              .eq("user_id", user.id)
-              .maybeSingle()
+          // Ban check ONLY on protected routes — public pages (marketplace, explorar, etc.)
+          // don't need ban enforcement. This avoids a user_profiles query on every public page
+          // visited by a logged-in user.
+          const needsBanCheck = !isAllowedWhenBanned && isProtected
 
-            if (profile?.banned_at) {
-              // Ban com expiração E já expirou → auto-clear
-              if (profile.banned_until && new Date(profile.banned_until) < new Date()) {
-                await supabase
+          const activePartnerId = request.cookies.get("active_partner_id")?.value
+          const needsPartnerCheck = pathname.startsWith("/erp") && !!activePartnerId
+
+          // Launch both queries in parallel
+          const [profileResult, partnerResult] = await Promise.all([
+            needsBanCheck
+              ? supabase
                   .from("user_profiles")
-                  .update({
-                    banned_at: null,
-                    banned_until: null,
-                    banned_reason: null,
-                    banned_by: null,
-                  })
+                  .select("banned_at, banned_until")
                   .eq("user_id", user.id)
-                // Ban expirado e limpo, segue normal
-              } else {
-                // Ativamente banido (permanente ou ainda não expirou)
-                console.log(`[MIDDLEWARE] User ${user.id} is BANNED - redirecting to /banned`)
-                const bannedUrl = new URL("/banned", request.url)
-                return NextResponse.redirect(bannedUrl)
-              }
+                  .maybeSingle()
+              : Promise.resolve({ data: null }),
+            needsPartnerCheck
+              ? supabase
+                  .from("partners")
+                  .select("is_active, erp_disabled")
+                  .eq("id", activePartnerId!)
+                  .maybeSingle()
+              : Promise.resolve({ data: null }),
+          ])
+
+          // Process ban check result
+          const profile = profileResult.data
+          if (profile?.banned_at) {
+            // Ban com expiração E já expirou → auto-clear
+            if (profile.banned_until && new Date(profile.banned_until) < new Date()) {
+              await supabase
+                .from("user_profiles")
+                .update({
+                  banned_at: null,
+                  banned_until: null,
+                  banned_reason: null,
+                  banned_by: null,
+                })
+                .eq("user_id", user.id)
+              // Ban expirado e limpo, segue normal
+            } else {
+              // Ativamente banido (permanente ou ainda não expirou)
+              console.log(`[MIDDLEWARE] User ${user.id} is BANNED - redirecting to /banned`)
+              const bannedUrl = new URL("/banned", request.url)
+              return NextResponse.redirect(bannedUrl)
             }
           }
 
-          // ================================================================
-          // ERP STATUS CHECK: Verifica se o parceiro está suspenso ou desativado
-          // ================================================================
-          if (pathname.startsWith("/erp")) {
-            const activePartnerId = request.cookies.get("active_partner_id")?.value
-            if (activePartnerId) {
-              const { data: partner } = await supabase
-                .from("partners")
-                .select("is_active, erp_disabled")
-                .eq("id", activePartnerId)
-                .maybeSingle()
-
-              if (partner && (partner.is_active === false || partner.erp_disabled === true)) {
-                console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
-                const selectErpUrl = new URL("/select-erp", request.url)
-                const responseRedirect = NextResponse.redirect(selectErpUrl)
-                responseRedirect.cookies.delete("active_partner_id")
-                return responseRedirect
-              }
-            }
+          // Process partner status check result
+          const partner = partnerResult.data
+          if (partner && (partner.is_active === false || partner.erp_disabled === true)) {
+            console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
+            const selectErpUrl = new URL("/select-erp", request.url)
+            const responseRedirect = NextResponse.redirect(selectErpUrl)
+            responseRedirect.cookies.delete("active_partner_id")
+            return responseRedirect
           }
 
           // Re-create the response to inject the new requestHeaders downstream
@@ -492,6 +501,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|ajuda|institucional|~offline|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
   ],
-}
+}

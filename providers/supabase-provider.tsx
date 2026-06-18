@@ -31,10 +31,14 @@ export function SupabaseProvider({
     const [isSessionLoading, setIsSessionLoading] = useState(false)
 
     useEffect(() => {
-        // Hydrate user from existing session on mount (compensates for no SSR prefetch)
-        supabase.auth.getUser().then(({ data }: any) => {
-            if (data?.user) setUser(data.user)
-        })
+        // Only fetch user client-side if SSR didn't provide one.
+        // When initialUser is available (the common case), this avoids a redundant
+        // Supabase GoTrue API round-trip (~50-150ms) on every page load.
+        if (!initialUser) {
+            supabase.auth.getUser().then(({ data }: any) => {
+                if (data?.user) setUser(data.user)
+            })
+        }
 
         const {
             data: { subscription },
@@ -45,7 +49,7 @@ export function SupabaseProvider({
         return () => {
             subscription.unsubscribe()
         }
-    }, [supabase])
+    }, [supabase, initialUser])
 
     const contextValue = useMemo(() => ({
         supabase,

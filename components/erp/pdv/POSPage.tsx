@@ -27,11 +27,11 @@ import {
     removeCouponFromPreSaleAction,
 } from "@/app/actions/erp/pdv"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
-import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
-import { getTeamMembers } from "@/app/actions/erp/team"
+
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pdv/SelectSellerSheet"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
@@ -67,6 +67,13 @@ interface Props {
         paymentMethods: PaymentMethodOption[]
     }
     initialActiveSession: any | null
+    /** SSR-loaded promotions — avoids a client-side Server Action POST on mount */
+    initialPromotions?: any[]
+    /** SSR-loaded team members — avoids a client-side Server Action POST on mount */
+    initialTeam?: {
+        members: { id: string; fullName?: string | null; userId?: string; avatarUrl?: string | null }[]
+        currentUserId?: string
+    }
 }
 
 type TeamMember = {
@@ -113,7 +120,7 @@ function DesktopPOSSheet({
     )
 }
 
-export default function POSPage({ partnerId, initialData, initialActiveSession }: Props) {
+export default function POSPage({ partnerId, initialData, initialActiveSession, initialPromotions, initialTeam }: Props) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { planSlug, hasSpecific } = usePermissions()
@@ -126,22 +133,20 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const [customers, setCustomers] = useState<Customer[]>(initialData.customers || [])
     const accounts = initialData.financeAccounts || []
     const [preSales, setPreSales] = useState<PreSale[]>(initialData.preSales || [])
-    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>(
+        initialTeam?.members?.map((m) => ({ id: m.id, fullName: m.fullName, userId: m.userId })) || []
+    )
     const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
 
     // New states and computations
     const [isCameraOpen, setIsCameraOpen] = useState(false)
     const [itemTypeTab, setItemTypeTab] = useState<"product" | "service">("product")
 
-    const [pdvPromotions, setPdvPromotions] = useState<any[]>([])
+    const [pdvPromotions, setPdvPromotions] = useState<any[]>(initialPromotions || [])
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false)
 
-    useEffect(() => {
-        if (!partnerId) return
-        listActivePromotionsForMarketplaceAction(partnerId).then(res => {
-            if (Array.isArray(res)) setPdvPromotions(res)
-        }).catch(() => { })
-    }, [partnerId])
+    // Promotions are now SSR-loaded via initialPromotions prop.
+    // No client-side useEffect POST needed.
 
     const getDisplayPrice = (prod: any) => computeItemDisplayPrice(
         Number(prod.price || 0),
@@ -290,28 +295,16 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         return ["Todos", ...Array.from(cats)]
     }, [products, itemTypeTab])
 
+    // Team members are now SSR-loaded via initialTeam prop.
+    // Set the default seller from SSR data on mount.
     useEffect(() => {
-        async function loadTeam() {
-            const res = await getTeamMembers()
-            if (res.error || !res.members?.length) return
-            setTeamMembers(
-                res.members.map((member) => ({
-                    id: member.id,
-                    fullName: member.fullName,
-                    userId: member.userId,
-                    avatarUrl: member.avatarUrl,
-                }))
-            )
-            if (res.currentUserId) {
-                const self = res.members.find((member) => member.userId === res.currentUserId)
-                if (self) {
-                    defaultSellerPartnerUserIdRef.current = self.id
-                    setSelectedSellerId((prev) => prev || self.id)
-                }
-            }
+        if (!initialTeam?.currentUserId || !initialTeam?.members?.length) return
+        const self = initialTeam.members.find((member) => member.userId === initialTeam.currentUserId)
+        if (self) {
+            defaultSellerPartnerUserIdRef.current = self.id
+            setSelectedSellerId((prev) => prev || self.id)
         }
-        loadTeam()
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const isFinalizingRef = useRef(false)
     /** Igual venda manual: o carrinho só é limpo ao fechar o PaymentModal após venda concluída, para a tela de sucesso e o recibo exibirem os valores. */

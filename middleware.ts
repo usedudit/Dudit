@@ -12,12 +12,17 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public assets (svg, png, jpg, jpeg, gif, webp)
+     * - public assets (svg, png, jpg, jpeg, gif, webp, etc.)
+     * - ajuda/* (static help pages — no auth/CSP needed)
+     * - institucional/* (static institutional pages)
+     * - ~offline (PWA offline page)
+     * - manifest.webmanifest (PWA manifest)
+     * - sitemap.xml, robots.txt (SEO files)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|ajuda|institucional|~offline|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
   ],
 }
