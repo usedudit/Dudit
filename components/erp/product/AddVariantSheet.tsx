@@ -496,8 +496,8 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
     const handleRemoveRowClick = (rowId: string, rowName: string) => {
         setConfirmAction({
-            title: "Remover Variante",
-            message: `Tem certeza que deseja remover a variante "${rowName}" da tabela?`,
+            title: "Remover Variação",
+            message: `Tem certeza que deseja remover a variação "${rowName}" da tabela?`,
             onConfirm: () => {
                 handleRemoveRow(rowId)
             }
@@ -588,14 +588,14 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
     // Handle save variants
     const handleSaveVariants = async () => {
         if (tableRows.length === 0) {
-            notifyError("Adicione pelo menos uma variante para salvar.")
+            notifyError("Adicione pelo menos uma variação para salvar.")
             return
         }
 
         // Validar limite de 30 valores por tipo e limites de 30 caracteres
         for (const variant of variants) {
             if (variant.type.length > 30) {
-                notifyError(`O nome do tipo de variante "${variant.type}" não pode ter mais de 30 caracteres.`)
+                notifyError(`O nome do tipo de variação "${variant.type}" não pode ter mais de 30 caracteres.`)
                 return
             }
             if (variant.values.length > 30) {
@@ -694,7 +694,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             }
         } catch (err) {
             console.error("Error saving variants:", err)
-            notifyError("Erro ao salvar variantes")
+            notifyError("Erro ao salvar variação")
         } finally {
             setIsSaving(false)
         }
@@ -763,7 +763,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                             className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-6 relative overflow-hidden"
                                         >
                                             <div className="flex items-center justify-between mb-4">
-                                                <h4 className="text-base font-bold text-brand-dark dark:text-dark-heading">Opção {index + 1}</h4>
+                                                <h4 className="text-base font-bold text-brand-dark dark:text-dark-heading">Variação {index + 1}</h4>
                                                 {variants.length > 1 && (
                                                     <Button variant="ghost" onClick={() => handleRemoveVariantClick(variant.id, variant.type)} className="w-8 h-8 flex items-center justify-center p-0">
                                                         <TrashIcon className="w-4 h-4 text-brand-inactive-text hover:text-brand-red" />
@@ -808,7 +808,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                     >
                                                         <div className="flex items-center gap-3 mb-4">
                                                             <Switch checked={variant.useImage} onCheckedChange={(checked) => updateVariant(variant.id, "useImage", checked)} />
-                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Usar imagens para esta variante</span>
+                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Usar imagens para esta variação</span>
                                                         </div>
 
                                                         <motion.div
@@ -865,7 +865,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                     {[
                                                         ...(showImageColumn ? [{ label: "Imagem", width: "80px", first: true }] : []),
-                                                        { label: "Variante", width: "auto", first: !showImageColumn },
+                                                        { label: "Variação", width: "auto", first: !showImageColumn },
                                                         { label: "Preço", width: "150px" },
                                                         { label: "Estoque", width: "160px" },
                                                         { label: "SKU", width: "200px" },
@@ -908,14 +908,14 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                 className="border-b border-brand-border dark:border-dark-border last:border-0 group hover:bg-brand-gray dark:hover:bg-dark-border/20 transition-colors"
                                                             >
                                                                 {showImageColumn && (
-                                                                <td className="p-2 pl-4 border-b border-brand-border dark:border-dark-border align-middle">
-                                                                    <VariantImageUpload
-                                                                        size="sm"
-                                                                        image={activeImage}
-                                                                        onSelectFile={(file) => handleInitiateCrop(file, { type: 'row', id: row.id })}
-                                                                        onRemove={() => setImageToDelete({ type: 'row', key: row.id })}
-                                                                    />
-                                                                </td>
+                                                                    <td className="p-2 pl-4 border-b border-brand-border dark:border-dark-border align-middle">
+                                                                        <VariantImageUpload
+                                                                            size="sm"
+                                                                            image={activeImage}
+                                                                            onSelectFile={(file) => handleInitiateCrop(file, { type: 'row', id: row.id })}
+                                                                            onRemove={() => setImageToDelete({ type: 'row', key: row.id })}
+                                                                        />
+                                                                    </td>
                                                                 )}
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
                                                                     <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading block">{row.name}</span>
@@ -924,6 +924,34 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                     <div className="w-32">
                                                                         <MoneyInput value={row.price} onChange={(val) => updateRow(row.id, "price", val)} />
                                                                     </div>
+                                                                </td>
+                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
+                                                                    {product?.id && matchingExisting ? (
+                                                                        <div className="flex items-center gap-1.5 min-w-[120px]">
+                                                                            <div className="flex-1 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg h-[34px] px-3 flex items-center justify-between text-xs text-brand-dark dark:text-dark-heading font-medium">
+                                                                                {row.stock}
+                                                                            </div>
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="outline"
+                                                                                className="h-[34px] px-2.5 text-[11px] border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-lg font-medium shrink-0"
+                                                                                onClick={() => {
+                                                                                    setSelectedVariantForAdjustment({
+                                                                                        id: matchingExisting.id,
+                                                                                        name: row.name,
+                                                                                        sku: row.sku,
+                                                                                        image: typeof activeImage === 'string' ? activeImage : null,
+                                                                                        stock: row.stock,
+                                                                                        rowId: row.id
+                                                                                    })
+                                                                                }}
+                                                                            >
+                                                                                Ajustar
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <QuantitySelector value={row.stock} onChange={(val) => updateRow(row.id, "stock", val)} min={0} size="md" />
+                                                                    )}
                                                                 </td>
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
                                                                     <div className="w-full">
@@ -935,34 +963,6 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                         />
                                                                     </div>
                                                                 </td>
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
-                                                                     {product?.id && matchingExisting ? (
-                                                                         <div className="flex items-center gap-1.5 min-w-[120px]">
-                                                                             <div className="flex-1 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg h-[34px] px-3 flex items-center justify-between text-xs text-brand-dark dark:text-dark-heading font-medium">
-                                                                                 {row.stock}
-                                                                             </div>
-                                                                             <Button
-                                                                                 type="button"
-                                                                                 variant="outline"
-                                                                                 className="h-[34px] px-2.5 text-[11px] border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-lg font-medium shrink-0"
-                                                                                 onClick={() => {
-                                                                                     setSelectedVariantForAdjustment({
-                                                                                         id: matchingExisting.id,
-                                                                                         name: row.name,
-                                                                                         sku: row.sku,
-                                                                                         image: typeof activeImage === 'string' ? activeImage : null,
-                                                                                         stock: row.stock,
-                                                                                         rowId: row.id
-                                                                                     })
-                                                                                 }}
-                                                                             >
-                                                                                 Ajustar
-                                                                             </Button>
-                                                                         </div>
-                                                                     ) : (
-                                                                         <QuantitySelector value={row.stock} onChange={(val) => updateRow(row.id, "stock", val)} min={0} size="md" />
-                                                                     )}
-                                                                </td>
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle text-center">
                                                                     <div className="flex justify-center">
                                                                         <Switch checked={row.active !== false} onCheckedChange={(val) => updateRow(row.id, "active", val)} />
@@ -970,12 +970,11 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                 </td>
                                                                 <td className="p-2 pr-4 border-b border-brand-border dark:border-dark-border align-middle text-center">
                                                                     <Button
-                                                                        variant="outline"
+                                                                        variant="outlinered"
                                                                         onClick={() => handleRemoveRowClick(row.id, row.name)}
-                                                                        className="w-8 h-8 p-0 rounded-full border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-red hover:border-red-200 hover:bg-red-50"
-                                                                    >
-                                                                        <XIcon className="w-4 h-4" />
-                                                                    </Button>
+                                                                        className="w-8 h-8 p-0"
+                                                                        leftIcon={<TrashIcon size={18} />}
+                                                                    />
                                                                 </td>
                                                             </motion.tr>
                                                         )

@@ -2,7 +2,6 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePermission } from "@/lib/permissions/access"
-import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -447,17 +446,6 @@ export async function duplicateRecurringTransactionAction(id: string, partnerId:
     if (error) throw error
     logRecurring("duplicated", { fromId: id, newId: data?.id, partnerId })
     return { success: true, data }
-  } catch (e: any) {
-    return { success: false, error: e.message }
-  }
-}
-
-export async function runDueRecurringTransactionsAction(limit = 200) {
-  try {
-    const admin = getAdminClient()
-    const { data, error } = await admin.rpc("process_due_recurring_transactions", { p_limit: limit })
-    if (error) throw error
-    return { success: true, data: data?.[0] || { processed_count: 0, created_count: 0, deactivated_count: 0 } }
   } catch (e: any) {
     return { success: false, error: e.message }
   }

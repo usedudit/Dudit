@@ -172,10 +172,18 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     }))
 
     const sumBase = splitRows.reduce((acc, r) => acc + r.amount, 0)
+
+    // Compute discount on baseTotal (not on amountReceived) to stay consistent with frontend
+    const baseDiscount = splitRows.reduce((acc, row) => {
+        const method = row.paymentMethodId ? methodById.get(row.paymentMethodId) : null
+        const dp = method ? Math.max(0, Number(method.discount_percent || 0)) : 0
+        return acc + (dp > 0 ? safeMoney(baseTotal * dp / 100) : 0)
+    }, 0)
+
     const isPartial = sumBase < baseTotal - 0.005
     const finalTotal = isPartial
-        ? Math.max(0, Math.round((baseTotal + recalculated.feeAmount + recalculated.interestAmount - recalculated.paymentMethodDiscountAmount) * 100) / 100)
-        : recalculated.finalTotal
+        ? Math.max(0, safeMoney(baseTotal + recalculated.feeAmount + recalculated.interestAmount - baseDiscount))
+        : Math.max(sumBase, recalculated.finalTotal)
 
     return {
         ok: true,

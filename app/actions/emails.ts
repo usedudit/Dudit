@@ -12,7 +12,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { UnosendService } from "@/lib/services/unosend.service"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
-import type { InternalEmailRequest, EmailSendResult } from "@/lib/types/unosend.types"
+import type { InternalEmailRequest } from "@/lib/types/unosend.types"
 
 // ============================================================================
 // TYPES
@@ -228,31 +228,4 @@ export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailR
   }
 }
 
-/**
- * Send transactional email (internal - no user context)
- * Used for system emails like password resets
- * Only available to authenticated server-side code
- */
-export async function sendTransactionalEmailAction(
-  input: Omit<SendEmailInput, "partnerId">,
-): Promise<EmailSendResult> {
-  // This is typically called from other server actions or API routes
-  // You might want additional checks here (e.g., whitelisted senders)
 
-  const internalRequest: InternalEmailRequest = {
-    to: Array.isArray(input.to) ? input.to.map((email) => ({ email })) : [{ email: input.to }],
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
-  }
-
-  const result = await UnosendService.sendEmail(internalRequest)
-
-  SecureLogger.info("[Transactional Email] Email sent", {
-    messageId: result.messageId,
-    success: result.success,
-    attempts: result.attempts,
-  })
-
-  return result
-}

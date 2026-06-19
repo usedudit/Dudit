@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { requireUser } from "@/lib/auth/authorization"
 import { incrementMarketplaceView } from "@/lib/services/marketplace-metrics.service"
 
 const VALID_TYPES = new Set(["produto", "servico", "plano"])
 
 export async function POST(request: NextRequest) {
   try {
+    await requireUser()
+
     const body = await request.json()
     const entityType = String(body.entityType || "")
     const entityId = String(body.entityId || "")
@@ -14,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
     }
 
-    const supabase = await createAdminClient()
+    const supabase = await createClient()
     await incrementMarketplaceView(
       supabase,
       entityType as "produto" | "servico" | "plano",

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { EditProductWrapper } from "@/components/erp/product/edit-product-wrapper"
 import { getCachedProductById, getCachedSuppliers } from "@/app/actions/erp/products"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { checkPermission } from "@/lib/permissions/access"
+import { AccessDenied } from "@/components/erp/access-denied"
 
 export const dynamic = "force-dynamic"
 
@@ -14,9 +16,12 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
     // Layout already guarantees auth + valid context
     const context = await getCurrentPartnerContext()
-    if (!context) redirect("/select-erp")
+    if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId
+
+    const { allowed } = await checkPermission(partnerId, "products", "view")
+    if (!allowed) return <AccessDenied />
 
     let product
     try {

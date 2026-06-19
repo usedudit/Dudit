@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { requireUser } from "@/lib/auth/authorization"
 
 export async function GET(request: NextRequest) {
+  await requireUser()
+
   const customerId = request.nextUrl.searchParams.get("customerId")
   if (!customerId) {
     return NextResponse.json({ reviews: [] })
   }
 
-  const supabase = createAdminClient()
+  const supabase = await createClient()
 
   const { data: customer } = await supabase
     .from("customers")

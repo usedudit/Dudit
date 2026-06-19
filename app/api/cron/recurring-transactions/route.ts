@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { runDueRecurringTransactionsAction } from "@/app/actions/erp/recurring-transactions"
+import { runDueRecurringTransactions } from "@/lib/services/recurring-transactions.server"
 
 export async function GET(req: Request) {
   try {
@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     }
 
     const limit = 500
-    const result = await runDueRecurringTransactionsAction(limit)
+    const result = await runDueRecurringTransactions(limit)
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 })
     }

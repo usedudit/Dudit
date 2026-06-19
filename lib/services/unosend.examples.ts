@@ -5,7 +5,7 @@
  * @module unosend.examples
  */
 
-import { sendEmailAction, sendTransactionalEmailAction } from "@/app/actions/emails"
+import { sendEmailAction } from "@/app/actions/emails"
 import { UnosendService } from "@/lib/services/unosend.service"
 import type { InternalEmailRequest } from "@/lib/types/unosend.types"
 
@@ -120,29 +120,6 @@ export async function examplePartnerNotification(
     `,
     text: `Novo pedido recebido!\n\nComprador: ${buyerName}\nProduto: ${productName}\n\nAcesse: https://example.com/erp/orders`,
     partnerId,
-  })
-
-  return result
-}
-
-// ============================================================================
-// EXAMPLE 5: Send password reset email (transactional)
-// ============================================================================
-
-export async function examplePasswordReset(userEmail: string, resetToken: string) {
-  const resetLink = `https://example.com/reset-password?token=${resetToken}`
-
-  const result = await sendTransactionalEmailAction({
-    to: userEmail,
-    subject: "Redefinir sua senha",
-    html: `
-      <h2>Redefinir Senha</h2>
-      <p>Você solicitou para redefinir sua senha.</p>
-      <p><a href="${resetLink}" style="background: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Redefinir Senha</a></p>
-      <p style="font-size: 12px; color: #666;">Este link expira em 24 horas.</p>
-      <p style="font-size: 12px; color: #999;">Se você não solicitou isso, ignore este email.</p>
-    `,
-    text: `Você solicitou para redefinir sua senha.\n\nClique no link abaixo:\n${resetLink}\n\nEste link expira em 24 horas.`,
   })
 
   return result

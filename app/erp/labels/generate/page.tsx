@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
+import { AccessDenied } from "@/components/erp/access-denied"
 import { Button } from "@/components/reusable"
 import Link from "next/link"
 import { LabelGenerator } from "@/components/erp/label-generator"
@@ -14,6 +16,9 @@ export default async function GenerateLabelsPage() {
   if (!partner) {
     redirect("/dashboard")
   }
+
+  const { allowed } = await checkPermission(partner.id, "products", "view")
+  if (!allowed) return <AccessDenied />
 
   const { data: products } = await supabase
     .from("products")

@@ -30,9 +30,9 @@ export function TagsInput({
 
   const isInputTooLong = inputValue.length > 30
   const hasTooLongTag = tags.some(tag => tag.length > 30)
-  
+
   const hasError = externalError || isInputTooLong || hasTooLongTag
-  const displayErrorMessage = isInputTooLong 
+  const displayErrorMessage = isInputTooLong
     ? "O valor digitado não pode ter mais de 30 caracteres."
     : hasTooLongTag
       ? "Um ou mais valores excedem o limite de 30 caracteres."
@@ -64,7 +64,7 @@ export function TagsInput({
       {label && <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>}
       <div
         className={cn(
-          "flex flex-wrap gap-2 h-[42px] px-3 py-2 rounded-lg border focus-within:border-brand-green dark:focus-within:border-brand-green focus-within:outline-none transition-all bg-white dark:bg-dark-surface",
+          "flex flex-wrap gap-2 h-[42px] px-3 py-2 rounded-lg border focus-within:border-brand-dark dark:focus-within:border-dark-body focus-within:outline-none transition-all bg-white dark:bg-dark-surface",
           hasError ? "border-brand-red" : "border-brand-border dark:border-dark-border",
           disabled && "opacity-50 cursor-not-allowed bg-brand-gray dark:bg-dark-border/20",
         )}
@@ -75,8 +75,8 @@ export function TagsInput({
             key={index}
             className={cn(
               "flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium animate-fadeIn",
-              tag.length > 30 
-                ? "bg-red-100 dark:bg-red-900/30 text-brand-red" 
+              tag.length > 30
+                ? "bg-red-100 dark:bg-red-900/30 text-brand-red"
                 : "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
             )}
           >

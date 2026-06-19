@@ -942,6 +942,7 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
   error?: string
 }> {
   try {
+    await requireUser()
     const supabase = await getSupabaseServerClient()
 
     const { data: xmlImport, error: impErr } = await supabase
@@ -1072,6 +1073,7 @@ export async function listImportsAction(
   },
 ): Promise<{ success: boolean; imports?: any[]; total?: number; error?: string }> {
   try {
+    await requireUser()
     const supabase = await getSupabaseServerClient()
 
     let query = supabase
@@ -1155,6 +1157,7 @@ export async function getImportFinanceAction(
   partnerId: string,
 ): Promise<{ success: boolean; transactions?: any[]; error?: string }> {
   try {
+    await requireUser()
     const supabase = await getSupabaseServerClient()
 
     const { data: xmlImport } = await supabase
@@ -1185,6 +1188,7 @@ export async function getImportStockMovementsAction(
   partnerId: string,
 ): Promise<{ success: boolean; movements?: any[]; error?: string }> {
   try {
+    await requireUser()
     const supabase = await getSupabaseServerClient()
 
     const { data: items } = await supabase

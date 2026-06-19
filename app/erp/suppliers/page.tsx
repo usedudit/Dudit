@@ -2,13 +2,17 @@ import { redirect } from "next/navigation"
 import { Button } from "@/components/reusable"
 import Link from "next/link"
 import { SuppliersList } from "@/components/erp/suppliers-list"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getPartnerSuppliersCached } from "@/lib/data/suppliers"
+import { AccessDenied } from "@/components/erp/access-denied"
 
 export default async function SuppliersPage() {
   const context = await getCurrentPartnerContext()
-  if (!context) redirect("/select-erp")
+  if (!context) return <AccessDenied />
+
+  const { allowed } = await checkPartnerPermission(context.partnerId, "suppliers", "view")
+  if (!allowed) return <AccessDenied />
 
   const suppliers = await getPartnerSuppliersCached(context.partnerId)
 

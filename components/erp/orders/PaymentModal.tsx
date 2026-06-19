@@ -1008,7 +1008,7 @@ const PaymentModal = ({
     const isAllocationUnderpaid = paymentBaseAmount < finalTotalWithMethodPricing - 0.005;
     const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.005 : isAllocationUnderpaid;
 
-    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
+    const isOverpaid = !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
     const changeAmount = isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0;
 
     /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
@@ -1042,7 +1042,7 @@ const PaymentModal = ({
         }
         // Para pagamento único: compara o que o operador digitou vs o total calculado do método
         const need = finalTotalWithMethodPricing;
-        const paid = isAllocationUnderpaid ? paymentBaseAmount : Math.max(paymentBaseAmount, need);
+        const paid = isAllocationUnderpaid ? paymentBaseAmount : need;
         return { compactAlertPaid: paid, compactAlertNeed: need };
     }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalTotalWithMethodPricing, isAllocationUnderpaid]);
 
@@ -1079,8 +1079,8 @@ const PaymentModal = ({
         ? successSnapshot.displayOrderTotal
         : view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
             ? splitPreview.finalTotal
-            : (view === 'money' || view === 'card' || view === 'pix') && legFinalCharged != null
-                ? legFinalCharged
+            : (view === 'money' || view === 'card' || view === 'pix')
+                ? finalTotalWithMethodPricing
                 : total;
 
     const receiptPricingDetails = useMemo(() => {
@@ -1360,7 +1360,7 @@ const PaymentModal = ({
             otherCosts: Number(otherCosts || 0),
             discountAmount: Number(discountAmount || 0),
             total,
-            displayOrderTotal: !isUnderpaid ? totalPaidCalculated : chargeTarget,
+            displayOrderTotal: displayTransactionTotal,
             totalPaid: totalPaidCalculated,
             change: changeAmount,
             isUnderpaid,
