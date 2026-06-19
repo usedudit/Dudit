@@ -4,12 +4,14 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
 import { redirect } from 'next/navigation'
 import { requireUser, requirePartnerAccessWithPermission, requireSupplierOwnership } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
 import { generateUniqueSupplierCode } from "@/lib/utils/code-generators"
 import { createAddressAction } from "@/app/actions/shared/addresses"
 import { canUseFeature } from "@/lib/services/subscription.service"
+import { revalidateSuppliers } from "@/lib/utils/revalidation"
 
 export async function createComprehensiveSupplierAction(data: {
   partnerId: string
@@ -367,6 +369,197 @@ export async function duplicateSupplierAction(supplierId: string) {
     return { error: createError.message }
   }
 
+  revalidatePath("/erp/suppliers")
+  return { success: true }
+}
+
+// ─── Cursor-based pagination for the suppliers page ───────────────────────
+
+export type ERPSupplierListCursor = { createdAt: string; id: string }
+
+function buildSupplierKeysetOrFilter(cursor: ERPSupplierListCursor): string {
+  const ts = cursor.createdAt
+  const id = cursor.id
+  const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+  return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
+const ERP_SUPPLIERS_PAGE_SIZE = 100
+
+export async function getERPSuppliersPageAction(
+  partnerId: string,
+  options?: { cursor?: ERPSupplierListCursor | null; limit?: number },
+): Promise<
+  | { success: true; items: any[]; nextCursor: ERPSupplierListCursor | null; hasMore: boolean }
+  | { success: false; error: string }
+> {
+  try {
+    await requirePermission(partnerId, "suppliers", "view")
+    const supabase = await getSupabaseServerClient()
+
+    const cursor = options?.cursor ?? null
+    const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_SUPPLIERS_PAGE_SIZE))))
+    const fetchLimit = limit + 1
+
+    let q = supabase
+      .from("suppliers")
+      .select("id, name, email, phone, person_type, cpf, cnpj, nome_fantasia, inscricao_estadual, status, created_at, supplier_code, notes")
+      .eq("partner_id", partnerId)
+
+    if (cursor) {
+      q = q.or(buildSupplierKeysetOrFilter(cursor))
+    }
+
+    const { data, error } = await q
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(fetchLimit)
+
+    if (error) throw error
+
+    const rows = data || []
+    const hasMore = rows.length > limit
+    const items = hasMore ? rows.slice(0, limit) : rows
+
+    // Aggregate XML import stats for this page of suppliers
+    const supplierIds = items.map((s: any) => s.id).filter(Boolean)
+    if (supplierIds.length > 0) {
+      const { data: xmlAgg } = await supabase
+        .from("xml_imports")
+        .select("supplier_id, total_value, created_at, id")
+        .in("supplier_id", supplierIds)
+        .neq("status", "reversed")
+
+      if (xmlAgg) {
+        const statsMap = new Map<string, { xml_count: number; total_value: number; last_import_at: string | null }>()
+        for (const x of xmlAgg) {
+          const prev = statsMap.get(x.supplier_id) || { xml_count: 0, total_value: 0, last_import_at: null }
+          prev.xml_count++
+          prev.total_value += Number(x.total_value) || 0
+          if (x.created_at && (!prev.last_import_at || x.created_at > prev.last_import_at)) {
+            prev.last_import_at = x.created_at
+          }
+          statsMap.set(x.supplier_id, prev)
+        }
+        for (const item of items) {
+          const stats = statsMap.get(item.id)
+          item.xml_count = stats?.xml_count || 0
+          item.total_imported_value = stats?.total_value || 0
+          item.last_import_at = stats?.last_import_at || null
+        }
+      }
+    }
+
+    const last = items[items.length - 1]
+    const nextCursor: ERPSupplierListCursor | null =
+      hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+
+    // Decrypt CPFs
+    const { decryptCPF } = await import("@/lib/crypto")
+    await Promise.all(items.map(async (item: any) => {
+      if (item.cpf) {
+        try { item.cpf = await decryptCPF(item.cpf) } catch { /* keep encrypted */ }
+      }
+    }))
+
+    return { success: true, items, nextCursor, hasMore }
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Erro ao carregar fornecedores" }
+  }
+}
+
+export async function getSupplierByIdAction(supplierId: string) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { data: supplier } = await supabase
+    .from("suppliers")
+    .select("*")
+    .eq("id", supplierId)
+    .maybeSingle()
+
+  if (!supplier) return { error: "Fornecedor não encontrado" }
+
+  if (supplier.cpf) {
+    try {
+      const { decryptCPF } = await import("@/lib/crypto")
+      supplier.cpf = await decryptCPF(supplier.cpf)
+    } catch { /* keep encrypted */ }
+  }
+
+  return { supplier }
+}
+
+export async function deleteSuppliersInBatchAction(supplierIds: string[]) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { data: suppliers } = await supabase
+    .from("suppliers")
+    .select("partner_id")
+    .in("id", supplierIds)
+
+  if (!suppliers || suppliers.length !== supplierIds.length) {
+    return { error: "Um ou mais fornecedores não encontrados" }
+  }
+
+  const partnerIds = [...new Set(suppliers.map((s: { partner_id: string }) => s.partner_id))] as string[]
+  if (partnerIds.length !== 1) {
+    return { error: "Fornecedores de lojas diferentes" }
+  }
+
+  const partnerId = partnerIds[0]
+  await requirePermission(partnerId, "suppliers", "delete", user)
+
+  const { error } = await supabase
+    .from("suppliers")
+    .delete()
+    .in("id", supplierIds)
+    .eq("partner_id", partnerId)
+
+  if (error) return { error: error.message }
+
+  revalidateSuppliers(partnerId)
+  revalidatePath("/erp/suppliers")
+  return { success: true }
+}
+
+export async function toggleSuppliersStatusAction(supplierIds: string[], isActive: boolean) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { data: suppliers } = await supabase
+    .from("suppliers")
+    .select("partner_id")
+    .in("id", supplierIds)
+
+  if (!suppliers || suppliers.length !== supplierIds.length) {
+    return { error: "Um ou mais fornecedores não encontrados" }
+  }
+
+  const partnerIds = [...new Set(suppliers.map((s: { partner_id: string }) => s.partner_id))] as string[]
+  if (partnerIds.length !== 1) {
+    return { error: "Fornecedores de lojas diferentes" }
+  }
+
+  const partnerId = partnerIds[0]
+  await requirePermission(partnerId, "suppliers", "edit", user)
+
+  const { error } = await supabase
+    .from("suppliers")
+    .update({ status: isActive ? "ativo" : "inativo", updated_at: new Date().toISOString() })
+    .in("id", supplierIds)
+    .eq("partner_id", partnerId)
+
+  if (error) return { error: error.message }
+
+  revalidateSuppliers(partnerId)
   revalidatePath("/erp/suppliers")
   return { success: true }
 }

@@ -12,6 +12,7 @@ export type PermissionTemplate = {
   }
   appointments: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   customers: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  suppliers: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   products: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   stock_movements: { view: boolean; create: boolean; undo: boolean }
   pdv: {

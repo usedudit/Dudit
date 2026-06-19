@@ -366,7 +366,7 @@ function ListContent({
               <FadeIn key="empty" className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full">
                 <IconPlaceholder
                   placeholderType="image"
-                  imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/MovimentacaoEstoque.png"}
+                  imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/NotasFiscais.png"}
                   imageAlt="Sem importações"
                   title={hasActiveFilters ? "Nenhuma importação encontrada" : "Sem importações"}
                   subtitle={hasActiveFilters ? "Tente ajustar seus filtros ou termos de busca." : "Suas notas importadas aparecerão aqui."}
@@ -416,13 +416,11 @@ function ListContent({
                                       <div className="flex items-center">
                                         <ArrowUpDownIcon
                                           size={14}
-                                          className={`transition-all duration-200 ${
-                                            isSorted
+                                          className={`transition-all duration-200 ${isSorted
                                               ? "text-brand-dark dark:text-dark-heading opacity-100 block"
                                               : "text-brand-inactive-text hidden group-hover:block opacity-40"
-                                          } ${
-                                            isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""
-                                          }`}
+                                            } ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""
+                                            }`}
                                         />
                                       </div>
                                     )}
@@ -828,7 +826,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
 
               <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                 <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
-                    <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
                       Série {preview.invoice.serie || "—"} | N° {preview.invoice.numero || "—"}
                     </div>
