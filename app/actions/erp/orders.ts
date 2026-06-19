@@ -28,6 +28,8 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
 import { applySaleToGoals, reverseSaleFromGoals } from "@/lib/services/sales-goals.service"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+
 
 type ERPItemPayload = {
     productId: string | null
@@ -175,14 +177,10 @@ function resolvePaymentState(params: {
 }
 
 function normalizePaymentMethodLabel(value?: string | null) {
-    const normalized = String(value || "").trim().toLowerCase()
-    if (!normalized) return ""
-    if (normalized === "dinheiro") return "Dinheiro"
-    if (normalized === "pix") return "Pix"
-    if (normalized === "cartao" || normalized === "cartão") return "Cartão"
-    if (normalized === "pendente") return "Pendente"
-    return String(value || "").trim()
+    if (!value) return ""
+    return formatPaymentMethodLabel(value, null)
 }
+
 
 function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) {
     const normalizedEntries = (entries || [])
@@ -3343,7 +3341,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
             await createFinancialTransactionsForPaidOrder(supabase, {
                 orderNumber: order.order_number,
                 partnerId: payload.partnerId,
-                totalAmount: order.total_amount,
+                totalAmount: totalAmountToSave,
                 paymentMethod: payload.paymentMethod,
                 paymentProvider: payload.paymentProvider,
                 paymentBreakdown: payload.paymentBreakdown,
@@ -3360,11 +3358,12 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 partnerId: payload.partnerId,
                 orderId: payload.orderId,
                 sellerUserId: order.created_by || user.id,
-                saleAmount: order.total_amount,
+                saleAmount: totalAmountToSave,
                 accountId: payload.financeAccountId,
                 createdByUserId: user.id,
             })
         }
+
 
         const { data: linkedAppointment } = await supabase
             .from("appointments")
@@ -3412,7 +3411,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 .catch(console.error)
         }
 
-        return { success: true }
+        return { success: true, orderNumber: order.order_number }
     } catch (e: any) {
         return { success: false, error: e?.message || "Erro ao processar pagamento" }
     }

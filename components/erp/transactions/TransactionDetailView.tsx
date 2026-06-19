@@ -410,60 +410,14 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                             <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.accountLine || "-"}</span>
                                                         }
                                                     />
-                                                    {detail.salesSummary && (
+                                                    {detail.paymentMethodSubtitle && (
                                                         <PaymentRow
-                                                            label="Subtotal da venda"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.subtotal)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.salesSummary && detail.salesSummary.paymentBreakdown && detail.salesSummary.paymentBreakdown.length > 1 && (
-                                                        <PaymentRow
-                                                            label="Valores por meio"
+                                                            label="Meio de pagamento"
                                                             value={
-                                                                <div className="flex flex-col gap-1 text-right">
-                                                                    {detail.salesSummary.paymentBreakdown.map((entry: any, index: number) => (
-                                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
+                                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                    {detail.paymentMethodSubtitle}
+                                                                </span>
                                                             }
-                                                        />
-                                                    )}
-                                                    {detail.salesSummary && detail.salesSummary.manualDiscount > 0 && (
-                                                        <PaymentRow
-                                                            label="Desconto"
-                                                            value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.manualDiscount)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.salesSummary && detail.salesSummary.couponDiscount > 0 && (
-                                                        <PaymentRow
-                                                            label="Desconto por cupom"
-                                                            value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.couponDiscount)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.salesSummary && detail.salesSummary.paymentMethodDiscount > 0 && (
-                                                        <PaymentRow
-                                                            label="Desconto por método"
-                                                            value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.paymentMethodDiscount)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.salesSummary && detail.salesSummary.paymentMethodExtra > 0 && (
-                                                        <PaymentRow
-                                                            label="Acréscimo do método"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detail.salesSummary.paymentMethodExtra)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.salesSummary && detail.salesSummary.deliveryFee > 0 && (
-                                                        <PaymentRow
-                                                            label="Entrega"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.deliveryFee)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.salesSummary && detail.salesSummary.additionalCosts > 0 && (
-                                                        <PaymentRow
-                                                            label="Outros custos"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.additionalCosts)}</span>}
                                                         />
                                                     )}
                                                     {detail.showDueDateRow && (
@@ -508,52 +462,19 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                     )}
                                                     {(() => {
                                                         const isPaid = String(detail.statusLabel || "").toLowerCase() === "pago" || String(detail.statusLabel || "").toLowerCase() === "recebido" || detail.timeline.step2.active;
-                                                        const showOriginalAmount = detail.originalAmount !== undefined && detail.originalAmount !== null && detail.originalAmount > 0 && (
-                                                            detail.isRecurring ||
-                                                            !!detail.installmentBreakdown?.length ||
-                                                            (detail.interestAmount || 0) > 0 ||
-                                                            (detail.discountAmount || 0) > 0 ||
-                                                            Math.abs(detail.originalAmount - detail.amount) > 0.01
-                                                        );
 
                                                         return (
-                                                            <>
-                                                                {showOriginalAmount && (
-                                                                    <PaymentRow
-                                                                        label="Valor original"
-                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.originalAmount!)}</span>}
-                                                                    />
-                                                                )}
-                                                                {detail.interestAmount !== undefined && detail.interestAmount !== null && detail.interestAmount > 0 && (
-                                                                    <PaymentRow
-                                                                        label="Juros"
-                                                                        value={<span className="text-brand-red font-bold text-sm">+ {formatCurrency(detail.interestAmount)}</span>}
-                                                                    />
-                                                                )}
-                                                                {detail.discountAmount !== undefined && detail.discountAmount !== null && detail.discountAmount > 0 && (
-                                                                    <PaymentRow
-                                                                        label="Desconto"
-                                                                        value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(detail.discountAmount)}</span>}
-                                                                    />
-                                                                )}
-                                                                {detail.salesSummary && detail.salesSummary.changeAmount !== undefined && detail.salesSummary.changeAmount > 0.009 && (
-                                                                    <PaymentRow
-                                                                        label="Troco"
-                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.changeAmount)}</span>}
-                                                                    />
-                                                                )}
-                                                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                                                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">
-                                                                        {isPaid ? "Total pago" : "Total"}
-                                                                    </span>
-                                                                    <span
-                                                                        className={`font-bold text-2xl tracking-tight ${detail.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}
-                                                                    >
-                                                                        {detail.ledgerDirection === "in" ? "+ " : "- "}
-                                                                        {formatCurrency(detail.amount)}
-                                                                    </span>
-                                                                </div>
-                                                            </>
+                                                            <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">
+                                                                    {isPaid ? "Total pago" : "Total"}
+                                                                </span>
+                                                                <span
+                                                                    className={`font-bold text-2xl tracking-tight ${detail.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}
+                                                                >
+                                                                    {detail.ledgerDirection === "in" ? "+ " : "- "}
+                                                                    {formatCurrency(detail.amount)}
+                                                                </span>
+                                                            </div>
                                                         );
                                                     })()}
                                                 </div>

@@ -29,6 +29,8 @@ import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 import { getMercadoPagoStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
+import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
+
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -59,27 +61,15 @@ const normalizePaymentMethodLabel = (value?: string | null) => {
     return String(value || '').trim();
 };
 
-const getFormattedMethodLabel = (name: string, type?: string | null) => {
-    if (!name) return "";
-    const normalizedType = normalizeMethodType(type);
-    const typeLabel =
-        normalizedType === 'cash' ? 'Dinheiro' :
-            normalizedType === 'pix' ? 'Pix' :
-                normalizedType === 'credit_card' ? 'Cartão de Crédito' :
-                    normalizedType === 'debit_card' ? 'Cartão de Débito' :
-                        normalizedType === 'bank_transfer' ? 'Transferência' : 'Outros';
-
-    const lowerName = name.toLowerCase().trim();
-    const lowerType = typeLabel.toLowerCase().trim();
-
-    if (lowerName === lowerType || (lowerName === "dinheiro" && lowerType === "dinheiro") || (lowerName === "pix" && lowerType === "pix")) {
-        return typeLabel;
-    }
-    if (lowerName.startsWith(lowerType)) {
-        return name;
-    }
-    return `${typeLabel} (${name})`;
+const formatPaymentMethodToFullLabel = (value?: string | null) => {
+    if (!value) return "";
+    return formatPaymentMethodLabel(value, null);
 };
+
+const getFormattedMethodLabel = (name: string, type?: string | null) => {
+    return formatPaymentMethodLabel(name, type);
+};
+
 
 
 // --- HELPER COMPONENTS ---
@@ -1300,7 +1290,9 @@ const PaymentModal = ({
                         if (selectedMethodObj) {
                             return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
                         }
-                        return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
+                        const fallbackName = view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
+                        const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
+                        return getFormattedMethodLabel(fallbackName, fallbackType);
                     })(),
                     amount: Number(totalPaidCalculated || 0),
                     amountReceived: Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0),
@@ -1321,7 +1313,7 @@ const PaymentModal = ({
 
         const paymentMethod = isPendingPayment
             ? 'pendente'
-            : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)))).join(', ');
+            : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ');
 
         const singleRegisterAmount =
             view !== 'split' ? totalPaidCalculated : 0;
@@ -1343,16 +1335,17 @@ const PaymentModal = ({
 
     const handleStartProcessing = async (forcedPayload?: any) => {
         const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
-        // Build per-method summary for success snapshot
+        const payload = forcedPayload || buildConfirmPayload();
+        setLastPaymentPayload(payload);
+
+        // Build per-method summary for success snapshot using payload breakdown data
         const snapshotBreakdown: Array<{ method: string; amount: number }> = []
-        if (view === 'split') {
-            payments
-                .filter((p) => p.method && p.amount > 0.009)
-                .forEach((p) => snapshotBreakdown.push({ method: p.method || '', amount: p.amount }))
-        } else {
-            const methodName = activeMethods.find((m) => m.id === selectedMethodId)?.name || view
-            snapshotBreakdown.push({ method: methodName, amount: totalPaidCalculated })
+        if (payload?.paymentBreakdown) {
+            payload.paymentBreakdown.forEach((p: any) => {
+                snapshotBreakdown.push({ method: p.method || '', amount: p.amount })
+            })
         }
+
         setSuccessSnapshot({
             subTotal,
             itemCount,
@@ -1375,8 +1368,7 @@ const PaymentModal = ({
             paymentBreakdown: snapshotBreakdown,
         })
         setPaymentStatus('processing');
-        const payload = forcedPayload || buildConfirmPayload();
-        setLastPaymentPayload(payload);
+
 
         try {
             const result = await onConfirm(payload);

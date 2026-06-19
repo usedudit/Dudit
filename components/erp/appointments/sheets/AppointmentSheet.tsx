@@ -1012,7 +1012,7 @@ export const AppointmentSheet = ({
                 }
 
                 router.refresh();
-                return { success: true, orderNumber: existingOrderId };
+                return { success: true, orderNumber: result.orderNumber || existingOrderId };
             }
 
             const items = selectedServices.map((s, idx) => {
