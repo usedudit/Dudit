@@ -31,29 +31,74 @@ export function PaymentMethodIndicator({ label, simplifyMultiple = true }: { lab
 
 function PaymentMethodIndicatorKeyed({ part }: { part: string }) {
     const normalized = part.toLowerCase()
-    let icon: React.ReactNode = null
+    let icons: React.ReactNode[] = []
     let colorClass = "text-brand-inactive-text dark:text-dark-body"
 
-    if (normalized.includes("multiplo") || normalized.includes("múltiplo")) {
-        icon = <CreditCardIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />
-        colorClass = "text-brand-inactive-text dark:text-dark-body"
-    } else if (normalized.includes("mercado") || normalized.includes("mp") || normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
-        icon = <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-3.5 h-3.5 object-contain" />
+    if (normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
         colorClass = "text-brand-blue dark:text-brand-blue"
+        icons.push(
+            <img 
+                key="mp" 
+                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" 
+                alt="Mercado Pago" 
+                className="w-3.5 h-3.5 object-contain" 
+            />
+        )
+        const match = part.match(/\(([^)]+)\)/);
+        if (match) {
+            const sub = match[1].trim().toLowerCase();
+            if (sub.includes("pix")) {
+                icons.push(
+                    <img 
+                        key="sub" 
+                        src="https://img.dudit.com.br/static/icons/payments/Pix.png" 
+                        alt="Pix" 
+                        className="w-3.5 h-3.5 object-contain" 
+                    />
+                )
+            } else if (sub.includes("cartão") || sub.includes("cartao") || sub.includes("credit") || sub.includes("debit") || sub.includes("visa") || sub.includes("master") || sub.includes("elo") || sub.includes("card") || sub.includes("crédito") || sub.includes("credito") || sub.includes("débito") || sub.includes("debito")) {
+                icons.push(
+                    <CreditCardIcon key="sub" className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                )
+            } else if (sub.includes("dinheiro") || sub.includes("money") || sub.includes("cash")) {
+                icons.push(
+                    <MoneyIcon key="sub" className="w-3.5 h-3.5 text-brand-green" />
+                )
+            } else if (sub.includes("boleto")) {
+                icons.push(
+                    <img 
+                        key="sub" 
+                        src="https://img.dudit.com.br/static/icons/payments/Boleto.png" 
+                        alt="Boleto" 
+                        className="w-3.5 h-3.5 object-contain" 
+                    />
+                )
+            }
+        }
+    } else if (normalized.includes("multiplo") || normalized.includes("múltiplo")) {
+        icons.push(<CreditCardIcon key="icon" className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />)
+        colorClass = "text-brand-inactive-text dark:text-dark-body"
     } else if (normalized.includes("pix")) {
-        icon = <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-3.5 h-3.5 object-contain" />
+        icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-3.5 h-3.5 object-contain" />)
         colorClass = "text-teal-700 dark:text-teal-400"
     } else if (normalized.includes("dinheiro") || normalized.includes("money") || normalized.includes("espécie") || normalized.includes("espece") || normalized.includes("cash") || normalized.includes("carteira")) {
-        icon = <MoneyIcon className="w-3.5 h-3.5 text-brand-green" />
+        icons.push(<MoneyIcon key="icon" className="w-3.5 h-3.5 text-brand-green" />)
         colorClass = "text-emerald-700 dark:text-emerald-400"
     } else if (normalized.includes("cartão") || normalized.includes("cartao") || normalized.includes("credit") || normalized.includes("debit") || normalized.includes("visa") || normalized.includes("master") || normalized.includes("elo") || normalized.includes("card")) {
-        icon = <CreditCardIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+        icons.push(<CreditCardIcon key="icon" className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />)
         colorClass = "text-indigo-700 dark:text-indigo-400"
+    } else if (normalized.includes("mercado") || normalized.includes("mp")) {
+        icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-3.5 h-3.5 object-contain" />)
+        colorClass = "text-brand-blue dark:text-brand-blue"
+    } else {
+        icons.push(<CreditCardIcon key="icon" className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />)
     }
 
     return (
         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${colorClass}`}>
-            {icon}
+            <span className="flex items-center gap-1">
+                {icons}
+            </span>
             <span>{part}</span>
         </span>
     )

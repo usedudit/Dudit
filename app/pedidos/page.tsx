@@ -23,7 +23,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(id, zip_code, street, number, complement, neighborhood, city, state)),
-    return_requests!order_id(id, request_type, status),
+    return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, created_at, updated_at, deleted_at, return_events(*)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       product_variants(variant_name, variant_options),
       products(id, name, images, video_thumbnail, unit),
@@ -36,7 +36,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(id, zip_code, street, number, complement, neighborhood, city, state)),
-    return_requests!order_id(id, request_type, status),
+    return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, created_at, updated_at, deleted_at, return_events(*)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       services(id, name, images),
       recurring_plans(id, name))

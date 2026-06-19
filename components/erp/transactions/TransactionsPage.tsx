@@ -223,6 +223,7 @@ export default function TransactionsPage({
             paymentDateSubtitle: item.dueDate || item.paymentDateRaw || null,
             creatorName: "...",
             originLabel: item.origin === "manual" ? "Manual" : item.origin === "gateway" ? "Gateway" : "Sistema",
+            originSource: item.originSource || "Manual",
             typeBannerLabel: item.transactionType === "income" ? "Receita" : item.transactionType === "expense" ? "Despesa" : "Ajuste",
             amount: item.amount,
             ledgerDirection: item.ledgerDirection,

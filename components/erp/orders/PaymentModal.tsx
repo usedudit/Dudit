@@ -54,10 +54,13 @@ const buildMethodsSignature = (methods: PartnerPaymentMethod[]) =>
 const normalizePaymentMethodLabel = (value?: string | null) => {
     const normalized = String(value || '').trim().toLowerCase();
     if (!normalized) return '';
-    if (normalized === 'dinheiro') return 'Dinheiro';
-    if (normalized === 'pix') return 'Pix';
-    if (normalized === 'cartao' || normalized === 'cartão') return 'Cartão';
-    if (normalized === 'pendente') return 'Pendente';
+    if (normalized.includes('dinheiro') || normalized.includes('cash') || normalized.includes('money')) return 'Dinheiro';
+    if (normalized.includes('pix')) return 'Pix';
+    if (normalized.includes('cartão de crédito') || normalized.includes('cartao de credito') || normalized.includes('credito') || normalized.includes('crédito') || normalized.includes('credit')) return 'Cartão de Crédito';
+    if (normalized.includes('cartão de débito') || normalized.includes('cartao de debito') || normalized.includes('debito') || normalized.includes('débito') || normalized.includes('debit')) return 'Cartão de Débito';
+    if (normalized.includes('transferência') || normalized.includes('transferencia') || normalized.includes('ted') || normalized.includes('doc')) return 'Transferência';
+    if (normalized.includes('cartao') || normalized.includes('cartão') || normalized.includes('card')) return 'Cartão';
+    if (normalized.includes('pendente')) return 'Pendente';
     return String(value || '').trim();
 };
 
@@ -335,6 +338,7 @@ const PaymentModal = ({
     const [mpPixData, setMpPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
     const [mpBoletoData, setMpBoletoData] = useState<{ barcode: string; ticketUrl: string } | null>(null);
     const [mpPaymentId, setMpPaymentId] = useState<string | null>(null);
+    const [preCreatedOrderId, setPreCreatedOrderId] = useState<string | null>(null);
     const [mpCopied, setMpCopied] = useState(false);
     const [mpIsCheckingStatus, setMpIsCheckingStatus] = useState(false);
     const mpInstanceRef = useRef<any>(null);
@@ -519,6 +523,7 @@ const PaymentModal = ({
             setMpPixData(null);
             setMpBoletoData(null);
             setMpPaymentId(null);
+            setPreCreatedOrderId(null);
             setMpCopied(false);
             setMpIsCheckingStatus(false);
             mpBrickInitializedRef.current = false;
@@ -740,6 +745,17 @@ const PaymentModal = ({
                 if (pix?.qrCode && pix?.qrCodeBase64) {
                     setMpPixData({ qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64 });
                     setMpStep("pix");
+                    handleStartProcessing({
+                        paymentMethod: "Pix (Mercado Pago)",
+                        paymentProvider: "Mercado Pago",
+                        mpPaymentId: responseData.mpPaymentId,
+                        paymentStatus: "unpaid",
+                        paidAmount: 0,
+                        paymentBreakdown: [],
+                        splitPayments: [],
+                        isPendingDelivery,
+                        isPreCreate: true,
+                    });
                 } else {
                     setMpBrickError("Dados do Pix não retornados pelo provedor.");
                 }
@@ -748,6 +764,17 @@ const PaymentModal = ({
                 if (boleto?.barcode || boleto?.ticketUrl) {
                     setMpBoletoData(boleto);
                     setMpStep("boleto");
+                    handleStartProcessing({
+                        paymentMethod: "Boleto (Mercado Pago)",
+                        paymentProvider: "Mercado Pago",
+                        mpPaymentId: responseData.mpPaymentId,
+                        paymentStatus: "unpaid",
+                        paidAmount: 0,
+                        paymentBreakdown: [],
+                        splitPayments: [],
+                        isPendingDelivery,
+                        isPreCreate: true,
+                    });
                 } else {
                     setMpBrickError("Dados do Boleto não retornados pelo provedor.");
                 }
@@ -1132,6 +1159,72 @@ const PaymentModal = ({
         }
     };
 
+    // Poll payment status for pre-created Pix/Boleto order
+    useEffect(() => {
+        if (!preCreatedOrderId) return;
+        if (mpStep !== "pix" && mpStep !== "boleto") return;
+
+        let intervalId: any;
+        let isChecking = false;
+
+        const checkStatus = async () => {
+            if (isChecking) return;
+            isChecking = true;
+            try {
+                const response = await fetch("/api/orders/sync-payment-status", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ orderId: preCreatedOrderId }),
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.newStatus === "paid" || data.paymentStatus === "approved") {
+                        const remainingPartial = 0;
+                        const snapshotBreakdown = [
+                            { method: mpStep === "pix" ? "Pix (Mercado Pago)" : "Boleto (Mercado Pago)", amount: chargeTarget }
+                        ];
+
+                        setSuccessSnapshot({
+                            subTotal,
+                            itemCount,
+                            shippingFee: Number(shippingFee || 0),
+                            otherCosts: Number(otherCosts || 0),
+                            discountAmount: Number(discountAmount || 0),
+                            total,
+                            displayOrderTotal: displayTransactionTotal,
+                            totalPaid: chargeTarget,
+                            change: 0,
+                            isUnderpaid: false,
+                            remainingPartial,
+                            paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
+                            interestAmount: Number(currentPricingTotals.interestAmount || 0),
+                            feeAmount: Number(currentPricingTotals.feeAmount || 0),
+                            appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
+                            appliedFeePercent: currentPricingTotals.appliedFeePercent,
+                            appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
+                            receiptCart: Array.isArray(cart) ? cart.map((row: any) => ({ ...row })) : [],
+                            paymentBreakdown: snapshotBreakdown,
+                        });
+
+                        setSaleId(data.orderNumber || "DDT000000");
+                        setPaymentStatus('success');
+                        setPreCreatedOrderId(null); // Stop polling
+                    }
+                }
+            } catch (error) {
+                console.error("Error polling payment status:", error);
+            } finally {
+                isChecking = false;
+            }
+        };
+
+        intervalId = setInterval(checkStatus, 3000);
+
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, [preCreatedOrderId, mpStep, chargeTarget, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total, displayTransactionTotal, currentPricingTotals, cart]);
+
     const getTitle = () => {
         const selectedTypeLabel =
             selectedMethodType === "pix" ? "Pix" :
@@ -1337,6 +1430,30 @@ const PaymentModal = ({
         const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
         const payload = forcedPayload || buildConfirmPayload();
         setLastPaymentPayload(payload);
+
+        if (payload?.isPreCreate) {
+            try {
+                const result = await onConfirm(payload);
+                if (result?.success) {
+                    setPreCreatedOrderId(result.orderId || null);
+                } else {
+                    console.error("Error pre-creating order:", result?.error);
+                    toast({
+                        title: "Erro ao pré-criar pedido",
+                        description: result?.error || "Não foi possível registrar o pedido no banco de dados.",
+                        variant: "destructive",
+                    });
+                }
+            } catch (error: any) {
+                console.error("Unexpected error pre-creating order:", error);
+                toast({
+                    title: "Erro inesperado",
+                    description: "Ocorreu um problema ao pré-criar o pedido.",
+                    variant: "destructive",
+                });
+            }
+            return;
+        }
 
         // Build per-method summary for success snapshot using payload breakdown data
         const snapshotBreakdown: Array<{ method: string; amount: number }> = []

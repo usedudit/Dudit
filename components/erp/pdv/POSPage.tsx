@@ -1015,7 +1015,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
             clearCartAfterPaymentModalClosesRef.current = true
             router.refresh()
-            return { success: true, orderNumber: result.data?.saleNumber || result.data?.saleId }
+            return { success: true, orderNumber: result.data?.saleNumber || result.data?.saleId, orderId: result.data?.saleId }
         } finally {
             setIsFinalizing(false)
             isFinalizingRef.current = false

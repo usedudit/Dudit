@@ -330,17 +330,25 @@ export async function syncAppointmentReceivable(params: {
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
 
   let saleNumber = `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
+  let orderPaymentMethod: string | null = null
+  let orderPaymentMethodId: string | null = null
 
   if (params.appointment.marketplace_order_id) {
     const { data: existingOrder } = await params.supabase
       .from("orders")
-      .select("order_number")
+      .select("order_number, payment_method, payment_method_id")
       .eq("id", params.appointment.marketplace_order_id)
       .eq("partner_id", params.partnerId)
       .limit(1)
       .maybeSingle()
     if (existingOrder?.order_number) {
       saleNumber = existingOrder.order_number
+    }
+    if (existingOrder?.payment_method) {
+      orderPaymentMethod = existingOrder.payment_method
+    }
+    if (existingOrder?.payment_method_id) {
+      orderPaymentMethodId = existingOrder.payment_method_id
     }
   } else {
     const saleRefNote = `appointment:${params.appointment.id}:sale`
@@ -355,6 +363,9 @@ export async function syncAppointmentReceivable(params: {
       saleNumber = existingSale.sale_number
     }
   }
+
+  const paymentMethod = params.appointment.payment_method || orderPaymentMethod || null
+  const paymentMethodId = params.appointment.payment_method_id || orderPaymentMethodId || null
 
   const existingId = params.currentReceivableId || (await params.supabase
     .from("transactions")
@@ -376,6 +387,8 @@ export async function syncAppointmentReceivable(params: {
           due_date: params.appointment.start_date,
           payment_date: null,
           transaction_date: `${params.appointment.start_date}T12:00:00.000Z`,
+          payment_type: paymentMethod || "Agendamento",
+          payment_method_id: paymentMethodId || null,
         })
         .eq("id", existingId)
         .eq("partner_id", params.partnerId)
@@ -396,7 +409,8 @@ export async function syncAppointmentReceivable(params: {
         transaction_date: `${params.appointment.start_date}T12:00:00.000Z`,
         status: "pending",
         notes: null,
-        payment_type: "Agendamento",
+        payment_type: paymentMethod || "Agendamento",
+        payment_method_id: paymentMethodId || null,
         original_amount: remaining,
         interest_amount: null,
         fee_amount: 0,
@@ -421,6 +435,8 @@ export async function syncAppointmentReceivable(params: {
         original_amount: totalAmount,
         status: "paid",
         payment_date: new Date().toISOString(),
+        payment_type: paymentMethod || "Agendamento",
+        payment_method_id: paymentMethodId || null,
       })
       .eq("id", existingId)
       .eq("partner_id", params.partnerId)

@@ -423,6 +423,17 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         await requireOrderAccess(base.orderId)
         const supabase = createAdminClient()
 
+        const { data: existingRequest } = await supabase
+            .from("return_requests")
+            .select("id")
+            .eq("order_id", base.orderId)
+            .is("deleted_at", null)
+            .maybeSingle()
+
+        if (existingRequest) {
+            throw new Error("Já existe uma solicitação de devolução/cancelamento ativa para este pedido.")
+        }
+
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .select("id, partner_id, buyer_id, situation, delivery_status")
@@ -486,6 +497,17 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
         const data = createCancellationSchema.parse(input)
         await requireOrderAccess(data.orderId)
         const supabase = createAdminClient()
+
+        const { data: existingRequest } = await supabase
+            .from("return_requests")
+            .select("id")
+            .eq("order_id", data.orderId)
+            .is("deleted_at", null)
+            .maybeSingle()
+
+        if (existingRequest) {
+            throw new Error("Já existe uma solicitação de devolução/cancelamento ativa para este pedido.")
+        }
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
@@ -733,6 +755,31 @@ export async function processReturnRequestAction(input: unknown) {
                     amount: cappedMpRefundAmount,
                     order: (request as any).orders,
                 })
+
+                // Find the Mercado Pago finance account, associate it to the transaction, and subtract balance
+                const { data: mpAcc } = await supabase
+                    .from("finance_accounts")
+                    .select("id")
+                    .eq("partner_id", data.partnerId)
+                    .eq("integration_source", "mercadopago")
+                    .eq("is_active", true)
+                    .maybeSingle()
+
+                if (mpAcc?.id && result?.transaction_id) {
+                    await supabase
+                        .from("transactions")
+                        .update({ account_id: mpAcc.id })
+                        .eq("id", result.transaction_id)
+
+                    const { error: deltaErr } = await supabase.rpc("apply_account_balance_delta", {
+                        p_account_id: mpAcc.id,
+                        p_partner_id: data.partnerId,
+                        p_delta: -cappedMpRefundAmount,
+                    })
+                    if (deltaErr) {
+                        console.error("[processReturnRequest] Error applying MP refund balance delta:", deltaErr.message)
+                    }
+                }
             }
         }
 
@@ -756,6 +803,48 @@ export async function processReturnRequestAction(input: unknown) {
         await revalidateReturns(data.partnerId, request.order_id, data.requestId)
         if (data.returnToInventory) await revalidateStockMovements(data.partnerId)
         if (data.refundAmount > 0 || data.storeCreditAmount > 0 || toNumber(result?.exchange_shortfall_amount) > 0 || toNumber(result?.exchange_surplus_amount) > 0) await revalidateTransactions(data.partnerId)
+
+        if (buyerId && data.nextStatus) {
+            try {
+                const { createNotification } = await import("@/lib/services/notification.service")
+                
+                let title = "Atualização na sua solicitação de devolução"
+                let message = `Sua solicitação de devolução para o pedido #${(request as any).orders?.order_number || request.order_id.slice(0, 8).toUpperCase()} foi atualizada.`
+                
+                if (data.nextStatus === "APPROVED") {
+                    title = "Solicitação de devolução aprovada!"
+                    message = `A solicitação de devolução/troca para o pedido #${(request as any).orders?.order_number || request.order_id.slice(0, 8).toUpperCase()} foi aprovada pelo vendedor.`
+                } else if (data.nextStatus === "REJECTED") {
+                    title = "Solicitação de devolução recusada"
+                    message = `A solicitação de devolução/troca para o pedido #${(request as any).orders?.order_number || request.order_id.slice(0, 8).toUpperCase()} foi recusada pelo vendedor.`
+                } else if (data.nextStatus === "RESOLVED") {
+                    title = "Solicitação de devolução concluída"
+                    message = `A solicitação de devolução/troca para o pedido #${(request as any).orders?.order_number || request.order_id.slice(0, 8).toUpperCase()} foi concluída.`
+                    if (data.refundAmount > 0) {
+                        message += ` Valor reembolsado: ${data.refundAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`
+                    }
+                    if (data.storeCreditAmount > 0) {
+                        message += ` Vale-compra de ${data.storeCreditAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} liberado.`
+                    }
+                }
+                
+                await createNotification({
+                    userId: buyerId,
+                    type: "order_delivered",
+                    title,
+                    message,
+                    entityType: "order",
+                    entityId: request.order_id,
+                    data: {
+                        return_request_id: request.id,
+                        status: data.nextStatus,
+                    },
+                    idempotencyKey: `return-notify:${request.id}:${data.nextStatus}:${Date.now()}`
+                })
+            } catch (notifyErr) {
+                console.error("[processReturnRequest] Failed to send notification to customer:", notifyErr)
+            }
+        }
 
         return successResponse(result)
     } catch (e: any) {

@@ -1012,7 +1012,7 @@ export const AppointmentSheet = ({
                 }
 
                 router.refresh();
-                return { success: true, orderNumber: result.orderNumber || existingOrderId };
+                return { success: true, orderNumber: result.orderNumber || existingOrderId, orderId: existingOrderId };
             }
 
             const items = selectedServices.map((s, idx) => {
@@ -1090,7 +1090,7 @@ export const AppointmentSheet = ({
             }
 
             router.refresh();
-            return { success: true, orderNumber };
+            return { success: true, orderNumber, orderId };
         } catch {
             return { error: 'Erro ao processar venda do agendamento' };
         }

@@ -170,6 +170,14 @@ export default function CreateReturnPage({
     const [refundValue, setRefundValue] = useState<number>(0)
     const [refundPaymentMethod, setRefundPaymentMethod] = useState<string>("")
 
+    const isViewOnly = useMemo(() => {
+        return mode === "view" || !!(returnRequest && ["APPROVED", "REJECTED", "RESOLVED", "EXPIRED"].includes(returnRequest.status))
+    }, [mode, returnRequest])
+
+    const isMarketplaceRequest = useMemo(() => {
+        return !!(returnRequest?.source === "marketplace")
+    }, [returnRequest])
+
     const isMercadoPagoOrder = useMemo(() => {
         if (!selectedOrder) return false
         const provider = String(selectedOrder.payment_provider || selectedOrder.paymentProvider || "").toLowerCase()
@@ -177,12 +185,12 @@ export default function CreateReturnPage({
     }, [selectedOrder])
 
     useEffect(() => {
-        if (selectedOrder && mode === "create") {
-            const provider = String(selectedOrder.payment_provider || selectedOrder.paymentProvider || "").toLowerCase()
-            const isMP = Boolean(selectedOrder.mp_payment_id || selectedOrder.mpPaymentId) || provider.includes("mercado")
-            setRefundPaymentMethod(isMP ? "Mercado Pago" : "pix")
+        if (isMercadoPagoOrder) {
+            setRefundPaymentMethod("Mercado Pago")
+        } else if (selectedOrder && mode === "create") {
+            setRefundPaymentMethod("pix")
         }
-    }, [selectedOrder, mode])
+    }, [isMercadoPagoOrder, selectedOrder, mode])
     const [creditType, setCreditType] = useState<"full" | "partial">("full")
     const [creditValue, setCreditValue] = useState<number>(0)
     const [replacementProduct, setReplacementProduct] = useState("")
@@ -205,7 +213,7 @@ export default function CreateReturnPage({
     const [isUploading, setIsUploading] = useState(false)
 
     const isDirty = useMemo(() => {
-        if (mode === "view" || isSaving || isUploading) return false
+        if (isViewOnly || isSaving || isUploading) return false
         if (mode === "create") {
             return selectedOrder !== null || observations !== "" || evidenceImages.length > 0 || replacementItems.length > 0
         }
@@ -588,7 +596,7 @@ export default function CreateReturnPage({
         }
     }
 
-    const isSaveDisabled = isSaving || isUploading || !selectedOrder || returnItems.filter(item => item.checked).length === 0
+    const isSaveDisabled = isSaving || isUploading || !selectedOrder || returnItems.filter(item => item.checked).length === 0 || isViewOnly
 
     const pageTitle = mode === "create" ? "Nova devolução" : mode === "edit" ? "Editar devolução" : "Detalhes da devolução"
 
@@ -630,10 +638,13 @@ export default function CreateReturnPage({
                                     {/* Desktop action buttons only */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving || isUploading}>
-                                            Cancelar
-                                        </Button><Button onClick={handleFormSubmit} disabled={isSaveDisabled} leftIcon={<SaveIcon size={18} />}>
-                                            {isSaving || isUploading ? "Salvando..." : "Salvar"}
+                                            {isViewOnly ? "Voltar" : "Cancelar"}
                                         </Button>
+                                        {!isViewOnly && (
+                                            <Button onClick={handleFormSubmit} disabled={isSaveDisabled} leftIcon={<SaveIcon size={18} />}>
+                                                {isSaving || isUploading ? "Salvando..." : "Salvar"}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -829,7 +840,7 @@ export default function CreateReturnPage({
                                             {/* Return Item Checklist */}
                                             {selectedOrder && (
                                                 <FormSection hasSeparator title="Produtos para Devolução">
-                                                    {mode === "view" ? (
+                                                    {isViewOnly ? (
                                                         <div className="flex flex-col gap-6">
                                                             {returnItems.filter(item => item.checked).map((item) => {
                                                                 const lineTotal = item.netItemValue ? item.netItemValue * item.quantity : item.price * item.quantity;
@@ -897,7 +908,7 @@ export default function CreateReturnPage({
                                                                                 <td className="py-4 pl-6 pr-2 border-b border-brand-border dark:border-dark-border align-middle">
                                                                                     <Checkbox
                                                                                         checked={item.checked}
-                                                                                        disabled={false}
+                                                                                        disabled={isMarketplaceRequest}
                                                                                         onChange={(checked: boolean) => {
                                                                                             setReturnItems(prev => {
                                                                                                 const next = [...prev]
@@ -944,7 +955,7 @@ export default function CreateReturnPage({
                                                                                 </td>
                                                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border align-middle">
                                                                                     <FormDropdown
-                                                                                        disabled={!item.checked}
+                                                                                        disabled={!item.checked || isMarketplaceRequest}
                                                                                         value={item.reason}
                                                                                         setValue={(val) => {
                                                                                             setReturnItems(prev => {
@@ -967,7 +978,7 @@ export default function CreateReturnPage({
                                                                                 </td>
                                                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border align-middle">
                                                                                     <FormDropdown
-                                                                                        disabled={!item.checked}
+                                                                                        disabled={!item.checked || isMarketplaceRequest}
                                                                                         value={item.condition}
                                                                                         setValue={(val) => {
                                                                                             setReturnItems(prev => {
@@ -997,7 +1008,7 @@ export default function CreateReturnPage({
                                                                                             min={1}
                                                                                             max={item.maxQuantity}
                                                                                             size="md"
-                                                                                            disabled={!item.checked}
+                                                                                            disabled={!item.checked || isMarketplaceRequest}
                                                                                         />
                                                                                     </div>
                                                                                 </td>
@@ -1014,7 +1025,7 @@ export default function CreateReturnPage({
                                                                         <div className="flex items-center gap-3">
                                                                             <Checkbox
                                                                                 checked={item.checked}
-                                                                                disabled={false}
+                                                                                disabled={isMarketplaceRequest}
                                                                                 onChange={(checked: boolean) => {
                                                                                     setReturnItems(prev => {
                                                                                         const next = [...prev]
@@ -1061,7 +1072,7 @@ export default function CreateReturnPage({
                                                                             <div className="grid grid-cols-2 gap-4 pl-7">
                                                                                 <FormDropdown
                                                                                     label="Motivo"
-                                                                                    disabled={false}
+                                                                                    disabled={!item.checked || isMarketplaceRequest}
                                                                                     value={item.reason}
                                                                                     setValue={(val) => {
                                                                                         setReturnItems(prev => {
@@ -1083,7 +1094,7 @@ export default function CreateReturnPage({
                                                                                 />
                                                                                 <FormDropdown
                                                                                     label="Condição"
-                                                                                    disabled={false}
+                                                                                    disabled={!item.checked || isMarketplaceRequest}
                                                                                     value={item.condition}
                                                                                     setValue={(val) => {
                                                                                         setReturnItems(prev => {
@@ -1112,6 +1123,7 @@ export default function CreateReturnPage({
                                                                                         min={1}
                                                                                         max={item.maxQuantity}
                                                                                         size="md"
+                                                                                        disabled={!item.checked || isMarketplaceRequest}
                                                                                     />
                                                                                 </div>
                                                                             </div>
@@ -1127,7 +1139,7 @@ export default function CreateReturnPage({
                                             {/* Refund/Exchange status details */}
                                             {selectedOrder && (
                                                 <FormSection hasSeparator title="Resolução da devolução">
-                                                    {mode === "view" ? (
+                                                    {isViewOnly ? (
                                                         <div className="space-y-1">
                                                             <PaymentRow label="Data" value={formatDateTime(returnDate)} />
                                                             <PaymentRow
@@ -1233,14 +1245,14 @@ export default function CreateReturnPage({
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                             <DatePicker
                                                                 label="Data"
-                                                                disabled={false}
+                                                                disabled={isViewOnly}
                                                                 value={returnDate}
                                                                 onChange={(d) => d && setReturnDate(d)}
                                                             />
 
                                                             <FormDropdown
                                                                 label="Request status"
-                                                                disabled={false}
+                                                                disabled={isViewOnly}
                                                                 value={returnStatus}
                                                                 setValue={(val) => setReturnStatus(val as ReturnRequest["status"])}
                                                                 options={[
@@ -1255,7 +1267,7 @@ export default function CreateReturnPage({
 
                                                             <FormDropdown
                                                                 label="Resolution type"
-                                                                disabled={mode === "edit" && returnRequest?.source === "marketplace"}
+                                                                disabled={isViewOnly || isMarketplaceRequest}
                                                                 value={resolutionType}
                                                                 setValue={(val) => setResolutionType(val as any)}
                                                                 options={[
@@ -1271,7 +1283,7 @@ export default function CreateReturnPage({
                                                                 <>
                                                                     <FormDropdown
                                                                         label="Refund type"
-                                                                        disabled={false}
+                                                                        disabled={isViewOnly}
                                                                         value={refundType || "partial"}
                                                                         setValue={(val) => setRefundType(val as ReturnRequest["refundType"])}
                                                                         options={[
@@ -1282,13 +1294,13 @@ export default function CreateReturnPage({
                                                                     />
                                                                     <MoneyInput
                                                                         label="Refund value"
-                                                                        disabled={refundType === "full" || refundType === "none"}
+                                                                        disabled={refundType === "full" || refundType === "none" || isViewOnly}
                                                                         value={refundValue}
                                                                         onChange={(val) => setRefundValue(Math.min(Number(val || 0), calculatedRefundValue))}
                                                                     />
                                                                     <FormDropdown
                                                                         label="Método de reembolso"
-                                                                        disabled={false}
+                                                                        disabled={isViewOnly || isMercadoPagoOrder}
                                                                         value={refundPaymentMethod}
                                                                         setValue={(val) => setRefundPaymentMethod(val)}
                                                                         options={
@@ -1313,7 +1325,7 @@ export default function CreateReturnPage({
                                                                 <>
                                                                     <FormDropdown
                                                                         label="Credit type"
-                                                                        disabled={false}
+                                                                        disabled={isViewOnly}
                                                                         value={creditType}
                                                                         setValue={(val) => setCreditType(val as "full" | "partial")}
                                                                         options={[
@@ -1323,7 +1335,7 @@ export default function CreateReturnPage({
                                                                     />
                                                                     <MoneyInput
                                                                         label="Store credit amount"
-                                                                        disabled={creditType === "full"}
+                                                                        disabled={creditType === "full" || isViewOnly}
                                                                         value={creditValue}
                                                                         onChange={(val) => setCreditValue(Math.min(Number(val || 0), calculatedRefundValue))}
                                                                     />
@@ -1335,7 +1347,7 @@ export default function CreateReturnPage({
                                                                     <div ref={replacementSearchRef} className="relative md:col-span-2">
                                                                         <Input
                                                                             label="Replacement products"
-                                                                            disabled={false}
+                                                                            disabled={isViewOnly}
                                                                             value={productBucket.searchQuery}
                                                                             onChange={(event) => {
                                                                                 productBucket.setSearchQuery(event.target.value)
@@ -1415,7 +1427,7 @@ export default function CreateReturnPage({
                                                                                     <div className="flex items-center gap-3">
                                                                                         <button
                                                                                             type="button"
-                                                                                            disabled={item.quantity <= 1}
+                                                                                            disabled={item.quantity <= 1 || isViewOnly}
                                                                                             onClick={() => updateReplacementQty(index, item.quantity - 1)}
                                                                                             className="h-9 w-9 rounded-full border border-brand-border text-brand-dark disabled:opacity-40 dark:border-dark-border dark:text-dark-heading"
                                                                                         >
@@ -1424,7 +1436,7 @@ export default function CreateReturnPage({
                                                                                         <span className="w-8 text-center text-sm font-bold text-brand-dark dark:text-dark-heading">{item.quantity}</span>
                                                                                         <button
                                                                                             type="button"
-                                                                                            disabled={false}
+                                                                                            disabled={isViewOnly}
                                                                                             onClick={() => updateReplacementQty(index, item.quantity + 1)}
                                                                                             className="h-9 w-9 rounded-full border border-brand-border text-brand-dark disabled:opacity-40 dark:border-dark-border dark:text-dark-heading"
                                                                                         >
@@ -1432,8 +1444,9 @@ export default function CreateReturnPage({
                                                                                         </button>
                                                                                         <button
                                                                                             type="button"
+                                                                                            disabled={isViewOnly}
                                                                                             onClick={() => removeReplacementProduct(index)}
-                                                                                            className="h-9 w-9 rounded-full text-brand-red hover:bg-brand-red-light"
+                                                                                            className="h-9 w-9 rounded-full text-brand-red hover:bg-brand-red-light disabled:opacity-40"
                                                                                             title="Remover produto"
                                                                                         >
                                                                                             <TrashIcon size={17} className="mx-auto" />
@@ -1446,7 +1459,7 @@ export default function CreateReturnPage({
 
                                                                     <FormDropdown
                                                                         label="Exchange status"
-                                                                        disabled={false}
+                                                                        disabled={isViewOnly}
                                                                         value={exchangeStatus}
                                                                         setValue={setExchangeStatus}
                                                                         options={[
@@ -1473,7 +1486,7 @@ export default function CreateReturnPage({
                                                                     {exchangeSurplus > 0 && (
                                                                         <FormDropdown
                                                                             label="Destino do saldo"
-                                                                            disabled={false}
+                                                                            disabled={isViewOnly}
                                                                             value={exchangeBalanceResolution}
                                                                             setValue={(val) => setExchangeBalanceResolution(val as "store_credit" | "refund")}
                                                                             options={[
@@ -1503,7 +1516,7 @@ export default function CreateReturnPage({
                                                 onImageUpload={handleImageUpload}
                                                 onRemoveImage={handleRemoveImage}
                                                 onSetPrimaryImage={handleSetPrimaryImage}
-                                                isEditing={mode !== "view"}
+                                                isEditing={!isViewOnly && !isMarketplaceRequest}
                                                 uploadingImages={uploadingImages}
                                                 isSaving={isSaving || isUploading}
                                             />
@@ -1517,7 +1530,7 @@ export default function CreateReturnPage({
                                                 name="observations"
                                                 label="Observações da Devolução"
                                                 placeholder="Adicione observações sobre a troca, feedback do cliente ou detalhes internos..."
-                                                disabled={mode === "view"}
+                                                disabled={isViewOnly || isMarketplaceRequest}
                                                 value={observations}
                                                 onChange={(e) => setObservations(e.target.value)}
                                                 maxLength={1000}
@@ -1556,9 +1569,9 @@ export default function CreateReturnPage({
             {/* Mobile action bar */}
             <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3">
                 <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
-                    Cancelar
+                    {isViewOnly ? "Voltar" : "Cancelar"}
                 </Button>
-                {mode !== "view" && (
+                {!isViewOnly && (
                     <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>
                         {isSaving || isUploading ? "Salvando..." : "Salvar"}
                     </Button>

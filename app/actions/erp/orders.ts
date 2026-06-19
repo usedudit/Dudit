@@ -3391,10 +3391,11 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                     id: linkedAppointment.id,
                     status: linkedAppointment.status,
                     payment_status: nextSituation === "paid" ? "paid" : "partially_paid",
-                    price: order.total_amount,
+                    price: totalAmountToSave,
                     paid_amount: nextPaidAmount,
                     marketplace_order_id: payload.orderId,
                     start_date: new Date().toISOString().split('T')[0],
+                    payment_method: payload.paymentMethod,
                 },
             })
         }

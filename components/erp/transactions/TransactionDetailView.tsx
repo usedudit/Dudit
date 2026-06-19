@@ -13,7 +13,7 @@ import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import { ListItem } from "@/components/reusable"
-import { AdjustIcon, ArrowRightIcon, BankIcon, CashierIcon, DigitalWalletIcon, MoneyIcon, ReturnIcon } from "@/lib/icons"
+import { AdjustIcon, ArrowRightIcon, BankIcon, CashierIcon, DigitalWalletIcon, MoneyIcon, ReturnIcon, ShoppingCartIcon, RepeatIcon, TrendingUpIcon } from "@/lib/icons"
 import BottomSheet from "@/components/BottomSheet"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
@@ -340,6 +340,23 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                 />
                                                             </div>
                                                         </div>
+                                                    ) : (detail.transactionType === "refund" || detail.categoryLine.toLowerCase().includes("comiss") || detail.isRecurring || detail.categoryLine === "Vendas") ? (
+                                                        <ListItem
+                                                            className="border-0 px-0 py-2 rounded-none bg-transparent hover:border-transparent hover:bg-transparent cursor-default"
+                                                            icon={(() => {
+                                                                if (detail.transactionType === "refund") return ReturnIcon;
+                                                                if (detail.categoryLine.toLowerCase().includes("comiss")) return TrendingUpIcon;
+                                                                if (detail.isRecurring) return RepeatIcon;
+                                                                return ShoppingCartIcon;
+                                                            })()}
+                                                            title={detail.headerTitle || "Transação"}
+                                                            description={detail.originSource || "Sistema"}
+                                                            right={
+                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
+                                                                    {formatCurrency(detail.amount)}
+                                                                </span>
+                                                            }
+                                                        />
                                                     ) : detail.transactionDetailKind === "manual_entry" ? (
                                                         detail.items.map((item) => (
                                                             <ListItem

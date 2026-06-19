@@ -10,6 +10,7 @@ export type SyncAppointmentReceivableParams = {
   startDate: string
   remaining: number
   paidAmount: number
+  paymentMethod?: string | null
 }
 
 /**
@@ -19,14 +20,18 @@ export type SyncAppointmentReceivableParams = {
 export async function syncAppointmentReceivable(
   params: SyncAppointmentReceivableParams,
 ): Promise<string | null> {
-  const { supabase, partnerId, appointmentId, customerId, serviceName, startDate, remaining, paidAmount } =
+  const { supabase, partnerId, appointmentId, customerId, serviceName, startDate, remaining, paidAmount, paymentMethod } =
     params
 
   if (remaining <= 0.009) {
     const ref = `appointment:${appointmentId}:receivable`
     await supabase
       .from("transactions")
-      .update({ status: "paid", payment_date: new Date().toISOString().slice(0, 10) })
+      .update({
+        status: "paid",
+        payment_date: new Date().toISOString().slice(0, 10),
+        payment_type: paymentMethod || "Agendamento",
+      })
       .eq("partner_id", partnerId)
       .eq("reference_note", ref)
       .eq("status", "pending")
@@ -53,6 +58,7 @@ export async function syncAppointmentReceivable(
         amount: remaining,
         original_amount: remaining,
         status: "pending",
+        payment_type: paymentMethod || "Agendamento",
       })
       .eq("id", receivableId)
   } else {
@@ -69,7 +75,7 @@ export async function syncAppointmentReceivable(
         payment_date: paidAmount > 0.009 ? new Date().toISOString().slice(0, 10) : null,
         transaction_date: `${startDate}T12:00:00.000Z`,
         status: "pending",
-        payment_type: "Agendamento",
+        payment_type: paymentMethod || "Agendamento",
         original_amount: remaining,
         fee_amount: 0,
         transaction_type: "income",
@@ -106,7 +112,7 @@ export async function syncAppointmentReceivable(
           payment_date: new Date().toISOString().slice(0, 10),
           transaction_date: `${startDate}T12:00:00.000Z`,
           status: "paid",
-          payment_type: "Agendamento",
+          payment_type: paymentMethod || "Agendamento",
           original_amount: paidAmount,
           fee_amount: 0,
           transaction_type: "income",

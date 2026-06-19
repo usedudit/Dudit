@@ -35,6 +35,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDateTime, formatTime, formatDayMonth } from "@/lib/utils"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 
 import { useStore } from "@/lib/store-context"
 import { parseAddressString } from "./CreateOrder"
@@ -205,34 +206,68 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
     const hasPendingPayment = order.situation !== "paid" && order.situation !== "cancelled" && remainingPaymentAmount > 0.009
     const getPaymentTypeLabel = () => {
+        let baseLabel = "Pix";
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
         if (breakdownMethod) {
             const m = breakdownMethod.toLowerCase();
-            if (m === "pix" || m === "bank_transfer") return "Pix";
-            if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) return "Cartão de Crédito";
-            if (m.includes("débito") || m.includes("debito") || m.includes("debit")) return "Cartão de Débito";
-            if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) return "Dinheiro";
-            if (m.includes("boleto")) return "Boleto";
-            return breakdownMethod;
+            if (m === "pix" || m === "bank_transfer") baseLabel = "Pix";
+            else if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) baseLabel = "Cartão de Crédito";
+            else if (m.includes("débito") || m.includes("debito") || m.includes("debit")) baseLabel = "Cartão de Débito";
+            else if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) baseLabel = "Dinheiro";
+            else if (m.includes("boleto")) baseLabel = "Boleto";
+            else baseLabel = breakdownMethod;
+        } else {
+            const pm = String(order.payment_method || "").toLowerCase();
+            if (pm === "pix" || pm === "bank_transfer") baseLabel = "Pix";
+            else if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) baseLabel = "Cartão de Crédito";
+            else if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) baseLabel = "Cartão de Débito";
+            else if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) baseLabel = "Dinheiro";
+            else if (pm.includes("boleto")) baseLabel = "Boleto";
+            else baseLabel = order.payment_method || "Nao informado";
         }
-        const pm = String(order.payment_method || "").toLowerCase();
-        if (pm === "pix" || pm === "bank_transfer") return "Pix";
-        if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
-        if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
-        if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) return "Dinheiro";
-        if (pm.includes("boleto")) return "Boleto";
-        return order.payment_method || "Nao informado";
+
+        if (order.payment_provider === "Mercado Pago") {
+            return `Mercado Pago (${baseLabel})`;
+        }
+        return baseLabel;
     };
     const paymentMethodLabel = `${getPaymentTypeLabel()}${pendingSuffix}`
+    const isMercadoPago = order.payment_provider === "Mercado Pago";
     const getPaymentIcon = () => {
-        const type = getPaymentTypeLabel().toLowerCase();
-        const icon = type === "pix" ? "Pix.png" :
-            type.includes("crédito") || type.includes("credito") || type.includes("credit") ? "CreditCard.png" :
-                type.includes("débito") || type.includes("debito") || type.includes("debit") ? "DebitCard.png" : null;
-        return icon ? (
-            <img src={`https://img.dudit.com.br/static/icons/payments/${icon}`} alt={getPaymentTypeLabel()} className="w-5 h-5 object-contain" />
-        ) : null;
+        const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+        const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
+        const subMethod = String(breakdownMethod || order.payment_method || "").toLowerCase();
+
+        const icons: React.ReactNode[] = [];
+        if (isMercadoPago) {
+            icons.push(
+                <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
+            );
+        }
+
+        let iconName = null;
+        if (subMethod.includes("pix") || subMethod.includes("bank_transfer")) {
+            iconName = "Pix.png";
+        } else if (subMethod.includes("crédito") || subMethod.includes("credito") || subMethod.includes("credit")) {
+            iconName = "CreditCard.png";
+        } else if (subMethod.includes("débito") || subMethod.includes("debito") || subMethod.includes("debit")) {
+            iconName = "DebitCard.png";
+        } else if (subMethod.includes("boleto")) {
+            iconName = "Boleto.png";
+        }
+
+        if (iconName) {
+            icons.push(
+                <img key="sub" src={`https://img.dudit.com.br/static/icons/payments/${iconName}`} alt="Sub method" className="w-5 h-5 object-contain shrink-0" />
+            );
+        } else if (!isMercadoPago) {
+            icons.push(
+                <span key="default" className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>
+            );
+        }
+
+        return <div className="flex items-center gap-1">{icons}</div>;
     }
 
     const getPaymentStatusDisplay = (situation: string) => {
@@ -281,17 +316,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const renderPaymentMethodValue = () => {
         const statusDisplay = getPaymentStatusDisplay(order.situation);
         const StatusIcon = statusDisplay.Icon;
-        const methodType = getPaymentTypeLabel();
-        const methodName = order.payment_method ? ` (${order.payment_method})` : "";
+        const formattedLabel = getPaymentTypeLabel();
 
         return (
             <div className="flex items-center gap-2 flex-wrap text-sm">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                    <div className={`${isMercadoPago ? "w-auto px-1.5" : "w-8"} h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border`}>
                         {getPaymentIcon()}
                     </div>
                     <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                        {methodType}{methodName}
+                        {formattedLabel}
                     </span>
                 </div>
                 <span className="text-brand-border dark:text-dark-border">|</span>
@@ -707,7 +741,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     value={<div className="flex flex-col gap-1">
                                                                         {paymentBreakdown.map((entry: any, index: number) => (
                                                                             <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                                {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
                                                                             </span>
                                                                         ))}
                                                                     </div>} />
@@ -971,7 +1005,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 value={<div className="flex flex-col gap-1">
                                                                     {paymentBreakdown.map((entry: any, index: number) => (
                                                                         <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
                                                                         </span>
                                                                     ))}
                                                                 </div>} />

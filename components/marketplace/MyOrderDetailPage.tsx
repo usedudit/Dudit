@@ -51,6 +51,99 @@ const getFulfillmentModeLabel = (mode?: string | null) => {
     }
 };
 
+const getReturnRequestStatusConfig = (request: any) => {
+    const status = request.status;
+    const isCancellation = request.request_type === "cancellation";
+    const typeLabel = isCancellation ? "Cancelamento" : request.request_type === "return" ? "Devolução" : "Troca/Devolução";
+    
+    switch (status) {
+        case "PENDING_REVIEW":
+            return {
+                title: `${typeLabel} em análise`,
+                description: `Sua solicitação de ${typeLabel.toLowerCase()} foi enviada e está pendente de revisão pelo vendedor.`,
+                color: "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50 text-amber-800 dark:text-amber-300",
+                icon: ClockIcon
+            };
+        case "UNDER_ANALYSIS":
+            return {
+                title: `${typeLabel} sob análise`,
+                description: `O vendedor está analisando as informações e evidências enviadas.`,
+                color: "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50 text-amber-800 dark:text-amber-300",
+                icon: ClockIcon
+            };
+        case "APPROVED":
+            return {
+                title: `${typeLabel} aprovado(a)!`,
+                description: `O vendedor aceitou sua solicitação. Resolução: ${request.approved_resolution === "refund" ? "Reembolso" : request.approved_resolution === "store_credit" ? "Vale-compra" : "Troca"}.`,
+                color: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300",
+                icon: CheckCircleIcon
+            };
+        case "REJECTED":
+            return {
+                title: `${typeLabel} recusado(a)`,
+                description: `A solicitação foi recusada pelo vendedor. Observação: ${request.seller_notes || "Sem observações informadas."}`,
+                color: "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50 text-red-800 dark:text-red-300",
+                icon: XIcon
+            };
+        case "WAITING_CUSTOMER":
+            return {
+                title: `Aguardando você`,
+                description: `O vendedor precisa de mais informações ou ações de sua parte. Verifique as observações.`,
+                color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/50 text-blue-800 dark:text-blue-300",
+                icon: AlertCircleIcon
+            };
+        case "WAITING_ITEM_RETURN":
+            return {
+                title: `Aguardando devolução do produto`,
+                description: `Por favor, envie o produto de volta conforme as orientações do vendedor.`,
+                color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/50 text-blue-800 dark:text-blue-300",
+                icon: ClockIcon
+            };
+        case "PROCESSING":
+            return {
+                title: `Processando devolução`,
+                description: `O vendedor recebeu o produto e está processando o reembolso/troca.`,
+                color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/50 text-blue-800 dark:text-blue-300",
+                icon: ClockIcon
+            };
+        case "RESOLVED":
+            let resMsg = `A solicitação de ${typeLabel.toLowerCase()} foi concluída com sucesso.`;
+            if (request.refund_amount > 0) {
+                resMsg += ` Valor reembolsado: ${formatCurrency(request.refund_amount)}.`;
+            }
+            if (request.store_credit_amount > 0) {
+                resMsg += ` Crédito em conta: ${formatCurrency(request.store_credit_amount)}.`;
+            }
+            return {
+                title: `${typeLabel} concluído(a)`,
+                description: resMsg,
+                color: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300",
+                icon: CheckCircleIcon
+            };
+        case "EXPIRED":
+            return {
+                title: `Solicitação expirada`,
+                description: `O prazo para esta solicitação expirou.`,
+                color: "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-900/50 text-gray-800 dark:text-gray-300",
+                icon: XIcon
+            };
+        case "ESCALATED":
+            return {
+                title: `Em disputa/Moderação`,
+                description: `A solicitação foi escalada para a mediação do Dudit.`,
+                color: "bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-900/50 text-purple-800 dark:text-purple-300",
+                icon: AlertCircleIcon
+            };
+        default:
+            return {
+                title: `Status: ${status}`,
+                description: `Sua solicitação está em status: ${status}`,
+                color: "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-900/50 text-gray-800 dark:text-gray-300",
+                icon: ClockIcon
+            };
+    }
+};
+
 const formatProductQuantity = (qty: number, unit?: string | null, hidePrefix = false) => {
     const cleanUnit = String(unit || "").trim().toLowerCase();
     if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
@@ -428,6 +521,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         };
     });
 
+    const activeReturnRequest = order.return_requests?.find((r: any) => !r.deleted_at);
+    const hasActiveReturn = !!activeReturnRequest;
+    const returnStatusCfg = activeReturnRequest ? getReturnRequestStatusConfig(activeReturnRequest) : null;
+
+    const returnEvents = activeReturnRequest?.return_events || [];
+    const mappedReturnHistoryEntries = returnEvents.map((evt: any) => {
+        let title = "Solicitação de devolução";
+        let lines = [evt.message || "Evento de devolução registrado."];
+        
+        if (evt.event_type === "status_changed") {
+            title = "Status da Devolução";
+            lines = [`Status alterado de ${evt.from_status || "início"} para ${evt.to_status}.`];
+            if (evt.message) lines.push(evt.message);
+        } else if (evt.event_type === "message_added") {
+            title = "Mensagem na Devolução";
+            lines = [evt.message];
+        }
+        
+        return {
+            id: `return-evt-${evt.id}`,
+            actor_name: title,
+            change_lines: lines,
+            created_at: evt.created_at || new Date().toISOString(),
+            entry_type: "devolução"
+        };
+    });
+
+    const combinedHistoryEntries = [...historyEntries, ...mappedReturnHistoryEntries].sort((a, b) => {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
     if (!order) return null;
 
     const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
@@ -447,10 +571,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking");
     const hasProducts = orderItems.some((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription");
     const hasMixedItems = hasAnyService && hasProducts;
-    const canCancelOrder = canRequestOrderCancellation(order);
+    const canCancelOrder = canRequestOrderCancellation(order) && !hasActiveReturn;
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
     const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
-    const showReturnRequestButton = isPaidOrPartiallyPaid && !canCancelOrder && order.situation !== "cancelled";
+    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && order.situation !== "cancelled" && !hasActiveReturn;
     const returnButtonLabel = order.delivery_status === "delivered"
         ? "Solicitar troca ou devolução"
         : "Solicitar reembolso ou vale-compra";
@@ -507,39 +631,57 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     };
 
     const getPaymentTypeLabel = () => {
+        let baseLabel = "Pix";
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
         if (breakdownMethod) {
             const m = breakdownMethod.toLowerCase();
-            if (m === "pix" || m === "bank_transfer") return "Pix";
-            if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) return "Cartão de Crédito";
-            if (m.includes("débito") || m.includes("debito") || m.includes("debit")) return "Cartão de Débito";
-            if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) return "Dinheiro";
-            if (m.includes("boleto")) return "Boleto";
-            return breakdownMethod;
+            if (m === "pix" || m === "bank_transfer") baseLabel = "Pix";
+            else if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) baseLabel = "Cartão de Crédito";
+            else if (m.includes("débito") || m.includes("debito") || m.includes("debit")) baseLabel = "Cartão de Débito";
+            else if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) baseLabel = "Dinheiro";
+            else if (m.includes("boleto")) baseLabel = "Boleto";
+            else baseLabel = breakdownMethod;
+        } else {
+            const pm = String(order.payment_method || "").toLowerCase();
+            if (pm === "pix" || pm === "bank_transfer") baseLabel = "Pix";
+            else if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) baseLabel = "Cartão de Crédito";
+            else if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) baseLabel = "Cartão de Débito";
+            else if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) baseLabel = "Dinheiro";
+            else if (pm.includes("boleto")) baseLabel = "Boleto";
+            else baseLabel = order.payment_method || order.payment_provider || "Pix";
         }
-        const pm = String(order.payment_method || "").toLowerCase();
-        if (pm === "pix" || pm === "bank_transfer") return "Pix";
-        if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
-        if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
-        if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) return "Dinheiro";
-        if (pm.includes("boleto")) return "Boleto";
-        return order.payment_method || order.payment_provider || "Pix";
+        if (order.payment_provider === "Mercado Pago") {
+            return `Mercado Pago (${baseLabel})`;
+        }
+        return baseLabel;
     };
 
     const paymentMethodName = getPaymentTypeLabel();
-    const typeLower = paymentMethodName.toLowerCase();
-    const PaymentIconEl = typeLower === "pix" ? (
-        <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />
-    ) : typeLower.includes("crédito") || typeLower.includes("credito") || typeLower.includes("credit") ? (
-        <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão de Crédito" className="w-5 h-5 object-contain shrink-0" />
-    ) : typeLower.includes("débito") || typeLower.includes("debito") || typeLower.includes("debit") ? (
-        <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão de Débito" className="w-5 h-5 object-contain shrink-0" />
-    ) : typeLower.includes("dinheiro") || typeLower.includes("cash") || typeLower.includes("money") ? (
-        <MoneyIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />
-    ) : (
-        <CreditCardIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />
-    );
+    const isMercadoPago = order.payment_provider === "Mercado Pago";
+    const PaymentIconEl = (() => {
+        const icons: React.ReactNode[] = [];
+        if (isMercadoPago) {
+            icons.push(
+                <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
+            );
+        }
+        
+        // Extract submethod name
+        const nameLower = paymentMethodName.toLowerCase();
+        if (nameLower.includes("pix")) {
+            icons.push(<img key="pix" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />);
+        } else if (nameLower.includes("crédito") || nameLower.includes("credito") || nameLower.includes("credit") || nameLower.includes("débito") || nameLower.includes("debito") || nameLower.includes("debit")) {
+            icons.push(<img key="card" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain shrink-0" />);
+        } else if (nameLower.includes("dinheiro") || nameLower.includes("cash") || nameLower.includes("money")) {
+            icons.push(<MoneyIcon key="money" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />);
+        } else if (nameLower.includes("boleto")) {
+            icons.push(<img key="boleto" src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className="w-5 h-5 object-contain shrink-0" />);
+        } else if (!isMercadoPago) {
+            icons.push(<CreditCardIcon key="default" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />);
+        }
+        return <div className="flex items-center gap-1.5">{icons}</div>;
+    })();
 
     // Address Type Resolution
     const matchedAddress = userAddresses.find(a => {
@@ -907,6 +1049,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </TabsList>
 
                         <TabsContent value="details" className="mt-0 focus-visible:ring-0">
+                            {activeReturnRequest && returnStatusCfg && (
+                                <div className={`mb-8 p-6 rounded-2xl border ${returnStatusCfg.color} flex items-start gap-4 shadow-sm`}>
+                                    <div className="w-10 h-10 rounded-full bg-current/10 flex items-center justify-center shrink-0 font-bold">
+                                        <returnStatusCfg.icon className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-bold text-base lg:text-lg leading-snug">{returnStatusCfg.title}</h4>
+                                        <p className="text-sm mt-1.5 opacity-90 leading-relaxed">{returnStatusCfg.description}</p>
+                                        {activeReturnRequest.seller_notes && (
+                                            <div className="mt-4 pt-3 border-t border-current/20 text-sm">
+                                                <span className="font-bold">Observações do vendedor:</span> {activeReturnRequest.seller_notes}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                                 {/* Left Column (Sections 1, 2, 3, 4, 5) */}
                                 <div className="lg:col-span-8 space-y-8">
@@ -1177,7 +1336,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     </Button>
                                                 )}
 
-                                                {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && (
+                                                {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
                                                     <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
                                                         Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso.
                                                     </div>
@@ -1239,7 +1398,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </Button>
                                         )}
 
-                                        {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && (
+                                        {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
                                             <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
                                                 Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso.
                                             </div>
@@ -1274,7 +1433,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <TabsContent value="history" className="mt-0 focus-visible:ring-0">
                             <div className="space-y-8">
                                 <HistoryTimeline
-                                    entries={historyEntries}
+                                    entries={combinedHistoryEntries}
                                     title="Status do Acompanhamento"
                                     subtitle="Acompanhe todas as movimentações e alterações de status detalhadas realizadas neste pedido."
                                     emptyMessage="Nenhum histórico encontrado para este pedido."

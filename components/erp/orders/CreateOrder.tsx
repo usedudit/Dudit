@@ -1221,11 +1221,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 debouncedRefresh()
                 if (editOrderId && !paymentOverrides?.paymentMethod) {
                     onBack()
-                    return { success: true }
+                    return { success: true, orderId: editOrderId }
                 }
                 setWasSaleSuccessful(true)
                 const returnedOrderNumber = 'orderNumber' in result ? result.orderNumber : undefined
-                return { success: true, orderNumber: returnedOrderNumber }
+                return { success: true, orderNumber: returnedOrderNumber, orderId: createdOrderId || editOrderId }
             }
 
             const errorMsg = result.error || (editOrderId ? "Erro ao atualizar pedido" : "Erro ao criar pedido")

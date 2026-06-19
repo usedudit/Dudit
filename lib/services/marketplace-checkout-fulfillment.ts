@@ -41,6 +41,7 @@ async function createBookingFromMetadata(
     paymentStatus: "unpaid" | "partially_paid" | "paid"
     fulfillmentMode?: LineFulfillmentMode | null
     bufferMinutes?: number
+    paymentMethod?: string | null
   },
 ): Promise<{ appointmentId: string | null; needsReschedule: boolean }> {
   const customerId = await ensureMarketplaceCustomer({
@@ -85,6 +86,7 @@ async function createBookingFromMetadata(
       startDate: params.meta.date,
       remaining,
       paidAmount: params.paidAmount,
+      paymentMethod: params.paymentMethod,
     })
 
     const updatePayload: Record<string, unknown> = {
@@ -156,6 +158,7 @@ async function createBookingFromMetadata(
     startDate: params.meta.date,
     remaining,
     paidAmount: params.paidAmount,
+    paymentMethod: params.paymentMethod,
   })
 
   if (receivableId) {
@@ -273,7 +276,7 @@ export async function fulfillMarketplaceOrder(
     .from("orders")
     .select(`
       id, partner_id, buyer_id, situation, checkout_fulfillment,
-      finance_account_id, customer_name, delivery_type, delivery_address
+      finance_account_id, customer_name, delivery_type, delivery_address, payment_method
     `)
     .eq("id", orderId)
     .single()
@@ -337,6 +340,7 @@ export async function fulfillMarketplaceOrder(
                 startDate: line.bookingMetadata.date,
                 remaining,
                 paidAmount,
+                paymentMethod: order.payment_method,
               })
               if (receivableId) {
                 await supabase
@@ -430,6 +434,7 @@ export async function fulfillMarketplaceOrder(
           fullPrice,
           paymentStatus,
           fulfillmentMode: line.fulfillmentMode,
+          paymentMethod: order.payment_method,
         })
 
         if (bookingResult.needsReschedule) {

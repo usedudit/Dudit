@@ -370,11 +370,11 @@ export async function getFinancialTransactionsAction(
         const ordersPromise = uniqueSaleRefs.length > 0
             ? supabase
                 .from("orders")
-                .select("order_number, buyer_id, customer_name, order_source")
+                .select("order_number, buyer_id, customer_name, order_source, payment_provider, payment_method")
                 .eq("partner_id", partnerId)
                 .in("order_number", uniqueSaleRefs)
                 .then((r: any) => r.data || [])
-            : Promise.resolve([] as { order_number: string; buyer_id: string | null; customer_name: string | null; order_source: string | null }[])
+            : Promise.resolve([] as { order_number: string; buyer_id: string | null; customer_name: string | null; order_source: string | null; payment_provider?: string | null; payment_method?: string | null }[])
 
         const salesPromise = uniqueSaleRefs.length > 0
             ? supabase
@@ -423,12 +423,24 @@ export async function getFinancialTransactionsAction(
                 })
             : Promise.resolve([] as any[])
 
-        const [orders, posSales, pmRows, installmentGroups, installmentPayRows] = await Promise.all([
+        // Accounts lookup
+        const accountIdsArr = [...new Set(txs.map(t => t.account_id).filter(Boolean))]
+        const accountsPromise = accountIdsArr.length > 0
+            ? supabase
+                .from("finance_accounts")
+                .select("id, name, integration_source")
+                .eq("partner_id", partnerId)
+                .in("id", accountIdsArr)
+                .then((r: any) => r.data || [])
+            : Promise.resolve([] as { id: string; name: string; integration_source: string | null }[])
+
+        const [orders, posSales, pmRows, installmentGroups, installmentPayRows, financeAccounts] = await Promise.all([
             ordersPromise,
             salesPromise,
             paymentMethodsPromise,
             installmentGroupsPromise,
             installmentPaymentsPromise,
+            accountsPromise,
         ])
 
         const installmentPaymentsMap = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
@@ -449,9 +461,9 @@ export async function getFinancialTransactionsAction(
         }
 
         // Build order lookup and collect buyer IDs into the customer set
-        const orderByNumber = new Map<string, { buyer_id: string | null; customer_name: string | null; order_source: string | null }>()
+        const orderByNumber = new Map<string, { buyer_id: string | null; customer_name: string | null; order_source: string | null; payment_provider?: string | null; payment_method?: string | null }>()
         for (const o of orders) {
-            orderByNumber.set(String(o.order_number), { buyer_id: o.buyer_id, customer_name: o.customer_name, order_source: o.order_source || null })
+            orderByNumber.set(String(o.order_number), { buyer_id: o.buyer_id, customer_name: o.customer_name, order_source: o.order_source || null, payment_provider: o.payment_provider, payment_method: o.payment_method })
             if (o.buyer_id) allCustomerIds.add(o.buyer_id)
         }
 
@@ -489,6 +501,13 @@ export async function getFinancialTransactionsAction(
         const installmentGroupById = new Map<string, InstallmentGroupRow>()
         for (const g of installmentGroups) {
             installmentGroupById.set(g.id, g as InstallmentGroupRow)
+        }
+
+        const integrationSourceByAccountId = new Map<string, string>()
+        for (const fa of financeAccounts) {
+            if (fa.integration_source) {
+                integrationSourceByAccountId.set(fa.id, fa.integration_source)
+            }
         }
 
         // ── Step 4: Map to ERPTransaction ───────────────────────────────
@@ -604,13 +623,35 @@ export async function getFinancialTransactionsAction(
                 paymentType: t.installment_group_id && installmentPaymentType
                     ? installmentPaymentType
                     : (() => {
+                        let ownLabel = "Não informado";
                         if (t.payment_method_id) {
-                            return paymentMethodLabelById.get(t.payment_method_id) || "Não informado";
+                            ownLabel = paymentMethodLabelById.get(t.payment_method_id) || "Não informado";
+                        } else if (t.payment_type && t.payment_type !== "Agendamento") {
+                            ownLabel = formatPaymentMethodLabel(t.payment_type, null) || "Não informado";
                         }
-                        if (t.payment_type && t.payment_type !== "Agendamento") {
-                            return formatPaymentMethodLabel(t.payment_type, null) || "Não informado";
+
+                        // Check if it's Mercado Pago
+                        const isMercadoPagoOrder = order && order.payment_provider === "Mercado Pago";
+                        const isMercadoPagoAccount = t.account_id && integrationSourceByAccountId.get(t.account_id) === "mercadopago";
+                        
+                        if (isMercadoPagoOrder || isMercadoPagoAccount) {
+                            if (ownLabel.includes("Mercado Pago")) {
+                                return ownLabel;
+                            }
+                            let base = ownLabel;
+                            const match = ownLabel.match(/^([^(]+)\(\1\)$/i) || ownLabel.match(/^([^(]+)\s*\(([^)]+)\)$/i);
+                            if (match) {
+                                base = (match[2] || match[1]).trim();
+                            }
+                            const baseLower = base.toLowerCase();
+                            if (baseLower === "bank_transfer") base = "Pix";
+                            else if (baseLower.includes("credit")) base = "Cartão de Crédito";
+                            else if (baseLower.includes("debit")) base = "Cartão de Débito";
+                            
+                            return `Mercado Pago (${base})`;
                         }
-                        return "Não informado";
+                        
+                        return ownLabel;
                     })(),
                 status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
                 statusVariant: toStatusVariant(t.status, isOverdue),
@@ -2184,6 +2225,7 @@ export type TransactionDetailPayload = {
     paymentDateSubtitle: string | null
     creatorName: string
     originLabel: string
+    originSource: string
     typeBannerLabel: string
     timeline: {
         step1: { label: string; date: string; time: string; active: boolean }
@@ -2536,6 +2578,17 @@ export async function getTransactionDetailsAction(
             }
         }
 
+        let originSource = originLabel(row.origin)
+        if (row.payment_type === "Agendamento" || (row.reference_note && row.reference_note.startsWith("appointment:"))) {
+            originSource = "Agendamento"
+        } else if (String(row.category || "").toLowerCase().includes("comiss")) {
+            originSource = "Comissão"
+        } else if (row.transaction_type === "refund") {
+            originSource = "Reembolso"
+        } else if (!!row.recurring_id) {
+            originSource = "Assinatura"
+        }
+
         let items: TransactionDetailPayload["items"] = []
         let salesSummary: TransactionDetailPayload["salesSummary"] = null
         let salesOrder: { buyer_id?: string | null; customer_name?: string | null } | null = null
@@ -2548,6 +2601,7 @@ export async function getTransactionDetailsAction(
                 .select(
                     `
           id,
+          order_source,
           buyer_id,
           customer_name,
           total_amount,
@@ -2576,6 +2630,14 @@ export async function getTransactionDetailsAction(
                 .maybeSingle()
 
             salesOrder = ord as any
+            if (ord) {
+                const src = String((ord as any).order_source || "Manual").toLowerCase()
+                if (src === "presencial") originSource = "PDV"
+                else if (src === "vitrine online") originSource = "Site"
+                else if (src === "assinatura") originSource = "Assinatura"
+                else if (src === "manual") originSource = "Venda Manual"
+                else originSource = (ord as any).order_source || "Venda Manual"
+            }
             const oi = (ord as any)?.order_items
             if (Array.isArray(oi) && oi.length > 0) {
                 items = oi.map((item: any) => {
@@ -2966,6 +3028,7 @@ export async function getTransactionDetailsAction(
             paymentDateSubtitle,
             creatorName,
             originLabel: originLabel(row.origin),
+            originSource,
             typeBannerLabel: transactionTypeLabel(row.transaction_type),
             timeline,
             items,

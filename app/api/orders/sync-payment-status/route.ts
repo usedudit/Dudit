@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { getCurrentUser, requireOrderAccess } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { revalidateProducts, revalidateMarketplace } from "@/lib/utils/revalidation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
@@ -18,14 +18,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    const supabase = await getSupabaseServerClient()
+    try {
+      await requireOrderAccess(orderId)
+    } catch (err) {
+      SecureLogger.error("Access denied during payment sync", { orderId, userId: user.id })
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
+
     const supabaseAdmin = await createAdminClient()
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .select("id, order_number, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id, payment_expires_at")
       .eq("id", orderId)
-      .eq("buyer_id", user.id)
       .single()
 
     if (orderError || !order) {
