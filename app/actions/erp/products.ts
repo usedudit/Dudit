@@ -3,7 +3,8 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { unstable_cache } from "next/cache"
 import { cache } from "react"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import {
@@ -95,9 +96,9 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
     if (error || !product) throw new Error("Produto não encontrado")
 
     if (requiredAction) {
-        await requirePartnerAccessWithPermission(product.partner_id, "products", requiredAction, user)
+        await requirePermission(product.partner_id, "products", requiredAction, user)
     } else {
-        await requirePartnerAccessWithPermission(product.partner_id, "products", "view", user)
+        await requirePermission(product.partner_id, "products", "view", user)
     }
 
     return product
@@ -126,7 +127,7 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     if (!partnerId || data.some((p: any) => p.partner_id !== partnerId)) throw new Error("Produtos de parceiros diferentes")
 
     // await requireMinimumPlan(partnerId, "crescer")
-    await requirePartnerAccessWithPermission(partnerId, "products", "view", user)
+    await requirePermission(partnerId, "products", "view", user)
 
     return { sanitized, partnerId, user }
 }
@@ -308,7 +309,7 @@ export async function createProductComprehensiveAction(data: {
 
         // 3. Permission + Store em paralelo (moderação agora é assíncrona)
         const [_access, storeResult] = await Promise.all([
-            requirePartnerAccessWithPermission(finalPartnerId, "products", "create", _user),
+            requirePermission(finalPartnerId, "products", "create", _user),
             (async () => {
                 if (data.storeId && data.storeId.trim() !== "") return data.storeId
                 const admin = getAdminClient()
@@ -868,7 +869,7 @@ export async function createProductVariantsBatchAction(data: {
         const csrf = await validateCSRF(data as Record<string, unknown>)
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
-        const product = await fetchProductAndVerifyOwnership(data.productId, "edit")
+        const product = await fetchProductAndVerifyOwnership(data.productId, "edit", "id, partner_id, images, sku, name, promotional_price")
 
         // Check subscription feature
         if (!await canUseFeature(product.partner_id, "product_variants")) {
@@ -906,6 +907,13 @@ export async function createProductVariantsBatchAction(data: {
             .select()
 
         if (error) return errorResponse(error.message)
+
+        if (product.promotional_price && Number(product.promotional_price) !== 0) {
+            await supabase.from("products").update({
+                promotional_price: null,
+                is_on_promotion: false
+            }).eq("id", data.productId)
+        }
 
         // 4+5. Fire-and-forget: Deletar imagens removidas em paralelo
         const imagesToCleanup: string[] = []
@@ -1072,6 +1080,7 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
                     return errorResponse("Sem permissão")
                 }
             }
+            await requirePermission(productPartnerId, "products", "edit", user)
         }
 
         const { error } = await supabase.from("product_variants").delete().in("id", variantIds)
@@ -1126,6 +1135,7 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
                     return errorResponse("Sem permissão")
                 }
             }
+            await requirePermission(productPartnerId, "products", "edit", user)
         }
 
         await Promise.all(updates.map(update => {
@@ -1211,7 +1221,8 @@ export const getCachedSuppliers = async (partnerId: string) => {
 export async function toggleProductStatusAction(productIds: string[], isActive: boolean) {
     try {
         await verifyAuth()
-        const { sanitized, partnerId } = await verifyBatchOwnership(productIds)
+        const { sanitized, partnerId, user } = await verifyBatchOwnership(productIds)
+        await requirePermission(partnerId, "products", "edit", user)
         const admin = getAdminClient()
 
         const { error } = await admin.from("products").update({ is_active: isActive }).in("id", sanitized)
@@ -1233,7 +1244,7 @@ export async function deleteProductsInBatchAction(productIds: string[]) {
     try {
         await verifyAuth()
         const { sanitized, partnerId } = await verifyBatchOwnership(productIds)
-        await requirePartnerAccessWithPermission(partnerId, "products", "delete")
+        await requirePermission(partnerId, "products", "delete")
         const admin = getAdminClient()
 
         const { data: products } = await admin.from("products").select("images").in("id", sanitized)
@@ -1261,7 +1272,8 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
     try {
         await verifyAuth()
         const productIds = updates.map(u => u.id)
-        const { sanitized, partnerId } = await verifyBatchOwnership(productIds)
+        const { sanitized, partnerId, user } = await verifyBatchOwnership(productIds)
+        await requirePermission(partnerId, "products", "edit", user)
 
         const admin = getAdminClient()
 
@@ -1302,7 +1314,7 @@ export async function duplicateProductsAction(productIds: string[]) {
         const { data: products } = await supabase.from("products").select("*").in("id", productIds)
 
         if (!products?.length) return { success: false, error: "Produtos não encontrados" }
-        await requirePartnerAccessWithPermission(products[0].partner_id, "products", "create")
+        await requirePermission(products[0].partner_id, "products", "create")
 
         // SKU puro (zero queries) â€” unicidade pelo banco
         const duplicated = products.map((p: any) => {
@@ -1478,7 +1490,7 @@ export async function getProductWithDetailsAction(productId: string) {
 export async function getProducts(partnerId: string) {
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(partnerId, "products", "view")
+        await requirePermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
         const { data } = await supabase.from("products").select("*").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(100)
         return data || []
@@ -1581,7 +1593,7 @@ export async function getERPProductsPageAction(
 > {
     try {
         // await requireMinimumPlan(partnerId, "crescer")
-        await requirePartnerAccessWithPermission(partnerId, "products", "view")
+        await requirePermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
 
         const cursor = options?.cursor ?? null
@@ -1652,7 +1664,7 @@ export async function searchProductByBarcodeAction(
             resolvedPartnerId = context.partnerId
         }
 
-        await requirePartnerAccessWithPermission(resolvedPartnerId, "products", "view")
+        await requirePermission(resolvedPartnerId, "products", "view")
         const supabase = getAdminClient()
         
         const cleanCode = code.trim()

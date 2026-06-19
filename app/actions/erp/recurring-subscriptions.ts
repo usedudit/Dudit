@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -37,7 +37,7 @@ export async function listRecurringSubscriptionsAction(
   },
 ) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_subscriptions", "view")
+    await requirePermission(partnerId, "recurring_subscriptions", "view")
     const supabase = await getSupabaseServerClient()
     const cursor = decodeCursor(options?.cursor)
     const search = String(options?.search || "").trim()
@@ -103,7 +103,7 @@ export async function createRecurringSubscriptionAction(input: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(input.partnerId, "recurring_subscriptions", "manage")
+    await requirePermission(input.partnerId, "recurring_subscriptions", "manage")
     const supabase = await getSupabaseServerClient()
 
     const { data: plan } = await supabase
@@ -201,7 +201,7 @@ async function updateSubscriptionStatus(
 
 export async function pauseRecurringSubscriptionAction(partnerId: string, subscriptionId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_subscriptions", "manage")
+    await requirePermission(partnerId, "recurring_subscriptions", "manage")
     const data = await updateSubscriptionStatus(
       partnerId,
       subscriptionId,
@@ -217,7 +217,7 @@ export async function pauseRecurringSubscriptionAction(partnerId: string, subscr
 
 export async function resumeRecurringSubscriptionAction(partnerId: string, subscriptionId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_subscriptions", "manage")
+    await requirePermission(partnerId, "recurring_subscriptions", "manage")
     const data = await updateSubscriptionStatus(
       partnerId,
       subscriptionId,
@@ -233,7 +233,7 @@ export async function resumeRecurringSubscriptionAction(partnerId: string, subsc
 
 export async function cancelRecurringSubscriptionAction(partnerId: string, subscriptionId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_subscriptions", "manage")
+    await requirePermission(partnerId, "recurring_subscriptions", "manage")
     const data = await updateSubscriptionStatus(
       partnerId,
       subscriptionId,
@@ -249,7 +249,7 @@ export async function cancelRecurringSubscriptionAction(partnerId: string, subsc
 
 export async function getRecurringSubscriptionExecutionsAction(partnerId: string, subscriptionId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_subscriptions", "view")
+    await requirePermission(partnerId, "recurring_subscriptions", "view")
     const supabase = await getSupabaseServerClient()
 
     const { data, error } = await supabase
@@ -282,7 +282,7 @@ export async function runDueRecurringSubscriptionsAction(limit = 100) {
 
 export async function getRecurringSubscriptionStatsAction(partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_subscriptions", "view")
+    await requirePermission(partnerId, "recurring_subscriptions", "view")
     const admin = getAdminClient()
     const { data } = await admin
       .from("recurring_subscriptions")

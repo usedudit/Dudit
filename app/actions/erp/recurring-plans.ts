@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -75,7 +75,7 @@ export async function listRecurringPlansAction(
   options?: { cursor?: string | null; status?: RecurringPlanStatus | "all"; search?: string },
 ) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_plans", "view")
+    await requirePermission(partnerId, "recurring_plans", "view")
     const supabase = await getSupabaseServerClient()
     const cursor = decodeCursor(options?.cursor)
     const search = String(options?.search || "").trim()
@@ -167,7 +167,7 @@ export async function createRecurringPlanAction(input: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(input.partnerId, "recurring_plans", "manage")
+    await requirePermission(input.partnerId, "recurring_plans", "manage")
     
     // Check images limit
     const { checkLimit, increment_usage_counter } = await import("@/lib/services/subscription.service")
@@ -264,7 +264,7 @@ export async function updateRecurringPlanAction(input: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(input.partnerId, "recurring_plans", "manage")
+    await requirePermission(input.partnerId, "recurring_plans", "manage")
     
     // Check images limit
     const { checkLimit, increment_usage_counter, decrement_usage_counter } = await import("@/lib/services/subscription.service")
@@ -360,7 +360,7 @@ export async function updateRecurringPlanAction(input: {
 
 export async function getRecurringPlanFormDataAction(partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "recurring_plans", "view")
+    await requirePermission(partnerId, "recurring_plans", "view")
     const supabase = await getSupabaseServerClient()
 
     const [productsRes, servicesRes, staffRes] = await Promise.all([
@@ -402,7 +402,7 @@ export async function deleteRecurringPlanAction(partnerId: string, planId: strin
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(partnerId, "recurring_plans", "manage")
+    await requirePermission(partnerId, "recurring_plans", "manage")
     const supabase = await getSupabaseServerClient()
 
     // 1. Delete items first

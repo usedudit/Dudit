@@ -24,15 +24,19 @@ export async function createNotification(
 
   const admin = getAdminClient()
 
-  const { data: userExists } = await admin
-    .from("auth.users")
-    .select("id")
-    .eq("id", input.userId)
-    .maybeSingle()
+  try {
+    const { data: userExists } = await admin
+      .from("auth.users")
+      .select("id")
+      .eq("id", input.userId)
+      .maybeSingle()
 
-  if (!userExists) {
-    console.warn(`[notifications] User ${input.userId} not found in auth.users. Skipping notification.`)
-    return { notification: null, created: false }
+    if (!userExists) {
+      console.warn(`[notifications] User ${input.userId} not found in auth.users. Skipping notification.`)
+      return { notification: null, created: false }
+    }
+  } catch {
+    console.warn(`[notifications] Could not verify user ${input.userId} in auth.users (schema may be inaccessible). Proceeding.`)
   }
 
   const { data: existing } = await admin

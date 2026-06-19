@@ -1,7 +1,8 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { revalidatePath } from "next/cache"
@@ -13,7 +14,7 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
         if (!user) return { success: false, error: "Não autenticado" }
 
         // Basic check for view permission on general modules
-        await requirePartnerAccessWithPermission(partnerId, "products", "view")
+        await requirePermission(partnerId, "products", "view")
 
         const supabase = createAdminClient()
 

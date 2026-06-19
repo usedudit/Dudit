@@ -2,7 +2,7 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FinancialSummary } from "@/components/erp/financial-overview/FinancialSummary"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { PlanGatePage } from "@/components/erp/PlanGatePage"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getFinancialOverviewData } from "@/lib/data/financial-overview"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
@@ -16,7 +16,7 @@ export default async function FinancialOverviewRoute() {
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
 
   const partnerId = context.partnerId
-  const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
+  const { allowed } = await checkPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
   const plan = await getPartnerPlan(partnerId)

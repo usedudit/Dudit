@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
@@ -22,7 +22,7 @@ export async function listAllTransactionContactsAction(
     partnerId: string,
 ): Promise<{ success: true; data: TransactionContactRow[] } | { success: false; error: string }> {
     try {
-        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        await requirePermission(partnerId, "financial", "view")
         const supabase = await getSupabaseServerClient()
         const { data, error } = await supabase
             .from("transaction_contacts")
@@ -45,7 +45,7 @@ export async function listTransactionContactsByTypeAction(
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        await requirePermission(partnerId, "financial", "view")
         if (!CONTACT_TYPES.has(contactType)) throw new Error("Tipo de contato inválido.")
 
         const supabase = await getSupabaseServerClient()
@@ -73,7 +73,7 @@ export async function createTransactionContactAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        await requirePermission(input.partnerId, "financial", "edit")
         if (!input.name?.trim()) throw new Error("O nome é obrigatório.")
         if (!CONTACT_TYPES.has(input.type)) throw new Error("Tipo de contato inválido.")
         const normalizedName = normalizeName(input.name)

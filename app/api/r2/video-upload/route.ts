@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -53,7 +54,7 @@ async function verifyItemAccess(itemType: ItemType, itemId: string, user: any) {
   if (error) throw new Error("Erro ao validar propriedade do item")
   if (!data) return
 
-  await requirePartnerAccessWithPermission(data.partner_id, itemType === "product" ? "products" : "services", "edit", user)
+  await requirePermission(data.partner_id, itemType === "product" ? "products" : "services", "edit", user)
 }
 
 export async function POST(req: NextRequest) {

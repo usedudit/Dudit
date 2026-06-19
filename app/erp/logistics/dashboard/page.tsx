@@ -2,7 +2,7 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { getERPDeliveryAnalyticsAction } from "@/app/actions/erp/deliveries"
 import { DashboardBarChart, DashboardLineChart } from "@/components/erp/dashboard/charts/DashboardCharts"
 import { InfoCard } from "@/components/reusable"
@@ -15,7 +15,7 @@ export default async function LogisticsDashboardPage() {
 
   const partnerId = context.partnerId
   const [{ allowed }, analytics] = await Promise.all([
-    checkPartnerPermission(partnerId, "delivery", "view"),
+    checkPermission(partnerId, "delivery", "view"),
     getERPDeliveryAnalyticsAction({ partnerId, days: 30 }),
   ])
 

@@ -2,7 +2,8 @@
 
 import { revalidateTag, unstable_cache } from "next/cache"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireMinimumPlan, requireUser } from "@/lib/auth/authorization"
+import { requireMinimumPlan, requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 
 type GoalInput = {
@@ -74,7 +75,7 @@ async function resolveSellerNameMap(partnerId: string): Promise<Map<string, stri
 export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ success: true; goals: any; sellers: { id: string; name: string }[] } | { success: false; error: string }> {
   try {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "goals", "view")
+    await requirePermission(partnerId, "goals", "view")
     const supabase = await getSupabaseServerClient()
     const nowDate = new Date().toISOString().slice(0, 10)
 
@@ -136,7 +137,7 @@ export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ su
 export async function upsertSalesGoalAction(input: GoalInput) {
   await requireUser()
   await requireMinimumPlan(input.partnerId, "crescer")
-  await requirePartnerAccessWithPermission(input.partnerId, "goals", input.id ? "edit" : "create")
+  await requirePermission(input.partnerId, "goals", input.id ? "edit" : "create")
   const supabase = await getSupabaseServerClient()
 
   const payload = {
@@ -176,7 +177,7 @@ export async function upsertSalesGoalAction(input: GoalInput) {
 export async function deleteSalesGoalAction(partnerId: string, goalId: string) {
   await requireUser()
   await requireMinimumPlan(partnerId, "crescer")
-  await requirePartnerAccessWithPermission(partnerId, "goals", "delete")
+  await requirePermission(partnerId, "goals", "delete")
   const supabase = await getSupabaseServerClient()
   const { error } = await supabase.from("sales_goals").delete().eq("partner_id", partnerId).eq("id", goalId)
   if (error) return { success: false as const, error: error.message }
@@ -295,7 +296,7 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
 
 export async function getSalesGoalsRankingAction(partnerId: string, filter?: RankingPeriodFilter) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
+  await requirePermission(partnerId, "goals", "view")
   const normalizedFilter: RankingPeriodFilter = {
     mode: filter?.mode || "monthly",
     startDate: filter?.startDate || null,
@@ -314,7 +315,7 @@ export async function getSalesGoalsRankingAction(partnerId: string, filter?: Ran
 
 export async function getSalesGoalsSummaryAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
+  await requirePermission(partnerId, "goals", "view")
   const supabase = await getSupabaseServerClient()
 
   // Try RPC first (single server-side aggregation - much faster)
@@ -380,7 +381,7 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
 
 export async function getGoalFormOptionsAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
+  await requirePermission(partnerId, "goals", "view")
   const supabase = await getSupabaseServerClient()
   const sellerMap = await resolveSellerNameMap(partnerId)
   const { data: accounts } = await supabase
@@ -402,7 +403,7 @@ export async function getGoalFormOptionsAction(partnerId: string) {
 
 export async function getSalesGoalByIdAction(partnerId: string, goalId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
+  await requirePermission(partnerId, "goals", "view")
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase
     .from("sales_goals")

@@ -1,6 +1,6 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import OrdersPage from "@/components/erp/orders/OrdersPage"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -17,7 +17,7 @@ export default async function OrdersPageServer() {
 
   // Parallelize permission check and data fetch
   const [{ allowed }, page] = await Promise.all([
-    checkPartnerPermission(partnerId, "orders", "view"),
+    checkPermission(partnerId, "orders", "view"),
     getERPOrdersPageAction(partnerId, { cursor: null, limit: 100 }),
   ])
 

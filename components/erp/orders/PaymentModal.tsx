@@ -314,6 +314,7 @@ const PaymentModal = ({
     /** Valor base alocado ao pedido neste meio (antes de desconto/juros/taxa do método); servidor recalcula o líquido a cobrar. */
     const [paymentBaseAmount, setPaymentBaseAmount] = useState<number>(0);
     const [calcBaseAmount, setCalcBaseAmount] = useState<number>(0);
+    const userManuallyChangedRef = useRef(false);
     const [installments, setInstallments] = useState<string>('1');
     const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
@@ -860,6 +861,7 @@ const PaymentModal = ({
     // Auto-fill amount logic
     useEffect(() => {
         if (view === 'money' || view === 'card' || view === 'pix') {
+            if (userManuallyChangedRef.current) return;
             setIsPixGenerated(false);
             let initialAmt = 0;
             if (editingPaymentIndex !== null) {
@@ -879,6 +881,7 @@ const PaymentModal = ({
             }
             setPaymentBaseAmount(initialAmt);
             setCalcBaseAmount(initialAmt);
+            userManuallyChangedRef.current = false;
         }
     }, [view, editingPaymentIndex, chargeTarget, payments]);
 
@@ -932,9 +935,11 @@ const PaymentModal = ({
                 }
                 // Only override paymentBaseAmount in single-payment mode, not split legs
                 if (res.finalAmount != null && Number.isFinite(res.finalAmount) && editingPaymentIndex === null) {
-                    setPaymentBaseAmount(res.finalAmount);
-                    const nextInput = res.finalAmount > 0 ? String(Math.round(res.finalAmount * 100)) : "";
-                    setCashCalculatorInput(nextInput);
+                    if (!userManuallyChangedRef.current) {
+                        setPaymentBaseAmount(res.finalAmount);
+                        const nextInput = res.finalAmount > 0 ? String(Math.round(res.finalAmount * 100)) : "";
+                        setCashCalculatorInput(nextInput);
+                    }
                 }
             } else {
                 setPaymentCalculation(null);
@@ -949,16 +954,19 @@ const PaymentModal = ({
 
 
     const handleQuickDenomination = (val: number) => {
+        userManuallyChangedRef.current = true;
         setCashCalculatorInput(val > 0 ? String(Math.round(val * 100)) : "");
         setPaymentBaseAmount(val);
     };
 
     const handleMoneyInputSync = (val: number) => {
+        userManuallyChangedRef.current = true;
         setPaymentBaseAmount(val);
         setCashCalculatorInput(val > 0 ? String(Math.round(val * 100)) : "");
     };
 
     const handleCashNumpadInput = (key: string) => {
+        userManuallyChangedRef.current = true;
         const nextRaw = key === '.'
             ? (cashCalculatorInput.includes('.') ? cashCalculatorInput : `${cashCalculatorInput || '0'}.`)
             : `${cashCalculatorInput}${key}`;
@@ -967,6 +975,7 @@ const PaymentModal = ({
     };
 
     const handleCashNumpadDelete = () => {
+        userManuallyChangedRef.current = true;
         const nextRaw = cashCalculatorInput.slice(0, -1);
         setCashCalculatorInput(nextRaw);
         setPaymentBaseAmount(parseCalculatorInput(nextRaw));

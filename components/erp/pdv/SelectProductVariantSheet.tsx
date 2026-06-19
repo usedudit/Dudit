@@ -450,6 +450,17 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                     <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
                         Cancelar
                     </Button>
+                    <Button
+                        className="h-12 flex-1"
+                        disabled={!canConfirm}
+                        onClick={() => {
+                            if (canConfirm) {
+                                onConfirm(selections)
+                            }
+                        }}
+                    >
+                        Salvar
+                    </Button>
                 </div>
             </footer>
         </div>

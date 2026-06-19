@@ -130,12 +130,12 @@ export default function HelpHome() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Catálogo" link="/ajuda/gestao/produtos" color="green" />
+                    <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Catálogo" link="/ajuda/produtos/visao-geral-produtos" color="green" />
                     <ModuleCard icon={<TruckIcon size={24} />} title="Delivery" link="/ajuda/gestao/delivery" color="orange" />
                     <ModuleCard icon={<MoneyIcon size={24} />} title="Financeiro" link="/ajuda/financeiro" color="blue" />
                     <ModuleCard icon={<UserIcon size={24} />} title="Clientes" link="/ajuda/gestao/clientes" color="purple" />
                     <ModuleCard icon={<FileTextIcon size={24} />} title="Pedidos" link="/ajuda/gestao/pedidos" color="cyan" />
-                    <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Vendas" link="/ajuda/vendas" color="green" />
+                    <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Vendas" link="/ajuda/vendas/visao-geral-vendas" color="green" />
                     <ModuleCard icon={<SettingsIcon size={24} />} title="Configurações" link="/ajuda/configuracoes" color="gray" />
                     <ModuleCard icon={<BriefcaseIcon size={24} />} title="Serviços" link="/ajuda/gestao/servicos" color="orange" />
                     <ModuleCard icon={<HelpCircleIcon size={24} />} title="Suporte" link="/ajuda/suporte" color="green" />

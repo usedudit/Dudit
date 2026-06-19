@@ -4,7 +4,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { GeneralTab } from "@/components/erp/dashboard/widgets/GeneralTab"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
 export const dynamic = "force-dynamic"
@@ -26,7 +26,7 @@ export default async function ERPDashboardPage() {
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId
-    const { allowed } = await checkPartnerPermission(partnerId, "dashboard", "view")
+    const { allowed } = await checkPermission(partnerId, "dashboard", "view")
     if (!allowed) return <AccessDenied />
 
     const businessInfo = normalizeBusinessInfo(context.businessInfo)

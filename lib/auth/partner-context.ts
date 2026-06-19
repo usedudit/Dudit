@@ -281,8 +281,8 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
         }
     }
 
-    // If no valid cookie, and they only have 1 ERP, auto-resolve to it
-    if (allAccess.length === 1) {
+    // If no valid cookie, and they only have 1 ERP that belongs to them, auto-resolve
+    if (allAccess.length === 1 && allAccess[0].roleId === "owner") {
         const match = allAccess[0]
         return {
             userId: match.userId,

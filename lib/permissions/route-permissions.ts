@@ -39,7 +39,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "orders", path: "/erp/orders", label: "Pedidos e Vendas", category: "Vendas", legacyCategory: "orders",
         specificPermissions: [
             "can_cancel_order", "can_refund", "can_update_status",
-            "can_assign_delivery", "can_view_values",
+            "can_assign_delivery", "can_view_values", "can_apply_discount",
         ],
     },
     returns: { key: "returns", path: "/erp/returns", label: "Devoluções", category: "Vendas", legacyCategory: "orders" },
@@ -53,9 +53,9 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     invoices: { key: "invoices", path: "/erp/invoices", label: "Notas Fiscais", category: "Vendas", legacyCategory: "orders" },
     pos: {
         key: "pos", path: "/erp/pdv", label: "PDV (Frente de Caixa)", category: "Vendas", legacyCategory: "orders",
-        specificPermissions: ["can_discount", "can_cancel_sale"],
+        specificPermissions: ["can_sell", "can_discount", "can_cancel_sale", "can_add_delivery"],
     },
-    quotes: { key: "quotes", path: "/erp/quotes", label: "Orçamentos", category: "Vendas", legacyCategory: "quotes" },
+    quotes: { key: "quotes", path: "/erp/quotes", label: "Orçamentos", category: "Vendas", legacyCategory: "quotes", specificPermissions: ["can_apply_discount"] },
     goals: { key: "goals", path: "/erp/goals", label: "Metas", category: "Vendas", legacyCategory: "orders" },
 
     // ── Produtos
@@ -95,7 +95,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     },
     cash_register: {
         key: "cash_register", path: "/erp/cash-register", label: "Caixa (PDV)", category: "Financeiro", legacyCategory: "financial",
-        specificPermissions: ["can_open_cash", "can_close_cash"],
+        specificPermissions: ["can_open_cash", "can_close_cash", "can_manage_cash"],
     },
     financial_dashboard: { key: "financial_dashboard", path: "/erp/resumo-financeiro", label: "Visão Geral", category: "Financeiro", legacyCategory: "financial" },
     financial_dre: {
@@ -133,7 +133,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     },
     settings_team: {
         key: "settings_team", path: "/erp/settings/team", label: "Equipe e Acessos", category: "Configurações",
-        specificPermissions: ["can_invite", "can_remove_member", "can_manage_team"],
+        specificPermissions: ["can_invite", "can_remove_member", "can_manage_team", "can_revoke_invite"],
     },
     settings_subscription: {
         key: "settings_subscription", path: "/erp/settings/subscription", label: "Minha Assinatura", category: "Configurações",
@@ -186,7 +186,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     // Vendas
     orders: withSpecific(full, {
         can_cancel_order: true, can_refund: true, can_update_status: true,
-        can_assign_delivery: true, can_view_values: true,
+        can_assign_delivery: true, can_view_values: true, can_apply_discount: true,
     }),
     returns: full,
     logistics: withSpecific(full, {
@@ -195,7 +195,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     }),
     invoices: full,
     pos: withSpecific(full, { can_sell: true, can_discount: true, can_cancel_sale: true, can_add_delivery: true }),
-    quotes: full,
+    quotes: withSpecific(full, { can_apply_discount: true }),
     goals: full,
     // Produtos
     products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
@@ -254,7 +254,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     // Vendas - full ops, can cancel but CANNOT refund
     orders: withSpecific(full, {
         can_cancel_order: true, can_refund: false, can_update_status: true,
-        can_assign_delivery: true, can_view_values: true,
+        can_assign_delivery: true, can_view_values: true, can_apply_discount: true,
     }),
     returns: full,
     logistics: withSpecific(full, {
@@ -263,7 +263,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     }),
     invoices: full,
     pos: withSpecific(full, { can_sell: true, can_discount: true, can_cancel_sale: true, can_add_delivery: true }),
-    quotes: full,
+    quotes: withSpecific(full, { can_apply_discount: true }),
     goals: full,
     // Produtos - full
     products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
@@ -310,13 +310,13 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     // Vendas - create/edit orders, update status, no cancel/refund
     orders: withSpecific(crud, {
         can_cancel_order: false, can_refund: false, can_update_status: true,
-        can_assign_delivery: false, can_view_values: true,
+        can_assign_delivery: false, can_view_values: true, can_apply_discount: false,
     }),
     returns: viewOnly,
     logistics: viewOnly,
     invoices: viewOnly,
     pos: withSpecific(crud, { can_sell: true, can_discount: false, can_cancel_sale: false, can_add_delivery: true }),
-    quotes: crud,
+    quotes: withSpecific(crud, { can_apply_discount: false }),
     goals: viewOnly,
     // Produtos - view only
     products: withSpecific(viewOnly, { can_adjust_stock: false, can_import_products: false }),
@@ -364,7 +364,7 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     // Vendas - view assigned orders only, update delivery status
     orders: withSpecific(viewOnly, {
         can_cancel_order: false, can_refund: false, can_update_status: false,
-        can_assign_delivery: false, can_view_values: false,
+        can_assign_delivery: false, can_view_values: false, can_apply_discount: false,
     }),
     returns: noAccess,
     logistics: withSpecific(viewOnly, {
@@ -506,7 +506,7 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             edit: orders.edit,
             delete: orders.delete,
             cancel: hasSpecificPermission(routePerms, "orders", "can_cancel_order"),
-            can_apply_discount: hasSpecificPermission(routePerms, "pos", "can_discount"),
+            can_apply_discount: hasSpecificPermission(routePerms, "orders", "can_apply_discount"),
             can_add_delivery: hasSpecificPermission(routePerms, "pos", "can_add_delivery") || hasSpecificPermission(routePerms, "orders", "can_assign_delivery"),
             delete_cancel: orders.delete,
         },
@@ -515,7 +515,6 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             create: routePerms.appointments?.create ?? false,
             edit: routePerms.appointments?.edit ?? false,
             delete: routePerms.appointments?.delete ?? false,
-            can_apply_discount: hasSpecificPermission(routePerms, "pos", "can_discount") || hasSpecificPermission(routePerms, "orders", "can_view_values"),
         },
         customers: mapRoute("customers"),
         products: mapRoute("products"),
@@ -537,7 +536,7 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
         services: mapRoute("services"),
         quotes: {
             ...mapRoute("quotes"),
-            can_apply_discount: hasSpecificPermission(routePerms, "pos", "can_discount"),
+            can_apply_discount: hasSpecificPermission(routePerms, "quotes", "can_apply_discount"),
         },
         stock_movements: {
             view: mapRoute("stock_movements").view,
@@ -655,7 +654,22 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             edit: legacy.orders.edit,
             delete: legacy.orders.delete ?? legacy.orders.delete_cancel ?? false,
         }
-            ;["orders", "returns", "invoices"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
+        const routes = ["orders", "returns", "invoices"] as RouteKey[]
+        routes.forEach((routeKey) => {
+            apply(routeKey, mapped)
+            if (routeKey === "orders" && legacy.orders.can_apply_discount !== undefined) {
+                base[routeKey].specific = {
+                    ...(base[routeKey]?.specific || {}),
+                    can_apply_discount: legacy.orders.can_apply_discount,
+                }
+            }
+            if (routeKey === "orders" && legacy.orders.can_add_delivery !== undefined) {
+                base[routeKey].specific = {
+                    ...(base[routeKey]?.specific || {}),
+                    can_assign_delivery: legacy.orders.can_add_delivery,
+                }
+            }
+        })
     }
 
     if (legacy.delivery) {
@@ -681,9 +695,26 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
                 can_add_delivery: legacy.pdv.can_add_delivery ?? legacy.specific?.can_add_delivery ?? false,
             },
         })
+        if (legacy.pdv.open_pdv !== undefined || legacy.pdv.close_pdv !== undefined || 
+            legacy.pdv.sangria !== undefined || legacy.pdv.reforco !== undefined) {
+            base.cash_register.specific = {
+                ...(base.cash_register?.specific || {}),
+                ...(legacy.pdv.open_pdv !== undefined && { can_open_cash: legacy.pdv.open_pdv }),
+                ...(legacy.pdv.close_pdv !== undefined && { can_close_cash: legacy.pdv.close_pdv }),
+                ...(legacy.pdv.sangria !== undefined && { can_manage_cash: legacy.pdv.sangria }),
+            }
+        }
     }
 
-    if (legacy.quotes) apply("quotes", mapLegacy(legacy.quotes))
+    if (legacy.quotes) {
+        apply("quotes", mapLegacy(legacy.quotes))
+        if (legacy.quotes.can_apply_discount !== undefined) {
+            base.quotes.specific = {
+                ...(base.quotes?.specific || {}),
+                can_apply_discount: legacy.quotes.can_apply_discount,
+            }
+        }
+    }
     if (legacy.goals) apply("goals", mapLegacy(legacy.goals))
     if (legacy.customers) apply("customers", mapLegacy(legacy.customers))
 

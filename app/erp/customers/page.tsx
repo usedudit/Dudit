@@ -1,6 +1,6 @@
 import CustomersPage from "@/components/erp/clientes/CustomersPage"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -11,7 +11,7 @@ export default async function CustomersRoute() {
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
   const [{ allowed }, page] = await Promise.all([
-    checkPartnerPermission(partnerId, "customers", "view"),
+    checkPermission(partnerId, "customers", "view"),
     getERPCustomersPageAction(partnerId, { cursor: null, limit: 100 }),
   ])
 

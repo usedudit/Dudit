@@ -2,7 +2,7 @@ import "server-only"
 
 import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 
 export const DASHBOARD_TAGS = {
@@ -511,27 +511,27 @@ async function getCachedOperations(partnerId: string): Promise<OperationsDashboa
 }
 
 export async function getDashboardGeneralData(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  await requirePermission(partnerId, "dashboard", "view")
   return getCachedGeneral(partnerId)
 }
 
 export async function getDashboardProductsData(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "products", "view")
+  await requirePermission(partnerId, "products", "view")
   return getCachedProducts(partnerId)
 }
 
 export async function getDashboardServicesData(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "appointments", "view")
+  await requirePermission(partnerId, "appointments", "view")
   return getCachedServices(partnerId)
 }
 
 export async function getDashboardFinancialData(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+  await requirePermission(partnerId, "financial", "view")
   return getCachedFinancial(partnerId)
 }
 
 export async function getDashboardOperationsData(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "delivery", "view")
+  await requirePermission(partnerId, "delivery", "view")
   return getCachedOperations(partnerId)
 }
 
@@ -871,31 +871,31 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[])
 // ============================================================================
 
 export async function getGeneralMetrics(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  await requirePermission(partnerId, "dashboard", "view")
   return getCachedGeneralMetrics(partnerId)
 }
 
 export async function getGeneralAlerts(partnerId: string, sells: string[]) {
-  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  await requirePermission(partnerId, "dashboard", "view")
   return getCachedGeneralAlerts(partnerId, sells)
 }
 
 export async function getGeneralRevenueChart(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  await requirePermission(partnerId, "dashboard", "view")
   return getCachedGeneralRevenueChart(partnerId)
 }
 
 export async function getGeneralRevenueOrigin(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  await requirePermission(partnerId, "dashboard", "view")
   return getCachedGeneralRevenueOrigin(partnerId)
 }
 
 export async function getGeneralActivity(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  await requirePermission(partnerId, "dashboard", "view")
   return getCachedGeneralActivity(partnerId)
 }
 
 export async function getGeneralTopCategories(partnerId: string, sells: string[]) {
-  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  await requirePermission(partnerId, "dashboard", "view")
   return getCachedGeneralTopCategories(partnerId, sells)
 }

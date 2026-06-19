@@ -14,7 +14,8 @@ export async function GET(request: Request) {
     // Força a base URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
 
-    if (allAccess.length === 1) {
+    // Only auto-select if the single ERP belongs to the user
+    if (allAccess.length === 1 && allAccess[0].roleId === "owner") {
         await setActivePartner(allAccess[0].partnerId)
         return NextResponse.redirect(`${baseUrl}/erp/dashboard`)
     }

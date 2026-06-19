@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -12,7 +12,7 @@ function normalizeName(value: string) {
 
 export async function getFinancialCategoriesAction(partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+    await requirePermission(partnerId, "financial", "view")
 
     // Use admin client after authz check so invited ERP users can read data.
     const supabase = createAdminClient()
@@ -40,7 +40,7 @@ export async function createFinancialCategoryAction(data: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(data.partnerId, "financial", "edit")
+    await requirePermission(data.partnerId, "financial", "create")
     const supabase = await getSupabaseServerClient()
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
@@ -96,7 +96,7 @@ export async function updateFinancialCategoryAction(
   data: { name?: string; parentId?: string | null; isActive?: boolean; categoryType?: "income" | "expense" | null },
 ) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
+    await requirePermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
 
     if (data.parentId) {
@@ -146,7 +146,7 @@ export async function updateFinancialCategoryAction(
 
 export async function deleteFinancialCategoryAction(id: string, partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
+    await requirePermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
 
     const { error } = await supabase

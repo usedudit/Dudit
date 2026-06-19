@@ -14,7 +14,8 @@ import {
     getDashboardServicesData,
 } from "@/lib/data/dashboard"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { checkPartnerPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requireMinimumPlan } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { redirect } from "next/navigation"
 
@@ -50,10 +51,10 @@ export default async function ERPReportsPage() {
 
     // Load data in parallel for allowed tabs
     const [productsData, servicesData, financialData, operationsData] = await Promise.all([
-        checkPartnerPermission(partnerId, "products", "view").then(res => res.allowed ? getDashboardProductsData(partnerId).catch(() => null) : null),
-        checkPartnerPermission(partnerId, "appointments", "view").then(res => res.allowed ? getDashboardServicesData(partnerId).catch(() => null) : null),
-        checkPartnerPermission(partnerId, "financial", "view").then(res => res.allowed ? getDashboardFinancialData(partnerId).catch(() => null) : null),
-        checkPartnerPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDashboardOperationsData(partnerId).catch(() => null) : null)
+        checkPermission(partnerId, "products", "view").then(res => res.allowed ? getDashboardProductsData(partnerId).catch(() => null) : null),
+        checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getDashboardServicesData(partnerId).catch(() => null) : null),
+        checkPermission(partnerId, "financial", "view").then(res => res.allowed ? getDashboardFinancialData(partnerId).catch(() => null) : null),
+        checkPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDashboardOperationsData(partnerId).catch(() => null) : null)
     ])
 
     const initialTab = productsData ? "produtos" : servicesData ? "servicos" : financialData ? "financeiro" : operationsData ? "operacao" : ""

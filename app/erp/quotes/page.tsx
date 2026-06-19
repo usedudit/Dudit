@@ -1,6 +1,6 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import QuotesPage from "@/components/erp/quotes/QuotesPage"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -17,7 +17,7 @@ export default async function QuotesPageServer() {
 
     // Parallelize permission check and data fetch
     const [{ allowed }, page] = await Promise.all([
-        checkPartnerPermission(partnerId, "quotes", "view"),
+        checkPermission(partnerId, "quotes", "view"),
         getERPQuotesPageAction(partnerId, { cursor: null, limit: 100 }),
     ])
 

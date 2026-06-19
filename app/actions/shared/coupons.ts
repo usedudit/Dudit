@@ -1,7 +1,8 @@
 "use server"
 
 import { z } from "zod"
-import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requireUser, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCoupons } from "@/lib/utils/revalidation"
 import { validateCoupon, findBestAutomaticCoupon, validateCouponRow } from "@/lib/services/coupons"
@@ -37,7 +38,7 @@ const CouponSchema = z.object({
 
 export async function listCouponsAction(partnerId: string, params?: { search?: string; isActive?: string; type?: string; page?: number; limit?: number }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+    await requirePermission(partnerId, "coupons", "view")
     const supabase = await getSupabaseServerClient()
 
     const page = Math.max(1, Number(params?.page || 1))
@@ -68,7 +69,7 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
     const data = parsed.data
     await requireUser()
     await requireMinimumPlan(data.partnerId, "crescer")
-    await requirePartnerAccessWithPermission(data.partnerId, "coupons", "create")
+    await requirePermission(data.partnerId, "coupons", "create")
     const supabase = await getSupabaseServerClient()
 
     const { data: inserted, error } = await supabase
@@ -120,7 +121,7 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
     const data = parsed.data
     await requireUser()
     await requireMinimumPlan(data.partnerId, "crescer")
-    await requirePartnerAccessWithPermission(data.partnerId, "coupons", "edit")
+    await requirePermission(data.partnerId, "coupons", "edit")
     const supabase = await getSupabaseServerClient()
 
     const { data: current } = await supabase
@@ -179,7 +180,7 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
 
 export async function toggleCouponStatusAction(partnerId: string, couponId: string, isActive: boolean) {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "coupons", "edit")
+    await requirePermission(partnerId, "coupons", "edit")
     const supabase = await getSupabaseServerClient()
     const { error } = await supabase
         .from("coupons")
@@ -194,7 +195,7 @@ export async function toggleCouponStatusAction(partnerId: string, couponId: stri
 export async function deleteCouponAction(partnerId: string, couponId: string) {
     await requireUser()
     await requireMinimumPlan(partnerId, "crescer")
-    await requirePartnerAccessWithPermission(partnerId, "coupons", "delete")
+    await requirePermission(partnerId, "coupons", "delete")
     const supabase = await getSupabaseServerClient()
     const { error } = await supabase.from("coupons").delete().eq("id", couponId).eq("partner_id", partnerId)
     if (error) return { success: false, error: error.message }
@@ -211,7 +212,7 @@ export async function validateCouponAction(input: {
     items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "orders", "view")
+    await requirePermission(input.partnerId, "orders", "view")
     return validateCoupon(input)
 }
 
@@ -223,13 +224,13 @@ export async function findAutomaticCouponAction(input: {
     items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "orders", "view")
+    await requirePermission(input.partnerId, "orders", "view")
     return findBestAutomaticCoupon(input)
 }
 
 export async function getCouponCustomersAction(partnerId: string, couponId: string) {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+    await requirePermission(partnerId, "coupons", "view")
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
         .from("coupon_customers")
@@ -350,7 +351,7 @@ export async function listApplicableMarketplaceCouponsAction(input: {
 
 export async function getCouponScopeDataAction(partnerId: string) {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+    await requirePermission(partnerId, "coupons", "view")
     const supabase = await getSupabaseServerClient()
 
     const [{ data: products }, { data: services }, { data: categories }, { data: customers }] = await Promise.all([
@@ -416,7 +417,7 @@ export async function getCouponScopeDataAction(partnerId: string) {
 
 export async function getCouponLinkedItemsAction(partnerId: string, couponId: string) {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+    await requirePermission(partnerId, "coupons", "view")
     const supabase = await getSupabaseServerClient()
 
     const [{ data: products }, { data: categories }, { data: services }] = await Promise.all([

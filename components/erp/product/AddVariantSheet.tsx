@@ -18,6 +18,7 @@ import { createProductVariantsBatchAction, getProductVariantsAction } from "@/ap
 import { useNotification } from "@/hooks/use-notification"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import QuickStockMovementSheet from "./QuickStockMovementSheet"
 
 interface AddVariantSheetProps {
     isOpen: boolean
@@ -181,6 +182,8 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
         message: string
         onConfirm: () => void
     } | null>(null)
+
+    const [selectedVariantForAdjustment, setSelectedVariantForAdjustment] = useState<any | null>(null)
 
     // Scroll
     const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -888,6 +891,11 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                     {tableRows.map((rawRow, idx) => {
                                                         const row = getDisplayData(rawRow)
                                                         const activeImage = getRowImage(row.values, row.id)
+                                                        const matchingExisting = existingVariants.find(ev => {
+                                                            if (!ev.value) return false
+                                                            const evRowId = ev.value.split(" / ").map((val: string) => val.trim()).join("-")
+                                                            return evRowId === row.id
+                                                        })
 
                                                         return (
                                                             <motion.tr
@@ -928,7 +936,32 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                     </div>
                                                                 </td>
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
-                                                                    <QuantitySelector value={row.stock} onChange={(val) => updateRow(row.id, "stock", val)} min={0} size="md" />
+                                                                     {product?.id && matchingExisting ? (
+                                                                         <div className="flex items-center gap-1.5 min-w-[120px]">
+                                                                             <div className="flex-1 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg h-[34px] px-3 flex items-center justify-between text-xs text-brand-dark dark:text-dark-heading font-medium">
+                                                                                 {row.stock}
+                                                                             </div>
+                                                                             <Button
+                                                                                 type="button"
+                                                                                 variant="outline"
+                                                                                 className="h-[34px] px-2.5 text-[11px] border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-lg font-medium shrink-0"
+                                                                                 onClick={() => {
+                                                                                     setSelectedVariantForAdjustment({
+                                                                                         id: matchingExisting.id,
+                                                                                         name: row.name,
+                                                                                         sku: row.sku,
+                                                                                         image: typeof activeImage === 'string' ? activeImage : null,
+                                                                                         stock: row.stock,
+                                                                                         rowId: row.id
+                                                                                     })
+                                                                                 }}
+                                                                             >
+                                                                                 Ajustar
+                                                                             </Button>
+                                                                         </div>
+                                                                     ) : (
+                                                                         <QuantitySelector value={row.stock} onChange={(val) => updateRow(row.id, "stock", val)} min={0} size="md" />
+                                                                     )}
                                                                 </td>
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle text-center">
                                                                     <div className="flex justify-center">
@@ -1018,6 +1051,31 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                 variant="danger"
                 icon={<TrashIcon />}
             />
+
+            {selectedVariantForAdjustment && (
+                <QuickStockMovementSheet
+                    isOpen={!!selectedVariantForAdjustment}
+                    product={{
+                        id: product.id,
+                        name: product.name,
+                        sku: product.sku,
+                        image: (typeof product.images?.[0] === 'string' ? product.images[0] : (product.image || null)),
+                        stock: Number(product.stock || 0)
+                    }}
+                    variant={selectedVariantForAdjustment}
+                    onClose={() => setSelectedVariantForAdjustment(null)}
+                    onSaveSuccess={(newStock) => {
+                        updateRow(selectedVariantForAdjustment.rowId, "stock", newStock)
+                        setExistingVariants(prev => prev.map(ev => {
+                            if (ev.id === selectedVariantForAdjustment.id) {
+                                return { ...ev, stock: newStock }
+                            }
+                            return ev
+                        }))
+                        onSaveSuccess?.()
+                    }}
+                />
+            )}
 
             <SavingStatusModal isOpen={isSaving} text="Salvando variações..." />
         </div>

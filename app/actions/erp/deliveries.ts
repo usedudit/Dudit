@@ -65,8 +65,9 @@ export type SmartDeliverySuggestionGroup = {
   orders: SmartDeliverySuggestionOrder[]
 }
 
-async function getDeliveryActorScope(partnerId: string) {
-  const access = await requirePartnerRouteAccess(partnerId, "logistics")
+async function getDeliveryActorScope(partnerId: string, specificPermission?: string) {
+  const options = specificPermission ? { specificPermission } : undefined
+  const access = await requirePartnerRouteAccess(partnerId, "logistics", options)
   if (access.roleId !== "delivery") {
     return { roleId: access.roleId, partnerUserId: null as string | null }
   }
@@ -1015,7 +1016,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
 export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
   const user = await requireUser()
-  const actor = await getDeliveryActorScope(payload.partnerId)
+  const actor = await getDeliveryActorScope(payload.partnerId, "can_create_deliveries")
   if (actor.roleId === "delivery") {
     return { success: false as const, error: "Sem permissão para criar entregas." }
   }
@@ -1499,7 +1500,7 @@ export async function updateERPDeliveryAction(payload: {
   notes?: string
 }) {
   const user = await requireUser()
-  const actor = await getDeliveryActorScope(payload.partnerId)
+  const actor = await getDeliveryActorScope(payload.partnerId, "can_assign_driver")
   if (actor.roleId === "delivery") {
     return { success: false as const, error: "Sem permissão para editar entregas." }
   }

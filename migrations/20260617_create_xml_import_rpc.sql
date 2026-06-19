@@ -412,7 +412,7 @@ BEGIN
       END IF;
 
       -- Atualiza/vincula fornecedor ao produto (existente ou novo)
-      v_supplier_action := COALESCE(p_supplier_actions->>v_item_id, 'add');
+      v_supplier_action := COALESCE(p_supplier_actions->>(v_item_id::text), 'add');
       IF v_decision != 'ignore' AND v_supplier_id IS NOT NULL AND v_supplier_action = 'add' THEN
         INSERT INTO public.product_suppliers (
           product_id, supplier_id, supplier_sku, cost_price,

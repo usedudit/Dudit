@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -21,7 +22,7 @@ export async function confirmPickupPaymentAction(params: {
   const ctx = await getCurrentPartnerContext()
   if (!ctx) return { error: "Contexto de ERP não encontrado" }
 
-  await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "edit")
+  await requirePermission(ctx.partnerId, "orders", "edit")
 
   const supabase = await getSupabaseServerClient()
   const adminClient = createAdminClient()

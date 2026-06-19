@@ -152,7 +152,7 @@ const TransactionGridCard = React.memo(
                             >
                                 {((String(transaction.rawStatus || "").toLowerCase() === "pending" || transaction.isOverdue) && !transaction.isInstallmentGroup && !transaction.isRecurringOccurrence && onMarkAsPaid) && (
                                     <DropdownItem onClick={() => onMarkAsPaid(transaction)}>
-                                        <MoneyIcon className="w-4 h-4" /> Marcar como {transaction.ledgerDirection === "in" ? "recebido" : "pago"}
+                                        <MoneyIcon size={18} /> Marcar como {transaction.ledgerDirection === "in" ? "recebido" : "pago"}
                                     </DropdownItem>
                                 )}
                             </ActionsDropdown>

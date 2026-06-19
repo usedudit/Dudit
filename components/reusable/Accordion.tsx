@@ -96,6 +96,7 @@ interface ActionsDropdownProps {
   onPaymentStatus?: () => void
   onDeliveryStatus?: () => void
   cancelLabel?: string
+  cancelIcon?: React.ReactNode
   trigger?: React.ReactElement
   className?: string
   children?: React.ReactNode
@@ -115,6 +116,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   onPaymentStatus,
   onDeliveryStatus,
   cancelLabel = "Cancelar",
+  cancelIcon,
   trigger,
   className,
   children
@@ -178,7 +180,14 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     )}
     {onCancel && (
       <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red" : ""}>
-        <BlockedIcon size={18} /> {cancelLabel}
+        {cancelIcon ? cancelIcon : (
+          (cancelLabel.toLowerCase().includes("pago") ||
+           cancelLabel.toLowerCase().includes("recebido") ||
+           cancelLabel.toLowerCase().includes("quitar") ||
+           cancelLabel.toLowerCase().includes("estornar"))
+            ? <MoneyIcon size={18} />
+            : <BlockedIcon size={18} />
+        )} {cancelLabel}
       </DropdownItem>
     )}
     {onPaymentStatus && (

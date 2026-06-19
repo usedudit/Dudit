@@ -2,7 +2,8 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { revalidateOrders, revalidateTransactions, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { getActiveCashSessionAction } from "@/app/actions/erp/cash-register"
@@ -478,7 +479,7 @@ function inputPaymentMethodLabel(paymentMethod?: string | null) {
 
 export async function getPOSInitialDataAction(partnerId: string) {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
+    await requirePermission(partnerId, "pdv", "view")
     // Read with admin client after authz so invited users can load POS datasets.
     const supabase = createAdminClient()
 
@@ -536,11 +537,11 @@ export async function getPOSInitialDataAction(partnerId: string) {
 
 export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "sell")
+    await requirePermission(input.partnerId, "pdv", "sell")
 
     // Validate discount permission if a discount or coupon is being applied
     if (input.discountAmount > 0 || input.couponCode || input.couponId) {
-        await requirePartnerAccessWithPermission(input.partnerId, "pdv", "can_apply_discount")
+        await requirePermission(input.partnerId, "pdv", "can_apply_discount")
     }
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -683,7 +684,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
 
 export async function deletePreSaleDraftAction(partnerId: string, preSaleId: string) {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
+    await requirePermission(partnerId, "pdv", "view")
     const supabase = createAdminClient()
 
     const { error } = await supabase
@@ -709,7 +710,7 @@ export async function deletePreSaleDraftAction(partnerId: string, preSaleId: str
  */
 export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const user = await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "sell")
+    await requirePermission(input.partnerId, "pdv", "sell")
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -731,7 +732,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         const hasDiscount = Number(draftCheck.discount_amount || 0) > 0
         const hasCoupon = !!draftCheck.coupon_id
         if (hasDiscount || hasCoupon) {
-            await requirePartnerAccessWithPermission(input.partnerId, "pdv", "can_apply_discount")
+            await requirePermission(input.partnerId, "pdv", "can_apply_discount")
         }
     }
 
@@ -1009,7 +1010,7 @@ export async function createPOSQuickProductAction(input: {
     stockQuantity: number
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "products", "create")
+    await requirePermission(input.partnerId, "products", "create")
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -1074,7 +1075,7 @@ export async function createPOSCustomerQuickAction(input: {
     }
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "customers", "create")
+    await requirePermission(input.partnerId, "customers", "create")
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -1177,7 +1178,7 @@ export async function getPOSCustomerDetailsAction(input: {
     customerId: string
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "customers", "view")
+    await requirePermission(input.partnerId, "customers", "view")
 
     const supabase = createAdminClient()
     const [{ data: customer, error: customerError }, { data: address }] = await Promise.all([
@@ -1246,7 +1247,7 @@ export async function createPOSCustomerAddressAction(input: {
     }
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "customers", "edit")
+    await requirePermission(input.partnerId, "customers", "edit")
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -1336,7 +1337,7 @@ export async function applyCouponToPreSaleAction(input: {
     items?: Array<{ productId?: string | null; serviceId?: string | null }>
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "can_apply_discount")
+    await requirePermission(input.partnerId, "pdv", "can_apply_discount")
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -1386,7 +1387,7 @@ export async function removeCouponFromPreSaleAction(input: {
     preSaleId: string
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "can_apply_discount")
+    await requirePermission(input.partnerId, "pdv", "can_apply_discount")
 
     const supabase = createAdminClient()
     const { error } = await supabase
@@ -1413,7 +1414,7 @@ export async function findAutomaticCouponForPOSAction(input: {
     items?: Array<{ productId?: string | null; serviceId?: string | null }>
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "can_apply_discount")
+    await requirePermission(input.partnerId, "pdv", "can_apply_discount")
 
     const result = await findBestAutomaticCoupon({
         partnerId: input.partnerId,

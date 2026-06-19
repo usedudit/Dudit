@@ -1,7 +1,7 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import GoalsPage from "@/components/erp/goals/GoalsPage"
@@ -16,7 +16,7 @@ export default async function GoalsPageServer() {
 
   const [plan, { allowed }, goalsRes, rankingRes, summaryRes] = await Promise.all([
     getPartnerPlan(partnerId),
-    checkPartnerPermission(partnerId, "goals", "view"),
+    checkPermission(partnerId, "goals", "view"),
     getSalesGoalsModuleAction(partnerId),
     getSalesGoalsRankingAction(partnerId),
     getSalesGoalsSummaryAction(partnerId),

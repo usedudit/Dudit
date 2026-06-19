@@ -3,7 +3,8 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { revalidateEntityTimeline, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { revalidatePath, revalidateTag } from "next/cache"
@@ -98,11 +99,11 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
   }
 }
 
-async function getPartnerContextWithPermission(permission: "view" | "create" | "edit") {
+async function getPartnerContextWithPermission(permission: "view" | "create" | "edit" | "delete") {
   const user = await requireUser()
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("Contexto ERP não encontrado")
-  await requirePartnerAccessWithPermission(context.partnerId, "appointments", permission, user)
+  await requirePermission(context.partnerId, "appointments", permission, user)
   return { user, partnerId: context.partnerId }
 }
 
@@ -616,7 +617,6 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
             customer_name: row.customer_name,
             total_amount: pricingResult.finalTotal,
             discount_amount: 0,
-            final_amount: pricingResult.finalTotal,
             paid_amount: 0,
             situation: "pending",
             delivery_status: "delivered", // Fulfilled right away
@@ -846,7 +846,6 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         .from("orders")
         .update({
           total_amount: orderPrice,
-          final_amount: orderPrice,
           notes: updated.notes || null,
         })
         .eq("id", updated.marketplace_order_id)
@@ -1099,7 +1098,7 @@ async function handleAppointmentStockMovement(params: {
 export async function deleteAppointmentAction(appointmentId: string) {
   try {
     if (!appointmentId) return { success: false, error: "Agendamento inválido" }
-    const { partnerId, user } = await getPartnerContextWithPermission("edit")
+    const { partnerId, user } = await getPartnerContextWithPermission("delete")
     const supabase = await getSupabaseServerClient()
 
     // Log the deletion
@@ -1142,7 +1141,7 @@ export async function deleteAppointmentAction(appointmentId: string) {
 
 export async function deleteUnavailableSeriesAction(partnerId: string, serviceName: string) {
   try {
-    const { user } = await getPartnerContextWithPermission("edit")
+    const { user } = await getPartnerContextWithPermission("delete")
     const supabase = await getSupabaseServerClient()
 
     // Only delete "unavailable" sources with matching service name

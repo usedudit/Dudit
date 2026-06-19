@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan, requireOrderAccess } from "@/lib/auth/authorization"
+import { requireUser, requireMinimumPlan, requireOrderAccess } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -197,7 +198,7 @@ export async function getReturnRequestsPageAction(
     options?: { cursor?: { createdAt: string; id: string } | null; limit?: number; status?: string | null; search?: string | null },
 ) {
     try {
-        const access = await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+        const access = await requirePermission(partnerId, "orders", "view")
         assertRole(access.roleId, VIEW_ROLES)
         const supabase = createAdminClient()
         const limit = Math.max(1, Math.min(100, Number(options?.limit || 50)))
@@ -260,7 +261,7 @@ export async function getReturnRequestsPageAction(
 
 export async function getReturnRequestDetailsAction(partnerId: string, requestId: string) {
     try {
-        const access = await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+        const access = await requirePermission(partnerId, "orders", "view")
         assertRole(access.roleId, VIEW_ROLES)
         const supabase = createAdminClient()
         const { data, error } = await supabase
@@ -320,7 +321,7 @@ export async function createReturnRequestAction(input: unknown) {
         const user = await requireUser()
         const data = createReturnSchema.parse(input)
         await requireMinimumPlan(data.partnerId, "crescer")
-        const access = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
+        const access = await requirePermission(data.partnerId, "orders", "edit")
         assertRole(access.roleId, MANAGE_ROLES)
         const supabase = createAdminClient()
 
@@ -585,7 +586,7 @@ export async function processReturnRequestAction(input: unknown) {
         await requireMinimumPlan(data.partnerId, "crescer")
         if (data.nextStatus && !RETURN_STATUS_SET.has(data.nextStatus)) throw new Error("Status invalido")
 
-        const access = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
+        const access = await requirePermission(data.partnerId, "orders", "edit")
         assertRole(access.roleId, MANAGE_ROLES)
         const supabase = createAdminClient()
 
@@ -778,7 +779,7 @@ export async function escalateReturnRequestAction(partnerId: string, requestId: 
 
 export async function fetchReturnOrderBucketAction(partnerId: string) {
     try {
-        const access = await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+        const access = await requirePermission(partnerId, "orders", "view")
         assertRole(access.roleId, VIEW_ROLES)
         const supabase = createAdminClient()
 

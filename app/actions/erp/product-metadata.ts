@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requireMinimumPlan } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 
 interface MetadataResponse {
@@ -16,7 +17,7 @@ interface MetadataResponse {
  */
 export async function getProductMetadataAction(partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "view")
+    await requirePermission(partnerId, "products", "view")
 
     // Use admin client after authz check so invited ERP users bypass owner-only RLS.
     const supabase = createAdminClient()
@@ -53,7 +54,7 @@ export async function revalidateProductMetadata(partnerId: string) {
 export async function createCategoryAction(data: { partnerId: string, name: string, parentId?: string | null }) {
   try {
     await requireMinimumPlan(data.partnerId, "crescer")
-    await requirePartnerAccessWithPermission(data.partnerId, "products", "edit")
+    await requirePermission(data.partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
@@ -95,7 +96,7 @@ export async function createCategoryAction(data: { partnerId: string, name: stri
 export async function createBrandAction(data: { partnerId: string, name: string }) {
   try {
     await requireMinimumPlan(data.partnerId, "crescer")
-    await requirePartnerAccessWithPermission(data.partnerId, "products", "edit")
+    await requirePermission(data.partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
@@ -124,7 +125,7 @@ export async function createBrandAction(data: { partnerId: string, name: string 
 export async function createLocationAction(data: { partnerId: string, name: string }) {
   try {
     await requireMinimumPlan(data.partnerId, "crescer")
-    await requirePartnerAccessWithPermission(data.partnerId, "products", "edit")
+    await requirePermission(data.partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
@@ -152,7 +153,7 @@ export async function createLocationAction(data: { partnerId: string, name: stri
  */
 export async function updateCategoryAction(id: string, partnerId: string, data: { name?: string, parentId?: string | null, isActive?: boolean }) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "edit")
+    await requirePermission(partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     // Security: Verify parent_id belongs to the same partner
@@ -194,7 +195,7 @@ export async function updateCategoryAction(id: string, partnerId: string, data: 
  */
 export async function deleteCategoryAction(id: string, partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "edit")
+    await requirePermission(partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     const { error } = await supabase
@@ -217,7 +218,7 @@ export async function deleteCategoryAction(id: string, partnerId: string) {
  */
 export async function updateBrandAction(id: string, partnerId: string, data: { name?: string, isActive?: boolean }) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "edit")
+    await requirePermission(partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     const payload: any = {}
@@ -246,7 +247,7 @@ export async function updateBrandAction(id: string, partnerId: string, data: { n
  */
 export async function deleteBrandAction(id: string, partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "edit")
+    await requirePermission(partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     const { error } = await supabase
@@ -269,7 +270,7 @@ export async function deleteBrandAction(id: string, partnerId: string) {
  */
 export async function updateLocationAction(id: string, partnerId: string, data: { name?: string, isActive?: boolean }) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "edit")
+    await requirePermission(partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     const payload: any = {}
@@ -298,7 +299,7 @@ export async function updateLocationAction(id: string, partnerId: string, data: 
  */
 export async function deleteLocationAction(id: string, partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "edit")
+    await requirePermission(partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
     const { error } = await supabase

@@ -1,7 +1,7 @@
 import "server-only"
 import { cache } from "react"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 
 type DbTransaction = {
@@ -231,7 +231,7 @@ function buildCashflow(transactions: DbTransaction[]) {
 
 export const getFinancialOverviewData = cache(async (partnerId: string): Promise<{ success: true; data: FinancialOverviewData } | { success: false; error: string }> => {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+    await requirePermission(partnerId, "financial", "view")
     const supabase = createAdminClient()
     const today = getTodayYmdSaoPaulo()
     const next30 = dateAfterDays(today, 30)

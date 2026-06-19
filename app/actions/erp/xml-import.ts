@@ -4,7 +4,8 @@ import crypto from "crypto"
 import { headers } from "next/headers"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { parseNFeFull, type NFMetadata, type ProductFromXML, type DuplicataFromXML } from "@/lib/xml-parser"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { decryptCPF } from "@/lib/crypto"
@@ -410,7 +411,7 @@ export async function uploadXMLAction(
 ): Promise<{ success: boolean; preview?: ImportPreview; error?: string; validation?: any; existingImportId?: string }> {
   try {
     await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
-    await requirePartnerAccessWithPermission(partnerId, "products", "create")
+    await requirePermission(partnerId, "products", "create")
 
     const supabase = await getSupabaseServerClient()
     const user = await requireUser()
@@ -800,7 +801,7 @@ export async function confirmImportAction(
   createPayables = true,
 ): Promise<{ success: boolean; imported?: number; skipped?: number; errors?: string[]; error?: string }> {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "create")
+    await requirePermission(partnerId, "products", "create")
 
     const supabase = await getSupabaseServerClient()
     const user = await requireUser()
@@ -857,34 +858,69 @@ export async function confirmImportAction(
 
     // Criar contas a pagar se solicitado
     if (createPayables && xmlImport.total_value && xmlImport.supplier_id) {
-      const duplicatas: any[] = (xmlImport.duplicatas as any[]) || []
-      const transactions = duplicatas.length > 0
-        ? duplicatas.map((d: any) => ({
-            partner_id: partnerId,
-            supplier_id: xmlImport.supplier_id,
-            transaction_type: "expense" as const,
-            category: "purchasing",
-            amount: d.valor,
-            description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
-            due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
-            status: "pending",
-            created_by_user_id: user.id,
-          }))
-        : [{
-            partner_id: partnerId,
-            supplier_id: xmlImport.supplier_id,
-            transaction_type: "expense" as const,
-            category: "purchasing",
-            amount: xmlImport.total_value,
-            description: `NF ${xmlImport.invoice_number || ""}`,
-            due_date: new Date(Date.now() + 30 * 86400000).toISOString(),
-            status: "pending",
-            created_by_user_id: user.id,
-          }]
+      // Busca supplier para obter nome
+      const { data: supplier } = await supabase
+        .from("suppliers")
+        .select("name, person_type")
+        .eq("id", xmlImport.supplier_id)
+        .single()
 
-      const { error: txErr } = await supabase.from("transactions").insert(transactions)
-      if (txErr) {
-        console.error("Erro ao criar contas a pagar:", txErr)
+      if (supplier) {
+        // Busca ou cria transaction_contacts para o fornecedor
+        let { data: contact } = await supabase
+          .from("transaction_contacts")
+          .select("id")
+          .eq("partner_id", partnerId)
+          .eq("type", "fornecedor")
+          .eq("contact_id", xmlImport.supplier_id)
+          .maybeSingle()
+
+        if (!contact) {
+          const { data: newContact } = await supabase
+            .from("transaction_contacts")
+            .insert({
+              partner_id: partnerId,
+              name: supplier.name,
+              type: "fornecedor",
+              contact_id: xmlImport.supplier_id,
+              description: "Fornecedor (importado de XML NF-e)",
+            })
+            .select("id")
+            .single()
+          contact = newContact
+        }
+
+        if (contact) {
+          const duplicatas: any[] = (xmlImport.duplicatas as any[]) || []
+          const transactions = duplicatas.length > 0
+            ? duplicatas.map((d: any) => ({
+                partner_id: partnerId,
+                contact_id: contact.id,
+                transaction_type: "expense" as const,
+                category: "purchasing",
+                amount: d.valor,
+                description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
+                due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
+                status: "pending",
+                created_by_user_id: user.id,
+              }))
+            : [{
+                partner_id: partnerId,
+                contact_id: contact.id,
+                transaction_type: "expense" as const,
+                category: "purchasing",
+                amount: xmlImport.total_value,
+                description: `NF ${xmlImport.invoice_number || ""}`,
+                due_date: new Date(Date.now() + 30 * 86400000).toISOString(),
+                status: "pending",
+                created_by_user_id: user.id,
+              }]
+
+          const { error: txErr } = await supabase.from("transactions").insert(transactions)
+          if (txErr) {
+            console.error("Erro ao criar contas a pagar:", txErr)
+          }
+        }
       }
     }
 
@@ -1089,7 +1125,7 @@ export async function revertImportAction(
   reason?: string,
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "products", "create")
+    await requirePermission(partnerId, "products", "create")
 
     const supabase = await getSupabaseServerClient()
     const user = await requireUser()

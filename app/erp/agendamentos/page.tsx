@@ -1,5 +1,5 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { AccessDenied } from "@/components/erp/access-denied"
 import AppointmentsPage from "@/components/erp/appointments/AppointmentsPage"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
@@ -124,7 +124,7 @@ export default async function AgendamentosPage() {
 
   const partnerId = context.partnerId
 
-  const { allowed } = await checkPartnerPermission(partnerId, "appointments", "view")
+  const { allowed } = await checkPermission(partnerId, "appointments", "view")
   if (!allowed) return <AccessDenied />
 
   // SSR: single parallel fetch replaces 4 client-side server actions

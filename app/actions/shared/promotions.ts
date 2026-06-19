@@ -1,7 +1,8 @@
 "use server"
 
 import { z } from "zod"
-import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requireUser, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { PromotionType, DiscountType, ApplyScope, PricingPromotion } from "@/lib/types/promotion"
@@ -64,7 +65,7 @@ export async function listCampaignsAction(
   params?: { search?: string; isActive?: string; page?: number; limit?: number }
 ) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+  await requirePermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
   const page = Math.max(1, Number(params?.page || 1))
@@ -102,7 +103,7 @@ export async function createCampaignAction(input: z.infer<typeof CampaignSchema>
   const data = parsed.data
   await requireUser()
   await requireMinimumPlan(data.partnerId, "escalar")
-  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "create")
+  await requirePermission(data.partnerId, "coupons", "create")
   const supabase = await getSupabaseServerClient()
 
   const { data: campaign, error } = await supabase
@@ -146,7 +147,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
   const data = parsed.data
   await requireUser()
   await requireMinimumPlan(data.partnerId, "escalar")
-  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "edit")
+  await requirePermission(data.partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   const { error: updateError } = await supabase
@@ -188,7 +189,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
 export async function deleteCampaignAction(partnerId: string, campaignId: string) {
   await requireUser()
   await requireMinimumPlan(partnerId, "escalar")
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "delete")
+  await requirePermission(partnerId, "coupons", "delete")
   const supabase = await getSupabaseServerClient()
 
   const { error } = await supabase
@@ -209,7 +210,7 @@ export async function toggleCampaignsStatusAction(
   isActive: boolean
 ) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "edit")
+  await requirePermission(partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   const { error } = await supabase
@@ -239,7 +240,7 @@ export async function bulkUpdateCampaignsAction(
   }
 ) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "edit")
+  await requirePermission(partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   // 1. Update Campaign fields if provided
@@ -319,7 +320,7 @@ export async function bulkUpdateCampaignsAction(
 
 export async function listPromotionsAction(partnerId: string, campaignId?: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+  await requirePermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
   let query = supabase
@@ -348,7 +349,7 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
   }
   const data = parsed.data
   await requireUser()
-  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "create")
+  await requirePermission(data.partnerId, "coupons", "create")
   const supabase = await getSupabaseServerClient()
 
   // Validate logical constraints
@@ -433,7 +434,7 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
   }
   const data = parsed.data
   await requireUser()
-  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "edit")
+  await requirePermission(data.partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   // Validate logical constraints
@@ -516,7 +517,7 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
 
 export async function deletePromotionAction(partnerId: string, promotionId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "delete")
+  await requirePermission(partnerId, "coupons", "delete")
   const supabase = await getSupabaseServerClient()
 
   const { error } = await supabase
@@ -533,7 +534,7 @@ export async function deletePromotionAction(partnerId: string, promotionId: stri
 
 export async function togglePromotionStatusAction(partnerId: string, promotionId: string, isActive: boolean) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "edit")
+  await requirePermission(partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   const { error } = await supabase
@@ -562,7 +563,7 @@ export async function simulatePromotionsAction(
 ) {
   try {
     await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+    await requirePermission(partnerId, "coupons", "view")
     const supabase = await getSupabaseServerClient()
 
     // 1. Fetch active promotions for this partner
@@ -727,7 +728,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
 
 export async function getPromotionScopeDataAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+  await requirePermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
   const [{ data: products }, { data: services }, { data: categories }, { data: serviceCategories }, { data: customers }] = await Promise.all([

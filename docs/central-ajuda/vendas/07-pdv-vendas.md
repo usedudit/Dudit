@@ -65,7 +65,7 @@ Legenda: Divida o pagamento entre dinheiro, cartão, PIX e outros.
 ### 5. Finalize a venda
 
 1. Revise o carrinho e os valores.
-2. Se o cliente vai levar depois, marque a opção **Cliente leva depois** (útil para itens que precisam ser preparados ou estão em falta no balcão).
+2. Se o cliente vai levar depois, marque a opção **Pendente de entrega** (útil para itens que precisam ser preparados ou estão em falta no balcão).
 3. Clique em **Finalizar venda**.
 
 Após finalizar:

@@ -25,7 +25,7 @@ import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
 import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
 import { fetchPartnerCustomersBucket } from '@/app/actions/erp/client-loaders';
 import { createServiceAction } from '@/app/actions/erp/servicos';
-import { confirmAppointmentOrderPaymentAction, createERPOrderAction } from '@/app/actions/erp/orders';
+import { confirmAppointmentOrderPaymentAction, createERPOrderAction, getAppointmentOrderNumberAction } from '@/app/actions/erp/orders';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
 import { getFinanceAccountsAction } from '@/app/actions/erp/finance-accounts';
 import { pickBankThenCashDefaultFinanceAccountId } from '@/lib/finance-utils';
@@ -331,7 +331,6 @@ export const AppointmentSheet = ({
 
     // Determine if appointment is paid or absence
     const isPaid = ['paid', 'pago', 'partially paid', 'parcialmente pago'].includes((status || '').toLowerCase());
-    const isPaymentMade = appointment?.paymentStatus === 'paid' || appointment?.paymentStatus === 'partially_paid';
 
     // Helper to determine if we need Range Picker
     const needsRangePicker = useMemo(() => {
@@ -898,11 +897,24 @@ export const AppointmentSheet = ({
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
     const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
     const [financeAccountId, setFinanceAccountId] = useState<string>('');
+    const [orderNumber, setOrderNumber] = useState<string | null>(null);
 
     const linkedOrderId = completedOrderId
         || appointment?.marketplaceOrderId
         || appointment?.saleId
         || null;
+
+    useEffect(() => {
+        if (!partnerId || !linkedOrderId) {
+            setOrderNumber(null);
+            return;
+        }
+        let cancelled = false;
+        getAppointmentOrderNumberAction(linkedOrderId, partnerId).then(num => {
+            if (!cancelled) setOrderNumber(num);
+        });
+        return () => { cancelled = true; };
+    }, [partnerId, linkedOrderId]);
 
     // Fetch default finance account for order creation
     useEffect(() => {
@@ -1551,14 +1563,11 @@ export const AppointmentSheet = ({
                     {/* VIEW: SUMMARY */}
                     {currentView === 'summary' && (() => {
                         const isCompletedStatus = (status || '').toLowerCase() === 'concluído' || (status || '').toLowerCase() === 'concluido';
-                        const isLocked = isPaid || isCompletedStatus || isPaymentMade;
-                        const salePaidAmount = Number(appointment?.paidAmount ?? 0);
-                        const saleTotal = Number(appointment?.price ?? calculatedPrice);
-                        const remainingToPay = Math.max(0, saleTotal - salePaidAmount);
+                        const isLocked = isPaid || isCompletedStatus;
                         const displaySalesChannel = getSalesChannelLabel(appointment?.salesChannel);
                         const displayPaymentStatus = getPaymentStatusLabel(appointment?.paymentStatus);
                         const displayFulfillmentMode = getFulfillmentModeLabel(appointment?.fulfillmentMode);
-                        const displayOrderNumber = linkedOrderId ? linkedOrderId.slice(0, 8).toUpperCase() : null;
+                        const displayOrderNumber = orderNumber || (linkedOrderId ? linkedOrderId.slice(0, 8).toUpperCase() : null);
 
                         const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
                         const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
@@ -1770,29 +1779,7 @@ export const AppointmentSheet = ({
                                     </div>
                                 </div>
 
-                                {mode === 'view' && (
-                                    <div className="mt-4">
-                                        {appointment?.paymentStatus === 'paid' ? (
-                                            <InfoCard
-                                                color="green"
-                                                title="Totalmente pago"
-                                                message="Valor total atingido!"
-                                            />
-                                        ) : appointment?.paymentStatus === 'partially_paid' ? (
-                                            <InfoCard
-                                                color="orange"
-                                                title="Pago parcialmente"
-                                                message={`Falta pagar: ${formatCurrency(remainingToPay)}`}
-                                            />
-                                        ) : (
-                                            <InfoCard
-                                                color="red"
-                                                title="Não pago"
-                                                message={`Falta pagar: ${formatCurrency(remainingToPay)}`}
-                                            />
-                                        )}
-                                    </div>
-                                )}
+
                             </motion.div>
                         );
                     })()}

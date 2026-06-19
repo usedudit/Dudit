@@ -38,11 +38,19 @@ export default async function SelectErpPage() {
     const ownPartner = await getPartnerStatus(user.id)
     const hasOwnPartner = !!ownPartner
 
-    // If only one ERP and user owns an ERP, redirect directly.
-    // Invited-only users must explicitly select.
-    if (partnerAccess.length === 1 && hasOwnPartner) {
+    // Check if user has access to any ERP that isn't theirs
+    const hasNonOwnAccess = partnerAccess.some(a => a.roleId !== "owner")
+
+    // Only auto-redirect if the user has a single ERP that belongs to them
+    if (partnerAccess.length === 1 && !hasNonOwnAccess) {
         redirect("/erp/dashboard")
     }
+
+    // Sort: own ERPs first, then others
+    const sortedAccess = [
+        ...partnerAccess.filter(a => a.roleId === "owner"),
+        ...partnerAccess.filter(a => a.roleId !== "owner"),
+    ]
 
     // Multiple ERPs - show selection screen
     return (
@@ -74,41 +82,53 @@ export default async function SelectErpPage() {
 
                     {/* ERP Cards */}
                     <div className="flex flex-col gap-3">
-                        {partnerAccess.map((access) => (
-                            <form key={access.partnerId} action={selectErpAction}>
-                                <input type="hidden" name="partnerId" value={access.partnerId} />
-                                <button
-                                    type="submit"
-                                    className="w-full text-left block bg-transparent p-0 border-0 cursor-pointer focus:outline-none"
-                                >
-                                    <ListItem
-                                        className="px-6 py-5 gap-4"
-                                        left={
-                                            <div className="w-12 h-12 rounded-xl bg-[#022C2B] flex items-center justify-center shrink-0">
-                                                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
-                                                </svg>
-                                            </div>
-                                        }
-                                        title={
-                                            <div className="flex items-center gap-2">
-                                                <span className="truncate">{access.storeName}</span>
-                                                <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
-                                                <Badge variant="green" icon={null}>
-                                                    {ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId}
-                                                </Badge>
-                                            </div>
-                                        }
-                                        description={
-                                            access.ownerName
-                                                ? `Proprietário: ${access.ownerName}`
-                                                : undefined
-                                        }
-                                        showChevron={true}
-                                    />
-                                </button>
-                            </form>
-                        ))}
+                        {sortedAccess.map((access, index) => {
+                            const isOwn = access.roleId === "owner"
+
+                            return (
+                                <form key={access.partnerId} action={selectErpAction}>
+                                    <input type="hidden" name="partnerId" value={access.partnerId} />
+                                    <button
+                                        type="submit"
+                                        className="w-full text-left block bg-transparent p-0 border-0 cursor-pointer focus:outline-none"
+                                    >
+                                        <ListItem
+                                            className={`px-6 py-5 gap-4 ${isOwn ? "ring-2 ring-brand-primary/20 bg-brand-primary/5" : ""}`}
+                                            left={
+                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isOwn ? "bg-brand-primary" : "bg-[#022C2B]"}`}>
+                                                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+                                                    </svg>
+                                                </div>
+                                            }
+                                            title={
+                                                <div className="flex items-center gap-2">
+                                                    <span className="truncate">{access.storeName}</span>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+                                                    <Badge variant="green" icon={null}>
+                                                        {ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId}
+                                                    </Badge>
+                                                    {isOwn && (
+                                                        <Badge variant="green" icon={null}>
+                                                            Seu negócio
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            }
+                                            description={
+                                                !isOwn && access.ownerName
+                                                    ? `Proprietário: ${access.ownerName}`
+                                                    : undefined
+                                            }
+                                            showChevron={true}
+                                        />
+                                    </button>
+                                    {isOwn && index < sortedAccess.length - 1 && (
+                                        <div className="my-2 border-b border-gray-200" />
+                                    )}
+                                </form>
+                            )
+                        })}
                     </div>
 
                     {/* Create Partner Account Button - only show if user doesn't have their own partner */}

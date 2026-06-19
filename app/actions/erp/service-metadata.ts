@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requireMinimumPlan } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 
 interface ServiceMetadataResponse {
@@ -14,7 +15,7 @@ interface ServiceMetadataResponse {
  */
 export async function getServiceMetadataAction(partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "services", "view")
+    await requirePermission(partnerId, "services", "view")
 
     // Use admin client after authz check so invited ERP users bypass owner-only RLS.
     const supabase = createAdminClient()
@@ -40,7 +41,7 @@ export async function getServiceMetadataAction(partnerId: string) {
 export async function createServiceCategoryAction(data: { partnerId: string, name: string, parentId?: string | null }) {
   try {
     await requireMinimumPlan(data.partnerId, "crescer")
-    await requirePartnerAccessWithPermission(data.partnerId, "services", "edit")
+    await requirePermission(data.partnerId, "services", "edit")
     const supabase = await getSupabaseServerClient()
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
@@ -80,7 +81,7 @@ export async function createServiceCategoryAction(data: { partnerId: string, nam
  */
 export async function updateServiceCategoryAction(id: string, partnerId: string, data: { name?: string, parentId?: string | null, isActive?: boolean }) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "services", "edit")
+    await requirePermission(partnerId, "services", "edit")
     const supabase = await getSupabaseServerClient()
 
     // Security: Verify parent_id belongs to the same partner
@@ -121,7 +122,7 @@ export async function updateServiceCategoryAction(id: string, partnerId: string,
  */
 export async function deleteServiceCategoryAction(id: string, partnerId: string) {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "services", "edit")
+    await requirePermission(partnerId, "services", "edit")
     const supabase = await getSupabaseServerClient()
 
     const { error } = await supabase

@@ -194,6 +194,7 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                             article.category === "login-registro" ? "🔐" :
                             article.category === "gestao" ? "📊" :
                             article.category === "pedidos" ? "📦" :
+                            article.category === "produtos" ? "🏷️" :
                             article.category === "vendas" ? "🛒" :
                             article.category === "financeiro" ? "💰" : "📁"
                         );

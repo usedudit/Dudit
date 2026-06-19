@@ -7,7 +7,8 @@ import { redirect } from "next/navigation"
 import { formatDate, formatTime } from "@/lib/utils"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
-import { requireUser, requirePartnerAccessWithPermission, requireCustomerOwnership } from "@/lib/auth/authorization"
+import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { createAddressAction } from "@/app/actions/shared/addresses"
@@ -114,7 +115,7 @@ export async function createComprehensiveCustomerAction(data: {
 
   const user = await requireUser()
 
-  await requirePartnerAccessWithPermission(data.partnerId, "customers", "create")
+  await requirePermission(data.partnerId, "customers", "create")
 
   if (!data.name.trim()) {
     return { error: "Nome é obrigatório" }
@@ -259,6 +260,8 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
   const { data: customer } = await supabase.from("customers").select("partner_id").eq("id", customerId).single()
   const partnerId = customer?.partner_id || ""
 
+  await requirePermission(partnerId, "customers", "delete", user)
+
   const { error } = await supabase.from("customers").delete().eq("id", customerId)
 
   if (error) {
@@ -323,6 +326,7 @@ export async function updateComprehensiveCustomerAction(data: {
   const user = await requireUser()
 
   await requireCustomerOwnership(data.customerId)
+  await requirePermission(data.partnerId, "customers", "edit", user)
 
   const supabase = await getSupabaseServerClient()
 
@@ -637,7 +641,7 @@ export async function getCustomerOrdersAction(customerId: string) {
 export async function getPartnerCustomersAction(partnerId: string, currentStoreId?: string | null) {
   try {
     const user = await requireUser()
-    await requirePartnerAccessWithPermission(partnerId, "customers", "view", user)
+    await requirePermission(partnerId, "customers", "view", user)
 
     const supabase = await getSupabaseServerClient()
 
@@ -688,14 +692,29 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
 
   const supabase = await getSupabaseServerClient()
 
-  // Fetch partner_id from the first customer so we can invalidate the correct cache
-  const { data: firstCustomer } = await supabase.from("customers").select("partner_id").eq("id", customerIds[0]).single()
-  const partnerId = firstCustomer?.partner_id || ""
+  // Verify all customers exist and belong to the same partner
+  const { data: customers } = await supabase
+    .from("customers")
+    .select("partner_id")
+    .in("id", customerIds)
+
+  if (!customers || customers.length !== customerIds.length) {
+    return { error: "Um ou mais clientes nÃ£o encontrados" }
+  }
+
+  const partnerIds = [...new Set(customers.map((c: { partner_id: string }) => c.partner_id))] as string[]
+  if (partnerIds.length !== 1) {
+    return { error: "Clientes de lojas diferentes" }
+  }
+
+  const partnerId = partnerIds[0]
+  await requirePermission(partnerId, "customers", "delete", user)
 
   const { error } = await supabase
     .from("customers")
     .delete()
     .in("id", customerIds)
+    .eq("partner_id", partnerId)
 
   if (error) {
     return { error: error.message }
@@ -712,14 +731,29 @@ export async function toggleCustomersStatusAction(customerIds: string[], isActiv
 
   const supabase = await getSupabaseServerClient()
 
-  // Fetch partner_id from the first customer so we can invalidate the correct cache
-  const { data: firstCustomer } = await supabase.from("customers").select("partner_id").eq("id", customerIds[0]).single()
-  const partnerId = firstCustomer?.partner_id || ""
+  const { data: customers } = await supabase
+    .from("customers")
+    .select("partner_id")
+    .in("id", customerIds)
+
+  if (!customers || customers.length !== customerIds.length) {
+    return { error: "Um ou mais clientes nÃ£o encontrados" }
+  }
+
+  const partnerIds = [...new Set(customers.map((c: { partner_id: string }) => c.partner_id))] as string[]
+  if (partnerIds.length !== 1) {
+    return { error: "Clientes de lojas diferentes" }
+  }
+
+  const partnerId = partnerIds[0]
+
+  await requirePermission(partnerId, "customers", "edit", user)
 
   const { error } = await supabase
     .from("customers")
     .update({ status: isActive ? "ativo" : "inativo" })
     .in("id", customerIds)
+    .eq("partner_id", partnerId)
 
   if (error) {
     return { error: error.message }
@@ -750,7 +784,7 @@ export async function getERPCustomersPageAction(
   | { success: false; error: string }
 > {
   try {
-    await requirePartnerAccessWithPermission(partnerId, "customers", "view")
+    await requirePermission(partnerId, "customers", "view")
     const supabase = await getSupabaseServerClient()
 
     const cursor = options?.cursor ?? null

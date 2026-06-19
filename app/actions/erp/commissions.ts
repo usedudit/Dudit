@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { calculateCommission, partnerRoleToCommissionRole, type CommissionRole, type CommissionType } from "@/lib/services/commission.service"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 
@@ -27,7 +28,7 @@ function roleIdToPartnerRole(roleId: RoleId | string | null | undefined) {
 
 export async function listEmployeeCommissionsAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "settings", "settings_comissions")
+  await requirePermission(partnerId, "settings", "settings_comissions")
   const supabase = await getSupabaseServerClient()
 
   const { data: partnerUsers, error: partnerUsersError } = await supabase
@@ -102,7 +103,7 @@ export async function upsertEmployeeCommissionAction(input: {
   metadata?: Record<string, unknown>
 }) {
   await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
+  await requirePermission(input.partnerId, "settings", "settings_comissions")
   const supabase = await getSupabaseServerClient()
 
   const normalizedValue = Math.max(0, Number(input.value || 0))
@@ -132,7 +133,7 @@ export async function calculateCommissionAction(input: {
   deliveryFee?: number
 }) {
   await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
+  await requirePermission(input.partnerId, "settings", "settings_comissions")
   const supabase = await getSupabaseServerClient()
 
   const { data } = await supabase

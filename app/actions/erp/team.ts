@@ -1,7 +1,8 @@
 "use server"
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { can } from "@/lib/permissions/can"
@@ -108,7 +109,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         const context = await getCurrentPartnerContext()
         if (!context) return { members: [], error: "Contexto de ERP não encontrado" }
 
-        const access = await requirePartnerAccessWithPermission(context.partnerId, "settings", "settings_team")
+        const access = await requirePermission(context.partnerId, "settings", "settings_team")
         if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
             return { members: [], error: "Sem permissão para visualizar equipe." }
         }
@@ -132,7 +133,7 @@ export async function getPDVSellersAction(): Promise<{ members: TeamMember[]; er
         await requireUser()
         const context = await getCurrentPartnerContext()
         if (!context) return { members: [], error: "Contexto de ERP não encontrado" }
-        await requirePartnerAccessWithPermission(context.partnerId, "pdv", "sell")
+        await requirePermission(context.partnerId, "pdv", "sell")
         return await fetchPartnerTeamMembers(context.partnerId)
     } catch (error: any) {
         return { members: [], error: error.message }
@@ -149,7 +150,7 @@ export async function getTeamMemberStatsAction(): Promise<{ stats: TeamMemberSta
         const context = await getCurrentPartnerContext()
         if (!context) return { stats: [], error: "Contexto de ERP não encontrado" }
 
-        const access = await requirePartnerAccessWithPermission(context.partnerId, "settings", "settings_team")
+        const access = await requirePermission(context.partnerId, "settings", "settings_team")
         if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
             return { stats: [], error: "Sem permissão para visualizar estatísticas." }
         }
@@ -273,7 +274,7 @@ export async function updateTeamMemberRole(
         const admin = getAdminClient()
         const partnerId = context.partnerId
 
-        const access = await requirePartnerAccessWithPermission(partnerId, "settings", "settings_team", user)
+        const access = await requirePermission(partnerId, "settings", "settings_team", user)
         if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
             return { success: false, error: "Acesso negado." }
         }
@@ -356,7 +357,7 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
             return { success: false, error: "O proprietário da loja não pode ser removido." }
         }
 
-        const access = await requirePartnerAccessWithPermission(partnerId, "settings", "settings_team", user)
+        const access = await requirePermission(partnerId, "settings", "settings_team", user)
         if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
             return { success: false, error: "Acesso negado." }
         }

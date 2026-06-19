@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -459,7 +460,7 @@ async function reverseCashMovementFallback(
 
 export async function getActiveCashSessionAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
+  await requirePermission(partnerId, "pdv", "view")
   // Read with admin client after authz so invited users can load session data.
   const supabase = createAdminClient()
   const session = await getActiveSessionForPartner(supabase, partnerId)
@@ -489,7 +490,7 @@ export async function openCashSessionAction(input: {
   notes?: string
 }) {
   const user = await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "pdv", "open_pdv")
+  await requirePermission(input.partnerId, "pdv", "open_pdv")
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -550,7 +551,7 @@ export async function createCashMovementAction(input: {
   cashFinanceAccountId?: string | null
 }) {
   const user = await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "pdv", "view")
+  await requirePermission(input.partnerId, "pdv", "view")
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -692,7 +693,7 @@ export async function reverseCashMovementAction(input: {
     return { success: false as const, error: movementInfoError?.message || "Movimentação não encontrada." }
   }
 
-  await requirePartnerAccessWithPermission(input.partnerId, "pdv", movementInfo.type === "withdrawal" ? "sangria" : "reforco")
+  await requirePermission(input.partnerId, "pdv", movementInfo.type === "withdrawal" ? "sangria" : "reforco")
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -765,7 +766,7 @@ export async function reverseCashMovementAction(input: {
 }
 
 export async function getCashSessionCloseSummaryAction(partnerId: string, cashSessionId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
+  await requirePermission(partnerId, "pdv", "view")
   const supabase = createAdminClient()
 
   const { data: session, error: sessionError } = await supabase
@@ -830,9 +831,9 @@ export async function closeCashSessionAction(input: {
   // The opener needs basic pdv access; non-openers need close_pdv permission.
   const openedBy = session.opened_by_user_id || session.user_id
   if (openedBy !== user.id) {
-    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "close_pdv")
+    await requirePermission(input.partnerId, "pdv", "close_pdv")
   } else {
-    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "view")
+    await requirePermission(input.partnerId, "pdv", "view")
   }
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -964,7 +965,7 @@ export async function closeCashSessionAction(input: {
 }
 
 export async function getCashSessionsHistoryAction(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
+  await requirePermission(partnerId, "pdv", "view")
   const supabase = createAdminClient()
 
   const { data: sessions, error: sessionError } = await supabase
@@ -1062,7 +1063,7 @@ export async function getCashSessionsHistoryPageAction(
   partnerId: string,
   options?: { cursor?: ERPCashSessionListCursor | null; limit?: number },
 ) {
-  await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
+  await requirePermission(partnerId, "pdv", "view")
   // Read with admin client after authz so invited users can load history.
   const supabase = createAdminClient()
 
@@ -1164,7 +1165,7 @@ export async function getCashSessionsHistoryPageAction(
 }
 
 export async function getCashSessionDetailsAction(partnerId: string, cashSessionId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
+  await requirePermission(partnerId, "pdv", "view")
   const supabase = createAdminClient()
 
   const { data: session, error: sessionError } = await supabase

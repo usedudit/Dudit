@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -67,7 +68,7 @@ export async function getERPServicesPageAction(
 > {
     try {
         // await requireMinimumPlan(partnerId, "crescer")
-        await requirePartnerAccessWithPermission(partnerId, "services", "view")
+        await requirePermission(partnerId, "services", "view")
         const supabase = await getSupabaseServerClient()
 
         const cursor = options?.cursor ?? null
@@ -117,7 +118,7 @@ export async function getServiceWithDetailsAction(serviceId: string) {
 
         if (error || !service) throw new Error("Serviço não encontrado")
         // await requireMinimumPlan(service.partner_id, "crescer")
-        await requirePartnerAccessWithPermission(service.partner_id, "services", "view", user)
+        await requirePermission(service.partner_id, "services", "view", user)
 
         return { success: true, product: service } // Returned as product to match products form logic
     } catch (error: any) {
@@ -138,7 +139,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             else throw new Error("Acesso negado: ID do Parceiro não pôde ser resolvido.")
         }
 
-        await requirePartnerAccessWithPermission(finalPartnerId, "services", "create", user)
+        await requirePermission(finalPartnerId, "services", "create", user)
 
         let finalStoreId = data.storeId
         if (!finalStoreId) {
@@ -253,7 +254,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, video_type, video_url, video_thumbnail").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
-        await requirePartnerAccessWithPermission(existing.partner_id, "services", "edit", user)
+        await requirePermission(existing.partner_id, "services", "edit", user)
 
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }
@@ -372,7 +373,7 @@ export async function deleteServiceAction(serviceId: string): Promise<ActionResp
         const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, video_type, video_url, video_thumbnail").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
-        await requirePartnerAccessWithPermission(existing.partner_id, "services", "delete", user)
+        await requirePermission(existing.partner_id, "services", "delete", user)
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase.from("services").delete().eq("id", serviceId)
@@ -410,7 +411,7 @@ export async function deleteServicesInBatchAction(serviceIds: string[]): Promise
         const partnerId = existing[0].partner_id
         if (existing.some((s: any) => s.partner_id !== partnerId)) return errorResponse("Serviços de múltiplos parceiros não permitidos")
 
-        await requirePartnerAccessWithPermission(partnerId, "services", "delete", user)
+        await requirePermission(partnerId, "services", "delete", user)
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase.from("services").delete().in("id", serviceIds)
@@ -439,7 +440,7 @@ export async function toggleServicesStatusAction(serviceIds: string[], isActive:
         const partnerId = existing[0].partner_id
         if (existing.some((s: any) => s.partner_id !== partnerId)) return errorResponse("Serviços de múltiplos parceiros não permitidos")
 
-        await requirePartnerAccessWithPermission(partnerId, "services", "edit", user)
+        await requirePermission(partnerId, "services", "edit", user)
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase.from("services").update({ is_active: isActive }).in("id", serviceIds)
@@ -469,7 +470,7 @@ export async function batchUpdateServicesAction(updates: any[]): Promise<ActionR
         const partnerId = existing[0].partner_id
         if (existing.some((s: any) => s.partner_id !== partnerId)) return errorResponse("Serviços de múltiplos parceiros não permitidos")
 
-        await requirePartnerAccessWithPermission(partnerId, "services", "edit", user)
+        await requirePermission(partnerId, "services", "edit", user)
 
         const supabase = await getSupabaseServerClient()
 
@@ -498,7 +499,7 @@ export async function duplicateServiceAction(serviceId: string) {
         const { data: service, error: fetchError } = await admin.from("services").select("*").eq("id", serviceId).single()
         if (fetchError || !service) return errorResponse("Serviço não encontrado")
 
-        await requirePartnerAccessWithPermission(service.partner_id, "services", "create", user)
+        await requirePermission(service.partner_id, "services", "create", user)
 
         const supabase = await getSupabaseServerClient()
 

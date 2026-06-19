@@ -5,7 +5,8 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { revalidateOrders } from "@/lib/utils/revalidation"
 import { formatDateTime } from "@/lib/utils/formatters"
 import { formatCurrency } from "@/lib/utils"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
@@ -1276,11 +1277,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     if (!user) return { error: "Não autenticado" }
 
     const partnerId = data.partnerId
-    await requirePartnerAccessWithPermission(partnerId, "orders", "create")
+    await requirePermission(partnerId, "orders", "create")
 
     // Validate discount permission if a discount is being applied
     if (data.discountValue > 0 || data.couponCode) {
-        await requirePartnerAccessWithPermission(partnerId, "orders", "can_apply_discount")
+        await requirePermission(partnerId, "orders", "can_apply_discount")
     }
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
@@ -1640,7 +1641,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+    await requirePermission(partnerId, "orders", "view")
     const supabase = createAdminClient()
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
 
@@ -1898,7 +1899,7 @@ export async function getOrderHistoryAction(orderId: string, partnerId: string) 
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+    await requirePermission(partnerId, "orders", "view")
 
     const supabase = createAdminClient()
     const { data: saleRow } = await supabase
@@ -1919,11 +1920,11 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    const { roleId } = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
+    const { roleId } = await requirePermission(data.partnerId, "orders", "edit")
 
     // Validate discount permission if a discount is being applied
     if (data.discountValue > 0 || data.couponCode) {
-        await requirePartnerAccessWithPermission(data.partnerId, "orders", "can_apply_discount")
+        await requirePermission(data.partnerId, "orders", "can_apply_discount")
     }
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
@@ -2431,7 +2432,7 @@ export async function deleteOrdersInBatchAction(orderIds: string[], partnerId: s
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccessWithPermission(partnerId, "orders", "delete")
+    await requirePermission(partnerId, "orders", "delete")
     const supabase = createAdminClient()
 
     await supabase.from("order_items").delete().in("order_id", orderIds)
@@ -2452,7 +2453,7 @@ export async function updateOrderNotesAction(input: {
     const user = await requireUser()
     if (!user) return { success: false as const, error: "Não autenticado" }
 
-    await requirePartnerAccessWithPermission(input.partnerId, "orders", "edit")
+    await requirePermission(input.partnerId, "orders", "edit")
     const supabase = createAdminClient()
 
     const { data: currentOrder, error: currentOrderError } = await supabase
@@ -2521,7 +2522,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         return { error: "Ação inválida para pedidos." }
     }
 
-    await requirePartnerAccessWithPermission(
+    await requirePermission(
         payload.partnerId,
         "orders",
         payload.actionType === "cancel" ? "cancel" : "edit"
@@ -3123,7 +3124,7 @@ export async function getERPOrdersPageAction(
     try {
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+        await requirePermission(partnerId, "orders", "view")
 
         const supabase = createAdminClient()
         const cursor = options?.cursor ?? null
@@ -3248,7 +3249,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     try {
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requirePartnerAccessWithPermission(payload.partnerId, "orders", "edit")
+        await requirePermission(payload.partnerId, "orders", "edit")
 
         const supabase = await getSupabaseServerClient()
 
@@ -3385,5 +3386,23 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         return { success: true }
     } catch (e: any) {
         return { success: false, error: e?.message || "Erro ao processar pagamento" }
+    }
+}
+
+export async function getAppointmentOrderNumberAction(orderId: string, partnerId: string) {
+    try {
+        const user = await requireUser()
+        if (!user) return null
+        await requirePermission(partnerId, "orders", "view")
+        const supabase = await getSupabaseServerClient()
+        const { data } = await supabase
+            .from("orders")
+            .select("order_number")
+            .eq("id", orderId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        return data?.order_number || null
+    } catch {
+        return null
     }
 }

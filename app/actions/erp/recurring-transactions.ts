@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -84,7 +84,7 @@ async function rpcFinancialNextRunDate(
 export async function getRecurringTransactionsAction(partnerId: string) {
   try {
     // await requireMinimumPlan(partnerId, "escalar")
-    await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+    await requirePermission(partnerId, "financial", "view")
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
       .from("recurring_transactions")
@@ -126,7 +126,7 @@ export async function createRecurringTransactionAction(input: {
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     // await requireMinimumPlan(input.partnerId, "escalar")
-    await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+    await requirePermission(input.partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
 
     // Input validation hardening
@@ -208,7 +208,7 @@ export async function updateRecurringTransactionAction(
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
+    await requirePermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
     const { data: currentRecurring } = await supabase
       .from("recurring_transactions")
@@ -356,7 +356,7 @@ export async function cancelRecurringTransactionAction(id: string, partnerId: st
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
+    await requirePermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
     const { data: currentRecurring } = await supabase
       .from("recurring_transactions")
@@ -403,7 +403,7 @@ export async function duplicateRecurringTransactionAction(id: string, partnerId:
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
+    await requirePermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
     const { data: source, error: sourceError } = await supabase
       .from("recurring_transactions")
@@ -494,7 +494,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
   const actionStart = performance.now()
   try {
     const authStart = performance.now()
-    await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+    await requirePermission(partnerId, "financial", "view")
     const supabase = await getSupabaseServerClient()
 
     // ── Single bulk RPC call replaces N×400 serial round trips ─────────

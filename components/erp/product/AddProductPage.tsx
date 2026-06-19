@@ -47,7 +47,24 @@ const BOOLEAN_FIELDS = new Set(["is_active", "allow_sell_without_stock", "show_i
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
-    { field: "price", tab: "general", validate: (v: any, data: any) => data.show_price_in_store === false || v > 0, message: "Preço inválido" },
+    {
+        field: "price",
+        tab: "general",
+        validate: (v: any, data: any) => {
+            const hasVariants = (() => {
+                const val = data.variants
+                if (Array.isArray(val) && val.length > 0) {
+                    if (typeof val[0]?.count === 'number') return val[0].count > 0
+                    return true
+                }
+                const pv = data.pending_variants
+                if (Array.isArray(pv) && pv.length > 0) return true
+                return false
+            })()
+            return hasVariants || data.show_price_in_store === false || v > 0
+        },
+        message: "Preço inválido"
+    },
 ]
 
 const getEmptyProduct = () => ({
@@ -497,6 +514,17 @@ const AddProductPage: FC<AddProductPageProps> = ({
             const d = productData
             const warranty = d.warranty_value > 0 ? `${d.warranty_value} ${d.warranty_period}` : undefined
 
+            const hasVariants = (() => {
+                const val = d.variants
+                if (Array.isArray(val) && val.length > 0) {
+                    if (typeof val[0]?.count === 'number') return val[0].count > 0
+                    return true
+                }
+                const pv = d.pending_variants
+                if (Array.isArray(pv) && pv.length > 0) return true
+                return false
+            })()
+
             const payload: any = {
                 id: d.id || undefined,
                 partnerId,
@@ -504,7 +532,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 csrf_token: csrfToken,
                 name: d.name,
                 description: d.description,
-                sku: d.sku,
+                sku: hasVariants ? null : (d.sku || null),
                 gtin: d.gtin,
                 brand: d.brand,
                 brand_id: d.brand_id || null,
@@ -518,14 +546,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 productType: d.productType,
                 location: d.localizacao,
                 deliveryFormat: d.digital_format,
-                costPrice: Number(d.costPrice) || 0,
-                price: Number(d.price),
-                promotionalPrice: d.promotional_price ? Number(d.promotional_price) : null,
+                costPrice: hasVariants ? 0 : (Number(d.costPrice) || 0),
+                price: hasVariants ? 0 : Number(d.price),
+                promotionalPrice: hasVariants ? null : (d.promotional_price ? Number(d.promotional_price) : null),
                 minStock: Number(d.minStock) || 0,
                 maxStock: Number(d.maxStock) || 0,
                 stockQuantity: Number(d.stock),
                 isActive: d.is_active,
-                isOnPromotion: !!d.promotional_price,
+                isOnPromotion: hasVariants ? false : !!d.promotional_price,
                 showPriceInStore: !!d.show_price_in_store,
                 showInMarketplace: d.show_in_marketplace !== false,
                 images: cleanedFinalImages,

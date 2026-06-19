@@ -803,24 +803,24 @@ export default function ProductsPage({
                                         fullWidth={false}
                                     >
                                         <DropdownItem onClick={() => setIsCameraOpen(true)}>
-                                            <CameraIcon size={16} /> Escanear Câmera
+                                            <CameraIcon size={18} /> Escanear Câmera
                                         </DropdownItem>
                                         <DropdownItem onClick={() => router.push("/erp/xml-import")}>
-                                            <UploadIcon size={16} /> Importar XML
+                                            <UploadIcon size={18} /> Importar XML
                                         </DropdownItem>
                                         <DropdownItem onClick={handleExport} disabled={isExporting}>
-                                            <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}
+                                            <ExportFileIcon size={18} /> {isExporting ? "Exportando..." : "Exportar"}
                                         </DropdownItem>
                                         <DropdownItem onClick={() => setShowLabelModal(true)}>
-                                            <PackageIcon size={16} /> Gerar Etiquetas
+                                            <PackageIcon size={18} /> Gerar Etiquetas
                                         </DropdownItem>
                                     </Dropdown>
 
                                     <Button
                                         onClick={handleAddFirstProduct}
                                         className="w-full"
+                                        leftIcon={<PlusIcon size={18} />}
                                     >
-                                        <PlusIcon size={16} />
                                         Novo produto
                                     </Button>
                                 </div>

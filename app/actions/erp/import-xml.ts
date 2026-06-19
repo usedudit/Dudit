@@ -3,7 +3,8 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { parseNFeXML, mapNFeToProductData } from "@/lib/xml-parser"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { UNITS } from "@/lib/constants/product-constants"
@@ -81,7 +82,7 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
     const user = await requireUser()
 
     // SECURITY: Verify caller has product-create access for this partner
-    await requirePartnerAccessWithPermission(partnerId, "products", "create")
+    await requirePermission(partnerId, "products", "create")
 
     const validation = await validatePartnerCPFCNPJ(partnerId, xmlContent, supabase)
     if (!validation.isValid) {

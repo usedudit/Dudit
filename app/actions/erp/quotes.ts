@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -54,7 +55,7 @@ export async function getERPQuotesPageAction(
     return withTelemetry("getERPQuotesPageAction", async () => {
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+            await requirePermission(partnerId, "quotes", "view", user)
 
             const supabase = await getSupabaseServerClient()
             const cursor = options?.cursor ?? null
@@ -310,7 +311,7 @@ export async function getNextQuoteNumberAction(partnerId: string) {
     return withTelemetry("getNextQuoteNumberAction", async () => {
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+            await requirePermission(partnerId, "quotes", "view", user)
 
             const supabase = await getSupabaseServerClient()
 
@@ -367,11 +368,11 @@ export async function createQuoteAction(data: {
 
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(data.partnerId, "quotes", "create", user)
+            await requirePermission(data.partnerId, "quotes", "create", user)
 
             // Validate discount permission if a discount is being applied
             if ((data.discountValue || 0) > 0) {
-                await requirePartnerAccessWithPermission(data.partnerId, "quotes", "can_apply_discount")
+                await requirePermission(data.partnerId, "quotes", "can_apply_discount")
             }
 
             const limitCheck = await checkLimit(data.partnerId, "monthly_quotes")
@@ -481,11 +482,11 @@ export async function updateQuoteAction(data: {
 
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
+            await requirePermission(data.partnerId, "quotes", "edit", user)
 
             // Validate discount permission if discount fields are being changed
             if ((data.discountValue !== undefined && data.discountValue > 0) || data.discountType) {
-                await requirePartnerAccessWithPermission(data.partnerId, "quotes", "can_apply_discount")
+                await requirePermission(data.partnerId, "quotes", "can_apply_discount")
             }
 
             const supabase = await getSupabaseServerClient()
@@ -740,7 +741,7 @@ export async function updateQuoteStatusAction(data: {
 
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
+            await requirePermission(data.partnerId, "quotes", "edit", user)
 
             // Validate status transition
             const supabase = await getSupabaseServerClient()
@@ -867,7 +868,7 @@ export async function deleteQuoteAction(quoteId: string) {
             if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "delete", user)
+            await requirePermission(ctx.partnerId, "quotes", "delete", user)
 
             const supabase = await getSupabaseServerClient()
 
@@ -907,7 +908,7 @@ export async function duplicateQuoteAction(quoteId: string) {
             if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "create", user)
+            await requirePermission(ctx.partnerId, "quotes", "create", user)
 
             const limitCheck = await checkLimit(ctx.partnerId, "monthly_quotes")
             if (!limitCheck.allowed) {
@@ -989,7 +990,7 @@ export async function addQuoteItemAction(data: {
 
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
+        await requirePermission(data.partnerId, "quotes", "edit", user)
 
         if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
         if (data.quantity > 999999) return errorResponse("Quantidade máxima excedida")
@@ -1050,7 +1051,7 @@ export async function updateQuoteItemAction(data: {
 
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
+        await requirePermission(data.partnerId, "quotes", "edit", user)
 
         if (data.quantity !== undefined && data.quantity <= 0) {
             return errorResponse("Quantidade deve ser maior que zero")
@@ -1127,7 +1128,7 @@ export async function deleteQuoteItemAction(itemId: string, partnerId: string) {
 
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(partnerId, "quotes", "edit", user)
+        await requirePermission(partnerId, "quotes", "edit", user)
 
         const supabase = await getSupabaseServerClient()
 
@@ -1332,8 +1333,8 @@ export async function convertQuoteToOrderAction(data: {
 
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
-            await requirePartnerAccessWithPermission(data.partnerId, "orders", "create", user)
+            await requirePermission(data.partnerId, "quotes", "edit", user)
+            await requirePermission(data.partnerId, "orders", "create", user)
 
             const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
             const csrfValidation = await requireCSRF(data.csrf_token)
@@ -1646,7 +1647,7 @@ export async function convertQuoteToOrderAction(data: {
 export async function getQuoteHistoryAction(quoteId: string, partnerId: string) {
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+        await requirePermission(partnerId, "quotes", "view", user)
 
         const entries = await getQuoteHistoryEntries(quoteId, partnerId)
         return successResponse(entries)
@@ -1661,7 +1662,7 @@ export async function getQuoteHistoryAction(quoteId: string, partnerId: string) 
 export async function getQuoteDetailsAction(quoteId: string, partnerId: string) {
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+        await requirePermission(partnerId, "quotes", "view", user)
 
         const quoteCache = await getQuoteWithItemsCached(quoteId, partnerId)
 
@@ -1718,7 +1719,7 @@ export async function batchDeleteQuotesAction(quoteIds: string[]) {
             if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "delete", user)
+            await requirePermission(ctx.partnerId, "quotes", "delete", user)
 
             const supabase = await getSupabaseServerClient()
 
@@ -1758,7 +1759,7 @@ export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: 
             if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "edit", user)
+            await requirePermission(ctx.partnerId, "quotes", "edit", user)
 
             const supabase = await getSupabaseServerClient()
 
@@ -1811,7 +1812,7 @@ export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: 
 export async function getSalespeopleAction(partnerId: string): Promise<{ success: true; sellers: { id: string; name: string }[] } | { success: false; error: string }> {
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+        await requirePermission(partnerId, "quotes", "view", user)
 
         const admin = getAdminClient()
         const { data: partnerUsers, error: puError } = await admin
@@ -1849,7 +1850,7 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
     return withTelemetry("regenerateQuoteApprovalCodeAction", async () => {
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(partnerId, "quotes", "edit", user)
+            await requirePermission(partnerId, "quotes", "edit", user)
 
             const supabase = await getSupabaseServerClient()
 
@@ -2474,7 +2475,7 @@ export async function submitSellerCommentAction(quoteId: string, partnerId: stri
     return withTelemetry("submitSellerCommentAction", async () => {
         try {
             const user = await requireUser()
-            await requirePartnerAccessWithPermission(partnerId, "quotes", "edit", user)
+            await requirePermission(partnerId, "quotes", "edit", user)
 
             const cleanMessage = String(message || "").replace(/<[^>]*>/g, "").trim().substring(0, 1000)
             if (!cleanMessage) return errorResponse("Mensagem não pode estar vazia")
@@ -2528,7 +2529,7 @@ export async function submitSellerCommentAction(quoteId: string, partnerId: stri
 export async function getQuoteInteractionsAction(quoteId: string, partnerId: string) {
     try {
         const user = await requireUser()
-        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+        await requirePermission(partnerId, "quotes", "view", user)
 
         const supabase = await getSupabaseServerClient()
         const { data, error } = await supabase

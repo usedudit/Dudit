@@ -39,11 +39,20 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import SelectProductVariantSheet from "../pdv/SelectProductVariantSheet"
 
 import { useProductBucket, type ProductBucketItem } from '../hooks'
 
 interface MovementItem {
     product: ProductBucketItem;
+    variant?: {
+        id: string;
+        name: string;
+        sku: string;
+        price: number;
+        stock: number;
+        image?: string | null;
+    };
     quantity: number;
 }
 
@@ -77,6 +86,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     // Multi-item state
     const [items, setItems] = useState<MovementItem[]>([]);
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
+    const [selectedProductForVariants, setSelectedProductForVariants] = useState<ProductBucketItem | null>(null);
     const searchRef = useRef<HTMLDivElement>(null);
 
     // Focus lock and camera scanner states
@@ -168,26 +178,32 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     }, [nextAction])
 
 
-    const addProduct = useCallback((product: ProductBucketItem, quantity = 1) => {
+    const addProduct = useCallback((product: ProductBucketItem, quantity = 1, variant?: any) => {
         setItems(prev => {
-            const existsIndex = prev.findIndex(item => item.product.id === product.id);
+            const existsIndex = prev.findIndex(item =>
+                item.product.id === product.id &&
+                (!variant ? !item.variant : item.variant?.id === variant.id)
+            );
+            const availableStock = variant ? Number(variant.stock || 0) : Number(product.stock || 0);
+            const displayName = product.name + (variant ? ` - ${variant.name}` : '');
+
             if (existsIndex > -1) {
                 const next = [...prev];
                 const item = next[existsIndex];
                 const nextQty = item.quantity + quantity;
-                if (type === 'out' && nextQty > Number(item.product.stock || 0)) {
-                    notifyError(`A quantidade de "${item.product.name}" excede o estoque disponível.`);
+                if (type === 'out' && nextQty > availableStock) {
+                    notifyError(`A quantidade de "${displayName}" excede o estoque disponível.`);
                     return prev;
                 }
                 next[existsIndex] = { ...item, quantity: nextQty };
                 return next;
             }
             // Add new item
-            if (type === 'out' && quantity > Number(product.stock || 0)) {
-                notifyError(`A quantidade de "${product.name}" excede o estoque disponível.`);
+            if (type === 'out' && quantity > availableStock) {
+                notifyError(`A quantidade de "${displayName}" excede o estoque disponível.`);
                 return prev;
             }
-            return [...prev, { product, quantity }];
+            return [...prev, { product, variant, quantity }];
         });
         productBucket.setSearchQuery('');
         setIsProductSearchOpen(false);
@@ -197,6 +213,17 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
             return next;
         });
     }, [productBucket, notifyError, type]);
+
+    const handleConfirmVariants = useCallback((selections: Array<{ variantId: string; qty: number }>) => {
+        if (!selectedProductForVariants) return;
+        selections.forEach(sel => {
+            const variantObj = selectedProductForVariants.variants?.find(v => v.id === sel.variantId);
+            if (variantObj) {
+                addProduct(selectedProductForVariants, sel.qty, variantObj);
+            }
+        });
+        setSelectedProductForVariants(null);
+    }, [selectedProductForVariants, addProduct]);
 
     const handleScanBarcode = useCallback(async (code: string) => {
         const cleanCode = code.trim();
@@ -219,7 +246,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         );
 
         if (localMatch) {
-            addProduct(localMatch);
+            if (localMatch.has_variants) {
+                setSelectedProductForVariants(localMatch);
+            } else {
+                addProduct(localMatch);
+            }
             playBeepSound();
             vibrateMobile();
             productBucket.setSearchQuery('');
@@ -231,7 +262,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
             item.variants?.some(v => v.sku && v.sku.toLowerCase() === cleanCode.toLowerCase())
         );
         if (localVariantMatch) {
-            addProduct(localVariantMatch);
+            const matchedVar = localVariantMatch.variants?.find(v => v.sku && v.sku.toLowerCase() === cleanCode.toLowerCase());
+            addProduct(localVariantMatch, 1, matchedVar);
             playBeepSound();
             vibrateMobile();
             productBucket.setSearchQuery('');
@@ -262,7 +294,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                             image: null
                         }))
                     };
-                    addProduct(bucketItem);
+                    if (bucketItem.has_variants) {
+                        setSelectedProductForVariants(bucketItem);
+                    } else {
+                        addProduct(bucketItem);
+                    }
                     playBeepSound();
                     vibrateMobile();
                     productBucket.setSearchQuery('');
@@ -281,9 +317,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         setItems(prev => prev.map((item, i) => {
             if (i !== index) return item;
             const nextQty = Math.max(1, qty);
-            if (type === 'out' && nextQty > Number(item.product.stock || 0)) {
-                notifyError(`A quantidade de "${item.product.name}" está maior que o estoque disponível.`);
-                return { ...item, quantity: Number(item.product.stock || 0) };
+            const stockLimit = item.variant ? Number(item.variant.stock || 0) : Number(item.product.stock || 0);
+            const displayName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
+            if (type === 'out' && nextQty > stockLimit) {
+                notifyError(`A quantidade de "${displayName}" está maior que o estoque disponível.`);
+                return { ...item, quantity: stockLimit };
             }
             return { ...item, quantity: nextQty };
         }));
@@ -327,9 +365,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                 notifyError("Todas as quantidades devem ser maiores que zero.");
                 break;
             }
-            if (type === 'out' && item.quantity > Number(item.product.stock || 0)) {
+            const stockLimit = item.variant ? Number(item.variant.stock || 0) : Number(item.product.stock || 0);
+            const displayName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
+            if (type === 'out' && item.quantity > stockLimit) {
                 errors.add('items');
-                notifyError(`A quantidade de "${item.product.name}" está maior que o estoque disponível.`);
+                notifyError(`A quantidade de "${displayName}" está maior que o estoque disponível.`);
                 break;
             }
         }
@@ -348,6 +388,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                 notes,
                 items: items.map(item => ({
                     productId: item.product.id,
+                    variantId: item.variant?.id || null,
                     quantity: item.quantity,
                 })),
             });
@@ -551,12 +592,19 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         </div>
                                                                     ) : productBucket.filteredResults.length > 0 ? (
                                                                         productBucket.filteredResults.map(product => {
-                                                                            const alreadyAdded = items.some(item => item.product.id === product.id);
+                                                                            const alreadyAdded = !product.has_variants && items.some(item => item.product.id === product.id);
                                                                             return (
                                                                                 <div
                                                                                     key={product.id}
                                                                                     className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
-                                                                                    onClick={() => !alreadyAdded && addProduct(product)}
+                                                                                    onClick={() => {
+                                                                                        if (alreadyAdded) return;
+                                                                                        if (product.has_variants) {
+                                                                                            setSelectedProductForVariants(product);
+                                                                                        } else {
+                                                                                            addProduct(product);
+                                                                                        }
+                                                                                    }}
                                                                                 >
                                                                                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
                                                                                         <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
@@ -592,43 +640,50 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
-                                                                        {items.map((item, index) => (
-                                                                            <tr key={item.product.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                                                                <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                                                    <div className="flex items-center gap-3">
-                                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                            <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain' : 'object-cover'}`} alt="" />
-                                                                                        </div>
-                                                                                        <div className="flex flex-col text-left flex-1 min-w-0">
-                                                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
-                                                                                                {item.product.name}
-                                                                                            </span>
-                                                                                            <div className="flex items-center gap-2">
-                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{item.product.sku}</span>
-                                                                                                <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
-                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{item.product.stock}</strong></span>
+                                                                        {items.map((item, index) => {
+                                                                            const itemImage = item.variant?.image || item.product.image;
+                                                                            const itemName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
+                                                                            const itemSku = item.variant?.sku || item.product.sku;
+                                                                            const itemStock = item.variant ? item.variant.stock : item.product.stock;
+
+                                                                            return (
+                                                                                <tr key={`${item.product.id}-${item.variant?.id || 'base'}`} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                                                    <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                                        <div className="flex items-center gap-3">
+                                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                                                <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!itemImage ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                                                            </div>
+                                                                                            <div className="flex flex-col text-left flex-1 min-w-0">
+                                                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                                                                    {itemName}
+                                                                                                </span>
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{itemSku}</span>
+                                                                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
+                                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{itemStock}</strong></span>
+                                                                                                </div>
                                                                                             </div>
                                                                                         </div>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                                    <div className="flex justify-center">
-                                                                                        <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(item.product.stock || 0)) : undefined} size="md" />
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                                    <div className="flex justify-center">
-                                                                                        <button
-                                                                                            onClick={() => removeItem(index)}
-                                                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
-                                                                                            title="Remover item"
-                                                                                        >
-                                                                                            <TrashIcon size={18} />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </td>
-                                                                            </tr>
-                                                                        ))}
+                                                                                    </td>
+                                                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                        <div className="flex justify-center">
+                                                                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(itemStock || 0)) : undefined} size="md" />
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                        <div className="flex justify-center">
+                                                                                            <button
+                                                                                                onClick={() => removeItem(index)}
+                                                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                                                                title="Remover item"
+                                                                                            >
+                                                                                                <TrashIcon size={18} />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
                                                                     </tbody>
                                                                 </table>
                                                             </div>
@@ -637,30 +692,37 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         {/* Items List - Mobile */}
                                                         {items.length > 0 && (
                                                             <div className="block md:hidden space-y-2">
-                                                                {items.map((item, index) => (
-                                                                    <div key={item.product.id} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
-                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
-                                                                            <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="flex justify-between items-start mb-0.5">
-                                                                                <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                                                    {item.product.name}
-                                                                                </h4>
-                                                                                <button
-                                                                                    onClick={() => removeItem(index)}
-                                                                                    className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors shrink-0"
-                                                                                >
-                                                                                    <TrashIcon size={14} />
-                                                                                </button>
+                                                                {items.map((item, index) => {
+                                                                    const itemImage = item.variant?.image || item.product.image;
+                                                                    const itemName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
+                                                                    const itemSku = item.variant?.sku || item.product.sku;
+                                                                    const itemStock = item.variant ? item.variant.stock : item.product.stock;
+
+                                                                    return (
+                                                                        <div key={`${item.product.id}-${item.variant?.id || 'base'}`} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                                                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
+                                                                                <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!itemImage ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
                                                                             </div>
-                                                                            <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate mb-2">
-                                                                                {item.product.sku} • Estoque: {item.product.stock}
-                                                                            </p>
-                                                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(item.product.stock || 0)) : undefined} size="md" />
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="flex justify-between items-start mb-0.5">
+                                                                                    <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                                                        {itemName}
+                                                                                    </h4>
+                                                                                    <button
+                                                                                        onClick={() => removeItem(index)}
+                                                                                        className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors shrink-0"
+                                                                                    >
+                                                                                        <TrashIcon size={14} />
+                                                                                    </button>
+                                                                                </div>
+                                                                                <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate mb-2">
+                                                                                    {itemSku} • Estoque: {itemStock}
+                                                                                </p>
+                                                                                <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(itemStock || 0)) : undefined} size="md" />
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         )}
 
@@ -786,26 +848,30 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         className="space-y-0"
                                                     >
                                                         {items.map((item, index) => {
+                                                            const itemStock = item.variant ? item.variant.stock : item.product.stock;
+                                                            const itemImage = item.variant?.image || item.product.image;
+                                                            const itemName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
+                                                            const itemSku = item.variant?.sku || item.product.sku;
                                                             const newStock = type === 'in'
-                                                                ? item.product.stock + item.quantity
-                                                                : Math.max(0, item.product.stock - item.quantity);
+                                                                ? itemStock + item.quantity
+                                                                : Math.max(0, itemStock - item.quantity);
 
                                                             return (
-                                                                <div key={item.product.id} className={`py-4 flex items-center justify-between gap-4 ${index > 0 ? 'border-t border-brand-border/40 dark:border-dark-border/40' : ''}`}>
+                                                                <div key={`${item.product.id}-${item.variant?.id || 'base'}`} className={`py-4 flex items-center justify-between gap-4 ${index > 0 ? 'border-t border-brand-border/40 dark:border-dark-border/40' : ''}`}>
                                                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                            <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
+                                                                            <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
-                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{item.product.name}</div>
-                                                                            <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{item.product.sku}</div>
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{itemName}</div>
+                                                                            <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{itemSku}</div>
                                                                         </div>
                                                                     </div>
 
                                                                     <div className="h-8 w-px bg-brand-border dark:bg-dark-border shrink-0" />
 
                                                                     <div className="flex items-center gap-2 shrink-0">
-                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{item.product.stock} <span className="text-[10px] font-medium opacity-60">un</span></span>
+                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{itemStock} <span className="text-[10px] font-medium opacity-60">un</span></span>
                                                                         <ArrowRightIcon size={14} className="text-brand-inactive-text" />
                                                                         <span className={`text-[15px] font-bold ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
                                                                             {newStock} <span className="text-xs font-bold">un</span>
@@ -892,6 +958,15 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                     onClose={() => setIsCameraOpen(false)}
                     onScan={handleScanBarcode}
                 />
+
+                {selectedProductForVariants && (
+                    <SelectProductVariantSheet
+                        isOpen={!!selectedProductForVariants}
+                        product={selectedProductForVariants}
+                        onClose={() => setSelectedProductForVariants(null)}
+                        onConfirm={handleConfirmVariants}
+                    />
+                )}
             </div>
         </FadeIn>
     );

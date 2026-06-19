@@ -1,7 +1,7 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getCategoriesData, getAccountsData } from "@/lib/data/financial-data"
 import FinancialCategoriesPage from "@/components/erp/financial-cadastros/FinancialCategoriesPage"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -15,7 +15,7 @@ export default async function FinancialCategoriesRoute() {
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
 
-  const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
+  const { allowed } = await checkPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
   const [catResult, accResult, plan] = await Promise.all([

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button } from "@/components/reusable"
 import { PlusIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
@@ -10,6 +10,8 @@ import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { RichTextEditor } from "@/components/reusable"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { useRouter } from "next/navigation"
+import QuickStockMovementSheet from "./QuickStockMovementSheet"
 
 const FormCombobox = ({
     label,
@@ -72,7 +74,7 @@ interface ProductGeneralTabProps {
     uploadingImages?: Set<number>
     blockedImages?: Set<number>
     isSaving?: boolean
-    mode?: "add" | "edit" | "details"
+    mode?: "add" | "edit" | "details" | "duplicate"
     isQuickMode?: boolean
     onGenerateBarcode?: () => void
 }
@@ -82,6 +84,8 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
+    const router = useRouter()
+    const [isStockAdjustmentOpen, setIsStockAdjustmentOpen] = useState(false)
 
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
     const { salesPrice, profit, margin } = useMemo(() => {
@@ -125,14 +129,6 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <FormSection title="Informações Básicas">
                     <div className="mb-10">
-                        {hasVariants && (
-                            <div className="mb-4">
-                                <InfoCard
-                                    color="blue"
-                                    message="Este produto possui variações. As imagens podem ser configuradas individualmente para cada variação na aba Variações."
-                                />
-                            </div>
-                        )}
                         <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
                     </div>
 
@@ -186,41 +182,63 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             />
                         </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                        {!isQuickMode && (
-                            <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
-                        )}
-                        <MoneyInput
-                            label="Preço de Venda"
-                            name="price"
-                            value={productData.price || ""}
-                            onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
-                            disabled={!isEditing || !showPrice}
-                            required={showPrice}
-                            error={fieldErrors?.has("price")}
-                            errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
-                        />
-                        <MoneyInput
-                            label="Preço Promocional"
-                            name="promotional_price"
-                            value={productData.promotional_price || ""}
-                            onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })}
-                            disabled={!isEditing || !showPrice}
-                        />
-
-                        {isQuickMode && (
-                            <Input
-                                label="Estoque Atual"
-                                name="stock"
-                                type="number"
-                                value={productData.stock || ""}
-                                onChange={handleFieldChange}
-                                disabled={!isEditing}
+                    {!hasVariants && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
+                            {!isQuickMode && (
+                                <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
+                            )}
+                            <MoneyInput
+                                label="Preço de Venda"
+                                name="price"
+                                value={productData.price || ""}
+                                onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
+                                disabled={!isEditing || !showPrice}
+                                required={showPrice}
+                                error={fieldErrors?.has("price")}
+                                errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
                             />
-                        )}
-                    </div>
+                            <MoneyInput
+                                label="Preço Promocional"
+                                name="promotional_price"
+                                value={productData.promotional_price || ""}
+                                onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })}
+                                disabled={!isEditing || !showPrice}
+                            />
 
-                    {!showPrice && (
+                            {isQuickMode && (
+                                mode === "add" || mode === "duplicate" ? (
+                                    <Input
+                                        label="Estoque Atual"
+                                        name="stock"
+                                        type="number"
+                                        value={productData.stock || ""}
+                                        onChange={handleFieldChange}
+                                        disabled={!isEditing}
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Estoque Atual"
+                                        name="stock"
+                                        type="number"
+                                        value={productData.stock || 0}
+                                        readOnly
+                                        suffix={
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
+                                                onClick={() => setIsStockAdjustmentOpen(true)}
+                                            >
+                                                Ajustar
+                                            </Button>
+                                        }
+                                    />
+                                )
+                            )}
+                        </div>
+                    )}
+
+                    {!showPrice && !hasVariants && (
                         <div className="mb-6">
                             <InfoCard
                                 color="orange"
@@ -272,7 +290,36 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             </div>
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
-                            <Input label="Estoque Atual" name="stock" type="number" value={productData.stock || ""} onChange={handleFieldChange} disabled={!isEditing} />
+                            {!hasVariants && (
+                                mode === "add" || mode === "duplicate" ? (
+                                    <Input
+                                        label="Estoque Atual"
+                                        name="stock"
+                                        type="number"
+                                        value={productData.stock || ""}
+                                        onChange={handleFieldChange}
+                                        disabled={!isEditing}
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Estoque Atual"
+                                        name="stock"
+                                        type="number"
+                                        value={productData.stock || 0}
+                                        readOnly
+                                        suffix={
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
+                                                onClick={() => setIsStockAdjustmentOpen(true)}
+                                            >
+                                                Ajustar
+                                            </Button>
+                                        }
+                                    />
+                                )
+                            )}
                             <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
 
                             <FormCombobox
@@ -321,14 +368,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 Envio e Dimensões
                             </span>
                         } defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left">
-                            {hasVariants && (
-                                <div className="mb-5">
-                                    <InfoCard
-                                        color="blue"
-                                        message="Este produto possui variações. As dimensões e pesos podem variar por variação e devem ser configurados na aba Variações."
-                                    />
-                                </div>
-                            )}
+
                             <div className="pb-4">
                                 <div className="space-y-5">
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
@@ -375,21 +415,23 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 <SidebarCard hasTopStrip>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>
                     <div className="space-y-5">
-                        <Input
-                            label="Código do Produto"
-                            name="sku"
-                            value={productData.sku}
-                            onChange={handleFieldChange}
-                            disabled={!isEditing}
-                            suffix={
-                                <div
-                                    onClick={generateRandomCode}
-                                    className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                >
-                                    <DiceIcon size={20} />
-                                </div>
-                            }
-                        />
+                        {!hasVariants && (
+                            <Input
+                                label="Código do Produto"
+                                name="sku"
+                                value={productData.sku}
+                                onChange={handleFieldChange}
+                                disabled={!isEditing}
+                                suffix={
+                                    <div
+                                        onClick={generateRandomCode}
+                                        className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                    >
+                                        <DiceIcon size={20} />
+                                    </div>
+                                }
+                            />
+                        )}
 
                         {!isQuickMode && (
                             <>
@@ -521,6 +563,23 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     </SidebarCard>
                 )}
             </div>
+            {isStockAdjustmentOpen && (
+                <QuickStockMovementSheet
+                    isOpen={isStockAdjustmentOpen}
+                    product={{
+                        id: productData.id,
+                        name: productData.name,
+                        sku: productData.sku,
+                        image: typeof images[0] === 'string' ? images[0] : (productData.images?.[0] || productData.image || null),
+                        stock: Number(productData.stock || 0)
+                    }}
+                    onClose={() => setIsStockAdjustmentOpen(false)}
+                    onSaveSuccess={(newStock) => {
+                        handleInputChange({ target: { name: "stock", value: newStock } })
+                        router.refresh()
+                    }}
+                />
+            )}
         </div>
     )
 }

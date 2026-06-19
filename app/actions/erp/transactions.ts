@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import type { ERPTransaction, FinancialTransactionCursor, FinancialTransactionsPageSuccess } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -316,7 +316,7 @@ export async function getFinancialTransactionsAction(
     const actionStart = performance.now()
     try {
         const authStart = performance.now()
-        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        await requirePermission(partnerId, "financial", "view")
         // Use admin client after authz check so invited ERP users can read transactions.
         const supabase = createAdminClient()
 
@@ -722,7 +722,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
         // await requireMinimumPlan(input.partnerId, "crescer")
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
         if (input.transactionType === "transfer") {
@@ -846,7 +846,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
         // await requireMinimumPlan(input.partnerId, "crescer")
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
         const amt = Number(input.amount || 0)
@@ -972,7 +972,7 @@ export async function updateManualTransactionAction(
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
+        await requirePermission(partnerId, "financial", "edit")
         const supabase = createAdminClient()
 
         const { data: current, error: currentError } = await supabase
@@ -1141,7 +1141,7 @@ export async function cancelPendingTransactionAction(input: {
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
         // await requireMinimumPlan(input.partnerId, "crescer")
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "cancel")
         const supabase = createAdminClient()
 
         const { data: tx, error } = await supabase
@@ -1204,7 +1204,7 @@ export async function cancelPendingTransactionAction(input: {
  */
 export async function getTransactionForEditAction(transactionId: string, partnerId: string) {
     try {
-        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        await requirePermission(partnerId, "financial", "view")
         const supabase = createAdminClient()
 
         const { data, error } = await supabase
@@ -1260,7 +1260,7 @@ export async function createInstallmentGroupAction(input: {
     firstInstallmentPaymentDate?: string | null
 }) {
     try {
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
         const count = Math.floor(Number(input.installmentsCount) || 0)
@@ -1357,7 +1357,7 @@ export async function createInstallmentGroupAction(input: {
 
 export async function getInstallmentGroupDetailsAction(input: { partnerId: string; installmentGroupId: string }) {
     try {
-        await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
+        await requirePermission(input.partnerId, "financial", "view")
         const supabase = createAdminClient()
 
         // PERF: Batch 1 — group metadata + installment transactions (independent reads)
@@ -1501,7 +1501,7 @@ export async function recordInstallmentPaymentAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
         const { data: tx, error: txErr } = await supabase
@@ -1693,7 +1693,7 @@ export async function recordRegularTransactionPaymentAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
         const { data: tx, error: txErr } = await supabase
@@ -1805,7 +1805,7 @@ export async function settleInstallmentGroupAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
         const nowIso = new Date().toISOString()
 
@@ -1884,7 +1884,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
         // Fetch the recurring template
@@ -2111,7 +2111,7 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
         const { data: acc, error: accErr } = await supabase
@@ -2165,7 +2165,7 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
 
 export async function getTransactionHistoryAction(transactionId: string, partnerId: string) {
     try {
-        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        await requirePermission(partnerId, "financial", "view")
         const entries = await getTransactionHistoryEntries(transactionId, partnerId)
         return { success: true as const, data: entries }
     } catch (e: any) {
@@ -2266,7 +2266,7 @@ export async function getTransactionDetailsAction(
     partnerId: string,
 ): Promise<{ success: true; data: TransactionDetailPayload } | { success: false; error: string }> {
     try {
-        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        await requirePermission(partnerId, "financial", "view")
         const supabase = createAdminClient()
 
         let txQuery = await supabase
@@ -2989,7 +2989,7 @@ export async function searchCustomersForTransaction(query?: string) {
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return []
 
-        await requirePartnerAccessWithPermission(ctx.partnerId, "financial", "view")
+        await requirePermission(ctx.partnerId, "financial", "view")
         const supabase = createAdminClient()
         const q = `%${String(query || "").trim()}%`
 

@@ -55,7 +55,7 @@ const recurringNone = { view: false, manage: false }
 export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
     OWNER: {
         orders: { view: true, create: true, edit: true, delete: true, cancel: true, can_apply_discount: true, can_add_delivery: true, delete_cancel: true },
-        appointments: { view: true, create: true, edit: true, delete: true, can_apply_discount: true },
+        appointments: { view: true, create: true, edit: true, delete: true },
         customers: crudFull,
         products: crudFull,
         stock_movements: { view: true, create: true, undo: true },
@@ -84,7 +84,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
     },
     ADMIN: {
         orders: { view: true, create: true, edit: true, delete: true, cancel: true, can_apply_discount: true, can_add_delivery: true, delete_cancel: true },
-        appointments: { view: true, create: true, edit: true, delete: true, can_apply_discount: true },
+        appointments: { view: true, create: true, edit: true, delete: true },
         customers: crudFull,
         products: crudFull,
         stock_movements: { view: true, create: true, undo: true },
@@ -113,7 +113,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
     },
     MANAGER: {
         orders: { view: true, create: true, edit: true, delete: true, cancel: true, can_apply_discount: true, can_add_delivery: true, delete_cancel: true },
-        appointments: { view: true, create: true, edit: true, delete: true, can_apply_discount: true },
+        appointments: { view: true, create: true, edit: true, delete: true },
         customers: crudFull,
         products: crudFull,
         stock_movements: { view: true, create: true, undo: true },
@@ -142,7 +142,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
     },
     OPERATOR: {
         orders: { view: true, create: true, edit: true, delete: false, cancel: false, can_apply_discount: false, can_add_delivery: true, delete_cancel: false },
-        appointments: { view: true, create: true, edit: true, delete: false, can_apply_discount: false },
+        appointments: { view: true, create: true, edit: true, delete: false },
         customers: crudNoDelete,
         products: crudViewOnly,
         stock_movements: { view: true, create: false, undo: false },
@@ -168,7 +168,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
     },
     DELIVERY: {
         orders: { view: true, create: false, edit: false, delete: false, cancel: false, can_apply_discount: false, can_add_delivery: false, delete_cancel: false },
-        appointments: { view: false, create: false, edit: false, delete: false, can_apply_discount: false },
+        appointments: { view: false, create: false, edit: false, delete: false },
         customers: crudViewOnly,
         products: crudNone,
         stock_movements: { view: false, create: false, undo: false },

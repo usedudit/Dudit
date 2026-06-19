@@ -1,6 +1,7 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { redirect } from "next/navigation"
-import { getCurrentUser, checkPartnerPermission } from "@/lib/auth/authorization"
+import { getCurrentUser } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -18,7 +19,7 @@ export default async function RecurringPlansRoute() {
   if (!context) redirect("/select-erp")
 
   const partnerId = context.partnerId
-  const permission = await checkPartnerPermission(partnerId, "recurring_plans", "view")
+  const permission = await checkPermission(partnerId, "recurring_plans", "view")
   if (!permission.allowed) return <AccessDenied />
 
   const result = await listRecurringPlansAction(partnerId)

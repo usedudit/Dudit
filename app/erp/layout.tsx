@@ -75,8 +75,9 @@ export default async function ERPLayout({
     }
   }
 
-  // If no valid cookie, auto-resolve if exactly 1 ERP (only for users with own ERP).
-  if (!context && (allAccess.length === 1) && hasOwnPartner) {
+  // If no valid cookie, auto-resolve only if the single ERP belongs to the user
+  const hasNonOwnAccess = allAccess.some((a: typeof allAccess[number]) => a.roleId !== "owner")
+  if (!context && (allAccess.length === 1) && !hasNonOwnAccess) {
     const match = allAccess[0]
     const role = String(match.roleId || "delivery").toUpperCase() as PartnerRole
     context = { partnerId: match.partnerId, roleId: match.roleId as RoleId, role, permissions: match.permissions, businessInfo: match.businessInfo }

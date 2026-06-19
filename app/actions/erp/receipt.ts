@@ -2,7 +2,8 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { successResponse, errorResponse } from "@/lib/utils/action-helpers"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import {
     buildPartnerTaxIdLine,
     type SaleReceiptPartnerHeader,
@@ -13,7 +14,7 @@ export async function getPartnerReceiptHeaderAction(partnerId: string) {
         const user = await requireUser()
         if (!user) return errorResponse("Não autenticado")
 
-        await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+        await requirePermission(partnerId, "orders", "view")
 
         const supabase = await getSupabaseServerClient()
 

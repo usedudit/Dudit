@@ -1,6 +1,6 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { TransactionsPage } from "@/components/erp/transactions"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { PlanGatePage } from "@/components/erp/PlanGatePage"
@@ -23,7 +23,7 @@ export default async function FinancialPagamentosRoute() {
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
 
   const partnerId = context.partnerId
-  const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
+  const { allowed } = await checkPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
   const plan = await getPartnerPlan(partnerId)

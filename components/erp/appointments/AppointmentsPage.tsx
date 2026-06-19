@@ -909,6 +909,7 @@ const AppointmentsPage = ({
                     <AnimatePresence>
                         {isSheetOpen && (
                             <AppointmentSheet
+                                key={sheetMode}
                                 onClose={() => {
                                     setIsSheetOpen(false);
                                     setDraftData(null);

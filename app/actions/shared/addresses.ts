@@ -4,7 +4,8 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 // Removed createSupabaseAdmin
 import { unstable_cache } from "next/cache"
 import { revalidateAddresses } from "@/lib/utils/revalidation"
-import { requireUser, requirePartnerAccessWithPermission, requireCustomerOwnership, requireSupplierOwnership } from "@/lib/auth/authorization"
+import { requireUser, requireCustomerOwnership, requireSupplierOwnership } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
@@ -85,7 +86,7 @@ async function verifyEntityOwnership(
   if (entityType === "user") {
     if (entityId !== userId) throw new Error("Acesso negado")
   } else if (entityType === "partner") {
-    await requirePartnerAccessWithPermission(entityId, "customers", "view")
+    await requirePermission(entityId, "customers", "view")
   } else if (entityType === "customer") {
     await requireCustomerOwnership(entityId)
   } else if (entityType === "supplier") {
@@ -95,7 +96,7 @@ async function verifyEntityOwnership(
     const supabase = await getSupabaseServerClient()
     const { data: store } = await supabase.from("stores").select("partner_id").eq("id", entityId).single()
     if (!store) throw new Error("Loja não encontrada")
-    await requirePartnerAccessWithPermission(store.partner_id, "customers", "view")
+    await requirePermission(store.partner_id, "customers", "view")
   }
 }
 

@@ -2,7 +2,7 @@
 
 import crypto from "crypto"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requirePartnerAccess, requirePartnerAccessWithPermission, requireMinimumPlan, requireUser, getCurrentUser } from "@/lib/auth/authorization"
+import { requirePartnerAccess, requireMinimumPlan, requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { auditLog } from "@/lib/security/audit-logger"

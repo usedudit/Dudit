@@ -156,6 +156,8 @@ export default function TransactionsPage({
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
     const [search, setSearch] = useState("")
+    const [isScrolled, setIsScrolled] = useState(false)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
     const setActiveTab = forcedTab ? () => { } : setActiveTabState
@@ -184,8 +186,13 @@ export default function TransactionsPage({
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
-    const isScrolled = false
     const observerTarget = useRef<HTMLDivElement>(null)
+
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) {
+            setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+        }
+    }, [])
 
     const entityPage = useEntityPage<ERPTransaction, TransactionDetailPayload, FinancialTransactionCursor>({
         entityType: "transactions",
@@ -1152,7 +1159,7 @@ export default function TransactionsPage({
                         const isRegular = !isInstallment && !isRecurring
                         const currentRemaining = Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0)
                         const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
-                        
+
                         return (
                             <div className="flex flex-col md:flex-row gap-6">
                                 {/* Left Column: Resumo (Summary Receipt Style) */}
@@ -1198,7 +1205,7 @@ export default function TransactionsPage({
                                         {/* Summary Details */}
                                         <div className="space-y-4 flex-1">
                                             <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">Resumo do Lançamento</h4>
-                                            
+
                                             <div className="space-y-2.5 text-xs">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo Devedor Atual</span>
@@ -1259,7 +1266,7 @@ export default function TransactionsPage({
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {/* Right Column: Inputs & Actions (55% width) */}
                                 <div className="w-full md:w-[55%] flex flex-col justify-between space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1391,37 +1398,43 @@ export default function TransactionsPage({
         )
 
         return (
-            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-                {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out px-4 md:px-6">
-                    <div className="max-w-[1300px] mx-auto relative md:pt-4">
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                        {/* Back button - desktop only */}
-                        <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 scale-100">
-                            <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center">
-                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            </Button>
-                        </div>
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                        {/* Title row */}
-                        <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
-                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                    <span className="truncate">Quitar todas as parcelas</span>
-                                </h1>
-                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                    Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
                                 </div>
-                            </div>
 
-                            {/* Desktop action buttons */}
-                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
-                                    Cancelar
-                                </Button>
-                                <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />}>
-                                    Confirmar quitação
-                                </Button>
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">Quitar todas as parcelas</span>
+                                        </h1>
+
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />}>
+                                            Confirmar quitação
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -2174,7 +2187,6 @@ export default function TransactionsPage({
                                                     ))}
                                                 </tbody>
                                             </table>
-                                            {/* <div ref={observerTarget} className="h-10" /> */}
                                         </div>
                                     </div>
                                 )}

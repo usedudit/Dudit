@@ -1,13 +1,13 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { successResponse, errorResponse } from "@/lib/utils/action-helpers"
 import { ActionResponse } from "@/lib/types/action-response"
 
 export async function getUnavailableTypesAction(partnerId: string): Promise<ActionResponse<any[]>> {
     try {
-        await requirePartnerAccessWithPermission(partnerId, "appointments", "view")
+        await requirePermission(partnerId, "appointments", "view")
         const supabase = await getSupabaseServerClient()
 
         const { data, error } = await supabase
@@ -32,7 +32,7 @@ export async function createUnavailableTypeAction(data: {
     colorHex?: string
 }): Promise<ActionResponse<any>> {
     try {
-        await requirePartnerAccessWithPermission(data.partnerId, "appointments", "create")
+        await requirePermission(data.partnerId, "appointments", "create")
         const supabase = await getSupabaseServerClient()
 
         const { data: inserted, error } = await supabase

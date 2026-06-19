@@ -14,9 +14,7 @@ export interface QuotesPermissions extends ResourcePermissions {
     can_apply_discount: boolean
 }
 
-export interface AppointmentsPermissions extends ResourcePermissions {
-    can_apply_discount: boolean
-}
+export interface AppointmentsPermissions extends ResourcePermissions {}
 
 export interface OrdersPermissions {
     view: boolean

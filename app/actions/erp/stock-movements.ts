@@ -1,7 +1,8 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
@@ -18,7 +19,7 @@ export async function searchProductsForMovement(query: string) {
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return []
 
-        await requirePartnerAccessWithPermission(ctx.partnerId, "stock_movements", "view")
+        await requirePermission(ctx.partnerId, "stock_movements", "view")
         const supabase = createAdminClient()
         const searchTerm = `%${query}%`
 
@@ -65,7 +66,7 @@ export async function createStockMovementAction(data: {
         if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
         const partnerId = ctx.partnerId
         const userId = user.id
-        await requirePartnerAccessWithPermission(partnerId, "stock_movements", "create")
+        await requirePermission(partnerId, "stock_movements", "create")
 
         if (!data.productId) return errorResponse("Produto inválido")
         if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
@@ -116,7 +117,7 @@ export async function createBatchStockMovementAction(data: {
         if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
         const partnerId = ctx.partnerId
         const userId = user.id
-        await requirePartnerAccessWithPermission(partnerId, "stock_movements", "create")
+        await requirePermission(partnerId, "stock_movements", "create")
 
         if (!data.items || data.items.length === 0) return errorResponse("Adicione pelo menos um item")
         if (!data.reason) return errorResponse("Motivo é obrigatório")
@@ -207,7 +208,7 @@ export async function getStockMovementDetails(id: string) {
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
-        await requirePartnerAccessWithPermission(ctx.partnerId, "stock_movements", "view")
+        await requirePermission(ctx.partnerId, "stock_movements", "view")
         const supabase = createAdminClient()
 
         const { data, error } = await supabase
@@ -339,7 +340,7 @@ export async function deleteStockMovementAction(id: string) {
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
-        await requirePartnerAccessWithPermission(ctx.partnerId, "stock_movements", "undo")
+        await requirePermission(ctx.partnerId, "stock_movements", "undo")
         const supabase = createAdminClient()
 
         const { error } = await supabase
@@ -373,7 +374,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
         const partnerId = ctx.partnerId
         const userId = user.id
-        await requirePartnerAccessWithPermission(partnerId, "stock_movements", "undo")
+        await requirePermission(partnerId, "stock_movements", "undo")
         const supabase = createAdminClient()
 
         // 1. Fetch the original movement
@@ -448,7 +449,7 @@ export async function undoBatchStockMovementsAction(ids: string[], customReason?
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
         const partnerId = ctx.partnerId
-        await requirePartnerAccessWithPermission(partnerId, "stock_movements", "view")
+        await requirePermission(partnerId, "stock_movements", "view")
 
         const results = []
         for (const id of ids) {
@@ -490,7 +491,7 @@ export async function getERPStockMovementsPageAction(
     try {
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requirePartnerAccessWithPermission(partnerId, "stock_movements", "view")
+        await requirePermission(partnerId, "stock_movements", "view")
         const supabase = createAdminClient()
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_STOCK_MOVEMENTS_PAGE_SIZE))))
