@@ -937,6 +937,46 @@ export const AppointmentSheet = ({
         const paymentStatus = paymentData.paymentStatus as 'paid' | 'partially_paid' | 'unpaid';
         const existingOrderId = linkedOrderId;
 
+        const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
+        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
+        const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
+        const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
+            ...appointment,
+            date: finalDateStr,
+            time: timeStr,
+            duration: calculatedDuration,
+            staffId: selectedServices[0]?.staffId || '',
+            status: status
+        } as Appointment, appointmentsList) : false;
+
+        let finalNotes = notes;
+        if (isOutsideHours) {
+            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Marcado fora do horário de funcionamento]`;
+        }
+        if (hasCollision) {
+            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Conflito de horário detectado]`;
+        }
+
+        const appointmentUpdatePayload = {
+            paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
+            paidAmount: paymentData.paidAmount,
+            customerName: selectedClient?.name || 'Cliente Sem Nome',
+            customerId: selectedClient?.id || null,
+            serviceName: selectedServices.map(s => s.name).join(', '),
+            serviceId: selectedServices[0]?.id || null,
+            categoryId: selectedServices[0]?.category_id || null,
+            date: finalDateStr,
+            time: timeStr,
+            endDate: needsRangePicker ? endDateRange : finalDateStr,
+            endTime: needsRangePicker ? endTimeRange : timeStr,
+            duration: calculatedDuration,
+            staffId: selectedServices[0]?.staffId || '',
+            staffName: selectedServices[0]?.staff || '',
+            price: calculatedPrice,
+            pricingUnit: selectedServices[0]?.pricingUnit || 'Por Serviço',
+            notes: finalNotes || null,
+        };
+
         try {
             if (existingOrderId) {
                 const result = await confirmAppointmentOrderPaymentAction({
@@ -950,6 +990,10 @@ export const AppointmentSheet = ({
                     mpPaymentId: paymentData.mpPaymentId || null,
                     financeAccountId,
                     notes: notes || undefined,
+                    servicePrice: calculatedPrice,
+                    serviceName: selectedServices.map(s => s.name).join(', '),
+                    serviceId: selectedServices[0]?.id || null,
+                    categoryId: selectedServices[0]?.category_id || null,
                 });
 
                 if (!result.success) {
@@ -960,10 +1004,7 @@ export const AppointmentSheet = ({
 
                 if (appointment?.id) {
                     try {
-                        const updateRes = await updateAppointmentAction(appointment.id, {
-                            paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
-                            paidAmount: paymentData.paidAmount,
-                        } as any);
+                        const updateRes = await updateAppointmentAction(appointment.id, appointmentUpdatePayload as any);
                         if (updateRes.success && updateRes.item && onAppointmentUpdated) {
                             onAppointmentUpdated(updateRes.item);
                         }
@@ -1039,9 +1080,8 @@ export const AppointmentSheet = ({
             if (appointment?.id) {
                 try {
                     const updateRes = await updateAppointmentAction(appointment.id, {
-                        paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
+                        ...appointmentUpdatePayload,
                         saleId: orderId,
-                        paidAmount: paymentData.paidAmount,
                     } as any);
                     if (updateRes.success && updateRes.item && onAppointmentUpdated) {
                         onAppointmentUpdated(updateRes.item);

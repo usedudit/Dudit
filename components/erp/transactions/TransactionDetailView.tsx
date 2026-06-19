@@ -416,6 +416,20 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                             value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.subtotal)}</span>}
                                                         />
                                                     )}
+                                                    {detail.salesSummary && detail.salesSummary.paymentBreakdown && detail.salesSummary.paymentBreakdown.length > 1 && (
+                                                        <PaymentRow
+                                                            label="Valores por meio"
+                                                            value={
+                                                                <div className="flex flex-col gap-1 text-right">
+                                                                    {detail.salesSummary.paymentBreakdown.map((entry: any, index: number) => (
+                                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            }
+                                                        />
+                                                    )}
                                                     {detail.salesSummary && detail.salesSummary.manualDiscount > 0 && (
                                                         <PaymentRow
                                                             label="Desconto"
@@ -520,6 +534,12 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                     <PaymentRow
                                                                         label="Desconto"
                                                                         value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(detail.discountAmount)}</span>}
+                                                                    />
+                                                                )}
+                                                                {detail.salesSummary && detail.salesSummary.changeAmount !== undefined && detail.salesSummary.changeAmount > 0.009 && (
+                                                                    <PaymentRow
+                                                                        label="Troco"
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.changeAmount)}</span>}
                                                                     />
                                                                 )}
                                                                 <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">

@@ -563,3 +563,102 @@ export async function toggleSuppliersStatusAction(supplierIds: string[], isActiv
   revalidatePath("/erp/suppliers")
   return { success: true }
 }
+
+export async function createSupplierQuickAction(input: {
+  partnerId: string
+  name: string
+  email?: string
+  phone?: string
+  cnpj?: string
+}) {
+  await requireUser()
+  await requirePermission(input.partnerId, "suppliers", "create")
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+  const name = String(input.name || "").trim()
+  const email = String(input.email || "").trim().toLowerCase()
+  const phone = String(input.phone || "").trim()
+  const cnpjDigits = String(input.cnpj || "").replace(/\D/g, "")
+
+  if (!name) return { success: false as const, error: "Informe o nome do fornecedor." }
+
+  const supabase = await getSupabaseServerClient()
+
+  if (email) {
+    const { data: existingEmail } = await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("partner_id", input.partnerId)
+      .ilike("email", email)
+      .limit(1)
+      .maybeSingle()
+    if (existingEmail?.id) {
+      return { success: false as const, error: "Já existe fornecedor com este email." }
+    }
+  }
+
+  if (cnpjDigits) {
+    const { data: existingCnpj } = await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("partner_id", input.partnerId)
+      .eq("cnpj", cnpjDigits)
+      .limit(1)
+      .maybeSingle()
+    if (existingCnpj?.id) {
+      return { success: false as const, error: "Já existe fornecedor com este CNPJ." }
+    }
+  }
+
+  const supplierCode = await generateUniqueSupplierCode(supabase)
+
+  const { data: supplier, error } = await supabase
+    .from("suppliers")
+    .insert({
+      partner_id: input.partnerId,
+      name,
+      email: email || null,
+      phone: phone || null,
+      cnpj: cnpjDigits || null,
+      supplier_code: supplierCode,
+      status: "ativo",
+    })
+    .select("id, name, email, phone, cnpj")
+    .single()
+
+  if (error) return { success: false as const, error: error.message }
+
+  return {
+    success: true as const,
+    data: {
+      id: supplier.id,
+      name: supplier.name,
+      email: supplier.email || null,
+      phone: supplier.phone || null,
+      cnpj: supplier.cnpj || null,
+    },
+  }
+}
+
+export async function getSupplierXmlImportsAction(supplierId: string) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+
+  await requireSupplierOwnership(supplierId)
+
+  const { data: xmlImports, error } = await supabase
+    .from("xml_imports")
+    .select("id, access_key, total_value, created_at, status, invoice_number, invoice_series, invoice_date")
+    .eq("supplier_id", supplierId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { xmlImports }
+}

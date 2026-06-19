@@ -2258,6 +2258,10 @@ export type TransactionDetailPayload = {
         paymentMethodExtra: number
         deliveryFee: number
         additionalCosts: number
+        paymentMethod?: string | null
+        paidAmount?: number
+        changeAmount?: number
+        paymentBreakdown?: Array<{ method: string; amount: number; paymentMethodId?: string | null; installmentNumber?: number }> | null
     } | null
 }
 
@@ -2547,10 +2551,15 @@ export async function getTransactionDetailsAction(
           buyer_id,
           customer_name,
           total_amount,
+          paid_amount,
+          payment_method,
           delivery_fee,
           additional_costs,
           discount_value,
           discount_amount,
+          payment_method_discount_amount,
+          payment_method_extra_amount,
+          payment_breakdown,
           order_items (
             id,
             quantity,
@@ -2598,14 +2607,37 @@ export async function getTransactionDetailsAction(
                 const additionalCosts = Math.max(0, Number((ord as any).additional_costs || 0))
                 const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + deliveryFee + additionalCosts)
                 const finalTotal = Math.max(0, Number((ord as any).total_amount || 0))
+                
+                const dbPaymentMethodDiscount = (ord as any).payment_method_discount_amount != null 
+                    ? Number((ord as any).payment_method_discount_amount) 
+                    : null
+                const dbPaymentMethodExtra = (ord as any).payment_method_extra_amount != null 
+                    ? Number((ord as any).payment_method_extra_amount) 
+                    : null
+
+                const dbBreakdown = Array.isArray((ord as any).payment_breakdown) && (ord as any).payment_breakdown.length > 0
+                    ? (ord as any).payment_breakdown.filter((e: any) => e?.method && Number(e?.amount || 0) > 0.009)
+                    : null
+
+                const paidAmt = Math.max(0, Number((ord as any).paid_amount || 0))
+                const changeAmount = Math.max(0, paidAmt - finalTotal)
+
                 salesSummary = {
                     subtotal,
                     manualDiscount,
                     couponDiscount,
-                    paymentMethodDiscount: Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100),
-                    paymentMethodExtra: Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100),
+                    paymentMethodDiscount: dbPaymentMethodDiscount !== null
+                        ? dbPaymentMethodDiscount
+                        : Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100),
+                    paymentMethodExtra: dbPaymentMethodExtra !== null
+                        ? dbPaymentMethodExtra
+                        : Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100),
                     deliveryFee,
                     additionalCosts,
+                    paymentMethod: (ord as any).payment_method || null,
+                    paidAmount: paidAmt,
+                    changeAmount,
+                    paymentBreakdown: dbBreakdown,
                 }
             }
 

@@ -1,41 +1,36 @@
-import { redirect } from "next/navigation"
-import { Button } from "@/components/reusable"
-import Link from "next/link"
-import { SuppliersList } from "@/components/erp/suppliers-list"
-import { requireUser, checkPartnerPermission } from "@/lib/auth/authorization"
+import SuppliersPage from "@/components/erp/fornecedores/SuppliersPage"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { getPartnerSuppliersCached } from "@/lib/data/suppliers"
+import { checkPermission } from "@/lib/permissions/access"
 import { AccessDenied } from "@/components/erp/access-denied"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { getERPSuppliersPageAction } from "@/app/actions/erp/suppliers"
 
-export default async function SuppliersPage() {
+export default async function SuppliersRoute() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
+  const partnerId = context.partnerId
+  const [{ allowed }, page] = await Promise.all([
+    checkPermission(partnerId, "suppliers", "view"),
+    getERPSuppliersPageAction(partnerId, { cursor: null, limit: 100 }),
+  ])
 
-  const { allowed } = await checkPartnerPermission(context.partnerId, "suppliers", "view")
   if (!allowed) return <AccessDenied />
-
-  const suppliers = await getPartnerSuppliersCached(context.partnerId)
+  if (!page.success) {
+    throw new Error(page.error || "Erro ao carregar fornecedores.")
+  }
 
   return (
-    <div className="min-h-svh p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Fornecedores</h1>
-            <p className="text-muted-foreground">Gerencie seus fornecedores</p>
-          </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link href="/erp/dashboard" prefetch={false}>Voltar</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/erp/suppliers/new" prefetch={false}>Adicionar fornecedor</Link>
-            </Button>
-          </div>
-        </div>
-
-        <SuppliersList suppliers={suppliers || []} partnerId={context.partnerId} />
-      </div>
-    </div>
+    <>
+      <ERPPageHeader title="Fornecedores" />
+      <FadeIn className="p-4">
+        <SuppliersPage
+          partnerId={partnerId}
+          initialSuppliers={page.items || []}
+          initialNextCursor={page.nextCursor}
+          initialHasMore={page.hasMore}
+        />
+      </FadeIn>
+    </>
   )
 }

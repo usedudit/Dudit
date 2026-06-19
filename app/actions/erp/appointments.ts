@@ -150,6 +150,29 @@ async function createAppointmentSaleAndSyncGoals(params: {
   let saleId = existingSale?.id || null
   let activeSaleNumber = existingSale?.sale_number || null
 
+  let orderDiscount = 0
+  let orderExtra = 0
+  let orderPaymentMethod: string | null = null
+  let orderPaymentMethodId: string | null = null
+  if (params.appointment.marketplace_order_id) {
+    const { data: orderData } = await params.supabase
+      .from("orders")
+      .select("payment_method_discount_amount, payment_method_extra_amount, payment_method, payment_method_id")
+      .eq("id", params.appointment.marketplace_order_id)
+      .eq("partner_id", params.partnerId)
+      .maybeSingle()
+
+    if (orderData) {
+      orderDiscount = Number(orderData.payment_method_discount_amount || 0)
+      orderExtra = Number(orderData.payment_method_extra_amount || 0)
+      orderPaymentMethod = orderData.payment_method || null
+      orderPaymentMethodId = orderData.payment_method_id || null
+    }
+  }
+
+  const baseAmount = Number(params.appointment.price || 0)
+  const finalAmount = Math.max(0, baseAmount - orderDiscount + orderExtra)
+
   if (!saleId) {
     const { data: saleNumberData } = await params.supabase.rpc("generate_sale_number")
     const saleNumber = String(saleNumberData || "").trim() || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
@@ -161,12 +184,12 @@ async function createAppointmentSaleAndSyncGoals(params: {
       .insert({
         partner_id: params.partnerId,
         customer_id: params.appointment.customer_id || null,
-        total_amount: Number(params.appointment.price || 0),
-        discount_amount: 0,
-        final_amount: Number(params.appointment.price || 0),
+        total_amount: baseAmount,
+        discount_amount: orderDiscount,
+        final_amount: finalAmount,
         paid_amount: paidAmount,
-        payment_status: paidAmount >= Number(params.appointment.price || 0) - 0.009 ? "paid" : "partially_paid",
-        status: paidAmount >= Number(params.appointment.price || 0) - 0.009 ? "paid" : "partially_paid",
+        payment_status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
+        status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
         finance_account_id: financeAccountId || null,
         notes: saleRefNote,
         finalized_by_user_id: params.userId,
@@ -186,12 +209,37 @@ async function createAppointmentSaleAndSyncGoals(params: {
         variant_id: null,
         product_name: params.appointment.service_name || "Serviço",
         variant_name: null,
-        unit_price: Number(params.appointment.price || 0),
+        unit_price: baseAmount,
         quantity: 1,
-        subtotal: Number(params.appointment.price || 0),
-        total_price: Number(params.appointment.price || 0),
+        subtotal: baseAmount,
+        total_price: baseAmount,
       })
     }
+  } else {
+    const { error: saleUpdateError } = await params.supabase
+      .from("sales")
+      .update({
+        total_amount: baseAmount,
+        discount_amount: orderDiscount,
+        final_amount: finalAmount,
+        paid_amount: paidAmount,
+        payment_status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
+        status: paidAmount >= finalAmount - 0.009 ? "paid" : "partially_paid",
+      })
+      .eq("id", saleId)
+      .eq("partner_id", params.partnerId)
+
+    if (saleUpdateError) throw saleUpdateError
+
+    await params.supabase
+      .from("sale_items")
+      .update({
+        product_name: params.appointment.service_name || "Serviço",
+        unit_price: baseAmount,
+        subtotal: baseAmount,
+        total_price: baseAmount,
+      })
+      .eq("sale_id", saleId)
   }
 
   const fallbackSaleNumber = activeSaleNumber || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
@@ -214,7 +262,8 @@ async function createAppointmentSaleAndSyncGoals(params: {
         transaction_date: nowIso,
         status: "paid",
         notes: null,
-        payment_type: "Agendamento",
+        payment_type: orderPaymentMethod || "Agendamento",
+        payment_method_id: orderPaymentMethodId || null,
         original_amount: paidAmount,
         interest_amount: null,
         fee_amount: 0,
@@ -228,6 +277,16 @@ async function createAppointmentSaleAndSyncGoals(params: {
       .single()
     if (txError) throw txError
     paymentTransactionId = tx?.id || null
+  } else {
+    // Sync the correct payment method / ID to the existing transaction row
+    await params.supabase
+      .from("transactions")
+      .update({
+        payment_type: orderPaymentMethod || "Agendamento",
+        payment_method_id: orderPaymentMethodId || null,
+      })
+      .eq("id", paymentTransactionId)
+      .eq("partner_id", params.partnerId)
   }
 
   const { data: partnerUser } = await params.supabase
@@ -842,10 +901,22 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
 
     if (updated.marketplace_order_id) {
       const orderPrice = Number(updated.price || 0)
+
+      const { data: ord } = await supabase
+        .from("orders")
+        .select("payment_method_discount_amount, payment_method_extra_amount")
+        .eq("id", updated.marketplace_order_id)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+      const discountAmt = Number(ord?.payment_method_discount_amount || 0)
+      const extraAmt = Number(ord?.payment_method_extra_amount || 0)
+      const nextTotalAmount = Math.max(0, orderPrice - discountAmt + extraAmt)
+
       await supabase
         .from("orders")
         .update({
-          total_amount: orderPrice,
+          total_amount: nextTotalAmount,
           notes: updated.notes || null,
         })
         .eq("id", updated.marketplace_order_id)

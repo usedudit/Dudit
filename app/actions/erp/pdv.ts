@@ -256,6 +256,7 @@ async function syncPosSaleToOrders(params: {
     isPendingDelivery?: boolean
     paymentProvider?: string
     mpPaymentId?: string | null
+    paymentBreakdown?: any[] | null
 }): Promise<string | null> {
     const admin = createAdminClient()
     const [{ data: sale }, { data: saleItems }, { data: draft }] = await Promise.all([
@@ -396,7 +397,7 @@ async function syncPosSaleToOrders(params: {
         additional_costs: otherCosts,
         notes: sale.notes || null,
         payment_method: formatPaymentMethodLabel(params.defaultPaymentMethod),
-        payment_breakdown: [],
+        payment_breakdown: params.paymentBreakdown || [],
         payment_provider: params.paymentProvider || null,
         mp_payment_id: params.mpPaymentId || null,
         finance_account_id: params.financeAccountId || null,
@@ -953,6 +954,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         isPendingDelivery: input.isPendingDelivery,
         paymentProvider: input.paymentProvider,
         mpPaymentId: input.mpPaymentId,
+        paymentBreakdown: breakdownForRpc.length > 0 ? breakdownForRpc : null,
     })
 
     // Invalidate caches (non-blocking - sale is already safely committed)

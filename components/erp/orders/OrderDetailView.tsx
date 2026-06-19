@@ -315,12 +315,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         return (a.sort_order || 0) - (b.sort_order || 0);
     });
     const itemsLabel = itemCount === 1 ? "1 item" : `${itemCount} itens`
-    const subtotalValue = Number(order.subtotal_value || 0) > 0
-        ? Number(order.subtotal_value || 0)
-        : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0)
     const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
     const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))
     const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
+    const subtotalValue = Number(order.subtotal_value || 0) > 0
+        ? Number(order.subtotal_value || 0)
+        : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - paymentMethodExtraAmount
     const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
     const cashEntry = Array.isArray(order.payment_breakdown)
         ? order.payment_breakdown.find((entry: any) => entry?.method === "cash")

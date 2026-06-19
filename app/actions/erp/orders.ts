@@ -3245,6 +3245,10 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     mpPaymentId?: string | null
     financeAccountId?: string | null
     notes?: string
+    servicePrice?: number
+    serviceName?: string
+    serviceId?: string | null
+    categoryId?: string | null
 }) {
     try {
         const user = await requireUser()
@@ -3264,9 +3268,31 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
             throw new Error("Pedido não encontrado")
         }
 
+        let orderPrice = Number(order.total_amount || 0)
+        if (payload.servicePrice !== undefined) {
+            orderPrice = Number(payload.servicePrice || 0)
+
+            await supabase
+                .from("order_items")
+                .update({
+                    product_name: payload.serviceName || "Serviço",
+                    product_price: orderPrice,
+                    subtotal: orderPrice,
+                    service_id: payload.serviceId || null,
+                })
+                .eq("order_id", payload.orderId)
+        }
+
+        const breakdownTotal = (payload.paymentBreakdown || []).reduce((s, e) => s + Number(e.amount || 0), 0)
+        const hasBreakdown = (payload.paymentBreakdown || []).length > 0
+        const finalTotal = hasBreakdown ? breakdownTotal : orderPrice
+        const paymentMethodDiscountAmount = Math.max(0, orderPrice - finalTotal)
+        const paymentMethodExtraAmount = Math.max(0, finalTotal - orderPrice)
+        const totalAmountToSave = finalTotal
+
         const paymentState = resolvePaymentState({
             requestedStatus: payload.paymentStatus,
-            totalAmount: order.total_amount,
+            totalAmount: totalAmountToSave,
             paidAmount: payload.paidAmount,
             fallbackPaidAmount: Number(order.paid_amount || 0),
         })
@@ -3282,6 +3308,9 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
             payment_provider: payload.paymentProvider || null,
             mp_payment_id: payload.mpPaymentId || null,
             finance_account_id: payload.financeAccountId || null,
+            total_amount: totalAmountToSave,
+            payment_method_discount_amount: paymentMethodDiscountAmount,
+            payment_method_extra_amount: paymentMethodExtraAmount,
         }
 
         if (payload.notes !== undefined) {

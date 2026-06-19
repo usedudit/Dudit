@@ -195,6 +195,45 @@ export async function fetchPartnerCustomersBucket(explicitPartnerId?: string): P
   return (data || []) as PartnerCustomerBucketItem[]
 }
 
+export type PartnerSupplierBucketItem = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  cnpj: string | null
+}
+
+export async function fetchPartnerSuppliersBucket(explicitPartnerId?: string): Promise<PartnerSupplierBucketItem[]> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("Unauthorized")
+
+  let partnerId = explicitPartnerId
+  if (!partnerId) {
+    const context = await getCurrentPartnerContext()
+    if (!context) throw new Error("No context")
+    partnerId = context.partnerId
+  }
+
+  const { allowed } = await checkPermission(partnerId, "suppliers", "view")
+  if (!allowed) throw new Error("Forbidden")
+
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase
+    .from("suppliers")
+    .select("id, name, email, phone, cnpj")
+    .eq("partner_id", partnerId)
+    .eq("status", "ativo")
+    .order("name", { ascending: true })
+    .limit(500)
+
+  if (error) {
+    console.error("[fetchPartnerSuppliersBucket]", error)
+    return []
+  }
+
+  return (data || []) as PartnerSupplierBucketItem[]
+}
+
 export type PartnerTeamMemberBucketItem = {
   id: string
   fullName: string | null
