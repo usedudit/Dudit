@@ -1401,9 +1401,9 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
     try {
         const user = await requireUser()
         await requirePermission(partnerId, "products", "view")
-        const supabase = await getSupabaseServerClient()
+        const admin = getAdminClient()
 
-        const { data, error } = await supabase
+        const { data, error } = await admin
             .from("products")
             .select(`
                 id, name, sku, gtin, stock_quantity, min_stock, cost_price, unit, images,
@@ -1428,7 +1428,7 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
         ))]
         const supplierNameMap: Record<string, string> = {}
         if (supplierIds.length > 0) {
-            const { data: suppliers } = await supabase.from("suppliers").select("id, name").in("id", supplierIds)
+            const { data: suppliers } = await admin.from("suppliers").select("id, name").in("id", supplierIds)
             if (suppliers) for (const s of suppliers) supplierNameMap[s.id] = s.name
         }
 

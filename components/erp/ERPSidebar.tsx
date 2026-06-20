@@ -63,7 +63,6 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Catálogo de Produtos", href: "/erp/products" },
             { label: "Movimentação de Estoque", href: "/erp/stock-movements" },
-            { label: "Importar Planilha", href: "/erp/spreadsheet-import" },
             { label: "Importar XML (NF-e)", href: "/erp/xml-import" },
             { label: "Notas de Entrada", href: "/" },
             { label: "Fornecedores", href: "/erp/suppliers" },

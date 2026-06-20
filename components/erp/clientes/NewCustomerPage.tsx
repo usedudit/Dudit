@@ -41,6 +41,7 @@ interface NewCustomerPageProps {
     onBack: () => void;
     partnerId: string;
     customerId?: string;
+    initialData?: any;
     onSuccess?: (msg: string) => void;
     onError?: (msg: string) => void;
 }
@@ -57,7 +58,7 @@ const REQUIRED_FIELDS = [
     { field: "billingCep", tab: "address" },
 ]
 
-const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customerId, onSuccess, onError }) => {
+const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customerId, initialData, onSuccess, onError }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -123,36 +124,51 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
     const [isLoadingData, setIsLoadingData] = useState(false)
+    const initialDataAppliedRef = useRef(false)
 
-    // Fetch customer data for editing
+    // Helper to populate form fields from a customer data object
+    const populateFormFromCustomer = useCallback((c: any) => {
+        if (!c) return
+        setCustomerName(c.name || "")
+        setPersonType(c.person_type === "pj" ? "Pessoa Jurídica" : "Pessoa Física")
+        setFantasia(c.nome_fantasia || "")
+        setCnpj(c.cnpj || "")
+        setIe(c.inscricao_estadual || "")
+        setCpf(c.cpf || "")
+        setRg(c.rg || "")
+        setEmail(c.email || "")
+        setMobile(c.phone || "")
+        setStoreCredit(c.store_credit || 0)
+        setStatus(c.status === "ativo" ? "Ativo" : c.status === "inativo" ? "Inativo" : "Bloqueado")
+        setContribuinte(c.contribuinte || "9")
+        setObservacoes(c.notes || "")
+        setWebsite(c.website || "")
+        setBirthDate(c.birth_date || "")
+        setMotherName(c.mother_name || "")
+        setFatherName(c.father_name || "")
+        if (c.phone_fixed) setPhone(c.phone_fixed)
+    }, [])
+
+    // Immediately populate from initialData (from cache) so fields are filled without waiting for fetch
+    useEffect(() => {
+        if (initialData && !initialDataAppliedRef.current) {
+            initialDataAppliedRef.current = true
+            populateFormFromCustomer(initialData)
+        }
+    }, [initialData, populateFormFromCustomer])
+
+    // Fetch customer data for editing (full detail fetch with addresses)
     useEffect(() => {
         if (customerId) {
             const fetchData = async () => {
-                setIsLoadingData(true)
+                // Only show loading overlay if we don't have initial data
+                if (!initialData) setIsLoadingData(true)
                 try {
                     const res = await getCustomerByIdAction(customerId)
                     if (res.customer) {
                         const c = res.customer
                         if (c) {
-                            setCustomerName(c.name || "")
-                            setPersonType(c.person_type === "pj" ? "Pessoa Jurídica" : "Pessoa Física")
-                            setFantasia(c.nome_fantasia || "")
-                            setCnpj(c.cnpj || "")
-                            setIe(c.inscricao_estadual || "")
-                            setCpf(c.cpf || "")
-                            // ... other fields
-                            setEmail(c.email || "")
-                            setMobile(c.phone || "")
-                            setStoreCredit(c.store_credit || 0)
-                            setStatus(c.status === "ativo" ? "Ativo" : c.status === "inativo" ? "Inativo" : "Bloqueado")
-                            setContribuinte(c.contribuinte || "9")
-                            setObservacoes(c.notes || "")
-                            setWebsite(c.website || "")
-                            setBirthDate(c.birth_date || "")
-                            setMotherName(c.mother_name || "")
-                            setFatherName(c.father_name || "")
-                            setRg(c.rg || "")
-                            if (c.phone_fixed) setPhone(c.phone_fixed)
+                            populateFormFromCustomer(c)
 
                             // Fetch addresses from the addresses table
                             try {
@@ -196,7 +212,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             }
             fetchData()
         }
-    }, [customerId, partnerId])
+    }, [customerId, partnerId, populateFormFromCustomer])
 
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 

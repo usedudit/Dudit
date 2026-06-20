@@ -394,8 +394,8 @@ export default function CustomersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && (isViewing || isEditingEntity) && isLoadingDetail ? (
-                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                {entityState.isOpen && isViewing && isLoadingDetail ? (
+                    <div key="loading" className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
                         <ThreeDotsLoader />
                     </div>
                 ) : (isCreatingEntity || isEditingEntity) ? (
@@ -403,6 +403,7 @@ export default function CustomersPage({
                         key="form"
                         partnerId={partnerId}
                         customerId={entityState.entityId || undefined}
+                        initialData={isEditingEntity ? currentEntity : undefined}
                         onBack={() => closeEntity()}
                         onSuccess={(msg) => {
                             toast({ title: "Sucesso", description: msg })

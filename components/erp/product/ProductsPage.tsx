@@ -40,6 +40,7 @@ import DropdownItem from "@/components/reusable/DropdownItem"
 import AlertModal from "../../reusable/AlertModal"
 import AddProductPage from "./AddProductPage"
 import { ImportXmlModal } from "@/components/erp/import-xml-modal"
+
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import Pagination from "@/components/reusable/Pagination"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -818,6 +819,9 @@ export default function ProductsPage({
                                     >
                                         <DropdownItem onClick={() => setIsCameraOpen(true)}>
                                             <CameraIcon size={18} /> Escanear Câmera
+                                        </DropdownItem>
+                                        <DropdownItem onClick={() => router.push("/erp/products/import")}>
+                                            <UploadIcon size={18} /> Importar Planilha
                                         </DropdownItem>
                                         <DropdownItem onClick={() => router.push("/erp/xml-import")}>
                                             <UploadIcon size={18} /> Importar XML

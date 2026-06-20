@@ -14,6 +14,7 @@ import {
   generatePreview,
   executeImport,
   deleteImportSession,
+  getFieldsForEntity,
 } from "@/lib/erp/import"
 import type { EntityType, ColumnMapping } from "@/lib/erp/import/types"
 
@@ -27,6 +28,8 @@ export async function uploadPlanilhaAction(
   totalRows?: number
   fileName?: string
   suggestedMapping?: ColumnMapping[]
+  availableFields?: { name: string; label: string; required?: boolean }[]
+  previewProducts?: any[]
   error?: string
 }> {
   try {
@@ -59,6 +62,10 @@ export async function uploadPlanilhaAction(
 
     const detectedEntity = entityType || detectEntity(readResult.headers)
     const mapping = suggestMapping(readResult.headers, detectedEntity)
+    const fields = getFieldsForEntity(detectedEntity)
+    const availableFields = fields
+      .filter((f) => f.name !== "technical_specs")
+      .map((f) => ({ name: f.name, label: f.label, required: f.required }))
 
     const sessionId = await createImportSession(partnerId, {
       entityType: detectedEntity,
@@ -70,6 +77,17 @@ export async function uploadPlanilhaAction(
       storeId,
     })
 
+    // Verify session was stored
+    const verifySession = await getImportSession(partnerId, sessionId)
+    if (!verifySession) {
+      console.error(`[uploadPlanilhaAction] Session verification FAILED — session was not persisted for ID ${sessionId}`)
+      return { success: false, error: "Erro ao persistir sessão de importação. Verifique a conexão com Redis." }
+    }
+
+    const previewProducts = readResult.rows.slice(0, 50).map((row, i) =>
+      rowToPreviewProduct(row, mapping, i)
+    )
+
     return {
       success: true,
       sessionId,
@@ -78,6 +96,8 @@ export async function uploadPlanilhaAction(
       totalRows: readResult.totalRows,
       fileName: readResult.fileName,
       suggestedMapping: mapping,
+      availableFields,
+      previewProducts,
     }
   } catch (err: any) {
     console.error("[uploadPlanilhaAction]", err)
@@ -131,6 +151,7 @@ export async function confirmImportAction(
     const session = await getImportSession(partnerId, sessionId)
 
     if (!session) {
+      console.warn(`[confirmImportAction] Session not found: partnerId=${partnerId}, sessionId=${sessionId}`)
       return { success: false, error: "Sessão de importação expirada ou inválida." }
     }
 
@@ -185,6 +206,33 @@ export async function confirmImportAction(
   }
 }
 
+export async function applyMappingAction(
+  sessionId: string,
+  partnerId: string,
+  mapping: ColumnMapping[],
+): Promise<{
+  success: boolean
+  previewProducts?: any[]
+  error?: string
+}> {
+  try {
+    const session = await getImportSession(partnerId, sessionId)
+    if (!session) {
+      console.warn(`[applyMappingAction] Session not found: partnerId=${partnerId}, sessionId=${sessionId}`)
+      return { success: false, error: "Sessão de importação expirada ou inválida." }
+    }
+
+    const previewProducts = session.rows.slice(0, 50).map((row, i) =>
+      rowToPreviewProduct(row, mapping, i)
+    )
+
+    return { success: true, previewProducts }
+  } catch (err: any) {
+    console.error("[applyMappingAction]", err)
+    return { success: false, error: err.message || "Erro ao aplicar mapeamento." }
+  }
+}
+
 export async function listImportsAction(
   partnerId: string,
   limit = 15,
@@ -211,5 +259,45 @@ export async function listImportsAction(
   } catch (err: any) {
     console.error("[listImportsAction]", err)
     return { success: false, error: err.message }
+  }
+}
+
+function rowToPreviewProduct(row: string[], mapping: ColumnMapping[], index: number): Record<string, any> {
+  const get = (field: string) => {
+    const col = mapping.find((m) => m.field === field)
+    if (!col || col.headerIndex >= row.length) return null
+    return row[col.headerIndex]?.trim() || null
+  }
+
+  const name = get("name") || `Item ${index + 1}`
+  const rawPrice = get("price")
+  const price = rawPrice ? parseFloat(rawPrice.replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
+  const rawStock = get("stock_quantity")
+  const stock = rawStock ? parseInt(rawStock.replace(/\D/g, "")) || 0 : 0
+
+  return {
+    id: `import-${Date.now()}-${index}`,
+    name,
+    sku: get("sku"),
+    price,
+    stock_quantity: stock,
+    cost_price: get("cost_price") ? parseFloat(get("cost_price")!.replace(",", ".").replace(/[^0-9.\-]/g, "")) : null,
+    gtin: get("gtin"),
+    category: get("category"),
+    brand: get("brand"),
+    unit: get("unit") || "UN",
+    description: get("description"),
+    ncm: get("ncm"),
+    cest: get("cest"),
+    is_active: true,
+    condition: get("condition") || "Novo",
+    product_type: get("product_type") || "Físico",
+    min_stock: get("min_stock") ? parseInt(get("min_stock")!.replace(/\D/g, "")) : null,
+    max_stock: get("max_stock") ? parseInt(get("max_stock")!.replace(/\D/g, "")) : null,
+    show_price_in_store: true,
+    images: [],
+    created_at: new Date().toISOString(),
+    partner_id: "",
+    rating: 0,
   }
 }
