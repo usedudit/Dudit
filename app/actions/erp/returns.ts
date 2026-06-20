@@ -108,6 +108,8 @@ const processReturnSchema = z.object({
     refundStatus: z.enum(["PENDING", "PROCESSING", "APPROVED", "FAILED", "MANUAL"]).default("PENDING"),
     refundPaymentMethod: z.string().max(120).optional().nullable(),
     returnToInventory: z.boolean().default(false),
+    returnToInventoryItems: z.array(z.string().uuid()).optional().nullable(),
+    customerId: z.string().uuid().optional().nullable(),
     storeCreditAmount: z.number().nonnegative().max(99999999).default(0),
     exchangeItems: z.array(z.object({
         product_id: z.string().uuid(),
@@ -436,7 +438,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, situation, delivery_status")
+            .select("id, partner_id, buyer_id, situation, delivery_status, order_number")
             .eq("id", base.orderId)
             .single()
 
@@ -484,6 +486,31 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         if (error) throw error
         const requestId = String((created as any)?.id || "")
         await revalidateReturns(order.partner_id, base.orderId, requestId)
+
+        // Notify partner team
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(order.partner_id)
+            if (teamUserIds.length > 0) {
+                const orderNum = order.order_number || order.id.slice(0, 8).toUpperCase()
+                await createNotificationsForUsers(teamUserIds, (userId) => ({
+                    userId,
+                    type: "order_refunded",
+                    title: "Nova solicitação de devolução",
+                    message: `O cliente solicitou devolução/troca para o pedido #${orderNum}.`,
+                    entityType: "order",
+                    entityId: order.id,
+                    data: {
+                        audience: "seller",
+                        return_request_id: requestId,
+                    },
+                    idempotencyKey: `return-request-partner-notify:${requestId}:${userId}`,
+                }))
+            }
+        } catch (notifyErr) {
+            console.error("[createMarketplaceReturnRequestAction] Failed to notify partner:", notifyErr)
+        }
+
         return successResponse({ id: requestId })
     } catch (e: any) {
         return errorResponse(e?.message || "Erro ao enviar solicitação")
@@ -511,7 +538,7 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, situation, delivery_status")
+            .select("id, partner_id, buyer_id, situation, delivery_status, order_number")
             .eq("id", data.orderId)
             .single()
 
@@ -539,6 +566,31 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
         if (error) throw error
         const requestId = String((created as any)?.id || "")
         await revalidateReturns(order.partner_id, data.orderId, requestId)
+
+        // Notify partner team
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(order.partner_id)
+            if (teamUserIds.length > 0) {
+                const orderNum = order.order_number || order.id.slice(0, 8).toUpperCase()
+                await createNotificationsForUsers(teamUserIds, (userId) => ({
+                    userId,
+                    type: "order_cancelled",
+                    title: "Nova solicitação de cancelamento",
+                    message: `O cliente solicitou o cancelamento do pedido #${orderNum}.`,
+                    entityType: "order",
+                    entityId: order.id,
+                    data: {
+                        audience: "seller",
+                        return_request_id: requestId,
+                    },
+                    idempotencyKey: `cancel-request-partner-notify:${requestId}:${userId}`,
+                }))
+            }
+        } catch (notifyErr) {
+            console.error("[createMarketplaceCancellationRequestAction] Failed to notify partner:", notifyErr)
+        }
+
         return successResponse({ id: requestId })
     } catch (e: any) {
         return errorResponse(e?.message || "Erro ao solicitar cancelamento")
@@ -615,7 +667,7 @@ export async function processReturnRequestAction(input: unknown) {
         const { data: request, error: requestError } = await supabase
             .from("return_requests")
             .select(`
-                id, partner_id, order_id, status, request_type, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
+                id, partner_id, order_id, status, request_type, desired_resolution, approved_resolution, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
                 orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name),
                 return_items(net_item_value_snapshot)
             `)
@@ -629,41 +681,43 @@ export async function processReturnRequestAction(input: unknown) {
 
         // Map buyer user UUID to ERP customers table ID to avoid foreign key violations on transactions
         const buyerId = (request as any).orders?.buyer_id || (request as any).customer_id
-        let erpCustomerId: string | null = null
-        if (buyerId) {
-            const { data: existingCustomer } = await supabase
-                .from("customers")
-                .select("id")
-                .eq("partner_id", request.partner_id)
-                .eq("marketplace_user_id", buyerId)
-                .maybeSingle()
-
-            if (existingCustomer) {
-                erpCustomerId = existingCustomer.id
-            } else {
-                const { data: directCustomer } = await supabase
+        let erpCustomerId: string | null = data.customerId || null
+        if (!erpCustomerId) {
+            if (buyerId) {
+                const { data: existingCustomer } = await supabase
                     .from("customers")
                     .select("id")
                     .eq("partner_id", request.partner_id)
-                    .eq("id", buyerId)
+                    .eq("marketplace_user_id", buyerId)
                     .maybeSingle()
 
-                if (directCustomer) {
-                    erpCustomerId = directCustomer.id
+                if (existingCustomer) {
+                    erpCustomerId = existingCustomer.id
                 } else {
-                    try {
-                        const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
-                        const buyerName = (request as any).orders?.customer_name || (request as any).customer_name_snapshot || "Cliente"
-                        const buyerEmail = (request as any).customer_email_snapshot || null
+                    const { data: directCustomer } = await supabase
+                        .from("customers")
+                        .select("id")
+                        .eq("partner_id", request.partner_id)
+                        .eq("id", buyerId)
+                        .maybeSingle()
 
-                        erpCustomerId = await ensureMarketplaceCustomer({
-                            partnerId: request.partner_id,
-                            name: buyerName,
-                            email: buyerEmail,
-                            userId: buyerId,
-                        })
-                    } catch (err) {
-                        console.error("[processReturnRequest] Error mapping marketplace customer:", err)
+                    if (directCustomer) {
+                        erpCustomerId = directCustomer.id
+                    } else {
+                        try {
+                            const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
+                            const buyerName = (request as any).orders?.customer_name || (request as any).customer_name_snapshot || "Cliente"
+                            const buyerEmail = (request as any).customer_email_snapshot || null
+
+                            erpCustomerId = await ensureMarketplaceCustomer({
+                                partnerId: request.partner_id,
+                                name: buyerName,
+                                email: buyerEmail,
+                                userId: buyerId,
+                            })
+                        } catch (err) {
+                            console.error("[processReturnRequest] Error mapping marketplace customer:", err)
+                        }
                     }
                 }
             }
@@ -692,15 +746,22 @@ export async function processReturnRequestAction(input: unknown) {
             ? (isMpRefund ? "PROCESSING" : data.refundStatus)
             : data.refundStatus
 
+        const useSelectiveReturn = data.returnToInventoryItems !== undefined && data.returnToInventoryItems !== null
+        const pReturnToInventoryForRpc = useSelectiveReturn ? false : data.returnToInventory
+
+        const approvedResolution = request.desired_resolution || request.approved_resolution
+        const isExchange = approvedResolution === "exchange"
+        const pRefundAmountForRpc = isExchange ? 0 : data.refundAmount
+
         const { data: processed, error } = await supabase.rpc("process_return_request", {
             p_request_id: data.requestId,
             p_actor_user_id: user.id,
             p_action: data.action,
             p_next_status: data.nextStatus || null,
-            p_refund_amount: data.refundAmount,
+            p_refund_amount: pRefundAmountForRpc,
             p_refund_status: refundStatus,
             p_refund_payment_method: data.refundPaymentMethod || null,
-            p_return_to_inventory: data.returnToInventory,
+            p_return_to_inventory: pReturnToInventoryForRpc,
             p_store_credit_amount: data.storeCreditAmount,
             p_exchange_items: data.exchangeItems,
             p_exchange_balance_resolution: data.exchangeBalanceResolution || null,
@@ -711,6 +772,78 @@ export async function processReturnRequestAction(input: unknown) {
         if (error) throw error
 
         const result = processed as any
+
+        // Selective inventory return handling
+        let returnToStockItems: { product_id: string; variant_id: string | null; quantity: number }[] = []
+        if (useSelectiveReturn && data.returnToInventoryItems && data.returnToInventoryItems.length > 0) {
+            const { data: dbItems, error: dbItemsErr } = await supabase
+                .from("return_items")
+                .select("product_id, variant_id, quantity")
+                .eq("return_request_id", data.requestId)
+                .in("id", data.returnToInventoryItems)
+
+            if (dbItemsErr) throw dbItemsErr
+
+            returnToStockItems = (dbItems || []).map((item: any) => ({
+                product_id: item.product_id,
+                variant_id: item.variant_id || null,
+                quantity: item.quantity,
+            }))
+        } else if (data.returnToInventory && !useSelectiveReturn) {
+            const { data: dbItems, error: dbItemsErr } = await supabase
+                .from("return_items")
+                .select("product_id, variant_id, quantity")
+                .eq("return_request_id", data.requestId)
+
+            if (dbItemsErr) throw dbItemsErr
+
+            returnToStockItems = (dbItems || []).map((item: any) => ({
+                product_id: item.product_id,
+                variant_id: item.variant_id || null,
+                quantity: item.quantity,
+            }))
+        }
+
+        if (returnToStockItems.length > 0) {
+            const { data: existingMovement } = await supabase
+                .from("stock_movements")
+                .select("id")
+                .eq("source_return_request_id", data.requestId)
+                .limit(1)
+                .maybeSingle()
+
+            if (!existingMovement) {
+                const { data: stockMovementRes, error: stockMovementErr } = await supabase.rpc("create_batch_stock_movement", {
+                    p_partner_id: request.partner_id,
+                    p_direction: "in",
+                    p_reason: "RETURN_IN",
+                    p_notes: "Devolução do cliente",
+                    p_created_by: user.id,
+                    p_items: returnToStockItems,
+                })
+
+                if (stockMovementErr) throw stockMovementErr
+
+                const v_stock_movement_id = stockMovementRes?.id || null
+                if (v_stock_movement_id) {
+                    await supabase
+                        .from("stock_movements")
+                        .update({
+                            source_return_request_id: data.requestId,
+                            reason: "RETURN_IN",
+                            notes: `Devolução do cliente - solicitação DVL-${data.requestId.slice(0, 6).toUpperCase()}`
+                        })
+                        .eq("id", v_stock_movement_id)
+
+                    await supabase
+                        .from("return_requests")
+                        .update({
+                            inventory_movement_id: v_stock_movement_id
+                        })
+                        .eq("id", data.requestId)
+                }
+            }
+        }
 
         // Post-sales Phase 1 adjustment: Cancellation approved/resolved -> Cancel Order + Sync appointments/transactions
         if (request.request_type === "cancellation" && (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED")) {
@@ -801,7 +934,7 @@ export async function processReturnRequestAction(input: unknown) {
         })
 
         await revalidateReturns(data.partnerId, request.order_id, data.requestId)
-        if (data.returnToInventory) await revalidateStockMovements(data.partnerId)
+        if (data.returnToInventory || returnToStockItems.length > 0) await revalidateStockMovements(data.partnerId)
         if (data.refundAmount > 0 || data.storeCreditAmount > 0 || toNumber(result?.exchange_shortfall_amount) > 0 || toNumber(result?.exchange_surplus_amount) > 0) await revalidateTransactions(data.partnerId)
 
         if (buyerId && data.nextStatus) {

@@ -25,6 +25,7 @@ interface CustomerListItemProps {
   onPrefetchMouseEnter?: () => void
   onPrefetchMouseLeave?: () => void
   onPrefetchTouchStart?: () => void
+  showBirthdayBadge?: boolean
 }
 
 const CustomerListItem = React.memo(
@@ -39,13 +40,14 @@ const CustomerListItem = React.memo(
     onPrefetchMouseEnter,
     onPrefetchMouseLeave,
     onPrefetchTouchStart,
+    showBirthdayBadge,
   }: CustomerListItemProps) => {
 
     const renderCellContent = (colId: string) => {
       switch (colId) {
         case "name": {
           const bdayInfo = checkBirthday(customer.birth_date)
-          const birthdayBadge = bdayInfo && (bdayInfo.isToday || bdayInfo.isUpcoming) ? (
+          const birthdayBadge = showBirthdayBadge && bdayInfo && (bdayInfo.isToday || bdayInfo.isUpcoming) ? (
             <Tooltip
               text={bdayInfo.isToday ? "Cliente faz aniversário hoje" : `Cliente faz aniversário em ${bdayInfo.daysUntil} dias`}
             >
@@ -181,7 +183,8 @@ const CustomerListItem = React.memo(
     prev.customer.storeCredit === next.customer.storeCredit &&
     prev.customer.birth_date === next.customer.birth_date &&
     prev.selected === next.selected &&
-    prev.columns === next.columns
+    prev.columns === next.columns &&
+    prev.showBirthdayBadge === next.showBirthdayBadge
 )
 
 CustomerListItem.displayName = "CustomerListItem"

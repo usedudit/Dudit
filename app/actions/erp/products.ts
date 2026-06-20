@@ -758,6 +758,14 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         // Synchronous revalidation and Redis sync to prevent stale data
         await invalidateProductCache(productId, product.partner_id, 'update')
 
+        // Fire-and-forget: low stock notification
+        if (data.stockQuantity !== undefined || data.minStock !== undefined) {
+            const { notifyLowStockAction } = await import("./notifications")
+            notifyLowStockAction(productId).catch((err: Error) =>
+                console.error("[notifications] low stock notification failed", err.message)
+            )
+        }
+
         return successResponse({ ...updatedProduct, ...fiscalPayload, ...logisticsPayload })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -1202,11 +1210,29 @@ export async function unlinkProductSupplierAction(productId: string, supplierId:
     }
 }
 
+export async function updateProductSupplierAction(productId: string, supplierId: string, data: { costPrice?: number | null; supplierSku?: string | null; leadTimeDays?: number | null }) {
+    try {
+        const product = await fetchProductAndVerifyOwnership(productId, "edit")
+        const supabase = await getSupabaseServerClient()
+        const updates: any = {}
+        if (data.costPrice !== undefined) updates.cost_price = data.costPrice
+        if (data.supplierSku !== undefined) updates.supplier_sku = data.supplierSku
+        if (data.leadTimeDays !== undefined) updates.lead_time_days = data.leadTimeDays
+        const { error } = await supabase.from("product_suppliers").update(updates).eq("product_id", productId).eq("supplier_id", supplierId)
+        if (error) return { error: error.message }
+        revalidateSuppliers(product.partner_id)
+        revalidateProducts(product.partner_id, productId)
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
 export const getCachedSuppliers = async (partnerId: string) => {
     return unstable_cache(
         async () => {
             const supabase = getAdminClient()
-            const { data } = await supabase.from("suppliers").select("id, name, email, phone").eq("partner_id", partnerId).order("name")
+            const { data } = await supabase.from("suppliers").select("id, name, email, phone, cnpj, cpf, status").eq("partner_id", partnerId).order("name")
             return data || []
         },
         [`suppliers-list-${partnerId}`],
@@ -1214,8 +1240,227 @@ export const getCachedSuppliers = async (partnerId: string) => {
     )()
 }
 
+export async function getProductSuppliersAction(productId: string) {
+    try {
+        const product = await fetchProductAndVerifyOwnership(productId, "view")
+        const supabase = await getSupabaseServerClient()
+        const { data, error } = await supabase
+            .from("product_suppliers")
+            .select(`
+                id, product_id, supplier_id, cost_price, supplier_sku, lead_time_days,
+                last_purchase_price, last_purchase_date, last_invoice_key,
+                supplier:suppliers!inner(id, name, email, phone, cnpj, cpf)
+            `)
+            .eq("product_id", productId)
+        if (error) return { error: error.message }
+        const suppliers = (data || []).map((ps: any) => ({
+            id: ps.id,
+            product_id: ps.product_id,
+            supplier_id: ps.supplier_id,
+            cost_price: ps.cost_price,
+            supplier_sku: ps.supplier_sku,
+            lead_time_days: ps.lead_time_days,
+            last_purchase_price: ps.last_purchase_price,
+            last_purchase_date: ps.last_purchase_date,
+            last_invoice_key: ps.last_invoice_key,
+            supplier_name: ps.supplier?.name || "",
+            supplier_email: ps.supplier?.email || null,
+            supplier_phone: ps.supplier?.phone || null,
+            supplier_document: ps.supplier?.cnpj || ps.supplier?.cpf || null,
+        }))
+        return { suppliers, partnerId: product.partner_id }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function searchSuppliersAction(partnerId: string, search: string) {
+    try {
+        const supabase = await getSupabaseServerClient()
+        const sanitized = search.replace(/[%_]/g, "")
+        if (!sanitized.trim()) {
+            const { data } = await supabase.from("suppliers").select("id, name, email, phone, cnpj, cpf").eq("partner_id", partnerId).order("name").limit(20)
+            return { suppliers: data || [] }
+        }
+        const term = `%${sanitized}%`
+        const { data, error } = await supabase
+            .from("suppliers")
+            .select("id, name, email, phone, cnpj, cpf")
+            .eq("partner_id", partnerId)
+            .or(`name.ilike.${term},email.ilike.${term},cnpj.ilike.${term},cpf.ilike.${term},phone.ilike.${term}`)
+            .order("name")
+            .limit(20)
+        if (error) return { error: error.message }
+        return { suppliers: data || [] }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
 // ============================================================================
-// OPERAÃ‡Ã•ES EM LOTE E UTILS
+// HISTÓRICO DE COMPRA
+// ============================================================================
+
+export async function getProductPurchaseHistoryAction(
+    productId: string,
+    options?: { limit?: number; offset?: number; supplierId?: string }
+) {
+    try {
+        await fetchProductAndVerifyOwnership(productId, "view")
+        const supabase = await getSupabaseServerClient()
+        const limit = options?.limit || 20
+        const offset = options?.offset || 0
+
+        // Get xml_import_ids and supplier_ids in one pass
+        let query = supabase
+            .from("xml_import_items")
+            .select(`
+                id, raw_quantity, raw_unit_cost, raw_total_cost, raw_name, created_at,
+                xml_import_id,
+                xml_import:xml_imports!inner(id, invoice_number, invoice_date, supplier_id)
+            `, { count: "exact" })
+            .not("match_status", "eq", "skipped")
+            .or(`matched_product_id.eq.${productId},created_product_id.eq.${productId}`)
+            .order("created_at", { ascending: false })
+            .range(offset, offset + limit - 1)
+
+        if (options?.supplierId) {
+            query = query.eq("xml_import.supplier_id", options.supplierId)
+        }
+
+        const { data, error, count } = await query
+        if (error) return { error: error.message }
+
+        // Batch resolve supplier names
+        const supplierIds = [...new Set((data || []).map((i: any) => i.xml_import?.supplier_id).filter(Boolean))]
+        const supplierNameMap: Record<string, string> = {}
+        if (supplierIds.length > 0) {
+            const { data: suppliers } = await supabase.from("suppliers").select("id, name").in("id", supplierIds)
+            if (suppliers) for (const s of suppliers) supplierNameMap[s.id] = s.name
+        }
+
+        const items = (data || []).map((item: any) => ({
+            id: item.id,
+            quantity: item.raw_quantity,
+            unit_cost: item.raw_unit_cost,
+            total_cost: item.raw_total_cost,
+            product_name: item.raw_name,
+            date: item.xml_import?.invoice_date || item.created_at,
+            invoice_number: item.xml_import?.invoice_number || null,
+            supplier_id: item.xml_import?.supplier_id,
+            supplier_name: supplierNameMap[item.xml_import?.supplier_id] || "",
+            created_at: item.created_at,
+        }))
+
+        return { items, total: count || 0 }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function getProductCostHistoryAction(productId: string, limit = 10) {
+    try {
+        await fetchProductAndVerifyOwnership(productId, "view")
+        const supabase = await getSupabaseServerClient()
+        const { data, error } = await supabase
+            .from("purchase_cost_history")
+            .select(`id, previous_cost, new_cost, unit_cost_from_xml, changed_at, invoice_key, supplier_id`)
+            .eq("product_id", productId)
+            .order("changed_at", { ascending: false })
+            .limit(limit)
+        if (error) return { error: error.message }
+
+        const supplierIds = [...new Set((data || []).map((h: any) => h.supplier_id).filter(Boolean))]
+        const supplierNameMap: Record<string, string> = {}
+        if (supplierIds.length > 0) {
+            const { data: suppliers } = await supabase.from("suppliers").select("id, name").in("id", supplierIds)
+            if (suppliers) for (const s of suppliers) supplierNameMap[s.id] = s.name
+        }
+
+        const items = (data || []).map((h: any) => ({
+            id: h.id,
+            previous_cost: h.previous_cost,
+            new_cost: h.new_cost,
+            unit_cost_from_xml: h.unit_cost_from_xml,
+            changed_at: h.changed_at,
+            invoice_key: h.invoice_key,
+            supplier_id: h.supplier_id,
+            supplier_name: supplierNameMap[h.supplier_id] || "",
+        }))
+        return { items }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+// ============================================================================
+// REPOSIÇÃO
+// ============================================================================
+
+export async function getReplenishmentSuggestionsAction(partnerId: string) {
+    try {
+        const user = await requireUser()
+        await requirePermission(partnerId, "products", "view")
+        const supabase = await getSupabaseServerClient()
+
+        const { data, error } = await supabase
+            .from("products")
+            .select(`
+                id, name, sku, gtin, stock_quantity, min_stock, cost_price, unit, images,
+                product_suppliers(supplier_id, cost_price)
+            `)
+            .eq("partner_id", partnerId)
+            .eq("is_active", true)
+            .gt("min_stock", 0)
+            .order("name")
+            .limit(200)
+
+        if (error) return { error: error.message }
+
+        // Filter in-memory: stock_quantity <= min_stock
+        const lowStockProducts = (data || []).filter((p: any) =>
+            (Number(p.stock_quantity) || 0) <= (Number(p.min_stock) || 0)
+        )
+
+        // Batch resolve supplier names
+        const supplierIds = [...new Set(lowStockProducts.flatMap((p: any) =>
+            (p.product_suppliers || []).map((ps: any) => ps.supplier_id).filter(Boolean)
+        ))]
+        const supplierNameMap: Record<string, string> = {}
+        if (supplierIds.length > 0) {
+            const { data: suppliers } = await supabase.from("suppliers").select("id, name").in("id", supplierIds)
+            if (suppliers) for (const s of suppliers) supplierNameMap[s.id] = s.name
+        }
+
+        const suggestions = lowStockProducts.map((p: any) => {
+            const stock = Number(p.stock_quantity) || 0
+            const min = Number(p.min_stock) || 0
+            const suggestion = Math.max(0, min - stock)
+            const primarySupplier = p.product_suppliers?.[0]
+            return {
+                id: p.id,
+                name: p.name,
+                sku: p.sku,
+                gtin: p.gtin,
+                stock_quantity: stock,
+                min_stock: min,
+                suggestion,
+                unit: p.unit || "un",
+                cost_price: p.cost_price,
+                image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null,
+                supplier_name: primarySupplier ? (supplierNameMap[primarySupplier.supplier_id] || null) : null,
+                supplier_cost: primarySupplier?.cost_price || null,
+            }
+        })
+
+        return { suggestions, total: suggestions.length }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+// ============================================================================
+// OPERAÇÕES EM LOTE E UTILS
 // ============================================================================
 
 export async function toggleProductStatusAction(productIds: string[], isActive: boolean) {

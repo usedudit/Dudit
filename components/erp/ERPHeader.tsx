@@ -257,9 +257,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="hidden md:flex">
-                            <NotificationBell variant="erp" />
-                        </div>
+                        <NotificationBell variant="erp" />
 
                         <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
 

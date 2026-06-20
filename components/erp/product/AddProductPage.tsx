@@ -127,6 +127,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const metricsPlanBlocked = !hasMinimumPlan(planSlug, "escalar")
     const metadataPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
     const videoPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+    const suppliersPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
     const isQuick = businessInfo.mode === "quick"
@@ -723,6 +724,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 <Tabs value={activeTab} onValueChange={(v) => {
                     if (v === "variations" && variantsPlanBlocked) { openPlanUpgrade("crescer"); return }
                     if (v === "metrics" && metricsPlanBlocked) { openPlanUpgrade("escalar"); return }
+                    if (v === "suppliers" && suppliersPlanBlocked) { openPlanUpgrade("crescer"); return }
                     setActiveTab(v)
                 }}
                     className="flex flex-col h-full w-full">
@@ -808,8 +810,13 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                         </TabsTrigger>
                                         {!isQuick && (
                                             <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
-                                                Fornecedores
-                                                {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                                <span className="inline-flex items-center gap-2">
+                                                    Fornecedores
+                                                    {suppliersPlanBlocked ? (
+                                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                                    ) : null}
+                                                    {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                                </span>
                                             </TabsTrigger>
                                         )}
                                         {!isQuick && productData.show_in_marketplace && (
@@ -876,7 +883,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando fornecedores...</p>
                                             </div>
                                         ) : (
-                                            <ProductSuppliersTab isEditing={isEditing} productData={productData} />
+                                            <ProductSuppliersTab isEditing={isEditing} productData={productData} partnerId={partnerId} />
                                         )}
                                     </FadeIn>
                                 )}

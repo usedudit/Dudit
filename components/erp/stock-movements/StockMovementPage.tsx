@@ -228,7 +228,19 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     const formattedMovements = useMemo(() => {
         return (loadedMovements || []).map(mov => {
             const dateObj = new Date(mov.created_at);
-            let reason = mov.reason || MOVEMENT_TYPE_LABELS[mov.movement_type] || mov.movement_type;
+            
+            // Translate reason if English (e.g. SALE_OUT, RETURN_IN)
+            let rawReason = mov.reason || MOVEMENT_TYPE_LABELS[mov.movement_type] || mov.movement_type;
+            let reason = rawReason;
+            if (rawReason) {
+                const upperRaw = rawReason.trim().toUpperCase();
+                if (upperRaw === 'SALE_OUT') {
+                    reason = 'Saída por Venda (Troca)';
+                } else if (upperRaw === 'RETURN_IN') {
+                    reason = 'Entrada por Devolução';
+                }
+            }
+
             const orderReference = mov.order_id && mov.orders?.order_number
                 ? `Pedido #${mov.orders.order_number}`
                 : null;
@@ -236,6 +248,27 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                 reason += ` (Pedido #${mov.orders.order_number})`;
             } else if (!mov.reason && mov.reference_name) {
                 reason += ` (${mov.reference_name})`;
+            }
+
+            // Translate and format notes (substituting raw UUIDs with short DVL- prefixes)
+            let notes = mov.notes || '';
+            if (notes.startsWith('Replacement products - source request ')) {
+                const uuidPart = notes.substring('Replacement products - source request '.length);
+                const codePart = uuidPart.length >= 6 ? `DVL-${uuidPart.substring(0, 6).toUpperCase()}` : uuidPart;
+                notes = `Produtos de reposição - solicitação ${codePart}`;
+            } else if (notes.startsWith('Customer return - source request ')) {
+                const uuidPart = notes.substring('Customer return - source request '.length);
+                const codePart = uuidPart.length >= 6 ? `DVL-${uuidPart.substring(0, 6).toUpperCase()}` : uuidPart;
+                notes = `Devolução do cliente - solicitação ${codePart}`;
+            } else {
+                // If notes has raw UUID after "solicitação " (in Portuguese or otherwise)
+                const regex = /solicitação ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+                const match = notes.match(regex);
+                if (match && match[1]) {
+                    const uuid = match[1];
+                    const code = `DVL-${uuid.substring(0, 6).toUpperCase()}`;
+                    notes = notes.replace(uuid, code);
+                }
             }
 
             // Count items from child records or fallback to 1
@@ -261,7 +294,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                 reason,
                 user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',
                 reference: orderReference || mov.reference_name || mov.reference_type || "-",
-                notes: mov.notes || '',
+                notes: notes,
             };
         });
     }, [loadedMovements]);

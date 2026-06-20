@@ -10,6 +10,11 @@ interface TemplateContext {
   time?: string
   reminderLabel?: string
   mixType?: "service" | "both"
+  productName?: string
+  stock?: string
+  minStock?: string
+  count?: string
+  supplierName?: string
 }
 
 export function buildNotificationContent(
@@ -118,6 +123,27 @@ export function buildNotificationContent(
       return {
         title: "Nova mensagem",
         message: `Você recebeu uma nova mensagem${ctx.customerName ? ` de ${ctx.customerName}` : ""}.`,
+      }
+    case "low_stock":
+      return {
+        title: "Estoque baixo",
+        message: ctx.productName
+          ? `${ctx.productName} está com estoque baixo (${ctx.stock || "?"} un.) — mínimo ${ctx.minStock || "?"} un.`
+          : "Alguns produtos estão com estoque abaixo do mínimo.",
+      }
+    case "replenishment_suggested":
+      return {
+        title: "Sugestão de reposição",
+        message: ctx.count
+          ? `${ctx.count} produto(s) precisam de reposição. Confira as sugestões.`
+          : "Há produtos que precisam de reposição.",
+      }
+    case "xml_import_completed":
+      return {
+        title: "Importação XML concluída",
+        message: ctx.count
+          ? `${ctx.count} produto(s) importados com sucesso.`
+          : "A importação de XML foi concluída.",
       }
     case "admin_announcement":
       return {

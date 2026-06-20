@@ -17,6 +17,7 @@ interface CustomerGridCardProps {
     onPrefetchMouseEnter?: () => void
     onPrefetchMouseLeave?: () => void
     onPrefetchTouchStart?: () => void
+    showBirthdayBadge?: boolean
 }
 
 const CustomerGridCard = React.memo(
@@ -30,6 +31,7 @@ const CustomerGridCard = React.memo(
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
+        showBirthdayBadge,
     }: CustomerGridCardProps) => {
 
         return (
@@ -69,7 +71,7 @@ const CustomerGridCard = React.memo(
                                 </Tooltip>
                                 {(() => {
                                     const bdayInfo = checkBirthday(customer.birth_date)
-                                    return bdayInfo && (bdayInfo.isToday || bdayInfo.isUpcoming) ? (
+                                    return showBirthdayBadge && bdayInfo && (bdayInfo.isToday || bdayInfo.isUpcoming) ? (
                                         <Tooltip
                                             text={bdayInfo.isToday ? "Cliente faz aniversário hoje" : `Cliente faz aniversário em ${bdayInfo.daysUntil} dias`}
                                         >
@@ -142,7 +144,8 @@ const CustomerGridCard = React.memo(
         prev.customer.status === next.customer.status &&
         prev.customer.orders === next.customer.orders &&
         prev.customer.totalOrderValue === next.customer.totalOrderValue &&
-        prev.customer.birth_date === next.customer.birth_date
+        prev.customer.birth_date === next.customer.birth_date &&
+        prev.showBirthdayBadge === next.showBirthdayBadge
 )
 
 CustomerGridCard.displayName = "CustomerGridCard"

@@ -36,9 +36,9 @@ import { calculateReturnNetTotal } from "@/lib/returns/calculations"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { useNotification } from "@/hooks/use-notification"
-import AlertModal from "@/components/reusable/AlertModal"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
+import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 
 interface CreateReturnPageProps {
     partnerId: string
@@ -200,6 +200,7 @@ export default function CreateReturnPage({
     const [exchangeStatus, setExchangeStatus] = useState("pending")
     const [pendingSaveData, setPendingSaveData] = useState<(Partial<ReturnRequest> & Record<string, any>) | null>(null)
     const [isInventoryRestoreModalOpen, setIsInventoryRestoreModalOpen] = useState(false)
+    const [selectedInventoryItems, setSelectedInventoryItems] = useState<string[]>([])
     const [isMpWarningModalOpen, setIsMpWarningModalOpen] = useState(false)
     const [mpWarningChecked, setMpWarningChecked] = useState(false)
     const [evidenceImages, setEvidenceImages] = useState<(string | File)[]>([])
@@ -211,6 +212,15 @@ export default function CreateReturnPage({
     const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
     const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
     const [isUploading, setIsUploading] = useState(false)
+    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
+
+    const isConsumidorFinal = useMemo(() => {
+        if (!selectedOrder) return false
+        const name = String(selectedOrder.customer_name || selectedOrder.customer?.name || "").toLowerCase()
+        return name.includes("consumidor final") || name === "consumidor"
+    }, [selectedOrder])
+
+    const checkedItems = useMemo(() => returnItems.filter(item => item.checked), [returnItems])
 
     const isDirty = useMemo(() => {
         if (isViewOnly || isSaving || isUploading) return false
@@ -396,25 +406,34 @@ export default function CreateReturnPage({
         )
     }, [returnItems])
 
-    useEffect(() => {
-        if (resolutionType === "refund" && refundType === "full") {
-            setRefundValue(calculatedRefundValue)
-        } else if (resolutionType !== "refund" || refundType === "none") {
-            setRefundValue(0)
-        }
-        if (resolutionType === "store_credit" && creditType === "full") {
-            setCreditValue(calculatedRefundValue)
-        } else if (resolutionType !== "store_credit") {
-            setCreditValue(0)
-        }
-    }, [calculatedRefundValue, creditType, refundType, resolutionType])
-
     const replacementTotal = useMemo(() => {
         return replacementItems.reduce((sum, item) => sum + Number(item.product.price || 0) * item.quantity, 0)
     }, [replacementItems])
 
     const exchangeDifference = useMemo(() => Math.max(0, replacementTotal - calculatedRefundValue), [calculatedRefundValue, replacementTotal])
     const exchangeSurplus = useMemo(() => Math.max(0, calculatedRefundValue - replacementTotal), [calculatedRefundValue, replacementTotal])
+
+    useEffect(() => {
+        if (resolutionType === "refund") {
+            if (refundType === "full") {
+                setRefundValue(calculatedRefundValue)
+            }
+        } else if (resolutionType === "exchange" && exchangeBalanceResolution === "refund") {
+            setRefundValue(exchangeSurplus)
+        } else {
+            setRefundValue(0)
+        }
+
+        if (resolutionType === "store_credit") {
+            if (creditType === "full") {
+                setCreditValue(calculatedRefundValue)
+            }
+        } else if (resolutionType === "exchange" && exchangeBalanceResolution === "store_credit") {
+            setCreditValue(exchangeSurplus)
+        } else {
+            setCreditValue(0)
+        }
+    }, [calculatedRefundValue, creditType, refundType, resolutionType, exchangeBalanceResolution, exchangeSurplus])
 
     const addReplacementProduct = useCallback((product: ProductBucketItem) => {
         setReplacementItems(prev => {
@@ -435,12 +454,35 @@ export default function CreateReturnPage({
         setReplacementItems(prev => prev.filter((_, itemIndex) => itemIndex !== index))
     }, [])
 
-    const completeSave = useCallback((returnToInventory: boolean) => {
+    const completeSave = useCallback((returnToInventoryItems: string[] | null) => {
         if (!pendingSaveData) return
-        onSave({ ...pendingSaveData, returnToInventory })
+        onSave({
+            ...pendingSaveData,
+            returnToInventory: returnToInventoryItems !== null && returnToInventoryItems.length > 0,
+            returnToInventoryItems,
+        })
         setPendingSaveData(null)
         setIsInventoryRestoreModalOpen(false)
     }, [onSave, pendingSaveData])
+
+    const handleSelectCustomer = useCallback((customer: any) => {
+        setSelectedOrder((prev: any) => {
+            if (!prev) return null
+            return {
+                ...prev,
+                buyer_id: customer.id,
+                customer_name: customer.name,
+                customer: {
+                    ...prev.customer,
+                    id: customer.id,
+                    name: customer.name,
+                    email: customer.email || "",
+                    phone: customer.phone || "",
+                }
+            }
+        })
+        setIsCustomerSheetOpen(false)
+    }, [])
 
     const handleConfirmMpWarning = useCallback(() => {
         setIsMpWarningModalOpen(false)
@@ -454,16 +496,16 @@ export default function CreateReturnPage({
             ["cancellation", "return", "exchange"].includes(returnRequest.requestType || "return")
 
         if (shouldAskInventoryRestore) {
+            setSelectedInventoryItems(checkedItems.map(i => i.id))
             setIsInventoryRestoreModalOpen(true)
             return
         }
 
-        onSave({ ...pendingSaveData, returnToInventory: false })
+        onSave({ ...pendingSaveData, returnToInventory: false, returnToInventoryItems: null })
         setPendingSaveData(null)
-    }, [mode, returnRequest, pendingSaveData, onSave])
+    }, [mode, returnRequest, pendingSaveData, onSave, checkedItems])
 
     const handleFormSubmit = async () => {
-        const checkedItems = returnItems.filter(item => item.checked)
         if (checkedItems.length === 0) return
 
         setIsUploading(true)
@@ -564,7 +606,7 @@ export default function CreateReturnPage({
 
             const isMpAutomaticRefund =
                 returnStatus === "APPROVED" &&
-                resolutionType === "refund" &&
+                (resolutionType === "refund" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "refund")) &&
                 refundPaymentMethod === "Mercado Pago" &&
                 isMercadoPagoOrder
 
@@ -584,11 +626,12 @@ export default function CreateReturnPage({
 
             if (shouldAskInventoryRestore) {
                 setPendingSaveData(payload)
+                setSelectedInventoryItems(checkedItems.map(i => i.id))
                 setIsInventoryRestoreModalOpen(true)
                 return
             }
 
-            onSave({ ...payload, returnToInventory: false })
+            onSave({ ...payload, returnToInventory: false, returnToInventoryItems: null })
         } catch (err) {
             console.error("Error saving return request:", err)
         } finally {
@@ -596,9 +639,19 @@ export default function CreateReturnPage({
         }
     }
 
-    const isSaveDisabled = isSaving || isUploading || !selectedOrder || returnItems.filter(item => item.checked).length === 0 || isViewOnly
+    const isSaveDisabled =
+        isSaving ||
+        isUploading ||
+        !selectedOrder ||
+        returnItems.filter(item => item.checked).length === 0 ||
+        isViewOnly ||
+        (isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")))
 
-    const pageTitle = mode === "create" ? "Nova devolução" : mode === "edit" ? "Editar devolução" : "Detalhes da devolução"
+    const pageTitle = mode === "create"
+        ? "Nova devolução"
+        : mode === "edit"
+            ? `Editar devolução DVL-${returnRequest?.id.slice(0, 6).toUpperCase()}`
+            : `Detalhes da devolução DVL-${returnRequest?.id.slice(0, 6).toUpperCase()}`
 
     return (
         <FadeIn>
@@ -1251,7 +1304,7 @@ export default function CreateReturnPage({
                                                             />
 
                                                             <FormDropdown
-                                                                label="Request status"
+                                                                label="Status da solicitação"
                                                                 disabled={isViewOnly}
                                                                 value={returnStatus}
                                                                 setValue={(val) => setReturnStatus(val as ReturnRequest["status"])}
@@ -1266,7 +1319,7 @@ export default function CreateReturnPage({
                                                             />
 
                                                             <FormDropdown
-                                                                label="Resolution type"
+                                                                label="Tipo de resolução"
                                                                 disabled={isViewOnly || isMarketplaceRequest}
                                                                 value={resolutionType}
                                                                 setValue={(val) => setResolutionType(val as any)}
@@ -1279,10 +1332,34 @@ export default function CreateReturnPage({
                                                                 ]}
                                                             />
 
+                                                            {isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")) && (
+                                                                <div className="md:col-span-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl">
+                                                                    <div className="flex items-start gap-3 min-w-0">
+                                                                        <AlertCircleIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                                                        <div className="min-w-0">
+                                                                            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                                                                                Cliente não cadastrado
+                                                                            </p>
+                                                                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+                                                                                Este pedido está vinculado a um "Consumidor Final". Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema.
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-100/50 dark:text-amber-300 dark:border-amber-800"
+                                                                        onClick={() => setIsCustomerSheetOpen(true)}
+                                                                        type="button"
+                                                                    >
+                                                                        Vincular Cliente
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+
                                                             {resolutionType === "refund" && (
                                                                 <>
                                                                     <FormDropdown
-                                                                        label="Refund type"
+                                                                        label="Tipo de reembolso"
                                                                         disabled={isViewOnly}
                                                                         value={refundType || "partial"}
                                                                         setValue={(val) => setRefundType(val as ReturnRequest["refundType"])}
@@ -1293,7 +1370,7 @@ export default function CreateReturnPage({
                                                                         ]}
                                                                     />
                                                                     <MoneyInput
-                                                                        label="Refund value"
+                                                                        label="Valor do reembolso"
                                                                         disabled={refundType === "full" || refundType === "none" || isViewOnly}
                                                                         value={refundValue}
                                                                         onChange={(val) => setRefundValue(Math.min(Number(val || 0), calculatedRefundValue))}
@@ -1324,7 +1401,7 @@ export default function CreateReturnPage({
                                                             {resolutionType === "store_credit" && (
                                                                 <>
                                                                     <FormDropdown
-                                                                        label="Credit type"
+                                                                        label="Tipo do vale-compra"
                                                                         disabled={isViewOnly}
                                                                         value={creditType}
                                                                         setValue={(val) => setCreditType(val as "full" | "partial")}
@@ -1334,7 +1411,7 @@ export default function CreateReturnPage({
                                                                         ]}
                                                                     />
                                                                     <MoneyInput
-                                                                        label="Store credit amount"
+                                                                        label="Valor do vale-compra"
                                                                         disabled={creditType === "full" || isViewOnly}
                                                                         value={creditValue}
                                                                         onChange={(val) => setCreditValue(Math.min(Number(val || 0), calculatedRefundValue))}
@@ -1346,7 +1423,7 @@ export default function CreateReturnPage({
                                                                 <>
                                                                     <div ref={replacementSearchRef} className="relative md:col-span-2">
                                                                         <Input
-                                                                            label="Replacement products"
+                                                                            label="Produtos de reposição"
                                                                             disabled={isViewOnly}
                                                                             value={productBucket.searchQuery}
                                                                             onChange={(event) => {
@@ -1484,16 +1561,58 @@ export default function CreateReturnPage({
                                                                         </div>
                                                                     </div>
                                                                     {exchangeSurplus > 0 && (
-                                                                        <FormDropdown
-                                                                            label="Destino do saldo"
-                                                                            disabled={isViewOnly}
-                                                                            value={exchangeBalanceResolution}
-                                                                            setValue={(val) => setExchangeBalanceResolution(val as "store_credit" | "refund")}
-                                                                            options={[
-                                                                                { value: "store_credit", label: "Gerar vale-compra" },
-                                                                                { value: "refund", label: "Gerar reembolso" }
-                                                                            ]}
-                                                                        />
+                                                                        <>
+                                                                            <FormDropdown
+                                                                                label="Destino do saldo"
+                                                                                disabled={isViewOnly}
+                                                                                value={exchangeBalanceResolution}
+                                                                                setValue={(val) => setExchangeBalanceResolution(val as "store_credit" | "refund")}
+                                                                                options={[
+                                                                                    { value: "store_credit", label: "Gerar vale-compra" },
+                                                                                    { value: "refund", label: "Gerar reembolso" }
+                                                                                ]}
+                                                                            />
+                                                                            {exchangeBalanceResolution === "refund" && (
+                                                                                <>
+                                                                                    <FormDropdown
+                                                                                        label="Tipo de reembolso"
+                                                                                        disabled={true}
+                                                                                        value="full"
+                                                                                        setValue={() => { }}
+                                                                                        options={[
+                                                                                            { value: "full", label: "Integral (Saldo restante)" },
+                                                                                            { value: "partial", label: "Parcial" }
+                                                                                        ]}
+                                                                                    />
+                                                                                    <MoneyInput
+                                                                                        label="Valor do reembolso"
+                                                                                        disabled={true}
+                                                                                        value={exchangeSurplus}
+                                                                                        onChange={() => { }}
+                                                                                    />
+                                                                                    <FormDropdown
+                                                                                        label="Método de reembolso"
+                                                                                        disabled={isViewOnly || isMercadoPagoOrder}
+                                                                                        value={refundPaymentMethod}
+                                                                                        setValue={(val) => setRefundPaymentMethod(val)}
+                                                                                        options={
+                                                                                            isMercadoPagoOrder
+                                                                                                ? [
+                                                                                                    { value: "Mercado Pago", label: "Mercado Pago (Automático)" },
+                                                                                                    { value: "pix", label: "Pix (Manual)" },
+                                                                                                    { value: "credit_card", label: "Cartão de Crédito (Manual)" },
+                                                                                                    { value: "other", label: "Outro (Manual)" }
+                                                                                                ]
+                                                                                                : [
+                                                                                                    { value: "pix", label: "Pix" },
+                                                                                                    { value: "credit_card", label: "Cartão de Crédito" },
+                                                                                                    { value: "other", label: "Outro" }
+                                                                                                ]
+                                                                                        }
+                                                                                    />
+                                                                                </>
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </>
                                                             )}
@@ -1587,18 +1706,108 @@ export default function CreateReturnPage({
                 />
             )}
 
-            <AlertModal
+            <DefaultModal
                 isOpen={isInventoryRestoreModalOpen}
+                onClose={() => {
+                    setPendingSaveData(null)
+                    setIsInventoryRestoreModalOpen(false)
+                }}
                 title="Restaurar itens ao estoque?"
-                description="Escolha se os itens desta solicitacao devem voltar ao estoque. A movimentacao sera registrada como RETURN_IN."
-                confirmText="Restaurar estoque"
-                cancelText="Nao restaurar"
-                variant="info"
-                onConfirm={() => completeSave(true)}
-                onClose={() => completeSave(false)}
-                disabled={isSaving}
-                isLoading={isSaving}
-            />
+                maxWidth="lg"
+            >
+                <div className="flex flex-col gap-4">
+                    <p className="text-brand-inactive-text dark:text-dark-body text-sm leading-relaxed">
+                        Selecione quais dos itens devolvidos devem retornar ao estoque.
+                    </p>
+
+                    {/* Table-like list of items */}
+                    <div className="border border-brand-border/40 dark:border-dark-border/40 rounded-xl overflow-hidden mt-2">
+                        {/* Header */}
+                        <div className="bg-brand-gray dark:bg-dark-border/20 px-4 py-3 flex items-center justify-between border-b border-brand-border/40 dark:border-dark-border/40 text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+                            <div className="flex items-center gap-3">
+                                <Checkbox
+                                    checked={checkedItems.length > 0 && selectedInventoryItems.length === checkedItems.length}
+                                    onChange={(checked) => {
+                                        if (checked) {
+                                            setSelectedInventoryItems(checkedItems.map(i => i.id))
+                                        } else {
+                                            setSelectedInventoryItems([])
+                                        }
+                                    }}
+                                />
+                                <span>Item</span>
+                            </div>
+                            <span className="pr-2">Quantidade</span>
+                        </div>
+
+                        {/* Rows */}
+                        <div className="divide-y divide-brand-border/40 dark:divide-dark-border/40 max-h-[300px] overflow-y-auto custom-scrollbar">
+                            {checkedItems.map((item) => {
+                                const isChecked = selectedInventoryItems.includes(item.id)
+                                return (
+                                    <div key={item.id} className="px-4 py-3 flex items-center justify-between hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <Checkbox
+                                                checked={isChecked}
+                                                onChange={(checked) => {
+                                                    setSelectedInventoryItems(prev =>
+                                                        checked ? [...prev, item.id] : prev.filter(id => id !== item.id)
+                                                    )
+                                                }}
+                                            />
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-brand-border/40 dark:border-dark-border/40 shrink-0 bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center">
+                                                <img
+                                                    src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                    alt={item.productName}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                    {item.productName}
+                                                </p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                                    SKU: {item.sku || "Sem SKU"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading px-3 py-1 bg-brand-gray dark:bg-dark-border/30 rounded-lg shrink-0">
+                                            {item.quantity} {item.quantity === 1 ? "unidade" : "unidades"}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setPendingSaveData(null)
+                                setIsInventoryRestoreModalOpen(false)
+                            }}
+                            disabled={isSaving}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={() => completeSave([])}
+                            variant="outline"
+                            className="text-brand-red hover:bg-brand-red-light hover:border-brand-red"
+                            disabled={isSaving}
+                        >
+                            Não retornar nenhum
+                        </Button>
+                        <Button
+                            onClick={() => completeSave(selectedInventoryItems)}
+                            disabled={isSaving}
+                        >
+                            {isSaving ? "Salvando..." : "Confirmar e salvar"}
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
 
             <DefaultModal
                 isOpen={isMpWarningModalOpen}
@@ -1679,11 +1888,10 @@ export default function CreateReturnPage({
                         </Button>
                         <Button
                             onClick={handleConfirmMpWarning}
-                            className={`flex-1 h-[46px] text-white border-none transition-colors ${
-                                mpWarningChecked
-                                    ? "bg-emerald-600 hover:bg-emerald-700"
-                                    : "bg-emerald-600/50 cursor-not-allowed opacity-50"
-                            }`}
+                            className={`flex-1 h-[46px] text-white border-none transition-colors ${mpWarningChecked
+                                ? "bg-emerald-600 hover:bg-emerald-700"
+                                : "bg-emerald-600/50 cursor-not-allowed opacity-50"
+                                }`}
                             disabled={!mpWarningChecked || isSaving}
                         >
                             Confirmar Estorno
@@ -1698,6 +1906,16 @@ export default function CreateReturnPage({
                 onCancel={cancelNavigation}
                 description="Você tem alterações na devolução que ainda não foram salvas."
             />
+
+            {isCustomerSheetOpen && (
+                <SelectCustomerSheet
+                    isOpen={isCustomerSheetOpen}
+                    onClose={() => setIsCustomerSheetOpen(false)}
+                    partnerId={partnerId}
+                    onSelect={handleSelectCustomer}
+                    selectedCustomerId={selectedOrder?.buyer_id}
+                />
+            )}
         </FadeIn>
     )
 }

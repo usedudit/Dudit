@@ -86,7 +86,7 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                {`RET-${returnRequest.id.slice(0, 6).toUpperCase()}`}
+                {`DVL-${returnRequest.id.slice(0, 6).toUpperCase()}`}
               </span>
               <Badge variant={statusMeta.variant} className="w-fit mt-0.5 text-[10px] py-0 px-1.5">
                 {statusMeta.label}

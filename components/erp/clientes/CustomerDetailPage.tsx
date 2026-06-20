@@ -15,6 +15,7 @@ import { formatCurrency, formatDate, checkBirthday, formatDateToBR } from '@/lib
 import { FadeIn } from '@/components/animations/FadeIn';
 import { getBirthdayCouponCodeAction, sendBirthdayNotificationAction } from '@/app/actions/erp/birthday';
 import { usePlanUpgrade, planStarIconForTarget } from '@/components/erp/subscription/PlanUpgradeModal';
+import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
 
@@ -66,7 +67,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
     const handleCreateBirthdayCoupon = useCallback(async () => {
         const planSlug = customer.planSlug || "free";
-        if (planSlug.toLowerCase() === "free") {
+        if (!hasMinimumPlan(planSlug, "crescer")) {
             openPlanUpgrade("crescer");
             return;
         }
@@ -79,6 +80,11 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     }, [customer.partner_id, customer.planSlug, realCustomerId, router, notifyError, openPlanUpgrade]);
 
     const handleSendWhatsAppBirthday = useCallback(async () => {
+        const planSlug = customer.planSlug || "free";
+        if (!hasMinimumPlan(planSlug, "crescer")) {
+            openPlanUpgrade("crescer");
+            return;
+        }
         const phone = customer.phone || customer.mobile;
         if (!phone) {
             notifyError("O cliente não possui um número de celular cadastrado.");
@@ -96,9 +102,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         } catch (err) {
             notifyError("Erro ao gerar link de WhatsApp.");
         }
-    }, [customer, notifyError]);
+    }, [customer, notifyError, openPlanUpgrade]);
 
     const handleSendNotificationBirthday = useCallback(async () => {
+        const planSlug = customer.planSlug || "free";
+        if (!hasMinimumPlan(planSlug, "crescer")) {
+            openPlanUpgrade("crescer");
+            return;
+        }
         setIsSendingNotification(true);
         try {
             const res = await sendBirthdayNotificationAction(realCustomerId, customer.partner_id || "");
@@ -116,7 +127,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         } finally {
             setIsSendingNotification(false);
         }
-    }, [realCustomerId, customer.partner_id, notifySuccess, notifyError]);
+    }, [realCustomerId, customer.partner_id, customer.planSlug, notifySuccess, notifyError, openPlanUpgrade]);
 
     const renderBirthdayCard = () => {
         if (!bdayInfo || (!bdayInfo.isToday && !bdayInfo.isUpcoming)) return null;
@@ -138,7 +149,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     >
                         <span className="flex items-center gap-1.5">
                             Criar cupom
-                            {(customer.planSlug || "free").toLowerCase() === "free" && planStarIconForTarget("crescer") && (
+                            {!hasMinimumPlan(customer.planSlug || "free", "crescer") && planStarIconForTarget("crescer") && (
                                 <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain invert brightness-0 dark:invert-0 dark:brightness-100" />
                             )}
                         </span>
@@ -148,7 +159,12 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                         variant="outline"
                         onClick={handleSendWhatsAppBirthday}
                     >
-                        Enviar WhatsApp
+                        <span className="flex items-center gap-1.5">
+                            Enviar WhatsApp
+                            {!hasMinimumPlan(customer.planSlug || "free", "crescer") && planStarIconForTarget("crescer") && (
+                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                            )}
+                        </span>
                     </Button>
                     <Button
                         size="sm"
@@ -156,7 +172,12 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                         onClick={handleSendNotificationBirthday}
                         isLoading={isSendingNotification}
                     >
-                        Enviar notificação
+                        <span className="flex items-center gap-1.5">
+                            Enviar notificação
+                            {!hasMinimumPlan(customer.planSlug || "free", "crescer") && planStarIconForTarget("crescer") && (
+                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                            )}
+                        </span>
                     </Button>
                 </div>
             </section>

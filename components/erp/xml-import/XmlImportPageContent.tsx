@@ -8,6 +8,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import Pagination from "@/components/reusable/Pagination"
 import { useNotification } from "@/hooks/use-notification"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useRouter } from "next/navigation"
 import { useStore } from "@/lib/store-context"
@@ -38,6 +39,7 @@ interface ImportItem {
 interface XmlImportPageContentProps {
   partnerId: string
   initialImports: ImportItem[]
+  planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }
 
 const ITEMS_PER_PAGE = 10
@@ -59,10 +61,11 @@ const COLUMNS = [
   { id: "actions" as const, label: "Ações", align: "center" as const, width: "80px" },
 ]
 
-export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPageContentProps) {
+export function XmlImportPageContent({ partnerId, initialImports, planGate }: XmlImportPageContentProps) {
   const { selectedStore } = useStore()
   const storeId = selectedStore?.id || ""
   const { success: notifySuccess, error: notifyError } = useNotification()
+  const { openPlanUpgrade } = usePlanUpgrade()
   const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
   const router = useRouter()
 
@@ -194,6 +197,26 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
     setShowUploadModal(false)
     setPendingUploadId(importId)
   }, [])
+
+  if (planGate) {
+    return (
+      <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+        <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+          <IconPlaceholder
+            placeholderType="image"
+            imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+            imageAlt="Recurso bloqueado"
+            title="Importação XML (NF-e)"
+            subtitle="Importe produtos de notas fiscais eletrônicas. Disponível nos planos Crescer e Escalar."
+            itemButton={{
+              text: "Fazer upgrade",
+              action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+            }}
+          />
+        </div>
+      </FadeIn>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -910,7 +933,20 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                                 <span className="text-xs text-brand-inactive-text">Custo: R$ {Number(item.raw_unit_cost).toFixed(4)}</span>
                                 <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
                               </div>
-                              {item.match_method && <p className="text-xs text-brand-green mt-1">Match por {item.match_method}</p>}
+                              <div className="flex items-center gap-2 mt-1">
+                                {item.match_method && <p className="text-xs text-brand-green">Match por {item.match_method}</p>}
+                                {item.match_confidence != null && (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                    item.match_confidence >= 0.9
+                                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                      : item.match_confidence >= 0.7
+                                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                        : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                  }`}>
+                                    {Math.round(item.match_confidence * 100)}%
+                                  </span>
+                                )}
+                              </div>
                               {conflicts.map((c: any, i: number) => (
                                 <div key={i} className="flex items-center gap-1.5 mt-1 text-xs">
                                   {c.campo === "fornecedor_diferente" ? (

@@ -8,6 +8,8 @@ import { useStore } from "@/lib/store-context"
 import { getERPCustomersPageAction, getCustomerByIdAction, type ERPCustomerListCursor } from "@/app/actions/erp/customers"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { usePermissions } from "@/lib/permission-context"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 // Components
 import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal, SelectionBanner } from "@/components/reusable"
@@ -93,6 +95,8 @@ export default function CustomersPage({
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
+    const { planSlug } = usePermissions()
+    const showBirthdayBadge = hasMinimumPlan(planSlug, "crescer")
 
     const queryKey = useMemo(() => ["erp", "customers", partnerId] as const, [partnerId])
 
@@ -535,6 +539,7 @@ export default function CustomersPage({
                                                                 onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                 onPrefetchMouseLeave={prefetch.onMouseLeave}
                                                                 onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                showBirthdayBadge={showBirthdayBadge}
                                                             />
                                                         )
                                                     })}
@@ -608,6 +613,7 @@ export default function CustomersPage({
                                                                             onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                             onPrefetchMouseLeave={prefetch.onMouseLeave}
                                                                             onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                            showBirthdayBadge={showBirthdayBadge}
                                                                         />
                                                                     )
                                                                 })}

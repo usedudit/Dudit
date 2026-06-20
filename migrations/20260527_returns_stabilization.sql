@@ -577,7 +577,7 @@ BEGIN
         UPDATE public.stock_movements
         SET source_return_request_id = p_request_id,
             reason = 'RETURN_IN',
-            notes = COALESCE(notes, 'Devolução do cliente - solicitação ' || p_request_id::TEXT)
+            notes = COALESCE(notes, 'Devolução do cliente - solicitação DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)))
         WHERE id = v_stock_movement_id;
       END IF;
     END IF;
@@ -749,7 +749,7 @@ BEGIN
       v_exchange_difference := GREATEST(0, v_exchange_total - v_max_action_amount);
       v_exchange_surplus := GREATEST(0, v_max_action_amount - v_exchange_total);
 
-      SELECT COALESCE(v_request.order_number_snapshot, 'EX') || '-EX' ||
+      SELECT COALESCE(v_request.order_number_snapshot, 'EX') || '-DVL' ||
              (COALESCE(COUNT(*), 0) + 1)::TEXT
       INTO v_exchange_order_number
       FROM public.orders
@@ -789,7 +789,7 @@ BEGIN
         CASE WHEN v_exchange_difference > 0 THEN 'pending' ELSE 'paid' END,
         'not_sent',
         'Troca',
-        'Pedido gerado pela troca ' || p_request_id::TEXT,
+        'Pedido gerado pela troca DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)),
         id,
         p_request_id,
         NOW(),
@@ -844,7 +844,7 @@ BEGIN
           v_request.partner_id,
           'out',
           'SALE_OUT',
-          'Produtos de reposição - solicitação ' || p_request_id::TEXT,
+          'Produtos de reposição - solicitação DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)),
           p_actor_user_id,
           v_items
         );

@@ -72,6 +72,8 @@ import {
 } from "@/lib/icons"
 
 import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
+import { ReplenishmentSheet } from "./ReplenishmentSheet"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 // --- CONSTANTES ---
 const UNIDADES_MEDIDA = UNITS.map(unit => ({ codigo: unit, descricao: unit }))
@@ -288,6 +290,7 @@ export default function ProductsPage({
         bulkInactive: false
     })
     const [modals, setModals] = useState({ filter: false, import: false })
+    const [showReplenishment, setShowReplenishment] = useState(false)
     const { exportData, isExporting } = useErpExport()
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [isCameraOpen, setIsCameraOpen] = useState(false)
@@ -792,6 +795,17 @@ export default function ProductsPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="outline"
+                                        className="text-brand-orange border-brand-orange/30 hover:bg-brand-orange/5"
+                                        onClick={() => {
+                                            if (hasMinimumPlan(planSlug, "escalar")) setShowReplenishment(true)
+                                            else openPlanUpgrade("escalar")
+                                        }}
+                                        leftIcon={<PackageIcon size={18} />}
+                                    >
+                                        Sugestões
+                                    </Button>
                                     <Dropdown
                                         trigger={
                                             <Button variant="outline">
@@ -845,6 +859,11 @@ export default function ProductsPage({
                                     hasActiveFilters={hasActiveFilters}
                                     onScanBarcode={handleScanBarcode}
                                     onOpenCamera={() => setIsCameraOpen(true)}
+                                    onOpenReplenishment={() => {
+                                        if (hasMinimumPlan(planSlug, "escalar")) setShowReplenishment(true)
+                                        else openPlanUpgrade("escalar")
+                                    }}
+                                    hasEscalarPlan={hasMinimumPlan(planSlug, "escalar")}
                                 />
                             )}
 
@@ -1110,6 +1129,12 @@ export default function ProductsPage({
             )}
 
             <SavingStatusModal isOpen={actionModal.open} text={actionModal.text || "Salvando..."} />
+
+            <ReplenishmentSheet
+                isOpen={showReplenishment}
+                onClose={() => setShowReplenishment(false)}
+                partnerId={partnerId}
+            />
 
             {showLabelModal && (
                 <LabelPrintModal

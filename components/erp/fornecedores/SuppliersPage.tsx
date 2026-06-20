@@ -31,6 +31,7 @@ import {
   FileTextIcon,
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 interface Supplier {
   id: string
@@ -70,13 +71,16 @@ export default function SuppliersPage({
   initialSuppliers = [],
   initialNextCursor,
   initialHasMore,
+  planGate,
 }: {
   partnerId: string
   initialSuppliers?: any[]
   initialNextCursor: ERPSupplierListCursor | null
   initialHasMore: boolean
+  planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }) {
   const { toast } = useToast()
+  const { openPlanUpgrade } = usePlanUpgrade()
   const isMobile = useMediaQuery("(max-width: 767px)")
   const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -322,6 +326,26 @@ export default function SuppliersPage({
     }
     setIsProcessingBulk(false)
     setSelection(p => ({ ...p, ids: new Set() }))
+  }
+
+  if (planGate) {
+    return (
+      <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+        <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+          <IconPlaceholder
+            placeholderType="image"
+            imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+            imageAlt="Recurso bloqueado"
+            title="Fornecedores"
+            subtitle="Gerencie seus fornecedores e relacione produtos. Disponível nos planos Crescer e Escalar."
+            itemButton={{
+              text: "Fazer upgrade",
+              action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+            }}
+          />
+        </div>
+      </FadeIn>
+    )
   }
 
   return (

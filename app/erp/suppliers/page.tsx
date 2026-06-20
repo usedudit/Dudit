@@ -1,6 +1,7 @@
 import SuppliersPage from "@/components/erp/fornecedores/SuppliersPage"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPermission } from "@/lib/permissions/access"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -10,13 +11,18 @@ export default async function SuppliersRoute() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
+
+  const plan = await getPartnerPlan(partnerId)
+  const isFreePlan = plan.slug.toLowerCase() === "free"
+  const planGate = isFreePlan ? { requiredPlanSlug: "crescer" as const } : undefined
+
   const [{ allowed }, page] = await Promise.all([
     checkPermission(partnerId, "suppliers", "view"),
-    getERPSuppliersPageAction(partnerId, { cursor: null, limit: 100 }),
+    !isFreePlan ? getERPSuppliersPageAction(partnerId, { cursor: null, limit: 100 }) : { success: true as const, items: [] as any[], error: undefined as string | undefined },
   ])
 
   if (!allowed) return <AccessDenied />
-  if (!page.success) {
+  if (!isFreePlan && !page.success) {
     throw new Error(page.error || "Erro ao carregar fornecedores.")
   }
 
@@ -26,9 +32,10 @@ export default async function SuppliersRoute() {
       <FadeIn className="p-4">
         <SuppliersPage
           partnerId={partnerId}
-          initialSuppliers={page.items || []}
-          initialNextCursor={page.nextCursor}
-          initialHasMore={page.hasMore}
+          initialSuppliers={!isFreePlan ? (page as any).items || [] : []}
+          initialNextCursor={!isFreePlan ? (page as any).nextCursor : null}
+          initialHasMore={!isFreePlan ? (page as any).hasMore : false}
+          planGate={planGate}
         />
       </FadeIn>
     </>

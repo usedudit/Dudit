@@ -13,6 +13,9 @@ export const NOTIFICATION_TYPES = [
   "subscription_renewed",
   "message_received",
   "admin_announcement",
+  "low_stock",
+  "replenishment_suggested",
+  "xml_import_completed",
 ] as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]
@@ -23,6 +26,7 @@ export type NotificationEntityType =
   | "subscription"
   | "message"
   | "announcement"
+  | "product"
   | null
 
 export interface NotificationRecord {

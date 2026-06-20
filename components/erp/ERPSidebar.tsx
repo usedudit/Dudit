@@ -146,6 +146,8 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/promotions": "escalar",
     "/erp/goals": "crescer",
     "/erp/returns": "crescer",
+    "/erp/suppliers": "crescer",
+    "/erp/xml-import": "crescer",
 }
 
 function ErpPlanGatedNavItem({

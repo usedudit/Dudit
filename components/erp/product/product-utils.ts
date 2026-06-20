@@ -1,18 +1,9 @@
-export const getStockStatus = (stock: number, min = 10) => {
+export const getStockStatus = (stock: number, min?: number | null) => {
   if (stock <= 0)
-    return {
-      label: "Esgotado",
-      variant: "red" as const,
-    }
-  if (stock < min)
-    return {
-      label: "Baixo",
-      variant: "orange" as const,
-    }
-  return {
-    label: "Normal",
-    variant: "green" as const,
-  }
+    return { label: "Esgotado", variant: "red" as const }
+  if (min && min > 0 && stock <= min)
+    return { label: "Baixo", variant: "orange" as const }
+  return { label: "Normal", variant: "green" as const }
 }
 
 import { formatCurrency as centralizedFormatCurrency } from "@/lib/utils"

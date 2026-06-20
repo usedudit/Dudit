@@ -266,6 +266,49 @@ async function matchProduct(
     }
   }
 
+  // Fallback: broader name similarity without NCM restriction
+  if (product.nome) {
+    const { data: allProducts } = await supabase
+      .from("products")
+      .select("id, name, gtin, stock_quantity, cost_price, unit")
+      .eq("partner_id", partnerId)
+      .limit(100)
+
+    if (allProducts && allProducts.length > 0) {
+      const MAX_DIST = Math.max(3, Math.floor(product.nome.length * 0.4))
+      let best: any = null
+      let bestSim = 0
+
+      for (const prod of allProducts) {
+        const dist = levenshtein(product.nome.toLowerCase(), prod.name.toLowerCase())
+        const sim = 1 - dist / Math.max(product.nome.length, prod.name.length)
+        if (sim > bestSim && sim > 0.5) {
+          // Require at least some word overlap to avoid false positives
+          const xmlWords = new Set(product.nome.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2))
+          const prodWords = new Set(prod.name.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2))
+          const overlap = [...xmlWords].filter((w: string) => prodWords.has(w)).length
+          if (overlap > 0 || sim > 0.7) {
+            best = prod
+            bestSim = sim
+          }
+        }
+      }
+
+      if (best) {
+        const details = await loadProductDetails(supabase, best.id, xmlSupplierId)
+        const conflicts = detectConflicts(product, best, details, xmlSupplierId)
+        return {
+          productId: best.id,
+          productName: best.name,
+          method: "similarity_broad",
+          confidence: Math.round(bestSim * 100) / 100,
+          matchStatus: "similar",
+          conflicts,
+        }
+      }
+    }
+  }
+
   return { productId: null, productName: null, method: null, confidence: null, matchStatus: "new", conflicts: null }
 }
 
@@ -922,6 +965,26 @@ export async function confirmImportAction(
           }
         }
       }
+    }
+
+    // Fire-and-forget: notification for team
+    const { getPartnerTeamUserIds, createNotificationsForUsers, buildIdempotencyKey } = await import("@/lib/services/notification.service")
+    const { buildNotificationContent } = await import("@/lib/notifications/templates")
+    const userIds = await getPartnerTeamUserIds(partnerId)
+    if (result.imported > 0 && userIds.length > 0) {
+      const { title, message } = buildNotificationContent("xml_import_completed", "seller", {
+        count: String(result.imported),
+      })
+      createNotificationsForUsers(userIds, (uid) => ({
+        userId: uid,
+        type: "xml_import_completed" as const,
+        title,
+        message,
+        entityType: "product" as const,
+        entityId: xmlImportId,
+        data: { imported: result.imported, skipped: result.skipped, invoiceNumber: xmlImport.invoice_number },
+        idempotencyKey: buildIdempotencyKey("xml_import_completed", "xml_import", xmlImportId, uid),
+      })).catch((err: Error) => console.error("[notifications] xml_import_completed failed", err.message))
     }
 
     return {

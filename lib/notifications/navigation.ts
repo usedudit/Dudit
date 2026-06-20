@@ -43,5 +43,10 @@ export function getNotificationHref(params: {
     return `/erp/integrations/whatsapp`
   }
 
+  if (entityType === "product") {
+    if (entityId) return `/erp/products?product=${encodeURIComponent(entityId)}`
+    return "/erp/products"
+  }
+
   return "/"
 }

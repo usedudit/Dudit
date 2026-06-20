@@ -10,6 +10,22 @@ export default function ERPErrorBoundary({
 }) {
     useEffect(() => {
         console.error("ERP Error Boundary caught:", error)
+
+        const isChunkError =
+            error.name === "ChunkLoadError" ||
+            error.message?.includes("ChunkLoadError") ||
+            error.message?.includes("Loading chunk") ||
+            error.message?.includes("Failed to fetch dynamically imported module")
+
+        if (isChunkError) {
+            const lastReload = sessionStorage.getItem("last-chunk-error-reload")
+            const now = Date.now()
+            // Only reload if we haven't reloaded in the last 10 seconds to prevent infinite reload loops
+            if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+                sessionStorage.setItem("last-chunk-error-reload", now.toString())
+                window.location.reload()
+            }
+        }
     }, [error])
 
     const msg = error.message?.toLowerCase() || ""

@@ -142,3 +142,13 @@ export interface ProductSupplier {
   supplier_sku: string | null
   lead_time_days: number | null
 }
+
+export interface ProductSupplierWithDetails extends ProductSupplier {
+  supplier_name: string
+  supplier_email: string | null
+  supplier_phone: string | null
+  supplier_document: string | null
+  last_purchase_price: number | null
+  last_purchase_date: string | null
+  last_invoice_key: string | null
+}

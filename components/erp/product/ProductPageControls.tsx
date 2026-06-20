@@ -53,6 +53,8 @@ interface ProductPageControlsProps {
     hasActiveFilters: boolean
     onScanBarcode?: (code: string) => void
     onOpenCamera?: () => void
+    onOpenReplenishment?: () => void
+    hasEscalarPlan?: boolean
 }
 
 const ProductPageControls: React.FC<ProductPageControlsProps> = ({
@@ -71,6 +73,8 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
     hasActiveFilters,
     onScanBarcode,
     onOpenCamera,
+    onOpenReplenishment,
+    hasEscalarPlan,
 }) => {
     // Estado local para o scroll dos filtros (badges)
     const filtersContainerRef = useRef<HTMLDivElement>(null)
@@ -253,6 +257,15 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                             showChevron={false}
                             className="w-fit"
                         >
+                            <DropdownItem onClick={onOpenReplenishment}>
+                                <div className="flex items-center gap-2">
+                                    <PackageIcon size={14} className={hasEscalarPlan ? "" : "text-brand-inactive-text"} />
+                                    <span>Sugestões de Reposição</span>
+                                    {!hasEscalarPlan && (
+                                        <span className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 px-1.5 py-0.5 rounded ml-auto">Premium</span>
+                                    )}
+                                </div>
+                            </DropdownItem>
                             <DropdownItem onClick={onOpenCamera}>
                                 <CameraIcon size={14} /> Escanear Câmera
                             </DropdownItem>

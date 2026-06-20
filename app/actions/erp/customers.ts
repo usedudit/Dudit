@@ -518,7 +518,7 @@ export async function getCustomerByIdAction(customerId: string) {
   const { data: customer } = await supabase
     .from("customers")
     .select(`
-      id, partner_id, name, email, phone, mobile, phone_fixed, status, person_type,
+      id, partner_id, name, email, phone, phone_fixed, status, person_type,
       cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
       store_credit, notes, birth_date, mother_name, father_name, website,
       created_at, zip_code, street, number, complement, neighborhood,
@@ -543,6 +543,9 @@ export async function getCustomerByIdAction(customerId: string) {
   const { getPartnerPlan } = await import("@/lib/services/subscription.service")
   const plan = await getPartnerPlan(customer.partner_id)
   customer.planSlug = plan?.slug || "free"
+
+  // Dynamically add mobile property for compatibility with frontend components
+  ;(customer as any).mobile = customer.phone
 
   return { customer }
 }

@@ -46,6 +46,9 @@ export const NOTIFICATION_CATEGORIES = {
       "order_shipped",
       "appointment_confirmed",
       "appointment_reminder",
+      "low_stock",
+      "replenishment_suggested",
+      "xml_import_completed",
     ] as NotificationType[],
   },
 } as const
@@ -61,7 +64,7 @@ export const CATEGORY_LABELS: Record<NotificationCategoryKey, string> = {
 export const CATEGORY_DESCRIPTIONS: Record<NotificationCategoryKey, string> = {
   customer: "Notificações que você recebe como comprador",
   seller: "Notificações que você recebe como vendedor",
-  system: "Avisos importantes da plataforma",
+  system: "Avisos importantes da plataforma e alertas do sistema",
 }
 
 export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
@@ -79,4 +82,7 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   subscription_renewed: "Assinatura renovada",
   message_received: "Nova mensagem",
   admin_announcement: "Comunicados",
+  low_stock: "Estoque baixo",
+  replenishment_suggested: "Sugestões de reposição",
+  xml_import_completed: "Importação XML concluída",
 }

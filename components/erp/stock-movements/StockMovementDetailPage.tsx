@@ -99,6 +99,36 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
     const data = movement;
     const isIn = data.type === 'in';
 
+    const rawReason = data.reason;
+    let reason = rawReason;
+    if (rawReason) {
+        const upperRaw = rawReason.trim().toUpperCase();
+        if (upperRaw === 'SALE_OUT') {
+            reason = 'Saída por Venda (Troca)';
+        } else if (upperRaw === 'RETURN_IN') {
+            reason = 'Entrada por Devolução';
+        }
+    }
+
+    let notes = data.notes || '';
+    if (notes.startsWith('Replacement products - source request ')) {
+        const uuidPart = notes.substring('Replacement products - source request '.length);
+        const codePart = uuidPart.length >= 6 ? `DVL-${uuidPart.substring(0, 6).toUpperCase()}` : uuidPart;
+        notes = `Produtos de reposição - solicitação ${codePart}`;
+    } else if (notes.startsWith('Customer return - source request ')) {
+        const uuidPart = notes.substring('Customer return - source request '.length);
+        const codePart = uuidPart.length >= 6 ? `DVL-${uuidPart.substring(0, 6).toUpperCase()}` : uuidPart;
+        notes = `Devolução do cliente - solicitação ${codePart}`;
+    } else {
+        const regex = /solicitação ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+        const match = notes.match(regex);
+        if (match && match[1]) {
+            const uuid = match[1];
+            const code = `DVL-${uuid.substring(0, 6).toUpperCase()}`;
+            notes = notes.replace(uuid, code);
+        }
+    }
+
     const displayItems: MovementItemData[] = data.items && data.items.length > 0
         ? data.items
         : data.product
@@ -265,21 +295,21 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     message={
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Motivo</span>
-                                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{data.reason || "-"}</span>
+                                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{reason || "-"}</span>
                                         </div>
                                     }
                                 />
                             </div>
 
                             {/* Notes Section */}
-                            {data.notes && (
+                            {notes && (
                                 <div>
                                     <InfoCard
                                         color="orange"
                                         message={
                                             <div className="flex flex-col">
                                                 <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
-                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{data.notes}</span>
+                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
                                             </div>
                                         }
                                     />

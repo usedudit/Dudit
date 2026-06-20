@@ -30,7 +30,7 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onDelete,
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-            {`RET-${returnRequest.id.slice(0, 6).toUpperCase()}`}
+            {`DVL-${returnRequest.id.slice(0, 6).toUpperCase()}`}
           </h3>
           <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
             {returnRequest.customerName}
