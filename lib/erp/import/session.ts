@@ -16,15 +16,15 @@ export async function createImportSession(
   const sessionId = crypto.randomUUID()
   const key = buildKey(partnerId, sessionId)
   const session: ImportSession = { ...data, createdAt: new Date().toISOString() }
-  const payload = JSON.stringify(session)
 
-  const sizeBytes = new TextEncoder().encode(payload).length
+  const payloadPreview = JSON.stringify(session)
+  const sizeBytes = new TextEncoder().encode(payloadPreview).length
   if (sizeBytes > 900_000) {
     console.warn(`[ImportSession] Session payload large: ${(sizeBytes / 1024).toFixed(1)} KB — rows=${data.rows.length}, headers=${data.headers.length}`)
   }
 
   try {
-    await redis.setex(key, TTL, payload)
+    await redis.set(key, session, { ex: TTL })
     console.log(`[ImportSession] Created session ${sessionId} for partner ${partnerId} (${sizeBytes} bytes, ${data.rows.length} rows, TTL ${TTL}s)`)
   } catch (err) {
     console.error(`[ImportSession] Failed to store session ${sessionId}:`, err)
@@ -39,23 +39,15 @@ export async function getImportSession(
   sessionId: string,
 ): Promise<ImportSession | null> {
   const key = buildKey(partnerId, sessionId)
-  let raw: string | null = null
   try {
-    raw = await redis.get<string>(key)
+    const data = await redis.get<ImportSession>(key)
+    if (!data) {
+      console.warn(`[ImportSession] Session not found in Redis — key=${key}, partnerId=${partnerId}, sessionId=${sessionId}`)
+      return null
+    }
+    return data
   } catch (err) {
     console.error(`[ImportSession] Redis GET error for key ${key}:`, err)
-    return null
-  }
-
-  if (!raw) {
-    console.warn(`[ImportSession] Session not found in Redis — key=${key}, partnerId=${partnerId}, sessionId=${sessionId}`)
-    return null
-  }
-
-  try {
-    return JSON.parse(raw) as ImportSession
-  } catch (err) {
-    console.error(`[ImportSession] Failed to parse session JSON for key ${key}:`, err)
     return null
   }
 }

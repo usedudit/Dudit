@@ -73,6 +73,7 @@ export async function getERPQuotesPageAction(
                     created_by_user_id,
                     created_at,
                     updated_at,
+                    public_token,
                     customers (id, name, email),
                     items_count:quote_items(count)
                 `
@@ -86,6 +87,7 @@ export async function getERPQuotesPageAction(
                     customer_id,
                     created_at,
                     updated_at,
+                    public_token,
                     customers (id, name, email),
                     items_count:quote_items(count)
                 `
@@ -1931,10 +1933,10 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
 export async function getPublicQuoteAction(publicToken: string, ip?: string, userAgent?: string) {
     return withTelemetry("getPublicQuoteAction", async () => {
         try {
-            const supabase = await getSupabaseServerClient()
+            const admin = getAdminClient()
 
             // 1. Fetch quote by public_token
-            let { data: quote, error: quoteErr } = await supabase
+            let { data: quote, error: quoteErr } = await admin
                 .from("quotes")
                 .select(`
                     *,
@@ -1951,7 +1953,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
 
             // 1b. Fallback: try by quote id (UUID)
             if (!quote && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(publicToken)) {
-                const { data: quoteById } = await supabase
+                const { data: quoteById } = await admin
                     .from("quotes")
                     .select(`
                         *,
@@ -1969,9 +1971,8 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     quote = quoteById
                     // Auto-generate public_token if missing
                     if (!quote.public_token) {
-                        const admin = getAdminClient()
                         await admin.from("quotes").update({ public_token: crypto.randomUUID() }).eq("id", quote.id)
-                        const { data: refreshed } = await supabase.from("quotes").select("public_token").eq("id", quote.id).single()
+                        const { data: refreshed } = await admin.from("quotes").select("public_token").eq("id", quote.id).single()
                         if (refreshed?.public_token) quote.public_token = refreshed.public_token
                     }
                 }
@@ -1979,9 +1980,8 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
 
             // 1c. Auto-generate public_token if quote exists but has none
             if (quote && !quote.public_token) {
-                const admin = getAdminClient()
                 await admin.from("quotes").update({ public_token: crypto.randomUUID() }).eq("id", quote.id)
-                const { data: refreshed } = await supabase.from("quotes").select("public_token").eq("id", quote.id).single()
+                const { data: refreshed } = await admin.from("quotes").select("public_token").eq("id", quote.id).single()
                 if (refreshed?.public_token) quote.public_token = refreshed.public_token
             }
 
@@ -1998,7 +1998,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 (quote.status === "draft" || quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed")
             ) {
                 // Transition to expired
-                const { error: expireErr } = await supabase
+                const { error: expireErr } = await admin
                     .from("quotes")
                     .update({
                         status: "expired",
@@ -2021,7 +2021,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             // 3. Debounced view updates
             let statusChangedToViewed = false
             if (quote.status === "sent" || quote.status === "pending_client") {
-                const { error: viewStatusErr } = await supabase
+                const { error: viewStatusErr } = await admin
                     .from("quotes")
                     .update({
                         status: "viewed",
@@ -2047,7 +2047,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
 
                 if (!lastViewed || lastViewed < fiveMinutesAgo) {
-                    await supabase
+                    await admin
                         .from("quotes")
                         .update({
                             last_viewed_at: new Date().toISOString(),
@@ -2075,7 +2075,6 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             }
 
             // 4. Fetch interactions using admin client to bypass RLS for public guests
-            const admin = getAdminClient()
             const { data: interactions } = await admin
                 .from("quote_interactions")
                 .select("*")

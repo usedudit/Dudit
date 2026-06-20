@@ -1029,7 +1029,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                     <ShareModal
                         isOpen={showShareModal}
                         onClose={() => setShowShareModal(false)}
-                        url={typeof window !== "undefined" ? `${window.location.origin}/print/orcamento/${quoteId}` : ""}
+                        url={typeof window !== "undefined" ? `${window.location.origin}/quote/${quote.public_token || quoteId}` : ""}
                         title={`Orçamento ${quote.quote_number || quoteId}`}
                         shareMessage={`Confira a proposta comercial de ${partnerName}`}
                         label="Link do orçamento"

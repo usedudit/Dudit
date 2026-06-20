@@ -16,6 +16,7 @@ import { FadeIn } from '@/components/animations/FadeIn';
 import { getBirthdayCouponCodeAction, sendBirthdayNotificationAction } from '@/app/actions/erp/birthday';
 import { usePlanUpgrade, planStarIconForTarget } from '@/components/erp/subscription/PlanUpgradeModal';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
+import { usePermissions } from '@/lib/permission-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
 
@@ -41,6 +42,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const realCustomerId = customer.originalId || customer.id;
     const { success: notifySuccess, error: notifyError } = useNotification();
     const { openPlanUpgrade } = usePlanUpgrade();
+    const { planSlug } = usePermissions();
     const [activeTab, setActiveTab] = useState('General');
     const [isScrolled, setIsScrolled] = useState(false);
     const isMobile = useMediaQuery("(max-width: 767px)");
@@ -66,7 +68,6 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [isSendingNotification, setIsSendingNotification] = useState(false);
 
     const handleCreateBirthdayCoupon = useCallback(async () => {
-        const planSlug = customer.planSlug || "free";
         if (!hasMinimumPlan(planSlug, "crescer")) {
             openPlanUpgrade("crescer");
             return;
@@ -77,10 +78,9 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         } catch (err) {
             notifyError("Erro ao iniciar criação do cupom.");
         }
-    }, [customer.partner_id, customer.planSlug, realCustomerId, router, notifyError, openPlanUpgrade]);
+    }, [customer.partner_id, planSlug, realCustomerId, router, notifyError, openPlanUpgrade]);
 
     const handleSendWhatsAppBirthday = useCallback(async () => {
-        const planSlug = customer.planSlug || "free";
         if (!hasMinimumPlan(planSlug, "crescer")) {
             openPlanUpgrade("crescer");
             return;
@@ -93,7 +93,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
         const formattedPhone = phone.replace(/\D/g, "");
         const phoneWithCountry = formattedPhone.startsWith("55") || formattedPhone.length > 11 ? formattedPhone : `55${formattedPhone}`;
-        
+
         try {
             const couponCode = await getBirthdayCouponCodeAction(customer.partner_id || "");
             const message = `Olá ${customer.name}! 🎉\n\nFeliz aniversário!\n\nPreparamos um presente para você.\n\nUse o cupom:\n${couponCode}\ne aproveite seu desconto especial.\n\nDesejamos um excelente dia! 🎂`;
@@ -102,10 +102,9 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         } catch (err) {
             notifyError("Erro ao gerar link de WhatsApp.");
         }
-    }, [customer, notifyError, openPlanUpgrade]);
+    }, [customer, planSlug, notifyError, openPlanUpgrade]);
 
     const handleSendNotificationBirthday = useCallback(async () => {
-        const planSlug = customer.planSlug || "free";
         if (!hasMinimumPlan(planSlug, "crescer")) {
             openPlanUpgrade("crescer");
             return;
@@ -127,7 +126,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         } finally {
             setIsSendingNotification(false);
         }
-    }, [realCustomerId, customer.partner_id, customer.planSlug, notifySuccess, notifyError, openPlanUpgrade]);
+    }, [realCustomerId, customer.partner_id, planSlug, notifySuccess, notifyError, openPlanUpgrade]);
 
     const renderBirthdayCard = () => {
         if (!bdayInfo || (!bdayInfo.isToday && !bdayInfo.isUpcoming)) return null;
@@ -149,7 +148,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     >
                         <span className="flex items-center gap-1.5">
                             Criar cupom
-                            {!hasMinimumPlan(customer.planSlug || "free", "crescer") && planStarIconForTarget("crescer") && (
+                            {!hasMinimumPlan(planSlug, "crescer") && planStarIconForTarget("crescer") && (
                                 <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain invert brightness-0 dark:invert-0 dark:brightness-100" />
                             )}
                         </span>
@@ -161,7 +160,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     >
                         <span className="flex items-center gap-1.5">
                             Enviar WhatsApp
-                            {!hasMinimumPlan(customer.planSlug || "free", "crescer") && planStarIconForTarget("crescer") && (
+                            {!hasMinimumPlan(planSlug, "crescer") && planStarIconForTarget("crescer") && (
                                 <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
                             )}
                         </span>
@@ -174,7 +173,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     >
                         <span className="flex items-center gap-1.5">
                             Enviar notificação
-                            {!hasMinimumPlan(customer.planSlug || "free", "crescer") && planStarIconForTarget("crescer") && (
+                            {!hasMinimumPlan(planSlug, "crescer") && planStarIconForTarget("crescer") && (
                                 <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
                             )}
                         </span>
@@ -255,14 +254,43 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         fetchAddress();
     }, [realCustomerId]);
 
+    const [fetchedReviews, setFetchedReviews] = useState<any[] | null>(null);
+    const [isLoadingReviews, setIsLoadingReviews] = useState(false);
 
+    useEffect(() => {
+        setFetchedReviews(null);
+    }, [realCustomerId]);
+
+    useEffect(() => {
+        if (activeTab === "Review" && fetchedReviews === null && !isLoadingReviews) {
+            const fetchReviews = async () => {
+                setIsLoadingReviews(true);
+                try {
+                    const res = await fetch(`/api/marketplace/customer-reviews?customerId=${realCustomerId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setFetchedReviews(data.reviews || []);
+                    } else {
+                        setFetchedReviews([]);
+                    }
+                } catch (e) {
+                    console.error("Error fetching reviews:", e);
+                    setFetchedReviews([]);
+                } finally {
+                    setIsLoadingReviews(false);
+                }
+            };
+            fetchReviews();
+        }
+    }, [activeTab, fetchedReviews, isLoadingReviews, realCustomerId]);
 
     const stats = useMemo(() => {
-        const totalOrders = fetchedOrders.length;
-        const totalSpent = fetchedOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
+        const nonCancelledOrders = fetchedOrders.filter(o => o.situation !== "cancelled");
+        const totalOrders = nonCancelledOrders.length;
+        const totalSpent = nonCancelledOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
         const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0;
-        const lastOrderDate = totalOrders > 0 && fetchedOrders[0]?.createdAt
-            ? formatDate(fetchedOrders[0].createdAt)
+        const lastOrderDate = totalOrders > 0 && nonCancelledOrders[0]?.createdAt
+            ? formatDate(nonCancelledOrders[0].createdAt)
             : '-';
         return { totalOrders, totalSpent, avgOrder, lastOrderDate };
     }, [fetchedOrders]);
@@ -407,6 +435,15 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                 /* Tablet/Mobile: Customer Info */
                                                 <div className="mb-8">
                                                     {renderBirthdayCard()}
+
+                                                    {/* KPI Stats Row for Tablet/Mobile */}
+                                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                                        <KPICard title="Pedidos" value={stats.totalOrders} />
+                                                        <KPICard title="Total Gasto" value={stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00"} />
+                                                        <KPICard title="Valor médio" value={stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00"} />
+                                                        <KPICard title="Última Compra" value={stats.lastOrderDate} />
+                                                    </div>
+
                                                     <div className="flex items-center gap-3 mb-6">
                                                         <UserProfileImage
                                                             fullName={customer.name || "Cliente"}
@@ -544,7 +581,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                     <TabsContent value="Review" className="mt-0">
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                            <ReviewsContent customerId={realCustomerId} />
+                                            <ReviewsContent reviews={fetchedReviews || []} isLoading={isLoadingReviews} />
                                         </motion.div>
                                     </TabsContent>
                                 </div>
@@ -590,7 +627,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-3">
+                                                    <div className="space-y-1">
                                                         <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -950,25 +987,9 @@ const OrdersContent = ({
 
 /* ── Reviews Content ──────────────────────────────────────────── */
 
-function ReviewsContent({ customerId }: { customerId: string }) {
-    const [reviews, setReviews] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/marketplace/customer-reviews?customerId=${customerId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setReviews(data.reviews || []);
-                }
-            } catch (e) {
-                console.error("Error fetching reviews:", e);
-            } finally {
-                setIsLoading(false);
-            }
-        })();
-    }, [customerId]);
+function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boolean }) {
+    const [page, setPage] = useState(1);
+    const itemsPerPage = 5;
 
     if (isLoading) {
         return (
@@ -990,9 +1011,12 @@ function ReviewsContent({ customerId }: { customerId: string }) {
         )
     }
 
+    const totalPages = Math.ceil(reviews.length / itemsPerPage);
+    const paginatedReviews = reviews.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
     return (
         <div className="space-y-4">
-            {reviews.map((review: any) => (
+            {paginatedReviews.map((review: any) => (
                 <div
                     key={review.id}
                     className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-5"
@@ -1026,6 +1050,12 @@ function ReviewsContent({ customerId }: { customerId: string }) {
                     </div>
                 </div>
             ))}
+
+            {totalPages > 1 && (
+                <div className="flex justify-center mt-6 w-full">
+                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                </div>
+            )}
         </div>
     )
 }

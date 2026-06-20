@@ -407,7 +407,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-3">
+                                                    <div className="space-y-1">
                                                         <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Fornecedor desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -460,7 +460,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                     {supplierAddress ? (
                                                         <div className="space-y-6">
                                                             <div>
-                                                                <div 
+                                                                <div
                                                                     className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group"
                                                                     onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(supplierAddress)}`, '_blank')}
                                                                 >
@@ -474,7 +474,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                                 <div className="mb-0">
                                                                     <div className="flex justify-between items-start mb-1">
                                                                         <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
-                                                                        <button 
+                                                                        <button
                                                                             onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(supplierAddress)}`, '_blank')}
                                                                             className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0"
                                                                         >

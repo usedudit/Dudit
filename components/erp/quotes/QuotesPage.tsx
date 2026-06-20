@@ -392,7 +392,7 @@ export default function QuotesPage({
     }, [])
 
     const handleShareQuote = useCallback((quote: any) => {
-        const shareUrl = `${window.location.origin}/print/orcamento/${quote.originalId || quote.id}`;
+        const shareUrl = `${window.location.origin}/quote/${quote.public_token || quote.originalId || quote.id}`;
         if (navigator.share) {
             navigator.share({
                 title: `Orçamento ${quote.quote_number || quote.displayId || quote.id}`,
