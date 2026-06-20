@@ -478,6 +478,33 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         />
                                                     )}
                                                     {(() => {
+                                                        const isSinglePayment = !detail.installmentBreakdown?.length && !detail.isRecurring;
+                                                        const hasFeesOrDiscount = !!((detail.interestAmount && detail.interestAmount > 0) || (detail.discountAmount && detail.discountAmount > 0));
+                                                        if (!isSinglePayment || !hasFeesOrDiscount) return null;
+                                                        return (
+                                                            <>
+                                                                {detail.originalAmount !== null && detail.originalAmount !== undefined && detail.originalAmount > 0 && (
+                                                                    <PaymentRow
+                                                                        label="Valor original"
+                                                                        value={<span className="text-brand-inactive-text dark:text-dark-body font-bold text-sm">{formatCurrency(detail.originalAmount)}</span>}
+                                                                    />
+                                                                )}
+                                                                {detail.interestAmount !== null && detail.interestAmount !== undefined && detail.interestAmount > 0 && (
+                                                                    <PaymentRow
+                                                                        label="Juros / Taxas"
+                                                                        value={<span className="text-brand-red font-bold text-sm">+ {formatCurrency(detail.interestAmount)}</span>}
+                                                                    />
+                                                                )}
+                                                                {detail.discountAmount !== null && detail.discountAmount !== undefined && detail.discountAmount > 0 && (
+                                                                    <PaymentRow
+                                                                        label="Desconto"
+                                                                        value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(detail.discountAmount)}</span>}
+                                                                    />
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                    {(() => {
                                                         const isPaid = String(detail.statusLabel || "").toLowerCase() === "pago" || String(detail.statusLabel || "").toLowerCase() === "recebido" || detail.timeline.step2.active;
 
                                                         return (

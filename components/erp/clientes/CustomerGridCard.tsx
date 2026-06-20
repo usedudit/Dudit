@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, checkBirthday } from "@/lib/utils";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface CustomerGridCardProps {
@@ -54,7 +54,7 @@ const CustomerGridCard = React.memo(
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         {/* Linha 1: Nome + Badge Status + Checkbox */}
                         <div className="flex justify-between items-start gap-1">
-                            <div className="flex items-center min-w-0 pr-1 gap-2">
+                            <div className="flex flex-wrap items-center min-w-0 pr-1 gap-2">
                                 <h3
                                     className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate"
                                     title={customer.name}
@@ -67,6 +67,18 @@ const CustomerGridCard = React.memo(
                                         className="whitespace-nowrap scale-90 shrink-0"
                                     />
                                 </Tooltip>
+                                {(() => {
+                                    const bdayInfo = checkBirthday(customer.birth_date)
+                                    return bdayInfo && (bdayInfo.isToday || bdayInfo.isUpcoming) ? (
+                                        <Tooltip
+                                            text={bdayInfo.isToday ? "Cliente faz aniversário hoje" : `Cliente faz aniversário em ${bdayInfo.daysUntil} dias`}
+                                        >
+                                            <Badge variant={bdayInfo.isToday ? "purple" : "blue"} icon={null} className="select-none scale-90 shrink-0">
+                                                🎂 {bdayInfo.isToday ? "Aniversário Hoje" : `Em ${bdayInfo.daysUntil} dias`}
+                                            </Badge>
+                                        </Tooltip>
+                                    ) : null
+                                })()}
                             </div>
 
                             {/* Checkbox com stopPropagation */}
@@ -129,7 +141,8 @@ const CustomerGridCard = React.memo(
         prev.customer.name === next.customer.name &&
         prev.customer.status === next.customer.status &&
         prev.customer.orders === next.customer.orders &&
-        prev.customer.totalOrderValue === next.customer.totalOrderValue
+        prev.customer.totalOrderValue === next.customer.totalOrderValue &&
+        prev.customer.birth_date === next.customer.birth_date
 )
 
 CustomerGridCard.displayName = "CustomerGridCard"

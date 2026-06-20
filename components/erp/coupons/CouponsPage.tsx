@@ -40,6 +40,7 @@ import {
     getCouponUsageSummary,
     getCouponValueLabel,
     mapCouponToForm,
+    ScopeCustomer,
 } from "@/lib/types/coupon"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ShareModal } from "@/components/marketplace/ShareModal"
@@ -47,6 +48,9 @@ import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { useSearchParams } from "next/navigation"
+import { getTodayYmdSaoPaulo } from "@/lib/utils"
+import { getCustomerByIdAction } from "@/app/actions/erp/customers"
 
 type FilterState = {
     discountType: string[]
@@ -95,6 +99,10 @@ export default function CouponsPage({
     const { canCreate, canEdit, canDelete } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
+    const searchParams = useSearchParams()
+    const autoCreate = searchParams?.get("create") === "true"
+    const autoCode = searchParams?.get("code")
+    const autoCustomerId = searchParams?.get("customerId")
 
     const canCreateCoupons = canCreate("marketing_coupons")
     const canEditCoupons = canEdit("marketing_coupons")
@@ -510,6 +518,54 @@ export default function CouponsPage({
             return { ...prev, customerIds, customers: Array.from(combinedMap.values()) }
         })
     }, [scopeData.customers])
+
+    useEffect(() => {
+        if (autoCreate && autoCode && autoCustomerId) {
+            resetRelations()
+ 
+            const todayStr = getTodayYmdSaoPaulo()
+            const today = new Date(todayStr + "T12:00:00")
+            const endsAtDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+            const endsAtStr = `${endsAtDate.getFullYear()}-${String(endsAtDate.getMonth() + 1).padStart(2, "0")}-${String(endsAtDate.getDate()).padStart(2, "0")}`
+ 
+            const prefilledForm: CouponFormState = {
+                ...DEFAULT_COUPON_FORM,
+                code: autoCode.toUpperCase(),
+                discountType: "percentage",
+                discountValue: 10,
+                customerScope: "specific",
+                usagePerCustomerEnabled: true,
+                usagePerCustomer: 1,
+                unlimitedDate: false,
+                startsAt: todayStr,
+                endsAt: endsAtStr,
+                isActive: true,
+            }
+            setForm(prefilledForm)
+            setWrapperMode("create")
+ 
+            ensureScopeData().then((scope) => {
+                const foundCustomer = scope.customers.find((c) => c.id === autoCustomerId)
+                if (foundCustomer) {
+                    setSelectedCustomerIds([autoCustomerId], foundCustomer)
+                } else {
+                    getCustomerByIdAction(autoCustomerId).then((res: any) => {
+                        if (res.customer) {
+                            const scopeCustomer: ScopeCustomer = {
+                                id: res.customer.id,
+                                name: res.customer.name,
+                                email: res.customer.email,
+                                phone: res.customer.phone || null,
+                                status: "ativo",
+                                avatarUrl: null,
+                            }
+                            setSelectedCustomerIds([autoCustomerId], scopeCustomer)
+                        }
+                    }).catch(console.error)
+                }
+            }).catch(console.error)
+        }
+    }, [autoCreate, autoCode, autoCustomerId, ensureScopeData, setSelectedCustomerIds, resetRelations])
 
     const saveCoupon = useCallback(async () => {
         const payload = {

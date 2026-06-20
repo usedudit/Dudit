@@ -518,7 +518,7 @@ export async function getCustomerByIdAction(customerId: string) {
   const { data: customer } = await supabase
     .from("customers")
     .select(`
-      id, name, email, phone, mobile, phone_fixed, status, person_type,
+      id, partner_id, name, email, phone, mobile, phone_fixed, status, person_type,
       cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
       store_credit, notes, birth_date, mother_name, father_name, website,
       created_at, zip_code, street, number, complement, neighborhood,
@@ -539,6 +539,10 @@ export async function getCustomerByIdAction(customerId: string) {
       // keep encrypted
     }
   }
+
+  const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+  const plan = await getPartnerPlan(customer.partner_id)
+  customer.planSlug = plan?.slug || "free"
 
   return { customer }
 }
@@ -647,7 +651,7 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
     const { data: customers, error } = await supabase
       .from("customers")
-      .select("id, name, email, phone, cpf, status, store_credit, created_at, store_id, partner_id, person_type")
+      .select("id, name, email, phone, cpf, status, store_credit, created_at, store_id, partner_id, person_type, birth_date")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
       .limit(500)
@@ -793,7 +797,7 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, name, email, phone, status, store_credit, created_at, store_id, cpf, person_type, cnpj")
+      .select("id, name, email, phone, status, store_credit, created_at, store_id, cpf, person_type, cnpj, birth_date")
       .eq("partner_id", partnerId)
 
     if (options?.storeId) {

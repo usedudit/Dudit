@@ -322,7 +322,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     products: withSpecific(viewOnly, { can_adjust_stock: false, can_import_products: false }),
     stock_movements: viewOnly,
     import_notes: noAccess,
-    suppliers: noAccess,
+    suppliers: crud,
     cadastros_produtos: viewOnly,
     // Serviços - view only (cannot create/edit services)
     // Agendamentos - create/edit, update status, no cancel

@@ -2,8 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils";
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
+import { formatCurrency, checkBirthday } from "@/lib/utils";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface ColumnDef {
@@ -43,23 +43,38 @@ const CustomerListItem = React.memo(
 
     const renderCellContent = (colId: string) => {
       switch (colId) {
-        case "name":
+        case "name": {
+          const bdayInfo = checkBirthday(customer.birth_date)
+          const birthdayBadge = bdayInfo && (bdayInfo.isToday || bdayInfo.isUpcoming) ? (
+            <Tooltip
+              text={bdayInfo.isToday ? "Cliente faz aniversário hoje" : `Cliente faz aniversário em ${bdayInfo.daysUntil} dias`}
+            >
+              <Badge variant={bdayInfo.isToday ? "purple" : "blue"} icon={null} className="select-none ml-2 shrink-0 scale-90">
+                🎂 {bdayInfo.isToday ? "Aniversário Hoje" : `Em ${bdayInfo.daysUntil} dias`}
+              </Badge>
+            </Tooltip>
+          ) : null
+
           return (
             <div className="flex items-center gap-3 text-left">
               <UserProfileImage
                 fullName={customer.name || "Cliente"}
                 className="w-10 h-10 text-[14px]"
               />
-              <div className="flex flex-col">
-                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
-                  {customer.name}
-                </span>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center">
+                  <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[150px] xl:max-w-[250px]">
+                    {customer.name}
+                  </span>
+                  {birthdayBadge}
+                </div>
                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                   ID {customer.id || "-"}
                 </span>
               </div>
             </div>
           )
+        }
 
         case "orders":
           return (
@@ -164,6 +179,7 @@ const CustomerListItem = React.memo(
     prev.customer.totalOrderValue === next.customer.totalOrderValue &&
     prev.customer.lastOrderDate === next.customer.lastOrderDate &&
     prev.customer.storeCredit === next.customer.storeCredit &&
+    prev.customer.birth_date === next.customer.birth_date &&
     prev.selected === next.selected &&
     prev.columns === next.columns
 )

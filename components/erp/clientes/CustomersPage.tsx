@@ -52,6 +52,7 @@ interface Customer {
     storeCredit?: number;
     createdAt?: string;
     address?: string;
+    birth_date?: string | null;
 }
 
 interface FilterState {
@@ -231,7 +232,8 @@ export default function CustomersPage({
                 rawLastOrderDate: c.last_order_at ? new Date(c.last_order_at).getTime() : 0,
                 storeCredit: c.store_credit || 0,
                 createdAt: c.created_at,
-                address: c.address
+                address: c.address,
+                birth_date: c.birth_date
             }))
 
         const result = [...filtered]
@@ -701,11 +703,11 @@ export default function CustomersPage({
                 >
                     {(rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.status === 'inativo') ? (
                         <>
-                            <CheckCircleIcon size={18} /> Ativar
+                            Ativar
                         </>
                     ) : (
                         <>
-                            <BlockedIcon size={18} /> Desativar
+                            Desativar
                         </>
                     )}
                 </Button>

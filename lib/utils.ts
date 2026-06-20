@@ -6,6 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export * from "./utils/formatters"
+export * from "./utils/birthday"
 
 /**
  * Generates a display name from email address

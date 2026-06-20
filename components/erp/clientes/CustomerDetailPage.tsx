@@ -11,8 +11,10 @@ import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { useMediaQuery } from '../hooks';
 import { useRouter } from 'next/navigation';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, checkBirthday, formatDateToBR } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
+import { getBirthdayCouponCodeAction, sendBirthdayNotificationAction } from '@/app/actions/erp/birthday';
+import { usePlanUpgrade, planStarIconForTarget } from '@/components/erp/subscription/PlanUpgradeModal';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
 
@@ -37,6 +39,7 @@ function formatOrderId(id: string): string {
 export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const realCustomerId = customer.originalId || customer.id;
     const { success: notifySuccess, error: notifyError } = useNotification();
+    const { openPlanUpgrade } = usePlanUpgrade();
     const [activeTab, setActiveTab] = useState('General');
     const [isScrolled, setIsScrolled] = useState(false);
     const isMobile = useMediaQuery("(max-width: 767px)");
@@ -58,6 +61,107 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
     const router = useRouter();
     const [page, setPage] = useState(1);
+    const bdayInfo = useMemo(() => checkBirthday(customer.birth_date), [customer.birth_date]);
+    const [isSendingNotification, setIsSendingNotification] = useState(false);
+
+    const handleCreateBirthdayCoupon = useCallback(async () => {
+        const planSlug = customer.planSlug || "free";
+        if (planSlug.toLowerCase() === "free") {
+            openPlanUpgrade("crescer");
+            return;
+        }
+        try {
+            const couponCode = await getBirthdayCouponCodeAction(customer.partner_id || "");
+            router.push(`/erp/coupons?create=true&code=${couponCode}&customerId=${realCustomerId}`);
+        } catch (err) {
+            notifyError("Erro ao iniciar criação do cupom.");
+        }
+    }, [customer.partner_id, customer.planSlug, realCustomerId, router, notifyError, openPlanUpgrade]);
+
+    const handleSendWhatsAppBirthday = useCallback(async () => {
+        const phone = customer.phone || customer.mobile;
+        if (!phone) {
+            notifyError("O cliente não possui um número de celular cadastrado.");
+            return;
+        }
+
+        const formattedPhone = phone.replace(/\D/g, "");
+        const phoneWithCountry = formattedPhone.startsWith("55") || formattedPhone.length > 11 ? formattedPhone : `55${formattedPhone}`;
+        
+        try {
+            const couponCode = await getBirthdayCouponCodeAction(customer.partner_id || "");
+            const message = `Olá ${customer.name}! 🎉\n\nFeliz aniversário!\n\nPreparamos um presente para você.\n\nUse o cupom:\n${couponCode}\ne aproveite seu desconto especial.\n\nDesejamos um excelente dia! 🎂`;
+            const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
+            window.open(url, "_blank");
+        } catch (err) {
+            notifyError("Erro ao gerar link de WhatsApp.");
+        }
+    }, [customer, notifyError]);
+
+    const handleSendNotificationBirthday = useCallback(async () => {
+        setIsSendingNotification(true);
+        try {
+            const res = await sendBirthdayNotificationAction(realCustomerId, customer.partner_id || "");
+            if (res.success) {
+                if (res.notified) {
+                    notifySuccess("Notificação enviada com sucesso!");
+                } else {
+                    notifySuccess("O cliente já recebeu uma notificação de aniversário este ano.");
+                }
+            } else {
+                notifyError(res.error || "Erro ao enviar notificação.");
+            }
+        } catch (err) {
+            notifyError("Erro ao processar envio de notificação.");
+        } finally {
+            setIsSendingNotification(false);
+        }
+    }, [realCustomerId, customer.partner_id, notifySuccess, notifyError]);
+
+    const renderBirthdayCard = () => {
+        if (!bdayInfo || (!bdayInfo.isToday && !bdayInfo.isUpcoming)) return null;
+
+        return (
+            <section className="bg-purple-50 dark:bg-purple-900/15 border border-purple-200 dark:border-purple-900/30 rounded-2xl p-5 mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">🎂</span>
+                    <h3 className="text-base font-bold text-purple-950 dark:text-purple-300">Aniversário</h3>
+                </div>
+                <p className="text-sm text-purple-900 dark:text-purple-400 mb-4 font-medium">
+                    {customer.name} faz aniversário {bdayInfo.isToday ? "hoje!" : `em ${bdayInfo.daysUntil} dias.`}
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                    <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleCreateBirthdayCoupon}
+                    >
+                        <span className="flex items-center gap-1.5">
+                            Criar cupom
+                            {(customer.planSlug || "free").toLowerCase() === "free" && planStarIconForTarget("crescer") && (
+                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain invert brightness-0 dark:invert-0 dark:brightness-100" />
+                            )}
+                        </span>
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSendWhatsAppBirthday}
+                    >
+                        Enviar WhatsApp
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSendNotificationBirthday}
+                        isLoading={isSendingNotification}
+                    >
+                        Enviar notificação
+                    </Button>
+                </div>
+            </section>
+        );
+    };
     const itemsPerPage = 8;
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>({ key: 'date', direction: 'desc' });
     const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -281,6 +385,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                             {isTablet ? (
                                                 /* Tablet/Mobile: Customer Info */
                                                 <div className="mb-8">
+                                                    {renderBirthdayCard()}
                                                     <div className="flex items-center gap-3 mb-6">
                                                         <UserProfileImage
                                                             fullName={customer.name || "Cliente"}
@@ -305,6 +410,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     </div>
 
                                                     <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 space-y-3">
+                                                        {customer.birth_date && (
+                                                            <div className="flex justify-between items-center py-2 border-b border-brand-border dark:border-dark-border/50">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Nascimento</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {formatDateToBR(customer.birth_date)}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         {(customer.cpf || customer.cnpj) && (
                                                             <div className="flex justify-between items-center py-2">
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
@@ -418,6 +531,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 {/* Sidebar - Desktop only */}
                                 {!isTablet && (
                                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                        {renderBirthdayCard()}
 
                                         {/* Observações */}
                                         {customer.notes && (
@@ -462,6 +576,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                                 {customer.createdAt ? formatDate(customer.createdAt) : '-'}
                                                             </span>
                                                         </div>
+                                                        {customer.birth_date && (
+                                                            <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Nascimento</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {formatDateToBR(customer.birth_date)}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         <div className="flex justify-between items-center py-2.5">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Tipo de Pessoa</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>

@@ -65,7 +65,7 @@ const navItems: NavItem[] = [
             { label: "Movimentação de Estoque", href: "/erp/stock-movements" },
             { label: "Importar XML (NF-e)", href: "/erp/xml-import" },
             { label: "Notas de Entrada", href: "/" },
-            { label: "Fornecedores", href: "/" },
+            { label: "Fornecedores", href: "/erp/suppliers" },
             { label: "Cadastros de Produtos", href: "/erp/products/cadastros" },
         ],
     },
@@ -324,6 +324,7 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/products") return productsResourceActive
                             if (sub.href === "/erp/stock-movements") return stockMovementsResourceActive
                             if (sub.href === "/erp/products/cadastros") return productCadastrosResourceActive
+                            if (sub.href === "/erp/suppliers") return productsResourceActive
                             return productsResourceActive
                         }
                         if (item.href === "/erp/servicos") {

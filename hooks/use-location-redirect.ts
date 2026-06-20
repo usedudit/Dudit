@@ -19,14 +19,14 @@ export function useLocationRedirect() {
           const { latitude, longitude } = position.coords;
           // Reverse geocoding using Nominatim (free, open source)
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`, {
-             headers: {
-               'User-Agent': 'Dudit Marketplace (contact@dudit.com.br)'
-             }
+            headers: {
+              'User-Agent': 'Dudit (contato@dudit.com.br)'
+            }
           });
-          
+
           if (!res.ok) throw new Error('Falha ao buscar cidade');
           const data = await res.json();
-          
+
           const address = data.address;
           if (!address) throw new Error('Endereço não encontrado');
 
@@ -34,11 +34,11 @@ export function useLocationRedirect() {
           const stateIso = address['ISO3166-2-lvl4'];
 
           if (!cityStr || !stateIso) {
-             throw new Error('Cidade não detectada');
+            throw new Error('Cidade não detectada');
           }
 
           const uf = stateIso.replace('BR-', '').toLowerCase();
-          
+
           const formattedCity = cityStr
             .toLowerCase()
             .normalize('NFD')
@@ -53,8 +53,8 @@ export function useLocationRedirect() {
             localStorage.setItem('dudit_city', slug);
             window.location.href = `/${slug}`;
           } else {
-             setError('Ainda não estamos na sua cidade');
-             setLoading(false);
+            setError('Ainda não estamos na sua cidade');
+            setLoading(false);
           }
         } catch (err: any) {
           setError('Erro na localização');
