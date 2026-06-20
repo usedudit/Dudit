@@ -68,6 +68,8 @@ export default function BannedView({ profile }: { profile: any }) {
     const handleSignOut = async (e: React.FormEvent) => {
         e.preventDefault()
         try {
+            document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            localStorage.removeItem("dudit_city")
             await supabase.auth.signOut({ scope: "local" })
             window.location.href = "/auth/login"
         } catch (error) {

@@ -194,7 +194,11 @@ export function AdminHeader({ sidebarOpen, setSidebarOpen, pageTitle, userProfil
 
                             <div className="py-2 border-t border-brand-border dark:border-dark-border">
                                 <DropdownItem
-                                    onClick={() => supabase.auth.signOut({ scope: 'local' }).then(() => (window.location.href = "/auth/login"))}
+                                    onClick={() => {
+                                        document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+                                        localStorage.removeItem("dudit_city")
+                                        supabase.auth.signOut({ scope: 'local' }).then(() => (window.location.href = "/auth/login"))
+                                    }}
                                     className="text-brand-red dark:text-brand-red"
                                 >
                                     <div className="w-4 h-4 bg-red-500 rounded flex items-center justify-center">

@@ -61,6 +61,8 @@ export function MarketplaceBottomMenu() {
     const fullName = profile?.full_name || user?.email?.split("@")[0] || "Visitante"
 
     const handleSignOut = async () => {
+        document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+        localStorage.removeItem("dudit_city")
         await supabase.auth.signOut({ scope: "local" })
         setIsMenuOpen(false)
         window.location.href = "/"

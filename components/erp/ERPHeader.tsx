@@ -164,6 +164,8 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     }
 
     const handleSignOut = async () => {
+        document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+        localStorage.removeItem("dudit_city")
         await supabase.auth.signOut({ scope: 'local' })
         window.location.href = "/"
     }

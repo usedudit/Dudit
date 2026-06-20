@@ -441,6 +441,8 @@ const Header: React.FC<HeaderProps> = ({
     }, [])
 
     const handleSignOut = useCallback(async () => {
+        document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+        localStorage.removeItem("dudit_city")
         await supabase.auth.signOut({ scope: 'local' })
         setIsUserMenuOpen(false)
         setIsMobileUserMenuOpen(false)
@@ -609,17 +611,17 @@ const Header: React.FC<HeaderProps> = ({
                                 </>
                             ) : (
                                 <>
-                                {user && (
-                                    <NotificationBell variant="marketplace" className="shrink-0" />
-                                )}
-                                <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
-                                    <ShoppingBagIcon size={24} strokeWidth={2} />
-                                    {cartCount > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
-                                            {cartCount}
-                                        </span>
+                                    {user && (
+                                        <NotificationBell variant="marketplace" className="shrink-0" />
                                     )}
-                                </Link>
+                                    <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
+                                        <ShoppingBagIcon size={24} strokeWidth={2} />
+                                        {cartCount > 0 && (
+                                            <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
+                                                {cartCount}
+                                            </span>
+                                        )}
+                                    </Link>
                                 </>
                             )}
                         </div>

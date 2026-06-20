@@ -47,7 +47,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
             else {
                 setSuggestions(res.suggestions || [])
                 if (res.suggestions && res.suggestions.length > 0) {
-                    notifyReplenishmentSuggestedAction()
+                    notifyReplenishmentSuggestedAction().catch(() => {})
                 }
             }
             setLoading(false)
