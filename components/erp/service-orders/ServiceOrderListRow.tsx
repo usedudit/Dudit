@@ -127,27 +127,28 @@ const ServiceOrderListRow = React.memo(
       <motion.tr
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className={`border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/50 dark:hover:bg-dark-border/50 cursor-pointer transition-colors ${
-          selected ? "bg-brand-gray/80 dark:bg-dark-border/80" : ""
-        }`}
+        className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
         onClick={onDetails}
       >
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-3">
-            <Checkbox
-              checked={selected}
-              onCheckedChange={() => onSelect(order.id)}
-            />
-            <div className="flex-1" />
-          </div>
+        <td
+          className="py-2 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Checkbox checked={selected} onCheckedChange={() => onSelect(order.id)} />
         </td>
         {columns.map((col) => (
           <td
             key={col.id}
-            className={`px-4 py-3 text-${col.align || "left"}`}
+            className={`p-2 border-b border-brand-border dark:border-dark-border ${
+              col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+            }`}
             style={{ width: col.width, minWidth: col.width }}
           >
-            {renderCellContent(col.id)}
+            <div className={`flex items-center w-full min-w-0 ${
+              col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"
+            }`}>
+              {renderCellContent(col.id)}
+            </div>
           </td>
         ))}
       </motion.tr>

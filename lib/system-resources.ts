@@ -197,6 +197,7 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
       "productCadastros",
       "showcase",
       "appointments",
+      "serviceOrders",
       "serviceCadastros",
       "deliveries",
       "financial",
@@ -225,6 +226,7 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: st
     "productCadastros",
     "showcase",
     "appointments",
+    "serviceOrders",
     "serviceCadastros",
     "deliveries",
     "financial",
@@ -268,6 +270,14 @@ export function resolveActiveResources(businessInfo: { sells?: string[]; activeR
     if (version < 4) {
       const v4Resources: SystemResourceId[] = ["stockMovements", "productCadastros", "serviceCadastros", "coupons", "campaigns"]
       for (const r of v4Resources) {
+        if (!current.includes(r)) {
+          current.push(r)
+        }
+      }
+    }
+    if (version < 5) {
+      const v5Resources: SystemResourceId[] = ["serviceOrders"]
+      for (const r of v5Resources) {
         if (!current.includes(r)) {
           current.push(r)
         }

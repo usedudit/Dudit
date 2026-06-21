@@ -680,3 +680,175 @@ export async function getServiceOrderByTokenAction(
     return { success: false, error: err.message || "Ordem de serviço não encontrada" }
   }
 }
+
+export async function updateServiceOrderAction(
+  partnerId: string,
+  serviceOrderId: string,
+  input: {
+    title?: string
+    description?: string
+    internal_notes?: string
+    customer_id?: string | null
+    expected_completion_date?: string | null
+    assigned_user_id?: string | null
+    status?: string
+  },
+): Promise<{ success: true; data: any } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "service_orders", "edit")
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    const { data: current, error: getErr } = await admin
+      .from("service_orders")
+      .select("*")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (getErr || !current) throw new Error("Ordem de serviço não encontrada")
+
+    const updateData: any = {}
+    if (input.title !== undefined) updateData.title = input.title
+    if (input.description !== undefined) updateData.description = input.description
+    if (input.internal_notes !== undefined) updateData.internal_notes = input.internal_notes
+    if (input.customer_id !== undefined) {
+      updateData.customer_id = input.customer_id
+      updateData.customer_snapshot = input.customer_id ? await getCustomerSnapshot(admin, input.customer_id) : null
+    }
+    if (input.expected_completion_date !== undefined) updateData.expected_completion_date = input.expected_completion_date
+    if (input.assigned_user_id !== undefined) updateData.assigned_user_id = input.assigned_user_id
+    if (input.status !== undefined) updateData.status = input.status
+
+    const { data, error } = await admin
+      .from("service_orders")
+      .update(updateData)
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    // Log audit event
+    const changes = []
+    if (input.title && input.title !== current.title) changes.push(`Título: "${current.title}" -> "${input.title}"`)
+    if (input.status && input.status !== current.status) changes.push(`Status: "${current.status}" -> "${input.status}"`)
+
+    await logAuditEvent({
+      partnerId, actorUserId: user.id,
+      entityType: "service_order", entityId: serviceOrderId,
+      actionType: "updated", source: "manual",
+      changeLines: changes.length > 0 ? changes : ["Dados da OS atualizados"],
+    })
+
+    revalidatePath("/erp/service-orders")
+    return { success: true, data }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao atualizar ordem de serviço" }
+  }
+}
+
+export async function syncServiceOrderServicesAction(
+  partnerId: string,
+  serviceOrderId: string,
+  services: { service_id: string; quantity: number }[],
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "service_orders", "edit")
+    const admin = getAdminClient()
+
+    // 1. Delete all existing services
+    const { error: delErr } = await admin
+      .from("service_order_services")
+      .delete()
+      .eq("service_order_id", serviceOrderId)
+    if (delErr) throw delErr
+
+    if (services.length > 0) {
+      // 2. Fetch service names/prices
+      const { data: svcRows, error: svcErr } = await admin
+        .from("services")
+        .select("id, name, price")
+        .in("id", services.map(s => s.service_id))
+      if (svcErr) throw svcErr
+
+      const items = services.map((s, idx) => {
+        const svc = svcRows?.find((r: any) => r.id === s.service_id)
+        const qty = s.quantity || 1
+        return {
+          service_order_id: serviceOrderId,
+          service_id: s.service_id,
+          service_name: svc?.name || "Serviço removido",
+          service_price: svc?.price || 0,
+          quantity: qty,
+          total_price: (svc?.price || 0) * qty,
+          sort_order: idx,
+        }
+      })
+
+      const { error: insErr } = await admin.from("service_order_services").insert(items)
+      if (insErr) throw insErr
+    }
+
+    await recalcTotals(admin, serviceOrderId)
+    revalidatePath("/erp/service-orders")
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao sincronizar serviços" }
+  }
+}
+
+export async function syncServiceOrderProductsAction(
+  partnerId: string,
+  serviceOrderId: string,
+  products: { product_id: string; variant_id?: string | null; quantity: number }[],
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "service_orders", "edit")
+    const admin = getAdminClient()
+
+    // 1. Delete all existing products
+    const { error: delErr } = await admin
+      .from("service_order_products")
+      .delete()
+      .eq("service_order_id", serviceOrderId)
+    if (delErr) throw delErr
+
+    if (products.length > 0) {
+      // 2. Fetch product names/prices
+      const { data: prodRows, error: prodErr } = await admin
+        .from("products")
+        .select("id, name, price")
+        .in("id", products.map(p => p.product_id))
+      if (prodErr) throw prodErr
+
+      const items = products.map((p, idx) => {
+        const prod = prodRows?.find((r: any) => r.id === p.product_id)
+        const qty = p.quantity || 1
+        return {
+          service_order_id: serviceOrderId,
+          product_id: p.product_id,
+          variant_id: p.variant_id || null,
+          product_name: prod?.name || "Produto removido",
+          unit_price: prod?.price || 0,
+          quantity: qty,
+          total_price: (prod?.price || 0) * qty,
+          sort_order: idx,
+        }
+      })
+
+      const { error: insErr } = await admin.from("service_order_products").insert(items)
+      if (insErr) throw insErr
+    }
+
+    await recalcTotals(admin, serviceOrderId)
+    revalidatePath("/erp/service-orders")
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao sincronizar produtos" }
+  }
+}
