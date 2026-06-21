@@ -1,8 +1,11 @@
 "use client"
 
 import React, { useState, useCallback, useRef } from "react"
-import { Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge } from "@/components/reusable"
-import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
+import { Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge, IconPlaceholder } from "@/components/reusable"
+import CustomerCard from "@/components/reusable/CustomerCard"
+import Pagination from "@/components/reusable/Pagination"
+import { ChevronLeftIcon, SaveIcon, PlusIcon, TrashIcon, WrenchIcon, PackageIcon, UserIcon } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
@@ -25,12 +28,7 @@ interface ServiceOrderFormProps {
   editData?: any
 }
 
-const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-  <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-    {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-    {children}
-  </div>
-)
+
 
 export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData }: ServiceOrderFormProps) {
   const { toast } = useToast()
@@ -40,6 +38,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
   const [internalNotes, setInternalNotes] = useState(editData?.internal_notes || "")
   const [customerId, setCustomerId] = useState(editData?.customer_id || "")
   const [customerName, setCustomerName] = useState(editData?.customer_snapshot?.name || "")
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(editData?.customer_snapshot || null)
   const [expectedDate, setExpectedDate] = useState(editData?.expected_completion_date || "")
   const [assignedUserId, setAssignedUserId] = useState(editData?.assigned_user_id || "")
   const [services, setServices] = useState<any[]>(editData?.services || [])
@@ -48,6 +47,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
   const [showCustomerSheet, setShowCustomerSheet] = useState(false)
   const [showServiceSheet, setShowServiceSheet] = useState(false)
   const [showProductSheet, setShowProductSheet] = useState(false)
+
+  const [servicesPage, setServicesPage] = useState(1)
+  const servicesItemsPerPage = 5
+  const totalServicesPages = Math.ceil(services.length / servicesItemsPerPage)
+  const paginatedServices = services.slice((servicesPage - 1) * servicesItemsPerPage, servicesPage * servicesItemsPerPage)
+
+  const [productsPage, setProductsPage] = useState(1)
+  const productsItemsPerPage = 5
+  const totalProductsPages = Math.ceil(products.length / productsItemsPerPage)
+  const paginatedProducts = products.slice((productsPage - 1) * productsItemsPerPage, productsPage * productsItemsPerPage)
 
   const [isScrolled, setIsScrolled] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -157,29 +166,46 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
   const handleSelectCustomer = (customer: any) => {
     setCustomerId(customer.id)
     setCustomerName(customer.name)
+    setSelectedCustomer(customer)
     setShowCustomerSheet(false)
   }
 
   const handleAddService = (svc: any) => {
     setServices((prev) => {
       if (prev.some((s) => (s.service_id || s.id) === svc.id)) return prev
+      setServicesPage(1)
       return [...prev, { ...svc, service_id: svc.id, quantity: 1 }]
     })
   }
 
   const handleRemoveService = (id: string) => {
-    setServices((prev) => prev.filter((s) => (s.service_id || s.id) !== id))
+    setServices((prev) => {
+      const next = prev.filter((s) => (s.service_id || s.id) !== id)
+      const nextTotalPages = Math.ceil(next.length / servicesItemsPerPage)
+      if (servicesPage > nextTotalPages && nextTotalPages > 0) {
+        setServicesPage(nextTotalPages)
+      }
+      return next
+    })
   }
 
   const handleAddProduct = (prod: any) => {
     setProducts((prev) => {
       if (prev.some((p) => (p.product_id || p.id) === prod.id)) return prev
+      setProductsPage(1)
       return [...prev, { ...prod, product_id: prod.id, quantity: 1 }]
     })
   }
 
   const handleRemoveProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => (p.product_id || p.id) !== id))
+    setProducts((prev) => {
+      const next = prev.filter((p) => (p.product_id || p.id) !== id)
+      const nextTotalPages = Math.ceil(next.length / productsItemsPerPage)
+      if (productsPage > nextTotalPages && nextTotalPages > 0) {
+        setProductsPage(nextTotalPages)
+      }
+      return next
+    })
   }
 
   const pageTitle = editData ? `Editar OS #${editData.order_number}` : "Nova Ordem de Serviço"
@@ -195,8 +221,17 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
             {/* Sticky Header */}
             <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
               <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-4 flex items-center justify-between">
+                
+                {/* Back button - desktop/wide only (standard ERP style) */}
+                <div className={`absolute -left-12 top-5 h-full hidden xl:flex justify-center transition-all duration-300`}>
+                  <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center rounded-full">
+                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                  </Button>
+                </div>
+
                 <div className="flex items-center gap-4 min-w-0">
-                  <Button variant="outline" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center rounded-full">
+                  {/* Inline back button for smaller screens */}
+                  <Button variant="outline" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center rounded-full xl:hidden shrink-0">
                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                   </Button>
                   <div className="min-w-0 flex flex-col">
@@ -229,6 +264,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
               <div className="max-w-[1300px] mx-auto px-4 md:px-6">
                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                   <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                  <TabsTrigger value="notes">Observações</TabsTrigger>
                   <TabsTrigger value="services">Serviços</TabsTrigger>
                   <TabsTrigger value="products">Produtos</TabsTrigger>
                 </TabsList>
@@ -259,116 +295,309 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                         />
                       </FormSection>
 
-                      <FormSection title="Observações internas">
-                        <textarea
-                          className="w-full min-h-[100px] px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green resize-y"
-                          placeholder="Anotações internas (não visíveis ao cliente)..."
-                          value={internalNotes}
-                          onChange={(e) => setInternalNotes(e.target.value)}
+                      <FormSection title="Data prevista de conclusão">
+                        <DatePicker
+                          value={expectedDate}
+                          onChange={setExpectedDate}
+                          placeholder="Selecionar data"
                         />
                       </FormSection>
                     </div>
 
-                    {/* Right Column (Sidebar Card with Client, Dates, etc.) */}
+                    {/* Right Column (Sidebar Card with Client Card) */}
                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                      <SidebarCard hasTopStrip>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Detalhamento</h3>
-                        
-                        <div className="space-y-5">
-                          {/* Cliente */}
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Cliente</label>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 cursor-pointer" onClick={() => setShowCustomerSheet(true)}>
-                                <Input
-                                  placeholder="Selecionar cliente..."
-                                  value={customerName}
-                                  readOnly
-                                  className="cursor-pointer"
-                                />
-                              </div>
-                              {customerId && (
-                                <Button variant="ghost" size="sm" onClick={() => { setCustomerId(""); setCustomerName("") }}>
-                                  Limpar
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Data prevista */}
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Data prevista de conclusão</label>
-                            <DatePicker
-                              value={expectedDate}
-                              onChange={setExpectedDate}
-                              placeholder="Selecionar data"
+                      <div>
+                        {selectedCustomer ? (
+                          <CustomerCard
+                            customer={selectedCustomer}
+                            onRemove={() => {
+                              setCustomerId("")
+                              setCustomerName("")
+                              setSelectedCustomer(null)
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40 transition-colors"
+                            onClick={() => setShowCustomerSheet(true)}
+                          >
+                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+                            <IconPlaceholder
+                              icon={UserIcon}
+                              title="Nenhum cliente selecionado"
+                              subtitle="Selecione um cliente para vincular à ordem de serviço."
+                              itemButton={{
+                                text: "Selecionar Cliente",
+                                action: () => setShowCustomerSheet(true),
+                                variant: "outline",
+                                className: "rounded-full px-8"
+                              }}
                             />
                           </div>
-                        </div>
-                      </SidebarCard>
+                        )}
+                      </div>
                     </div>
+                  </FadeIn>
+                )}
+
+                {activeTab === "notes" && (
+                  <FadeIn key="notes" className="space-y-6 w-full max-w-[800px]">
+                    <FormSection title="Observações internas">
+                      <textarea
+                        className="w-full min-h-[150px] px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green resize-y"
+                        placeholder="Anotações internas (não visíveis ao cliente)..."
+                        value={internalNotes}
+                        onChange={(e) => setInternalNotes(e.target.value)}
+                      />
+                    </FormSection>
                   </FadeIn>
                 )}
 
                 {activeTab === "services" && (
-                  <FadeIn key="services" className="space-y-6 max-w-[800px]">
+                  <FadeIn key="services" className="space-y-6 w-full">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Serviços da OS</h2>
-                      <Button variant="outline" size="sm" onClick={() => setShowServiceSheet(true)}>
-                        + Adicionar serviço
+                      <Button variant="link" onClick={() => setShowServiceSheet(true)} className="gap-2 h-auto py-0 text-brand-primary">
+                        <PlusIcon size={14} strokeWidth={3} />
+                        Adicionar serviço
                       </Button>
                     </div>
 
-                    <div className="space-y-3">
-                      {services.length === 0 ? (
-                        <div className="p-8 text-center text-sm text-brand-inactive-text border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                          Nenhum serviço adicionado a esta ordem de serviço.
+                    {services.length === 0 ? (
+                      <div className="w-full flex flex-col items-center justify-center py-12">
+                        <IconPlaceholder
+                          icon={WrenchIcon}
+                          title="Nenhum serviço adicionado"
+                          subtitle="Adicione serviços para vincular a esta ordem de serviço."
+                          itemButton={{
+                            text: "Adicionar serviço",
+                            action: () => setShowServiceSheet(true),
+                            variant: "outline",
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        {/* --- SERVICES TABLE (Desktop) --- */}
+                        <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
+                          <table className="w-full text-left border-separate border-spacing-0">
+                            <thead>
+                              <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Serviço</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {paginatedServices.map((svc: any) => {
+                                const unitPrice = svc.price || svc.service_price || 0
+                                const qty = svc.quantity || 1
+                                return (
+                                  <tr key={svc.service_id || svc.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                    <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                          <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </div>
+                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                          {svc.name || svc.service_name}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                      {formatCurrency(unitPrice)}
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                      {qty}
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                      {formatCurrency(unitPrice * qty)}
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                      <div className="flex justify-center">
+                                        <button
+                                          onClick={() => handleRemoveService(svc.service_id || svc.id)}
+                                          className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                                        >
+                                          <TrashIcon size={14} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
                         </div>
-                      ) : (
-                        services.map((svc: any) => (
-                          <div key={svc.service_id || svc.id} className="flex items-center justify-between bg-brand-gray dark:bg-dark-border rounded-xl px-4 py-3 border border-brand-border dark:border-dark-border">
-                            <div>
-                              <p className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{svc.name || svc.service_name}</p>
-                              <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">Qtd: {svc.quantity || 1}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => handleRemoveService(svc.service_id || svc.id)} className="text-brand-red hover:bg-brand-red/5">
-                              Remover
-                            </Button>
-                          </div>
-                        ))
-                      )}
-                    </div>
+
+                        {/* --- SERVICES LIST (Mobile) --- */}
+                        <div className="md:hidden flex flex-col gap-4 mb-4">
+                          {paginatedServices.map((svc: any) => {
+                            const unitPrice = svc.price || svc.service_price || 0
+                            const qty = svc.quantity || 1
+                            return (
+                              <div key={svc.service_id || svc.id} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                                <div className="flex items-start gap-4">
+                                  <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                    <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                  </div>
+                                  <div className="flex-1 min-w-0 text-left">
+                                    <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                      {svc.name || svc.service_name}
+                                    </div>
+                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate mb-2">
+                                      Qtd: {qty} • Unit: {formatCurrency(unitPrice)}
+                                    </div>
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                      Total: {formatCurrency(unitPrice * qty)}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRemoveService(svc.service_id || svc.id)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                                  >
+                                    <TrashIcon size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Pagination */}
+                        <Pagination
+                          currentPage={servicesPage}
+                          totalPages={totalServicesPages}
+                          onPageChange={setServicesPage}
+                        />
+                      </>
+                    )}
                   </FadeIn>
                 )}
 
                 {activeTab === "products" && (
-                  <FadeIn key="products" className="space-y-6 max-w-[800px]">
+                  <FadeIn key="products" className="space-y-6 w-full">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Produtos da OS</h2>
-                      <Button variant="outline" size="sm" onClick={() => setShowProductSheet(true)}>
-                        + Adicionar produto
+                      <Button variant="link" onClick={() => setShowProductSheet(true)} className="gap-2 h-auto py-0 text-brand-primary">
+                        <PlusIcon size={14} strokeWidth={3} />
+                        Adicionar produto
                       </Button>
                     </div>
 
-                    <div className="space-y-3">
-                      {products.length === 0 ? (
-                        <div className="p-8 text-center text-sm text-brand-inactive-text border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                          Nenhum produto adicionado a esta ordem de serviço.
+                    {products.length === 0 ? (
+                      <div className="w-full flex flex-col items-center justify-center py-12">
+                        <IconPlaceholder
+                          icon={PackageIcon}
+                          title="Nenhum produto adicionado"
+                          subtitle="Adicione produtos para vincular a esta ordem de serviço."
+                          itemButton={{
+                            text: "Adicionar produto",
+                            action: () => setShowProductSheet(true),
+                            variant: "outline",
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        {/* --- PRODUCTS TABLE (Desktop) --- */}
+                        <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
+                          <table className="w-full text-left border-separate border-spacing-0">
+                            <thead>
+                              <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
+                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {paginatedProducts.map((prod: any) => {
+                                const unitPrice = prod.price || prod.unit_price || 0
+                                const qty = prod.quantity || 1
+                                return (
+                                  <tr key={prod.product_id || prod.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                    <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                          <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </div>
+                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                          {prod.name || prod.product_name}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                      {formatCurrency(unitPrice)}
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                      {qty}
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                      {formatCurrency(unitPrice * qty)}
+                                    </td>
+                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                      <div className="flex justify-center">
+                                        <button
+                                          onClick={() => handleRemoveProduct(prod.product_id || prod.id)}
+                                          className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                                        >
+                                          <TrashIcon size={14} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
                         </div>
-                      ) : (
-                        products.map((prod: any) => (
-                          <div key={prod.product_id || prod.id} className="flex items-center justify-between bg-brand-gray dark:bg-dark-border rounded-xl px-4 py-3 border border-brand-border dark:border-dark-border">
-                            <div>
-                              <p className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{prod.name || prod.product_name}</p>
-                              <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">Qtd: {prod.quantity || 1}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => handleRemoveProduct(prod.product_id || prod.id)} className="text-brand-red hover:bg-brand-red/5">
-                              Remover
-                            </Button>
-                          </div>
-                        ))
-                      )}
-                    </div>
+
+                        {/* --- PRODUCTS LIST (Mobile) --- */}
+                        <div className="md:hidden flex flex-col gap-4 mb-4">
+                          {paginatedProducts.map((prod: any) => {
+                            const unitPrice = prod.price || prod.unit_price || 0
+                            const qty = prod.quantity || 1
+                            return (
+                              <div key={prod.product_id || prod.id} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                                <div className="flex items-start gap-4">
+                                  <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                    <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                  </div>
+                                  <div className="flex-1 min-w-0 text-left">
+                                    <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                      {prod.name || prod.product_name}
+                                    </div>
+                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate mb-2">
+                                      Qtd: {qty} • Unit: {formatCurrency(unitPrice)}
+                                    </div>
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                      Total: {formatCurrency(unitPrice * qty)}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRemoveProduct(prod.product_id || prod.id)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                                  >
+                                    <TrashIcon size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Pagination */}
+                        <Pagination
+                          currentPage={productsPage}
+                          totalPages={totalProductsPages}
+                          onPageChange={setProductsPage}
+                        />
+                      </>
+                    )}
                   </FadeIn>
                 )}
               </AnimatePresence>

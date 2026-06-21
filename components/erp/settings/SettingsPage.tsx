@@ -55,8 +55,6 @@ type ActivePage =
   | "comissao"
   | "recibo"
   | "vitrine"
-  | "os"
-  | "mensagens"
   | "delivery"
   | "service-checkout"
   | "resources"
@@ -79,8 +77,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "comissao": "comissao",
     "recibo": "recibo-devolucao",
     "vitrine": "vitrine",
-    "os": "os",
-    "mensagens": "modelos-de-mensagens",
     "delivery": "entrega",
     "service-checkout": "servicos-checkout",
     "integrations": "integracoes",
@@ -143,8 +139,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "comissao": "Comissão",
         "recibo": "Recibo/Devolução",
         "vitrine": "Minha Vitrine",
-        "os": "Configuração de O.S",
-        "mensagens": "Modelos de Mensagens",
         "delivery": "Logística e Entrega",
         "home": "Configurações"
       }
@@ -171,7 +165,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const isOwnerAdminOrManager = isOwner || isAdmin || isManager
 
   const canAccessOS = businessInfo?.sells?.includes("services") && isOwnerAdminOrManager
-  const showOS = canAccessOS
   const showVitrine = isOwnerOrAdmin && isSystemResourceActive(businessInfo, "showcase")
   const isQuick = businessInfo.mode === "quick"
   const isDeliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
@@ -182,7 +175,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessTeam = isOwnerOrAdmin
   const canAccessPayments = isOwnerOrAdmin
   const canAccessReturns = isOwnerAdminOrManager
-  const canAccessMessages = isOwnerAdminOrManager
   const canAccessDelivery = isOwnerOrAdmin
   const canAccessServiceCheckout = canAccessOS
   const canAccessBusinessData = isOwnerAdminOrManager
@@ -200,11 +192,9 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "team" && !canAccessTeam) setActivePage("home")
     if (activePage === "payment-methods" && !canAccessPayments) setActivePage("home")
     if (activePage === "recibo" && !canAccessReturns) setActivePage("home")
-    if (activePage === "os" && !canAccessOS) setActivePage("home")
-    if (activePage === "mensagens" && !canAccessMessages) setActivePage("home")
     if (activePage === "business-data" && !canAccessBusinessData) setActivePage("home")
     if (activePage === "resources" && !canAccessResources) setActivePage("home")
-  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, showOS, canAccessMessages, canAccessBusinessData, canAccessResources])
+  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, canAccessBusinessData, canAccessResources])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -355,32 +345,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                       <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
                         {activeTab === "adicionais" && (
                           <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {showOS && (
-                              <ListItem
-                                icon={WrenchIcon}
-                                title="Configurar O.S"
-                                description="Personalize campos, status e o layout das ordens de serviço."
-                                onClick={() => setActivePage("os")}
-                                showChevron
-                                className="px-4 py-3 gap-4"
-                              />
-                            )}
                             {canAccessResources && (
                               <ListItem
                                 icon={CadastrosIcon}
                                 title="Gerenciar recursos"
                                 description="Ative ou desative modulos do sistema para limpar o menu."
                                 onClick={() => setActivePage("resources")}
-                                showChevron
-                                className="px-4 py-3 gap-4"
-                              />
-                            )}
-                            {canAccessMessages && (
-                              <ListItem
-                                icon={MailIcon}
-                                title="Mensagens e Alertas"
-                                description="Configure mensagens automáticas de WhatsApp e e-mail."
-                                onClick={() => setActivePage("mensagens")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -469,8 +439,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "recibo" && <SimpleSettingsSubPage key="recibo" title="Recibo/Devolução" onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && <ShowcaseSubPage key="vitrine" partner={partner} onBack={() => setActivePage("home")} />}
-          {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}
-          {activePage === "mensagens" && <SimpleSettingsSubPage key="mensagens" title="Modelos de Mensagens" onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "service-checkout" && canAccessServiceCheckout && (
             <ServiceCheckoutSettingsSubPage key="service-checkout" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={serviceCheckoutPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />

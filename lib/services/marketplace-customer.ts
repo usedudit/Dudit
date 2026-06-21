@@ -66,7 +66,6 @@ export async function ensureMarketplaceCustomer({
       .select("id, cpf, phone")
       .eq("partner_id", partnerId)
       .eq("email", email)
-      .eq("status", "ativo")
       .maybeSingle()
 
     if (existingCustomer) {

@@ -184,6 +184,7 @@ export type RouteKey =
     | "financial_dashboard"
     | "financial_dre"
     | "cadastros_financeiro"
+    | "reports"
     // Minha Vitrine
     | "store_customize"
     | "store_reviews"

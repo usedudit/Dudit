@@ -142,33 +142,6 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
 
                     {/* Content Body */}
                     <div className="px-3 md:px-6 py-6 max-w-[980px] mx-auto min-h-[400px]">
-                        <div className="mb-6 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface p-4">
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ativar recursos</p>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                                Recursos ativados aparecem no menu. Recursos desativados somem para deixar a operação mais limpa.
-                            </p>
-                        </div>
-
-                        {/* Always-on resources */}
-                        <div className="mb-8 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface p-4">
-                            <div className="divide-y divide-brand-border dark:divide-dark-border">
-                                <div className="flex items-center justify-between gap-4 py-3 px-0">
-                                    <div className="min-w-0">
-                                        <p className="font-bold text-brand-dark dark:text-dark-heading">Início</p>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">Página inicial do sistema.</p>
-                                    </div>
-                                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body shrink-0">Sempre ativo</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-4 py-3 px-0">
-                                    <div className="min-w-0">
-                                        <p className="font-bold text-brand-dark dark:text-dark-heading">Dashboard</p>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">Gráficos, métricas e relatórios rápidos.</p>
-                                    </div>
-                                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body shrink-0">Sempre ativo</span>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="space-y-10">
                             {(Object.keys(groupedResources) as SystemResourceModule[]).map((module, idx) => (
                                 <FormSection key={module} title={SYSTEM_RESOURCE_MODULE_LABELS[module]} hasSeparator={idx > 0}>

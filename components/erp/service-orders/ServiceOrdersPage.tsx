@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, SelectionBanner, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -18,21 +19,21 @@ import ServiceOrderForm from "./ServiceOrderForm"
 import ServiceOrderDetail from "./ServiceOrderDetail"
 import {
   PlusIcon, WrenchIcon, SearchIcon, FilterIcon, TrashIcon,
-  ListIcon, GridIcon, ArrowUpDownIcon,
+  ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon,
 } from "@/lib/icons"
+import {
+  isDatePeriodFilterActive,
+  resolveDatePeriodBounds,
+  ymdInBounds,
+  summarizeDatePeriodFilter,
+} from "@/lib/utils/filter-date-period"
 import {
   getERPServiceOrdersPageAction,
   getServiceOrderDetailsAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 
-const STATUS_FILTERS: { label: string; value: string }[] = [
-  { label: "Todas", value: "all" },
-  ...Object.entries(SERVICE_ORDER_STATUS_META).map(([value, meta]) => ({
-    label: meta.label,
-    value,
-  })),
-]
+
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
   { id: "order_number", label: "Nº OS", align: "left", width: "150px" },
@@ -60,8 +61,14 @@ export default function ServiceOrdersPage({
 }: ServiceOrdersPageProps) {
   const { toast } = useToast()
   const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
-  const [activeTab, setActiveTab] = useState("all")
+  const [filters, setFilters] = useState<any>({
+    status: [],
+    total: { min: "", max: "" },
+    expected_completion_date: { presets: [], from: "", to: "" },
+  })
+  const [activeTab, setActiveTab] = useState<string>("all")
   const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
+  const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -115,10 +122,30 @@ export default function ServiceOrdersPage({
         String(o.title || "").toLowerCase().includes(term) ||
         String(o.customer_snapshot?.name || "").toLowerCase().includes(term)
       )
-      const matchesTab = activeTab === "all" || o.status === activeTab
-      return matchesSearch && matchesTab
+      const matchesTab = activeTab === "all" ||
+        (activeTab === "aberta" && (o.status === "aberta" || o.status === "aguardando_aprovacao" || o.status === "aprovada")) ||
+        (activeTab === "em_andamento" && (o.status === "em_andamento" || o.status === "aguardando_peca")) ||
+        (activeTab === "concluida" && (o.status === "concluida" || o.status === "entregue")) ||
+        (activeTab === "cancelada" && o.status === "cancelada")
+
+      const statusMeta = SERVICE_ORDER_STATUS_META[o.status as ServiceOrderStatus]
+      const statusLabel = statusMeta?.label || o.status
+      const matchesFilterStatus = !filters.status || filters.status.length === 0 || filters.status.includes(statusLabel)
+
+      const value = Number(o.total_amount || 0)
+      const minVal = filters.total?.min ? Number(filters.total.min) : null
+      const maxVal = filters.total?.max ? Number(filters.total.max) : null
+      const matchesFilterTotal = (minVal === null || value >= minVal) && (maxVal === null || value <= maxVal)
+
+      let matchesFilterDate = true
+      if (isDatePeriodFilterActive(filters.expected_completion_date)) {
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.expected_completion_date)
+        matchesFilterDate = ymdInBounds(o.expected_completion_date, startYmd, endYmd)
+      }
+
+      return matchesSearch && matchesTab && matchesFilterStatus && matchesFilterTotal && matchesFilterDate
     })
-  }, [effectiveOrders, debouncedSearch, activeTab])
+  }, [effectiveOrders, debouncedSearch, activeTab, filters])
 
   const sortedOrders = useMemo(() => {
     if (!sortConfig) return filteredOrders
@@ -174,9 +201,81 @@ export default function ServiceOrdersPage({
       id: "status",
       title: "Status",
       type: "checkbox-list",
-      options: Object.entries(SERVICE_ORDER_STATUS_META).map(([value, meta]) => meta.label),
+      options: Object.entries(SERVICE_ORDER_STATUS_META).map(([_, meta]) => meta.label),
+    },
+    {
+      id: "total",
+      title: "Valor Total",
+      type: "range",
+      rangeConfig: {
+        minKey: "min",
+        maxKey: "max",
+        minPlaceholder: "Mín (R$)",
+        maxPlaceholder: "Máx (R$)",
+      },
+    },
+    {
+      id: "expected_completion_date",
+      title: "Data Prevista",
+      type: "date-period",
     },
   ], [])
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      (filters.status && filters.status.length > 0) ||
+      Boolean(filters.total?.min || filters.total?.max) ||
+      isDatePeriodFilterActive(filters.expected_completion_date)
+    )
+  }, [filters])
+
+  const renderGroupedBadge = (label: string, items: string[], key: string) => {
+    if (!items || items.length === 0) return null
+    const displayValue = items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`
+    const fullValue = items.join(", ")
+    return (
+      <FilterChip
+        key={key}
+        label={label}
+        value={displayValue}
+        tooltip={`${label}: ${fullValue}`}
+        onRemove={() => setFilters((prev: any) => ({ ...prev, [key]: [] }))}
+      />
+    )
+  }
+
+  const renderRangeBadge = (label: string, range: { min: string; max: string }, key: string) => {
+    if (!range || (!range.min && !range.max)) return null
+    return (
+      <FilterChip
+        key={key}
+        label={label}
+        value={`${range.min ? `R$ ${range.min}` : "R$ 0"} - ${range.max ? `R$ ${range.max}` : "∞"}`}
+        onRemove={() => setFilters((prev: any) => ({ ...prev, [key]: { min: "", max: "" } }))}
+      />
+    )
+  }
+
+  const renderDatePeriodBadge = (label: string, period: any, key: string) => {
+    if (!isDatePeriodFilterActive(period)) return null
+    const val = summarizeDatePeriodFilter(period) || ""
+    return (
+      <FilterChip
+        key={key}
+        label={label}
+        value={val}
+        onRemove={() => setFilters((prev: any) => ({ ...prev, [key]: { presets: [], from: "", to: "" } }))}
+      />
+    )
+  }
+
+  const BadgeList = () => (
+    <>
+      {renderGroupedBadge("Status", filters.status, "status")}
+      {renderRangeBadge("Valor", filters.total, "total")}
+      {renderDatePeriodBadge("Data Prevista", filters.expected_completion_date, "expected_completion_date")}
+    </>
+  )
 
   return (
     <>
@@ -244,17 +343,22 @@ export default function ServiceOrdersPage({
                 value={activeTab}
                 onValueChange={(val) => { setActiveTab(val); setPage(1) }}
               >
-                <TabsList className="px-0 flex-wrap md:flex-nowrap gap-6 w-full justify-start border-b-0">
-                  {STATUS_FILTERS.map((f) => (
-                    <TabsTrigger key={f.value} value={f.value}>
-                      {f.label}
-                      {f.value !== "all" && (
-                        <span className="ml-1.5 opacity-60 text-xs font-bold">
-                          ({effectiveOrders?.filter((o: any) => o.status === f.value).length || 0})
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  ))}
+                <TabsList className="px-0">
+                  <TabsTrigger value="all" icon={WrenchIcon}>
+                    Todas
+                  </TabsTrigger>
+                  <TabsTrigger value="aberta" icon={PlusIcon}>
+                    Abertas
+                  </TabsTrigger>
+                  <TabsTrigger value="em_andamento" icon={ClockIcon}>
+                    Em Andamento
+                  </TabsTrigger>
+                  <TabsTrigger value="concluida" icon={CheckCircleIcon}>
+                    Concluídas
+                  </TabsTrigger>
+                  <TabsTrigger value="cancelada" icon={BlockedIcon}>
+                    Canceladas
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -323,25 +427,40 @@ export default function ServiceOrdersPage({
                   >
                     Filtros
                   </Button>
+                  {hasActiveFilters && (
+                    <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1"></div>
+                  )}
                 </div>
 
-                <div className="flex-1" />
+                {/* Scrollable Badges Area (Desktop) */}
+                <div className="flex-1 min-w-0 relative h-[42px] flex items-center">
+                  <div className="overflow-x-auto hide-scrollbar flex items-center gap-2 w-full">
+                    <BadgeList />
+                  </div>
+                </div>
 
                 {/* View Toggles */}
                 <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
                   <button
                     onClick={() => setViewMode("list")}
-                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${effectiveViewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                   >
                     <ListIcon className="w-[18px] h-[18px]" />
                   </button>
                   <button
                     onClick={() => setViewMode("grid")}
-                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${effectiveViewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                   >
                     <GridIcon className="w-[18px] h-[18px]" />
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* MOBILE CHIPS CAROUSEL */}
+            <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">
+              <div className="flex items-center gap-2">
+                <BadgeList />
               </div>
             </div>
 
@@ -369,7 +488,7 @@ export default function ServiceOrdersPage({
                 />
               ) : (
                 <>
-                  {viewMode === "grid" ? (
+                  {effectiveViewMode === "grid" ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                       {paginated.map((o: any) => (
                         <ServiceOrderGridCard
@@ -383,13 +502,15 @@ export default function ServiceOrdersPage({
                             setSelection(next)
                           }}
                           onDetails={() => openEntity("view", o.id)}
+                          onEdit={() => openEntity("edit", o.id)}
+                          onDelete={() => setConfirmDelete(o.id)}
                           statusColor={statusColor(o.status)}
                           statusLabel={statusLabel(o.status)}
                         />
                       ))}
                     </div>
                   ) : (
-                    <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                    <div className="w-full overflow-hidden rounded-xl relative">
                       <div className="overflow-x-auto no-scrollbar">
                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                           <thead>
@@ -493,9 +614,13 @@ export default function ServiceOrdersPage({
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
         sections={filterSections}
-        filters={{}}
-        setFilters={() => {}}
-        onClear={() => setShowFilters(false)}
+        filters={filters}
+        setFilters={setFilters}
+        onClear={() => setFilters({
+          status: [],
+          total: { min: "", max: "" },
+          expected_completion_date: { presets: [], from: "", to: "" },
+        })}
       />
     </>
   )

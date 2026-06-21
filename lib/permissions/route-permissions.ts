@@ -112,6 +112,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         specificPermissions: ["can_view_dre"],
     },
     cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/transactions/cadastros-financeiro", label: "Cadastros financeiros", category: "Financeiro", legacyCategory: "financial" },
+    reports: { key: "reports", path: "/erp/reports", label: "Relatórios", category: "Relatórios" },
 
     // ── Minha Vitrine
     store_customize: {
@@ -231,6 +232,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     financial_dashboard: full,
     financial_dre: withSpecific(full, { can_view_dre: true }),
     cadastros_financeiro: full,
+    reports: full,
     // Vitrine
     store_customize: withSpecific(full, { can_customize_store: true }),
     store_reviews: withSpecific(full, { can_respond_reviews: true }),
@@ -303,6 +305,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     financial_dashboard: viewOnly,
     financial_dre: withSpecific(viewOnly, { can_view_dre: true }),
     cadastros_financeiro: full,
+    reports: viewOnly,
     // Vitrine
     store_customize: withSpecific(crud, { can_customize_store: true }),
     store_reviews: withSpecific(viewOnly, { can_respond_reviews: true }),
@@ -361,6 +364,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     financial_dashboard: noAccess,
     financial_dre: noAccess,
     cadastros_financeiro: noAccess,
+    reports: noAccess,
     // Vitrine - no access
     store_customize: noAccess,
     store_reviews: noAccess,
@@ -415,6 +419,7 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     financial_dashboard: noAccess,
     financial_dre: noAccess,
     cadastros_financeiro: noAccess,
+    reports: noAccess,
     // Vitrine - no access
     store_customize: noAccess,
     store_reviews: noAccess,
@@ -790,6 +795,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
     if (legacy.reports) {
         apply("financial_dashboard", { access: legacy.reports.view_basic })
         apply("financial_dre", { access: legacy.reports.view_advanced, specific: { can_view_dre: legacy.reports.view_advanced } })
+        apply("reports", { access: legacy.reports.view_basic || legacy.reports.view_advanced })
     }
 
     if (legacy.team) {

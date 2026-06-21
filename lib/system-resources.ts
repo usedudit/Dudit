@@ -93,12 +93,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     module: "catalog",
     minimumPlan: "crescer",
   },
-  {
-    id: "showcase",
-    label: "Minha Vitrine",
-    description: "Vitrine online para divulgação de produtos e serviços.",
-    module: "catalog",
-  },
+
   {
     id: "services",
     label: "Serviços",
@@ -159,12 +154,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     module: "management",
     minimumPlan: "crescer",
   },
-  {
-    id: "marketing",
-    label: "Marketing",
-    description: "Planos recorrentes e assinaturas.",
-    module: "marketing",
-  },
+
   {
     id: "coupons",
     label: "Cupons de Desconto",
@@ -181,7 +171,11 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   },
 ]
 
-export const SYSTEM_RESOURCE_IDS = SYSTEM_RESOURCES.map((resource) => resource.id)
+export const SYSTEM_RESOURCE_IDS: SystemResourceId[] = [
+  ...SYSTEM_RESOURCES.map((resource) => resource.id),
+  "marketing",
+  "showcase",
+]
 
 export function normalizeActiveResources(value: unknown): SystemResourceId[] {
   if (!Array.isArray(value)) {
