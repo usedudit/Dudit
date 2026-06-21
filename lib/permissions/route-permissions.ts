@@ -83,6 +83,15 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "services", path: "/erp/servicos", label: "Catálogo de Serviços", category: "Serviços", legacyCategory: "services",
         specificPermissions: ["can_change_service_price"],
     },
+    service_orders: {
+        key: "service_orders", path: "/erp/service-orders", label: "Ordens de Serviço", category: "Serviços", legacyCategory: "services",
+        specificPermissions: [
+            "can_assign_technician",
+            "can_change_status",
+            "can_request_signature",
+            "can_generate_invoice",
+        ],
+    },
     cadastros_services: { key: "cadastros_services", path: "/erp/cadastros-services", label: "Cadastros", category: "Serviços", legacyCategory: "services" },
 
     // ── Clientes
@@ -209,6 +218,10 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
         can_update_appointment_status: true,
     }),
     services: withSpecific(full, { can_change_service_price: true }),
+    service_orders: withSpecific(full, {
+        can_assign_technician: true, can_change_status: true,
+        can_request_signature: true, can_generate_invoice: true,
+    }),
     cadastros_services: full,
     // Clientes
     customers: full,
@@ -277,6 +290,10 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
         can_update_appointment_status: true,
     }),
     services: withSpecific(full, { can_change_service_price: true }),
+    service_orders: withSpecific(full, {
+        can_assign_technician: true, can_change_status: true,
+        can_request_signature: true, can_generate_invoice: false,
+    }),
     cadastros_services: full,
     // Clientes
     customers: full,
@@ -331,6 +348,10 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
         can_update_appointment_status: true,
     }),
     services: viewOnly,
+    service_orders: withSpecific(crud, {
+        can_assign_technician: false, can_change_status: true,
+        can_request_signature: false, can_generate_invoice: false,
+    }),
     cadastros_services: viewOnly,
     // Clientes - CRUD sem exclusão
     customers: crud,
@@ -384,6 +405,7 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     // Serviços - no access
     appointments: noAccess,
     services: noAccess,
+    service_orders: noAccess,
     cadastros_services: noAccess,
     // Clientes - no access
     customers: noAccess,
@@ -576,7 +598,7 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             settings_comissions: mapRoute("settings").view,
             settings_returns: mapRoute("returns").view,
             settings_vitrine: mapRoute("store_customize").view,
-            settings_os: mapRoute("appointments").view,
+            settings_os: mapRoute("service_orders").view,
             settings_messages: mapRoute("settings").view,
             settings_delivery: mapRoute("logistics").view,
             settings_integrations: mapRoute("settings_integrations").view,
@@ -642,7 +664,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
 
     if (legacy.services) {
         const mapped = mapLegacy(legacy.services)
-            ;["appointments", "services", "cadastros_services"].forEach((routeKey) =>
+            ;["appointments", "services", "service_orders", "cadastros_services"].forEach((routeKey) =>
                 apply(routeKey as RouteKey, mapped)
             )
     }

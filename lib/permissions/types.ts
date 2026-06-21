@@ -174,6 +174,7 @@ export type RouteKey =
     // Serviços
     | "appointments"
     | "services"
+    | "service_orders"
     | "cadastros_services"
     // Clientes
     | "customers"

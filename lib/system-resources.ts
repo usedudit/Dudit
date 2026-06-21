@@ -18,6 +18,7 @@ export type SystemResourceId =
   | "returns"
   | "stockMovements"
   | "productCadastros"
+  | "serviceOrders"
   | "serviceCadastros"
   | "coupons"
   | "campaigns"
@@ -109,6 +110,13 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     label: "Agendamentos",
     description: "Agenda de serviços e atendimentos.",
     module: "services",
+  },
+  {
+    id: "serviceOrders",
+    label: "Ordens de Serviço",
+    description: "Ordens de serviço e acompanhamento.",
+    module: "services",
+    minimumPlan: "crescer",
   },
   {
     id: "serviceCadastros",

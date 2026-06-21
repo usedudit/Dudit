@@ -26,6 +26,7 @@ export type PermissionTemplate = {
     can_add_delivery: boolean
   }
   services: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  service_orders: { view: boolean; create: boolean; edit: boolean; delete: boolean; can_assign_technician: boolean; can_change_status: boolean }
   quotes: { view: boolean; create: boolean; edit: boolean; delete: boolean; can_apply_discount: boolean }
   financial: { view: boolean; create: boolean; edit: boolean; cancel: boolean }
   categories: { view: boolean; create: boolean; edit: boolean; delete: boolean }

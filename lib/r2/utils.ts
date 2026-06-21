@@ -32,6 +32,10 @@ export const R2_PREFIXES = {
   customers: "customers/",
   orders: "orders/",
   temp: "temp/",
+  serviceOrders: "service-orders/",
+  serviceOrderSignatures: "service-orders/signatures/",
+  serviceOrderAttachments: "service-orders/attachments/",
+  serviceOrderPdfs: "service-orders/pdfs/",
 } as const
 
 export type R2Prefix = (typeof R2_PREFIXES)[keyof typeof R2_PREFIXES]

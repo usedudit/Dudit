@@ -76,7 +76,7 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Catálogo de Serviços", href: "/erp/servicos" },
             { label: "Agendamentos", href: "/erp/agendamentos" },
-            { label: "Ordens de Serviço", href: "/" },
+            { label: "Ordens de Serviço", href: "/erp/service-orders" },
             { label: "Cadastros de Serviços", href: "/erp/servicos/cadastros" },
         ],
     },
@@ -145,6 +145,7 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/coupons": "crescer",
     "/erp/promotions": "escalar",
     "/erp/goals": "crescer",
+    "/erp/service-orders": "crescer",
     "/erp/returns": "crescer",
     "/erp/suppliers": "crescer",
     "/erp/xml-import": "crescer",
@@ -247,6 +248,7 @@ export function ERPSidebar() {
     const deliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
     const financialResourceActive = isSystemResourceActive(businessInfo, "financial")
     const appointmentsResourceActive = isSystemResourceActive(businessInfo, "appointments")
+    const serviceOrdersResourceActive = isSystemResourceActive(businessInfo, "serviceOrders")
     const serviceCadastrosResourceActive = isSystemResourceActive(businessInfo, "serviceCadastros")
     const customersResourceActive = isSystemResourceActive(businessInfo, "customers")
     const reportsResourceActive = isSystemResourceActive(businessInfo, "reports")
@@ -255,7 +257,7 @@ export function ERPSidebar() {
     const campaignsResourceActive = isSystemResourceActive(businessInfo, "campaigns")
     const showcaseResourceActive = isSystemResourceActive(businessInfo, "showcase")
     const salesGroupActive = ordersResourceActive || quotesResourceActive || goalsResourceActive || returnsResourceActive || posResourceActive || deliveriesResourceActive
-    const servicesGroupActive = servicesResourceActive || appointmentsResourceActive || serviceCadastrosResourceActive
+    const servicesGroupActive = servicesResourceActive || appointmentsResourceActive || serviceOrdersResourceActive || serviceCadastrosResourceActive
 
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
@@ -331,6 +333,7 @@ export function ERPSidebar() {
                         }
                         if (item.href === "/erp/servicos") {
                             if (sub.href === "/erp/agendamentos") return appointmentsResourceActive
+                            if (sub.href === "/erp/service-orders") return serviceOrdersResourceActive
                             if (sub.href === "/erp/servicos/cadastros") return serviceCadastrosResourceActive
                             return servicesResourceActive
                         }
