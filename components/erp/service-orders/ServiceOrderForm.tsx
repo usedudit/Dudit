@@ -200,22 +200,22 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         subtotal,
         customerId: customerId || null,
       })
-      if (res.success && res.data) {
-        const c = res.data
+      if (res.valid && res.pricingCoupon) {
+        const c = res.pricingCoupon
         setCouponId(c.id)
-        setCouponDiscountAmount(Number(c.discount_amount || 0))
+        setCouponDiscountAmount(Number(res.discountAmount || 0))
         setDiscountType("coupon")
         setDiscountValue(0)
         setCouponPricingData({
           id: c.id,
-          discountType: c.discount_type as any,
-          discountValue: c.discount_value != null ? Number(c.discount_value) : null,
-          maxDiscountValue: c.max_discount_value != null ? Number(c.max_discount_value) : null,
-          freeShipping: c.discount_type === "free_shipping" || !!c.free_shipping
+          discountType: c.discountType as any,
+          discountValue: c.discountValue != null ? Number(c.discountValue) : null,
+          maxDiscountValue: c.maxDiscountValue != null ? Number(c.maxDiscountValue) : null,
+          freeShipping: c.freeShipping || false
         })
         toast({ description: "Cupom aplicado com sucesso!" })
       } else {
-        toast({ description: res.error || "Cupom inválido." })
+        toast({ description: res.errorMessage || "Cupom inválido." })
         setCouponCode("")
       }
     } finally {
@@ -1108,22 +1108,22 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
               subtotal,
               customerId: customerId || null,
             })
-            if (res.success && res.data) {
-              const c = res.data
+            if (res.valid && res.pricingCoupon) {
+              const c = res.pricingCoupon
               setCouponId(c.id)
-              setCouponDiscountAmount(Number(c.discount_amount || 0))
+              setCouponDiscountAmount(Number(res.discountAmount || 0))
               setDiscountType("coupon")
               setDiscountValue(0)
               setCouponPricingData({
                 id: c.id,
-                discountType: c.discount_type as any,
-                discountValue: c.discount_value != null ? Number(c.discount_value) : null,
-                maxDiscountValue: c.max_discount_value != null ? Number(c.max_discount_value) : null,
-                freeShipping: c.discount_type === "free_shipping" || !!c.free_shipping
+                discountType: c.discountType as any,
+                discountValue: c.discountValue != null ? Number(c.discountValue) : null,
+                maxDiscountValue: c.maxDiscountValue != null ? Number(c.maxDiscountValue) : null,
+                freeShipping: c.freeShipping || false
               })
               toast({ description: "Cupom aplicado com sucesso!" })
             } else {
-              toast({ description: res.error || "Cupom inválido." })
+              toast({ description: res.errorMessage || "Cupom inválido." })
               setCouponCode("")
             }
           } finally {

@@ -135,13 +135,13 @@ export async function createServiceOrderAction(
     title: string
     description?: string
     internal_notes?: string
-    customer_id?: string
-    expected_completion_date?: string
-    assigned_user_id?: string
+    customer_id?: string | null
+    expected_completion_date?: string | null
+    assigned_user_id?: string | null
     status?: string
     priority?: string
-    estimated_hours?: number
-    expected_completion_time?: string
+    estimated_hours?: number | null
+    expected_completion_time?: string | null
     discount_value?: number
     discount_type?: string
     coupon_id?: string | null
@@ -150,7 +150,7 @@ export async function createServiceOrderAction(
     other_costs?: number
     payment_status?: string
     paid_amount?: number
-    payment_method?: string
+    payment_method?: string | null
     payment_breakdown?: any
   },
 ): Promise<{ success: true; data: any; orderNumber: string } | { success: false; error: string }> {
@@ -1059,7 +1059,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
       if (saleId) {
         // Insert sale_items for services and products
         const saleItems: any[] = []
-        orderServices.forEach(s => {
+        orderServices.forEach((s: any) => {
           saleItems.push({
             sale_id: saleId,
             partner_id: payload.partnerId,
@@ -1074,7 +1074,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
           })
         })
 
-        orderProducts.forEach(p => {
+        orderProducts.forEach((p: any) => {
           saleItems.push({
             sale_id: saleId,
             partner_id: payload.partnerId,
