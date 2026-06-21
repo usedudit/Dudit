@@ -7,9 +7,9 @@ import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
 
 export const metadata: Metadata = {
-    title: "Dudit | Tudo o que sua cidade tem",
+    title: "Dudit | Achou, anunciou, resolveu",
     description:
-        "Descubra, compre, venda e organize. Tudo em um só lugar.",
+        "Descubra oportunidades, anuncie o que quiser e gerencie seu negócio sem complicação.",
     keywords: [
         "vender online sem taxa",
         "vitrine digital",
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
         "divulgar serviços locais",
     ],
     openGraph: {
-        title: "Dudit | Tudo o que sua cidade tem",
+        title: "Dudit | Achou, anunciou, resolveu",
         description:
-            "Descubra, compre, venda e organize. Tudo em um só lugar.",
+            "Descubra oportunidades, anuncie o que quiser e gerencie seu negócio sem complicação.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [

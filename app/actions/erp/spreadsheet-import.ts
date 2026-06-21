@@ -85,7 +85,7 @@ export async function uploadPlanilhaAction(
     }
 
     const previewProducts = readResult.rows.slice(0, 50).map((row, i) =>
-      rowToPreviewProduct(row, mapping, i)
+      rowToPreviewEntity(detectedEntity, row, mapping, i)
     )
 
     return {
@@ -223,7 +223,7 @@ export async function applyMappingAction(
     }
 
     const previewProducts = session.rows.slice(0, 50).map((row, i) =>
-      rowToPreviewProduct(row, mapping, i)
+      rowToPreviewEntity(session.entityType, row, mapping, i)
     )
 
     return { success: true, previewProducts }
@@ -262,11 +262,58 @@ export async function listImportsAction(
   }
 }
 
-function rowToPreviewProduct(row: string[], mapping: ColumnMapping[], index: number): Record<string, any> {
+function rowToPreviewEntity(
+  entityType: EntityType,
+  row: string[],
+  mapping: ColumnMapping[],
+  index: number
+): Record<string, any> {
   const get = (field: string) => {
     const col = mapping.find((m) => m.field === field)
     if (!col || col.headerIndex >= row.length) return null
     return row[col.headerIndex]?.trim() || null
+  }
+
+  if (entityType === "customers") {
+    const name = get("name") || `Cliente ${index + 1}`
+    return {
+      id: `import-${Date.now()}-${index}`,
+      name,
+      email: get("email"),
+      phone: get("phone"),
+      phone_fixed: get("phone_fixed"),
+      cpf: get("cpf"),
+      cnpj: get("cnpj"),
+      birth_date: get("birth_date"),
+      notes: get("notes"),
+      street: get("street"),
+      number: get("number"),
+      complement: get("complement"),
+      neighborhood: get("neighborhood"),
+      city: get("city"),
+      state: get("state"),
+      zip_code: get("zip_code"),
+      is_active: true,
+      created_at: new Date().toISOString(),
+    }
+  }
+
+  if (entityType === "services") {
+    const name = get("name") || `Serviço ${index + 1}`
+    const price = get("price") ? parseFloat(get("price")!.replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
+    return {
+      id: `import-${Date.now()}-${index}`,
+      name,
+      sku: get("sku"),
+      price,
+      cost_price: get("cost_price") ? parseFloat(get("cost_price")!.replace(",", ".").replace(/[^0-9.\-]/g, "")) : null,
+      description: get("description"),
+      category: get("category"),
+      duration_minutes: get("duration_minutes") ? parseInt(get("duration_minutes")!.replace(/\D/g, "")) : 60,
+      unit: get("unit") || "Serviço",
+      is_active: true,
+      created_at: new Date().toISOString(),
+    }
   }
 
   const name = get("name") || `Item ${index + 1}`

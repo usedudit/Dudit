@@ -41,11 +41,11 @@ const QuickModeItemCard = ({
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col h-full relative"
+            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-5 hover:border-brand-green/30 dark:hover:border-brand-green/30 transition-all duration-300 flex flex-col h-full relative"
         >
             <div className="flex gap-4 mb-4">
                 {/* Imagem */}
-                <div className="w-16 h-16 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden border border-brand-border dark:border-dark-border">
+                <div className="w-16 h-16 rounded-[16px] bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden border border-brand-border dark:border-dark-border">
                     <img
                         src={imageUrl}
                         alt={item.name}

@@ -299,8 +299,11 @@ async function importCustomerBatch(
   let duplicates = 0
   let warnings = 0
 
+  // Collect all unique emails and CPFs to check in bulk
+  const emails = [...new Set(batch.map((r) => r["email"]?.trim()).filter(Boolean))] as string[]
+  const rawCpfs = [...new Set(batch.map((r) => r["cpf"]?.replace(/\D/g, "")).filter((c): c is string => !!c && c.length === 11))]
+
   const existingEmails = new Set<string>()
-  const emails = batch.map((r) => r["email"]?.trim()).filter(Boolean) as string[]
   if (emails.length > 0) {
     const { data: existing } = await supabase
       .from("customers")
@@ -309,6 +312,29 @@ async function importCustomerBatch(
       .in("email", emails)
     for (const e of existing || []) {
       if (e.email) existingEmails.add(e.email)
+    }
+  }
+
+  const existingCpfs = new Set<string>()
+  if (rawCpfs.length > 0) {
+    const { data: allCpfs } = await supabase
+      .from("customers")
+      .select("cpf")
+      .eq("partner_id", partnerId)
+      .not("cpf", "is", null)
+
+    if (allCpfs?.length) {
+      const { decryptCPF } = await import("@/lib/crypto")
+      for (const row of allCpfs) {
+        try {
+          const decrypted = await decryptCPF(row.cpf)
+          if (rawCpfs.includes(decrypted)) {
+            existingCpfs.add(decrypted)
+          }
+        } catch {
+          continue
+        }
+      }
     }
   }
 
@@ -328,8 +354,13 @@ async function importCustomerBatch(
       continue
     }
 
-    let cpfEncrypted = null
     const rawCpf = row["cpf"]?.replace(/\D/g, "")
+    if (rawCpf && rawCpf.length === 11 && existingCpfs.has(rawCpf)) {
+      duplicates++
+      continue
+    }
+
+    let cpfEncrypted = null
     if (rawCpf && rawCpf.length === 11) {
       try {
         cpfEncrypted = await encryptCPF(rawCpf)

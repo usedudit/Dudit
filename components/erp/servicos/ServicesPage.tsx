@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
@@ -42,7 +43,8 @@ import {
     ArrowUpDownIcon,
     TrashIcon,
     CheckCircleIcon,
-    BlockedIcon
+    BlockedIcon,
+    UploadIcon
 } from "@/lib/icons"
 
 // --- TYPES & INTERFACES ---
@@ -146,6 +148,7 @@ export default function ServicesPage({
     partnerId,
     partner,
 }: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; partner?: any; }) {
+    const router = useRouter()
     const { toast } = useToast()
     const { exportData, isExporting } = useErpExport()
     const { selectedStore } = useStore()
@@ -533,10 +536,17 @@ export default function ServicesPage({
 
                                 <div className="flex items-center gap-3">
                                     <Button
+                                        variant="outline"
+                                        onClick={() => router.push("/erp/servicos/import")}
+                                        leftIcon={<UploadIcon size={16} />}
+                                    >
+                                        Importar
+                                    </Button>
+                                    <Button
                                         onClick={handleAddFirstService}
                                         className="w-full"
+                                        leftIcon={<PlusIcon size={16} />}
                                     >
-                                        <PlusIcon size={16} />
                                         Novo serviço
                                     </Button>
                                 </div>

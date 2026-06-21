@@ -139,6 +139,19 @@ export async function createServiceOrderAction(
     expected_completion_date?: string
     assigned_user_id?: string
     status?: string
+    priority?: string
+    estimated_hours?: number
+    expected_completion_time?: string
+    discount_value?: number
+    discount_type?: string
+    coupon_id?: string | null
+    coupon_code?: string | null
+    coupon_discount_amount?: number
+    other_costs?: number
+    payment_status?: string
+    paid_amount?: number
+    payment_method?: string
+    payment_breakdown?: any
   },
 ): Promise<{ success: true; data: any; orderNumber: string } | { success: false; error: string }> {
   try {
@@ -168,6 +181,19 @@ export async function createServiceOrderAction(
         assigned_user_id: input.assigned_user_id || null,
         status,
         created_by: user.id,
+        priority: input.priority || 'media',
+        estimated_hours: input.estimated_hours || null,
+        expected_completion_time: input.expected_completion_time || null,
+        discount_value: input.discount_value || 0,
+        discount_type: input.discount_type || 'fixed',
+        coupon_id: input.coupon_id || null,
+        coupon_code: input.coupon_code || null,
+        coupon_discount_amount: input.coupon_discount_amount || 0,
+        other_costs: input.other_costs || 0,
+        payment_status: input.payment_status || 'unpaid',
+        paid_amount: input.paid_amount || 0,
+        payment_method: input.payment_method || null,
+        payment_breakdown: input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null,
       })
       .select("*")
       .single()
@@ -213,7 +239,7 @@ export async function createServiceOrderAction(
 async function getCustomerSnapshot(admin: any, customerId: string) {
   const { data } = await admin
     .from("customers")
-    .select("id, name, email, phone, address, cpf_cnpj, city, state, zip_code")
+    .select("id, name, email, phone, cpf_cnpj, city, state, zip_code")
     .eq("id", customerId)
     .single()
   return data || null
@@ -222,7 +248,7 @@ async function getCustomerSnapshot(admin: any, customerId: string) {
 export async function addServicesToOrderAction(
   partnerId: string,
   serviceOrderId: string,
-  services: { service_id: string; quantity?: number }[],
+  services: { service_id: string | null; service_name?: string; service_price?: number; quantity?: number }[],
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -230,22 +256,29 @@ export async function addServicesToOrderAction(
     const user = await requireUser()
     const admin = getAdminClient()
 
-    const { data: svcRows, error: svcErr } = await admin
-      .from("services")
-      .select("id, name, price, cost_price")
-      .in("id", services.map(s => s.service_id))
-    if (svcErr) throw svcErr
+    const validServiceIds = services.map(s => s.service_id).filter((id): id is string => !!id)
+    let svcRows: any[] = []
+    if (validServiceIds.length > 0) {
+      const { data, error: svcErr } = await admin
+        .from("services")
+        .select("id, name, price, cost_price")
+        .in("id", validServiceIds)
+      if (svcErr) throw svcErr
+      svcRows = data || []
+    }
 
     const items = services.map((s, idx) => {
-      const svc = svcRows?.find((r: any) => r.id === s.service_id)
+      const svc = s.service_id ? svcRows.find((r: any) => r.id === s.service_id) : null
       const qty = s.quantity || 1
+      const name = s.service_name || svc?.name || "Serviço avulso"
+      const price = s.service_price !== undefined ? s.service_price : (svc?.price || 0)
       return {
         service_order_id: serviceOrderId,
-        service_id: s.service_id,
-        service_name: svc?.name || "Serviço removido",
-        service_price: svc?.price || 0,
+        service_id: s.service_id || null,
+        service_name: name,
+        service_price: price,
         quantity: qty,
-        total_price: (svc?.price || 0) * qty,
+        total_price: price * qty,
         sort_order: idx,
       }
     })
@@ -272,7 +305,7 @@ export async function addServicesToOrderAction(
 export async function addProductsToOrderAction(
   partnerId: string,
   serviceOrderId: string,
-  products: { product_id: string; variant_id?: string; quantity?: number }[],
+  products: { product_id: string | null; variant_id?: string | null; product_name?: string; unit_price?: number; quantity?: number }[],
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -280,23 +313,30 @@ export async function addProductsToOrderAction(
     const user = await requireUser()
     const admin = getAdminClient()
 
-    const { data: prodRows, error: prodErr } = await admin
-      .from("products")
-      .select("id, name, price, cost_price")
-      .in("id", products.map(p => p.product_id))
-    if (prodErr) throw prodErr
+    const validProductIds = products.map(p => p.product_id).filter((id): id is string => !!id)
+    let prodRows: any[] = []
+    if (validProductIds.length > 0) {
+      const { data, error: prodErr } = await admin
+        .from("products")
+        .select("id, name, price, cost_price")
+        .in("id", validProductIds)
+      if (prodErr) throw prodErr
+      prodRows = data || []
+    }
 
     const items = products.map((p, idx) => {
-      const prod = prodRows?.find((r: any) => r.id === p.product_id)
+      const prod = p.product_id ? prodRows.find((r: any) => r.id === p.product_id) : null
       const qty = p.quantity || 1
+      const name = p.product_name || prod?.name || "Produto avulso"
+      const price = p.unit_price !== undefined ? p.unit_price : (prod?.price || 0)
       return {
         service_order_id: serviceOrderId,
-        product_id: p.product_id,
+        product_id: p.product_id || null,
         variant_id: p.variant_id || null,
-        product_name: prod?.name || "Produto removido",
-        unit_price: prod?.price || 0,
+        product_name: name,
+        unit_price: price,
         quantity: qty,
-        total_price: (prod?.price || 0) * qty,
+        total_price: price * qty,
         sort_order: idx,
       }
     })
@@ -599,6 +639,12 @@ export async function deleteServiceOrderAction(
 }
 
 async function recalcTotals(admin: any, serviceOrderId: string) {
+  const { data: order } = await admin
+    .from("service_orders")
+    .select("discount_value, discount_type, coupon_discount_amount, other_costs")
+    .eq("id", serviceOrderId)
+    .single()
+
   const { data: services } = await admin
     .from("service_order_services")
     .select("total_price")
@@ -611,14 +657,30 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
 
   const totalService = (services || []).reduce((sum: number, s: any) => sum + Number(s.total_price || 0), 0)
   const totalProduct = (products || []).reduce((sum: number, p: any) => sum + Number(p.total_price || 0), 0)
-  const total = totalService + totalProduct
+  const subtotal = totalService + totalProduct
+
+  const discVal = Number(order?.discount_value || 0)
+  const discType = order?.discount_type || 'fixed'
+  const couponDisc = Number(order?.coupon_discount_amount || 0)
+  const otherCosts = Number(order?.other_costs || 0)
+
+  let discountAmount = 0
+  if (discType === 'percentage') {
+    discountAmount = (subtotal * discVal) / 100
+  } else if (discType === 'fixed') {
+    discountAmount = discVal
+  } else if (discType === 'coupon') {
+    discountAmount = couponDisc
+  }
+
+  const finalTotal = Math.max(0, subtotal - discountAmount + otherCosts)
 
   await admin
     .from("service_orders")
     .update({
       total_service_amount: totalService,
       total_product_amount: totalProduct,
-      total_amount: total,
+      total_amount: finalTotal,
     })
     .eq("id", serviceOrderId)
 }
@@ -692,6 +754,19 @@ export async function updateServiceOrderAction(
     expected_completion_date?: string | null
     assigned_user_id?: string | null
     status?: string
+    priority?: string
+    estimated_hours?: number | null
+    expected_completion_time?: string | null
+    discount_value?: number
+    discount_type?: string
+    coupon_id?: string | null
+    coupon_code?: string | null
+    coupon_discount_amount?: number
+    other_costs?: number
+    payment_status?: string
+    paid_amount?: number
+    payment_method?: string | null
+    payment_breakdown?: any
   },
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
@@ -720,6 +795,21 @@ export async function updateServiceOrderAction(
     if (input.expected_completion_date !== undefined) updateData.expected_completion_date = input.expected_completion_date
     if (input.assigned_user_id !== undefined) updateData.assigned_user_id = input.assigned_user_id
     if (input.status !== undefined) updateData.status = input.status
+    if (input.priority !== undefined) updateData.priority = input.priority
+    if (input.estimated_hours !== undefined) updateData.estimated_hours = input.estimated_hours
+    if (input.expected_completion_time !== undefined) updateData.expected_completion_time = input.expected_completion_time
+    if (input.discount_value !== undefined) updateData.discount_value = input.discount_value
+    if (input.discount_type !== undefined) updateData.discount_type = input.discount_type
+    if (input.coupon_id !== undefined) updateData.coupon_id = input.coupon_id
+    if (input.coupon_code !== undefined) updateData.coupon_code = input.coupon_code
+    if (input.coupon_discount_amount !== undefined) updateData.coupon_discount_amount = input.coupon_discount_amount
+    if (input.other_costs !== undefined) updateData.other_costs = input.other_costs
+    if (input.payment_status !== undefined) updateData.payment_status = input.payment_status
+    if (input.paid_amount !== undefined) updateData.paid_amount = input.paid_amount
+    if (input.payment_method !== undefined) updateData.payment_method = input.payment_method
+    if (input.payment_breakdown !== undefined) {
+      updateData.payment_breakdown = input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null
+    }
 
     const { data, error } = await admin
       .from("service_orders")
@@ -753,7 +843,7 @@ export async function updateServiceOrderAction(
 export async function syncServiceOrderServicesAction(
   partnerId: string,
   serviceOrderId: string,
-  services: { service_id: string; quantity: number }[],
+  services: { service_id: string | null; service_name?: string; service_price?: number; quantity: number }[],
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -769,22 +859,29 @@ export async function syncServiceOrderServicesAction(
 
     if (services.length > 0) {
       // 2. Fetch service names/prices
-      const { data: svcRows, error: svcErr } = await admin
-        .from("services")
-        .select("id, name, price")
-        .in("id", services.map(s => s.service_id))
-      if (svcErr) throw svcErr
+      const validServiceIds = services.map(s => s.service_id).filter((id): id is string => !!id)
+      let svcRows: any[] = []
+      if (validServiceIds.length > 0) {
+        const { data: dataRows, error: svcErr } = await admin
+          .from("services")
+          .select("id, name, price")
+          .in("id", validServiceIds)
+        if (svcErr) throw svcErr
+        svcRows = dataRows || []
+      }
 
       const items = services.map((s, idx) => {
-        const svc = svcRows?.find((r: any) => r.id === s.service_id)
+        const svc = s.service_id ? svcRows.find((r: any) => r.id === s.service_id) : null
         const qty = s.quantity || 1
+        const name = s.service_name || svc?.name || "Serviço avulso"
+        const price = s.service_price !== undefined ? s.service_price : (svc?.price || 0)
         return {
           service_order_id: serviceOrderId,
-          service_id: s.service_id,
-          service_name: svc?.name || "Serviço removido",
-          service_price: svc?.price || 0,
+          service_id: s.service_id || null,
+          service_name: name,
+          service_price: price,
           quantity: qty,
-          total_price: (svc?.price || 0) * qty,
+          total_price: price * qty,
           sort_order: idx,
         }
       })
@@ -804,7 +901,7 @@ export async function syncServiceOrderServicesAction(
 export async function syncServiceOrderProductsAction(
   partnerId: string,
   serviceOrderId: string,
-  products: { product_id: string; variant_id?: string | null; quantity: number }[],
+  products: { product_id: string | null; variant_id?: string | null; product_name?: string; unit_price?: number; quantity: number }[],
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -820,23 +917,30 @@ export async function syncServiceOrderProductsAction(
 
     if (products.length > 0) {
       // 2. Fetch product names/prices
-      const { data: prodRows, error: prodErr } = await admin
-        .from("products")
-        .select("id, name, price")
-        .in("id", products.map(p => p.product_id))
-      if (prodErr) throw prodErr
+      const validProductIds = products.map(p => p.product_id).filter((id): id is string => !!id)
+      let prodRows: any[] = []
+      if (validProductIds.length > 0) {
+        const { data: dataRows, error: prodErr } = await admin
+          .from("products")
+          .select("id, name, price")
+          .in("id", validProductIds)
+        if (prodErr) throw prodErr
+        prodRows = dataRows || []
+      }
 
       const items = products.map((p, idx) => {
-        const prod = prodRows?.find((r: any) => r.id === p.product_id)
+        const prod = p.product_id ? prodRows.find((r: any) => r.id === p.product_id) : null
         const qty = p.quantity || 1
+        const name = p.product_name || prod?.name || "Produto avulso"
+        const price = p.unit_price !== undefined ? p.unit_price : (prod?.price || 0)
         return {
           service_order_id: serviceOrderId,
-          product_id: p.product_id,
+          product_id: p.product_id || null,
           variant_id: p.variant_id || null,
-          product_name: prod?.name || "Produto removido",
-          unit_price: prod?.price || 0,
+          product_name: name,
+          unit_price: price,
           quantity: qty,
-          total_price: (prod?.price || 0) * qty,
+          total_price: price * qty,
           sort_order: idx,
         }
       })
@@ -850,5 +954,256 @@ export async function syncServiceOrderProductsAction(
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao sincronizar produtos" }
+  }
+}
+
+export async function confirmServiceOrderPaymentAction(payload: {
+  serviceOrderId: string
+  partnerId: string
+  paymentStatus: "paid" | "partially_paid" | "unpaid"
+  paidAmount: number
+  paymentMethod: string
+  paymentBreakdown?: Array<{
+    method: string
+    amount: number
+    paymentMethodId?: string | null
+    installmentNumber?: number
+  }>
+  paymentProvider?: string | null
+  mpPaymentId?: string | null
+  financeAccountId?: string | null
+  notes?: string
+}) {
+  try {
+    const user = await requireUser()
+    if (!user) return { success: false, error: "Não autenticado" }
+    await requirePermission(payload.partnerId, "service_orders", "edit")
+
+    const supabase = await getSupabaseServerClient()
+
+    // 1. Get the service order
+    const { data: order, error: orderErr } = await supabase
+      .from("service_orders")
+      .select("*")
+      .eq("id", payload.serviceOrderId)
+      .eq("partner_id", payload.partnerId)
+      .single()
+
+    if (orderErr || !order) {
+      throw new Error("Ordem de serviço não encontrada")
+    }
+
+    // 2. Fetch services and products to build sale items
+    const [servicesRes, productsRes] = await Promise.all([
+      supabase.from("service_order_services").select("*").eq("service_order_id", order.id),
+      supabase.from("service_order_products").select("*").eq("service_order_id", order.id),
+    ])
+
+    const orderServices = servicesRes.data || []
+    const orderProducts = productsRes.data || []
+
+    const totalAmount = Number(order.total_amount || 0)
+
+    // 3. Update the service order's payment info
+    const { error: updateErr } = await supabase
+      .from("service_orders")
+      .update({
+        payment_status: payload.paymentStatus,
+        paid_amount: payload.paidAmount,
+        payment_method: payload.paymentMethod || null,
+        payment_breakdown: payload.paymentBreakdown ? JSON.stringify(payload.paymentBreakdown) : null,
+      })
+      .eq("id", order.id)
+
+    if (updateErr) throw updateErr
+
+    // 4. Create or update sale in `sales` table
+    const saleRefNote = `service_order:${order.id}:sale`
+    const { data: existingSale } = await supabase
+      .from("sales")
+      .select("id, sale_number")
+      .eq("partner_id", payload.partnerId)
+      .eq("notes", saleRefNote)
+      .limit(1)
+      .maybeSingle()
+
+    let saleId = existingSale?.id || null
+    let saleNumber = existingSale?.sale_number || null
+
+    if (!saleId) {
+      const { data: saleNumberData } = await supabase.rpc("generate_sale_number")
+      saleNumber = String(saleNumberData || "").trim() || `OS-DDT-${String(order.id).slice(0, 8).toUpperCase()}`
+
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .insert({
+          partner_id: payload.partnerId,
+          customer_id: order.customer_id || null,
+          total_amount: totalAmount,
+          discount_amount: Number(order.discount_value || 0) + Number(order.coupon_discount_amount || 0),
+          final_amount: totalAmount,
+          paid_amount: payload.paidAmount,
+          payment_status: payload.paymentStatus,
+          status: payload.paymentStatus,
+          finance_account_id: payload.financeAccountId || null,
+          notes: saleRefNote,
+          finalized_by_user_id: user.id,
+          sale_number: saleNumber,
+        })
+        .select("id")
+        .single()
+
+      if (saleError) throw saleError
+      saleId = sale?.id || null
+
+      if (saleId) {
+        // Insert sale_items for services and products
+        const saleItems: any[] = []
+        orderServices.forEach(s => {
+          saleItems.push({
+            sale_id: saleId,
+            partner_id: payload.partnerId,
+            product_id: null,
+            variant_id: null,
+            product_name: s.service_name || "Mão de Obra",
+            variant_name: null,
+            unit_price: Number(s.service_price || 0),
+            quantity: Number(s.quantity || 1),
+            subtotal: Number(s.total_price || 0),
+            total_price: Number(s.total_price || 0),
+          })
+        })
+
+        orderProducts.forEach(p => {
+          saleItems.push({
+            sale_id: saleId,
+            partner_id: payload.partnerId,
+            product_id: p.product_id,
+            variant_id: p.variant_id || null,
+            product_name: p.product_name || "Produto",
+            variant_name: null,
+            unit_price: Number(p.unit_price || 0),
+            quantity: Number(p.quantity || 1),
+            subtotal: Number(p.total_price || 0),
+            total_price: Number(p.total_price || 0),
+          })
+        })
+
+        if (saleItems.length > 0) {
+          const { error: itemsError } = await supabase.from("sale_items").insert(saleItems)
+          if (itemsError) throw itemsError
+        }
+      }
+    } else {
+      // Update existing sale
+      const { error: saleUpdateError } = await supabase
+        .from("sales")
+        .update({
+          total_amount: totalAmount,
+          discount_amount: Number(order.discount_value || 0) + Number(order.coupon_discount_amount || 0),
+          final_amount: totalAmount,
+          paid_amount: payload.paidAmount,
+          payment_status: payload.paymentStatus,
+          status: payload.paymentStatus,
+          finance_account_id: payload.financeAccountId || null,
+        })
+        .eq("id", saleId)
+
+      if (saleUpdateError) throw saleUpdateError
+    }
+
+    // 5. Create or update transaction in `transactions` table (if paidAmount > 0)
+    if (payload.paidAmount > 0.009) {
+      const txRefNote = `service_order:${order.id}:payment`
+      const { data: existingPaymentTx } = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("partner_id", payload.partnerId)
+        .eq("reference_note", txRefNote)
+        .limit(1)
+        .maybeSingle()
+
+      const nowIso = new Date().toISOString()
+      if (!existingPaymentTx?.id) {
+        const { error: txError } = await supabase
+          .from("transactions")
+          .insert({
+            partner_id: payload.partnerId,
+            description: saleNumber || order.order_number,
+            category: "Vendas",
+            customer_id: order.customer_id || null,
+            contact_type: "customer",
+            amount: payload.paidAmount,
+            due_date: null,
+            payment_date: nowIso,
+            transaction_date: nowIso,
+            status: "paid",
+            notes: null,
+            payment_type: payload.paymentMethod || "Ordem de Serviço",
+            payment_method_id: (payload.paymentBreakdown && payload.paymentBreakdown[0]?.paymentMethodId) || null,
+            original_amount: payload.paidAmount,
+            interest_amount: null,
+            fee_amount: 0,
+            transaction_type: "income",
+            origin: "system",
+            reference_note: txRefNote,
+            account_id: payload.financeAccountId || null,
+            created_by_user_id: user.id,
+          })
+
+        if (txError) throw txError
+      } else {
+        await supabase
+          .from("transactions")
+          .update({
+            amount: payload.paidAmount,
+            original_amount: payload.paidAmount,
+            payment_type: payload.paymentMethod || "Ordem de Serviço",
+            payment_method_id: (payload.paymentBreakdown && payload.paymentBreakdown[0]?.paymentMethodId) || null,
+            account_id: payload.financeAccountId || null,
+          })
+          .eq("id", existingPaymentTx.id)
+      }
+    }
+
+    // 6. Sync goals
+    const sellerUserId = order.assigned_user_id || user.id
+    if (sellerUserId) {
+      try {
+        const { applyServiceOrderToGoals } = await import("@/lib/services/sales-goals.service")
+        const adminClient = getAdminClient()
+        await applyServiceOrderToGoals({
+          supabase: adminClient,
+          partnerId: payload.partnerId,
+          sellerUserId,
+          saleAmount: totalAmount,
+          createdByUserId: user.id,
+        })
+      } catch (err) {
+        console.error("Error applying service order to goals:", err)
+      }
+    }
+
+    // Log audit event
+    await logAuditEvent({
+      partnerId: payload.partnerId,
+      actorUserId: user.id,
+      entityType: "service_order",
+      entityId: order.id,
+      actionType: "payment_confirmed",
+      source: "manual",
+      changeLines: [
+        `confirmou pagamento da OS: ${payload.paymentMethod} (R$ ${payload.paidAmount.toFixed(2)})`,
+      ],
+      metadata: {
+        paymentMethod: payload.paymentMethod,
+        amount: payload.paidAmount,
+      },
+    })
+
+    revalidatePath("/erp/service-orders")
+    return { success: true, orderId: order.id, orderNumber: order.order_number }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao processar pagamento da ordem de serviço" }
   }
 }

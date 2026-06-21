@@ -156,6 +156,22 @@ export async function createComprehensiveCustomerAction(data: {
     return { error: "CEP de cobrança inválido" }
   }
 
+  // Check for existing customer before creating
+  if (data.email || data.cpf) {
+    const { findExistingCustomer } = await import("@/lib/services/marketplace-customer")
+    const match = await findExistingCustomer({
+      partnerId: data.partnerId,
+      email: data.email || null,
+      cpf: data.cpf || null,
+    })
+    if (match) {
+      return {
+        error: `Já existe um cliente cadastrado com este ${match.matchBy === "email" ? "e-mail" : "CPF"}: "${match.customer.name}".`,
+        existingCustomerId: match.customer.id,
+      }
+    }
+  }
+
   const supabase = await getSupabaseServerClient()
   const cpfResult = await prepareEncryptedCpf(supabase, data.partnerId, data.cpf)
   if (cpfResult.error) {

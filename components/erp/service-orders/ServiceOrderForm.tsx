@@ -1,10 +1,14 @@
 "use client"
 
-import React, { useState, useCallback, useRef } from "react"
-import { Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge, IconPlaceholder } from "@/components/reusable"
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
+import {
+  Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge, IconPlaceholder,
+  FormDropdown, TimePicker, MoneyInput, PercentageInput, ListItem, RadioButton, InfoCard, DefaultModal
+} from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import Pagination from "@/components/reusable/Pagination"
-import { ChevronLeftIcon, SaveIcon, PlusIcon, TrashIcon, WrenchIcon, PackageIcon, UserIcon } from "@/lib/icons"
+import QuantitySelector from "@/components/reusable/QuantitySelector"
+import { ChevronLeftIcon, SaveIcon, PlusIcon, TrashIcon, WrenchIcon, PackageIcon, UserIcon, TagIcon, MoneyIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -20,6 +24,10 @@ import {
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectServiceSheet from "./SelectServiceSheet"
 import SelectProductSheet from "./SelectProductSheet"
+import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
+import { validateCouponAction } from "@/app/actions/shared/coupons"
+import { getTeamMembers } from "@/app/actions/erp/team"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 interface ServiceOrderFormProps {
   partnerId: string
@@ -41,6 +49,30 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
   const [selectedCustomer, setSelectedCustomer] = useState<any>(editData?.customer_snapshot || null)
   const [expectedDate, setExpectedDate] = useState(editData?.expected_completion_date || "")
   const [assignedUserId, setAssignedUserId] = useState(editData?.assigned_user_id || "")
+  
+  // Custom OS fields
+  const [priority, setPriority] = useState(editData?.priority || "media")
+  const [estimatedHours, setEstimatedHours] = useState(editData?.estimated_hours != null ? String(editData.estimated_hours) : "")
+  const [expectedCompletionTime, setExpectedCompletionTime] = useState(editData?.expected_completion_time || "")
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+
+  // Financial fields matching CreateOrder / pdv
+  const [discountValue, setDiscountValue] = useState(editData?.discount_value || 0)
+  const [discountType, setDiscountType] = useState<'fixed' | 'percentage' | 'coupon'>(editData?.discount_type || 'fixed')
+  const [couponCode, setCouponCode] = useState(editData?.coupon_code || "")
+  const [couponId, setCouponId] = useState<string | null>(editData?.coupon_id || null)
+  const [couponDiscountAmount, setCouponDiscountAmount] = useState(editData?.coupon_discount_amount || 0)
+  const [couponPricingData, setCouponPricingData] = useState<any>(null)
+  const [otherCosts, setOtherCosts] = useState(editData?.other_costs || 0)
+
+  // Modals for discounts
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false)
+  const [isCouponSheetOpen, setIsCouponSheetOpen] = useState(false)
+  const [globalDiscountValue, setGlobalDiscountValue] = useState(0)
+  const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage" | "coupon">("fixed")
+  const [globalDiscountCouponCode, setGlobalDiscountCouponCode] = useState("")
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+
   const [services, setServices] = useState<any[]>(editData?.services || [])
   const [products, setProducts] = useState<any[]>(editData?.products || [])
   const [saving, setSaving] = useState(false)
@@ -67,6 +99,130 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     }
   }, [])
 
+  // Load team members
+  useEffect(() => {
+    async function loadTeam() {
+      try {
+        const res = await getTeamMembers()
+        if (res.members) {
+          setTeamMembers(res.members)
+        }
+      } catch (err) {
+        console.error("Erro ao carregar equipe:", err)
+      }
+    }
+    loadTeam()
+  }, [])
+
+  // Load coupon pricing data if editData has it
+  useEffect(() => {
+    if (editData?.coupon_id) {
+      setCouponPricingData({
+        id: editData.coupon_id,
+        discountType: editData.discount_type || "fixed",
+        discountValue: Number(editData.discount_value || 0),
+        maxDiscountValue: null,
+        freeShipping: false
+      })
+    }
+  }, [editData])
+
+  // Sync global discount states for modal
+  useEffect(() => {
+    if (!isDiscountModalOpen) return
+    setGlobalDiscountValue(discountValue)
+    setGlobalDiscountType(discountType === "coupon" ? "coupon" : discountType)
+    setGlobalDiscountCouponCode(couponCode)
+  }, [isDiscountModalOpen, discountValue, discountType, couponCode])
+
+  // Pricing engine calculations
+  const pricingItems = useMemo(() => {
+    const list: any[] = []
+    services.forEach(s => {
+      list.push({
+        serviceId: s.service_id || s.id,
+        unitPrice: Number(s.service_price !== undefined ? s.service_price : (s.price || 0)),
+        quantity: Number(s.quantity || 1),
+      })
+    })
+    products.forEach(p => {
+      list.push({
+        productId: p.product_id || p.id,
+        unitPrice: Number(p.unit_price !== undefined ? p.unit_price : (p.price || 0)),
+        quantity: Number(p.quantity || 1),
+      })
+    })
+    return list
+  }, [services, products])
+
+  const subtotal = useMemo(() => {
+    const totalS = services.reduce((sum, s) => sum + (Number(s.service_price !== undefined ? s.service_price : (s.price || 0)) * (s.quantity || 1)), 0)
+    const totalP = products.reduce((sum, p) => sum + (Number(p.unit_price !== undefined ? p.unit_price : (p.price || 0)) * (p.quantity || 1)), 0)
+    return totalS + totalP
+  }, [services, products])
+
+  const discountAmount = useMemo(() => {
+    if (discountType === 'percentage') {
+      return (subtotal * discountValue) / 100
+    }
+    if (discountType === "coupon") return 0
+    return discountValue
+  }, [subtotal, discountValue, discountType])
+
+  const pricingPreview = useMemo(() => {
+    return calculateOrderPricing({
+      items: pricingItems,
+      shippingCost: 0,
+      additionalCosts: Number(otherCosts || 0),
+      manualDiscount: discountAmount > 0 ? { type: "fixed", value: discountAmount } : null,
+      coupon: couponPricingData,
+    })
+  }, [pricingItems, otherCosts, discountAmount, couponPricingData])
+
+  const effectiveCouponDiscountAmount = couponPricingData
+    ? pricingPreview.couponDiscountAmount
+    : couponDiscountAmount
+
+  const totalAmount = useMemo(() => {
+    return pricingPreview.finalTotal
+  }, [pricingPreview])
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast({ description: "Informe o código do cupom." })
+      return
+    }
+    setIsApplyingCoupon(true)
+    try {
+      const res = await validateCouponAction({
+        partnerId,
+        code: couponCode.trim().toUpperCase(),
+        subtotal,
+        customerId: customerId || null,
+      })
+      if (res.success && res.data) {
+        const c = res.data
+        setCouponId(c.id)
+        setCouponDiscountAmount(Number(c.discount_amount || 0))
+        setDiscountType("coupon")
+        setDiscountValue(0)
+        setCouponPricingData({
+          id: c.id,
+          discountType: c.discount_type as any,
+          discountValue: c.discount_value != null ? Number(c.discount_value) : null,
+          maxDiscountValue: c.max_discount_value != null ? Number(c.max_discount_value) : null,
+          freeShipping: c.discount_type === "free_shipping" || !!c.free_shipping
+        })
+        toast({ description: "Cupom aplicado com sucesso!" })
+      } else {
+        toast({ description: res.error || "Cupom inválido." })
+        setCouponCode("")
+      }
+    } finally {
+      setIsApplyingCoupon(false)
+    }
+  }
+
   const handleSave = async () => {
     if (!title.trim()) {
       toast({ description: "Título é obrigatório" })
@@ -75,16 +231,27 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
     setSaving(true)
 
+    const payload = {
+      title: title.trim(),
+      description: description.trim() || "",
+      internal_notes: internalNotes.trim() || "",
+      customer_id: customerId || null,
+      expected_completion_date: expectedDate || null,
+      assigned_user_id: assignedUserId || null,
+      priority,
+      estimated_hours: estimatedHours ? Number(estimatedHours) : null,
+      expected_completion_time: expectedCompletionTime || null,
+      discount_value: discountValue,
+      discount_type: discountType,
+      coupon_id: couponId,
+      coupon_code: couponCode || null,
+      coupon_discount_amount: effectiveCouponDiscountAmount,
+      other_costs: Number(otherCosts || 0),
+    }
+
     if (editData) {
       // 1. Update OS details
-      const res = await updateServiceOrderAction(partnerId, editData.id, {
-        title: title.trim(),
-        description: description.trim() || "",
-        internal_notes: internalNotes.trim() || "",
-        customer_id: customerId || null,
-        expected_completion_date: expectedDate || null,
-        assigned_user_id: assignedUserId || null,
-      })
+      const res = await updateServiceOrderAction(partnerId, editData.id, payload)
 
       if (!res.success) {
         toast({ description: res.error || "Erro ao atualizar OS" })
@@ -96,7 +263,12 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
       const svcRes = await syncServiceOrderServicesAction(
         partnerId,
         editData.id,
-        services.map((s: any) => ({ service_id: s.service_id || s.id, quantity: Number(s.quantity || 1) }))
+        services.map((s: any) => ({
+          service_id: s.isManual ? null : (s.service_id || s.id || null),
+          service_name: s.service_name || s.name || "Serviço avulso",
+          service_price: Number(s.service_price !== undefined ? s.service_price : (s.price || 0)),
+          quantity: Number(s.quantity || 1)
+        }))
       )
       if (!svcRes.success) {
         toast({ description: svcRes.error || "Erro ao atualizar serviços" })
@@ -106,7 +278,13 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
       const prodRes = await syncServiceOrderProductsAction(
         partnerId,
         editData.id,
-        products.map((p: any) => ({ product_id: p.product_id || p.id, quantity: Number(p.quantity || 1), variant_id: p.variant_id }))
+        products.map((p: any) => ({
+          product_id: p.isManual ? null : (p.product_id || p.id || null),
+          product_name: p.product_name || p.name || "Produto avulso",
+          unit_price: Number(p.unit_price !== undefined ? p.unit_price : (p.price || 0)),
+          quantity: Number(p.quantity || 1),
+          variant_id: p.variant_id || null
+        }))
       )
       if (!prodRes.success) {
         toast({ description: prodRes.error || "Erro ao atualizar produtos" })
@@ -115,14 +293,11 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
       toast({ description: `OS #${editData.order_number} atualizada com sucesso!` })
       onSaved(res.data)
     } else {
-      // Create OS (original logic)
+      // Create OS
       const res = await createServiceOrderAction(partnerId, {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        internal_notes: internalNotes.trim() || undefined,
-        customer_id: customerId || undefined,
-        expected_completion_date: expectedDate || undefined,
-        assigned_user_id: assignedUserId || undefined,
+        ...payload,
+        payment_status: "unpaid",
+        paid_amount: 0,
       })
 
       if (!res.success) {
@@ -138,7 +313,12 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         const svcRes = await addServicesToOrderAction(
           partnerId,
           orderId,
-          services.map((s: any) => ({ service_id: s.service_id || s.id, quantity: s.quantity || 1 }))
+          services.map((s: any) => ({
+            service_id: s.isManual ? null : (s.service_id || s.id || null),
+            service_name: s.service_name || s.name || "Serviço avulso",
+            service_price: Number(s.service_price !== undefined ? s.service_price : (s.price || 0)),
+            quantity: Number(s.quantity || 1)
+          }))
         )
         if (!svcRes.success) {
           toast({ description: "OS criada, mas erro ao adicionar serviços" })
@@ -150,7 +330,13 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         const prodRes = await addProductsToOrderAction(
           partnerId,
           orderId,
-          products.map((p: any) => ({ product_id: p.product_id || p.id, quantity: p.quantity || 1, variant_id: p.variant_id }))
+          products.map((p: any) => ({
+            product_id: p.isManual ? null : (p.product_id || p.id || null),
+            product_name: p.product_name || p.name || "Produto avulso",
+            unit_price: Number(p.unit_price !== undefined ? p.unit_price : (p.price || 0)),
+            quantity: Number(p.quantity || 1),
+            variant_id: p.variant_id || null
+          }))
         )
         if (!prodRes.success) {
           toast({ description: "OS criada, mas erro ao adicionar produtos" })
@@ -174,7 +360,14 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     setServices((prev) => {
       if (prev.some((s) => (s.service_id || s.id) === svc.id)) return prev
       setServicesPage(1)
-      return [...prev, { ...svc, service_id: svc.id, quantity: 1 }]
+      return [...prev, {
+        ...svc,
+        service_id: svc.id,
+        quantity: 1,
+        service_price: svc.price,
+        service_name: svc.name,
+        isManual: false
+      }]
     })
   }
 
@@ -193,7 +386,14 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     setProducts((prev) => {
       if (prev.some((p) => (p.product_id || p.id) === prod.id)) return prev
       setProductsPage(1)
-      return [...prev, { ...prod, product_id: prod.id, quantity: 1 }]
+      return [...prev, {
+        ...prod,
+        product_id: prod.id,
+        quantity: 1,
+        unit_price: prod.price,
+        product_name: prod.name,
+        isManual: false
+      }]
     })
   }
 
@@ -204,6 +404,50 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
       if (productsPage > nextTotalPages && nextTotalPages > 0) {
         setProductsPage(nextTotalPages)
       }
+      return next
+    })
+  }
+
+  const addBlankService = () => {
+    const newService = {
+      id: Math.random().toString(36).substr(2, 9),
+      service_id: null,
+      service_name: "",
+      service_price: 0,
+      quantity: 1,
+      isManual: true,
+      isEditing: true
+    }
+    setServices(prev => [...prev, newService])
+    setServicesPage(1)
+  }
+
+  const addBlankProduct = () => {
+    const newProduct = {
+      id: Math.random().toString(36).substr(2, 9),
+      product_id: null,
+      product_name: "",
+      unit_price: 0,
+      quantity: 1,
+      isManual: true,
+      isEditing: true
+    }
+    setProducts(prev => [...prev, newProduct])
+    setProductsPage(1)
+  }
+
+  const updateServiceField = (indexInAll: number, field: string, value: any) => {
+    setServices(prev => {
+      const next = [...prev]
+      next[indexInAll] = { ...next[indexInAll], [field]: value }
+      return next
+    })
+  }
+
+  const updateProductField = (indexInAll: number, field: string, value: any) => {
+    setProducts(prev => {
+      const next = [...prev]
+      next[indexInAll] = { ...next[indexInAll], [field]: value }
       return next
     })
   }
@@ -295,17 +539,60 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                         />
                       </FormSection>
 
-                      <FormSection title="Data prevista de conclusão">
-                        <DatePicker
-                          value={expectedDate}
-                          onChange={setExpectedDate}
-                          placeholder="Selecionar data"
-                        />
+                      <FormSection title="Agendamento e Responsabilidade">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <DatePicker
+                            label="Data prevista de conclusão"
+                            value={expectedDate}
+                            onChange={setExpectedDate}
+                            placeholder="Selecionar data"
+                          />
+
+                          <TimePicker
+                            label="Hora prevista para conclusão"
+                            value={expectedCompletionTime}
+                            onChange={(time) => setExpectedCompletionTime(time)}
+                            placeholder="14:30"
+                          />
+
+                          <FormDropdown
+                            label="Prioridade"
+                            value={priority}
+                            setValue={(val) => setPriority(val)}
+                            options={[
+                              { value: "baixa", label: "Baixa" },
+                              { value: "media", label: "Média" },
+                              { value: "alta", label: "Alta" },
+                              { value: "urgente", label: "Urgente" },
+                            ]}
+                          />
+
+                          <FormDropdown
+                            label="Responsável Técnico"
+                            value={assignedUserId}
+                            setValue={(val) => setAssignedUserId(val)}
+                            options={teamMembers.map(m => ({
+                              value: m.userId,
+                              label: m.fullName || m.email || "Sem Nome",
+                            }))}
+                            placeholder="Selecione um responsável"
+                          />
+
+                          <Input
+                            label="Tempo Estimado (horas)"
+                            placeholder="Ex: 2.5"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={estimatedHours}
+                            onChange={(e) => setEstimatedHours(e.target.value)}
+                          />
+                        </div>
                       </FormSection>
                     </div>
 
-                    {/* Right Column (Sidebar Card with Client Card) */}
-                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    {/* Right Column (Sidebar Card with Client Card and Totals) */}
+                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                       <div>
                         {selectedCustomer ? (
                           <CustomerCard
@@ -336,6 +623,74 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                           </div>
                         )}
                       </div>
+
+                      {/* Totals & Payment Section */}
+                      <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-6">
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                          Pagamento
+                        </h3>
+
+                        <div className="space-y-4">
+                          <ListItem
+                            icon={TagIcon}
+                            title="Aplicar desconto"
+                            description={couponId || discountValue > 0 ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique na OS"}
+                            onClick={() => setIsDiscountModalOpen(true)}
+                            className="px-4 py-3 gap-4 cursor-pointer border border-brand-border dark:border-dark-border rounded-xl"
+                          />
+                          
+                          <MoneyInput
+                            label="Outros Custos"
+                            value={otherCosts}
+                            onChange={(val) => setOtherCosts(val)}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-3 pt-2">
+                          <div className="flex justify-between items-center text-[15px]">
+                            <span className="text-brand-inactive-text font-medium">Subtotal</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                              {formatCurrency(subtotal)}
+                            </span>
+                          </div>
+
+                          {discountAmount > 0 && (
+                            <div className="flex justify-between items-center text-[15px]">
+                              <span className="text-brand-inactive-text font-medium">Desconto</span>
+                              <span className="font-bold text-brand-green">
+                                -{formatCurrency(discountAmount)}
+                              </span>
+                            </div>
+                          )}
+
+                          {effectiveCouponDiscountAmount > 0 && (
+                            <div className="flex justify-between items-center text-[15px]">
+                              <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
+                              <span className="font-bold text-brand-green">
+                                -{formatCurrency(effectiveCouponDiscountAmount)}
+                              </span>
+                            </div>
+                          )}
+
+                          {otherCosts > 0 && (
+                            <div className="flex justify-between items-center text-[15px]">
+                              <span className="text-brand-inactive-text font-medium">Outros Custos</span>
+                              <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(otherCosts)}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="border-t border-dashed border-brand-border dark:border-dark-border pt-4 mt-2">
+                            <div className="flex justify-between items-end">
+                              <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total Geral</span>
+                              <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
+                                {formatCurrency(totalAmount)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </FadeIn>
                 )}
@@ -357,10 +712,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                   <FadeIn key="services" className="space-y-6 w-full">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Serviços da OS</h2>
-                      <Button variant="link" onClick={() => setShowServiceSheet(true)} className="gap-2 h-auto py-0 text-brand-primary">
-                        <PlusIcon size={14} strokeWidth={3} />
-                        Adicionar serviço
-                      </Button>
+                      <div className="flex items-center gap-3">
+                        <Button variant="link" onClick={addBlankService} className="gap-2 h-auto py-0 text-brand-primary">
+                          <PlusIcon size={14} strokeWidth={3} />
+                          Adicionar serviço manual
+                        </Button>
+                        <Button variant="link" onClick={() => setShowServiceSheet(true)} className="gap-2 h-auto py-0 text-brand-primary">
+                          <PlusIcon size={14} strokeWidth={3} />
+                          Adicionar da lista
+                        </Button>
+                      </div>
                     </div>
 
                     {services.length === 0 ? (
@@ -391,26 +752,48 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                               </tr>
                             </thead>
                             <tbody>
-                              {paginatedServices.map((svc: any) => {
+                              {paginatedServices.map((svc: any, paginatedIdx: number) => {
+                                const index = (servicesPage - 1) * servicesItemsPerPage + paginatedIdx
                                 const unitPrice = svc.price || svc.service_price || 0
                                 const qty = svc.quantity || 1
                                 return (
-                                  <tr key={svc.service_id || svc.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                  <tr key={svc.service_id || svc.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                       <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                           <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </div>
-                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                          {svc.name || svc.service_name}
-                                        </span>
+                                        {svc.isManual || !svc.service_id ? (
+                                          <Input
+                                            value={svc.service_name || svc.name || ""}
+                                            onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
+                                            placeholder="Nome do serviço manual..."
+                                            className="mb-0"
+                                          />
+                                        ) : (
+                                          <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                            {svc.name || svc.service_name}
+                                          </span>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                      {formatCurrency(unitPrice)}
+                                      <div className="w-[120px]">
+                                        <MoneyInput
+                                          value={unitPrice}
+                                          onChange={(val) => updateServiceField(index, "service_price", val)}
+                                          className="mb-0"
+                                        />
+                                      </div>
                                     </td>
                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                      {qty}
+                                      <div className="flex justify-center">
+                                        <QuantitySelector
+                                          value={qty}
+                                          onChange={(val) => updateServiceField(index, "quantity", val)}
+                                          size="md"
+                                        />
+                                      </div>
                                     </td>
                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
                                       {formatCurrency(unitPrice * qty)}
@@ -434,23 +817,44 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                         {/* --- SERVICES LIST (Mobile) --- */}
                         <div className="md:hidden flex flex-col gap-4 mb-4">
-                          {paginatedServices.map((svc: any) => {
+                          {paginatedServices.map((svc: any, paginatedIdx: number) => {
+                            const index = (servicesPage - 1) * servicesItemsPerPage + paginatedIdx
                             const unitPrice = svc.price || svc.service_price || 0
                             const qty = svc.quantity || 1
                             return (
-                              <div key={svc.service_id || svc.id} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                              <div key={svc.service_id || svc.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
                                 <div className="flex items-start gap-4">
                                   <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                     <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                   </div>
-                                  <div className="flex-1 min-w-0 text-left">
-                                    <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                      {svc.name || svc.service_name}
+                                  <div className="flex-1 min-w-0 text-left space-y-2">
+                                    {svc.isManual || !svc.service_id ? (
+                                      <Input
+                                        value={svc.service_name || svc.name || ""}
+                                        onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
+                                        placeholder="Nome do serviço manual..."
+                                        className="mb-0"
+                                      />
+                                    ) : (
+                                      <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                        {svc.name || svc.service_name}
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-4 mt-2">
+                                      <QuantitySelector
+                                        value={qty}
+                                        onChange={(val) => updateServiceField(index, "quantity", val)}
+                                        size="sm"
+                                      />
+                                      <div className="flex-1 max-w-[140px]">
+                                        <MoneyInput
+                                          value={unitPrice}
+                                          onChange={(val) => updateServiceField(index, "service_price", val)}
+                                          className="mb-0"
+                                        />
+                                      </div>
                                     </div>
-                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate mb-2">
-                                      Qtd: {qty} • Unit: {formatCurrency(unitPrice)}
-                                    </div>
-                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading pt-1">
                                       Total: {formatCurrency(unitPrice * qty)}
                                     </div>
                                   </div>
@@ -481,10 +885,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                   <FadeIn key="products" className="space-y-6 w-full">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Produtos da OS</h2>
-                      <Button variant="link" onClick={() => setShowProductSheet(true)} className="gap-2 h-auto py-0 text-brand-primary">
-                        <PlusIcon size={14} strokeWidth={3} />
-                        Adicionar produto
-                      </Button>
+                      <div className="flex items-center gap-3">
+                        <Button variant="link" onClick={addBlankProduct} className="gap-2 h-auto py-0 text-brand-primary">
+                          <PlusIcon size={14} strokeWidth={3} />
+                          Adicionar produto manual
+                        </Button>
+                        <Button variant="link" onClick={() => setShowProductSheet(true)} className="gap-2 h-auto py-0 text-brand-primary">
+                          <PlusIcon size={14} strokeWidth={3} />
+                          Adicionar da lista
+                        </Button>
+                      </div>
                     </div>
 
                     {products.length === 0 ? (
@@ -515,26 +925,48 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                               </tr>
                             </thead>
                             <tbody>
-                              {paginatedProducts.map((prod: any) => {
+                              {paginatedProducts.map((prod: any, paginatedIdx: number) => {
+                                const index = (productsPage - 1) * productsItemsPerPage + paginatedIdx
                                 const unitPrice = prod.price || prod.unit_price || 0
                                 const qty = prod.quantity || 1
                                 return (
-                                  <tr key={prod.product_id || prod.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                  <tr key={prod.product_id || prod.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                       <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                           <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </div>
-                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                          {prod.name || prod.product_name}
-                                        </span>
+                                        {prod.isManual || !prod.product_id ? (
+                                          <Input
+                                            value={prod.product_name || prod.name || ""}
+                                            onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
+                                            placeholder="Nome do produto manual..."
+                                            className="mb-0"
+                                          />
+                                        ) : (
+                                          <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                            {prod.name || prod.product_name}
+                                          </span>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                      {formatCurrency(unitPrice)}
+                                      <div className="w-[120px]">
+                                        <MoneyInput
+                                          value={unitPrice}
+                                          onChange={(val) => updateProductField(index, "unit_price", val)}
+                                          className="mb-0"
+                                        />
+                                      </div>
                                     </td>
                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                      {qty}
+                                      <div className="flex justify-center">
+                                        <QuantitySelector
+                                          value={qty}
+                                          onChange={(val) => updateProductField(index, "quantity", val)}
+                                          size="md"
+                                        />
+                                      </div>
                                     </td>
                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
                                       {formatCurrency(unitPrice * qty)}
@@ -558,23 +990,44 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                         {/* --- PRODUCTS LIST (Mobile) --- */}
                         <div className="md:hidden flex flex-col gap-4 mb-4">
-                          {paginatedProducts.map((prod: any) => {
+                          {paginatedProducts.map((prod: any, paginatedIdx: number) => {
+                            const index = (productsPage - 1) * productsItemsPerPage + paginatedIdx
                             const unitPrice = prod.price || prod.unit_price || 0
                             const qty = prod.quantity || 1
                             return (
-                              <div key={prod.product_id || prod.id} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                              <div key={prod.product_id || prod.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
                                 <div className="flex items-start gap-4">
                                   <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                     <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                   </div>
-                                  <div className="flex-1 min-w-0 text-left">
-                                    <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                      {prod.name || prod.product_name}
+                                  <div className="flex-1 min-w-0 text-left space-y-2">
+                                    {prod.isManual || !prod.product_id ? (
+                                      <Input
+                                        value={prod.product_name || prod.name || ""}
+                                        onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
+                                        placeholder="Nome do produto manual..."
+                                        className="mb-0"
+                                      />
+                                    ) : (
+                                      <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                        {prod.name || prod.product_name}
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-4 mt-2">
+                                      <QuantitySelector
+                                        value={qty}
+                                        onChange={(val) => updateProductField(index, "quantity", val)}
+                                        size="sm"
+                                      />
+                                      <div className="flex-1 max-w-[140px]">
+                                        <MoneyInput
+                                          value={unitPrice}
+                                          onChange={(val) => updateProductField(index, "unit_price", val)}
+                                          className="mb-0"
+                                        />
+                                      </div>
                                     </div>
-                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate mb-2">
-                                      Qtd: {qty} • Unit: {formatCurrency(unitPrice)}
-                                    </div>
-                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading pt-1">
                                       Total: {formatCurrency(unitPrice * qty)}
                                     </div>
                                   </div>
@@ -636,6 +1089,189 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         onSelect={handleAddProduct}
         partnerId={partnerId}
       />
+
+      <SelectCouponSheet
+        isOpen={isCouponSheetOpen}
+        onClose={() => setIsCouponSheetOpen(false)}
+        partnerId={partnerId}
+        subtotal={subtotal}
+        selectedCustomerId={customerId || null}
+        appliedCouponId={couponId}
+        hasWinningDiscount={false}
+        onApplyCoupon={async (coupon) => {
+          setCouponCode(coupon.code)
+          setIsApplyingCoupon(true)
+          try {
+            const res = await validateCouponAction({
+              partnerId,
+              code: coupon.code.trim().toUpperCase(),
+              subtotal,
+              customerId: customerId || null,
+            })
+            if (res.success && res.data) {
+              const c = res.data
+              setCouponId(c.id)
+              setCouponDiscountAmount(Number(c.discount_amount || 0))
+              setDiscountType("coupon")
+              setDiscountValue(0)
+              setCouponPricingData({
+                id: c.id,
+                discountType: c.discount_type as any,
+                discountValue: c.discount_value != null ? Number(c.discount_value) : null,
+                maxDiscountValue: c.max_discount_value != null ? Number(c.max_discount_value) : null,
+                freeShipping: c.discount_type === "free_shipping" || !!c.free_shipping
+              })
+              toast({ description: "Cupom aplicado com sucesso!" })
+            } else {
+              toast({ description: res.error || "Cupom inválido." })
+              setCouponCode("")
+            }
+          } finally {
+            setIsApplyingCoupon(false)
+          }
+          setIsCouponSheetOpen(false)
+        }}
+        onRemoveCoupon={async () => {
+          setCouponId(null)
+          setCouponCode("")
+          setCouponDiscountAmount(0)
+          setCouponPricingData(null)
+          setDiscountType("fixed")
+          setDiscountValue(0)
+          toast({ description: "Cupom removido." })
+        }}
+      />
+
+      <DefaultModal
+        isOpen={isDiscountModalOpen}
+        onClose={() => setIsDiscountModalOpen(false)}
+        title="Aplicar Desconto"
+        footer={
+          <div className="flex w-full items-center gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setIsDiscountModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1"
+              isLoading={isApplyingCoupon}
+              onClick={async () => {
+                if (globalDiscountType === "coupon") {
+                  setIsDiscountModalOpen(false)
+                  setIsCouponSheetOpen(true)
+                  return
+                }
+                setDiscountType(globalDiscountType)
+                setDiscountValue(globalDiscountValue)
+                setCouponId(null)
+                setCouponDiscountAmount(0)
+                setCouponPricingData(null)
+                setCouponCode("")
+                setIsDiscountModalOpen(false)
+              }}
+            >
+              Aplicar
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-6 pt-2">
+          <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
+          <div className="grid grid-cols-1 gap-3">
+            <ListItem
+              onClick={() => setGlobalDiscountType("percentage")}
+              icon={TagIcon}
+              title="Porcentagem"
+              description="Aplica um desconto percentual sobre o subtotal"
+              className={`px-4 py-3 gap-4 cursor-pointer border rounded-xl ${globalDiscountType === "percentage" ? "border-brand-primary bg-brand-primary/5" : "border-brand-border dark:border-dark-border"}`}
+              right={
+                <RadioButton
+                  name="globalDiscountType"
+                  value="percentage"
+                  checked={globalDiscountType === "percentage"}
+                  onChange={() => setGlobalDiscountType("percentage")}
+                />
+              }
+            />
+            <ListItem
+              onClick={() => setGlobalDiscountType("fixed")}
+              icon={MoneyIcon}
+              title="Valor fixo"
+              description="Aplica um valor fixo de desconto em reais"
+              className={`px-4 py-3 gap-4 cursor-pointer border rounded-xl ${globalDiscountType === "fixed" ? "border-brand-primary bg-brand-primary/5" : "border-brand-border dark:border-dark-border"}`}
+              right={
+                <RadioButton
+                  name="globalDiscountType"
+                  value="fixed"
+                  checked={globalDiscountType === "fixed"}
+                  onChange={() => setGlobalDiscountType("fixed")}
+                />
+              }
+            />
+            <ListItem
+              onClick={() => setGlobalDiscountType("coupon")}
+              icon={FileIcon}
+              title="Cupom"
+              description="Utiliza um cupom de desconto pré-cadastrado"
+              className={`px-4 py-3 gap-4 cursor-pointer border rounded-xl ${globalDiscountType === "coupon" ? "border-brand-primary bg-brand-primary/5" : "border-brand-border dark:border-dark-border"}`}
+              right={
+                <RadioButton
+                  name="globalDiscountType"
+                  value="coupon"
+                  checked={globalDiscountType === "coupon"}
+                  onChange={() => setGlobalDiscountType("coupon")}
+                />
+              }
+            />
+          </div>
+          {globalDiscountType === "fixed" && (
+            <MoneyInput
+              label="Desconto do pedido"
+              value={globalDiscountValue}
+              onChange={(value: number) => setGlobalDiscountValue(value)}
+            />
+          )}
+          {globalDiscountType === "percentage" && (
+            <div className="space-y-3">
+              <PercentageInput
+                label="Porcentagem a ser aplicada"
+                value={globalDiscountValue}
+                onChange={(value: number) => setGlobalDiscountValue(value)}
+              />
+              <div className="flex flex-wrap gap-3">
+                {[5, 10, 15, 20].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setGlobalDiscountValue(preset)}
+                    className="h-12 min-w-[72px] rounded-xl border border-transparent bg-gray-100 px-5 text-sm font-bold text-brand-dark transition-colors hover:border-brand-border hover:bg-gray-200 dark:bg-dark-border/30 dark:text-dark-heading dark:hover:bg-dark-border/50"
+                  >
+                    {preset}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {globalDiscountType === "coupon" && (
+            <div className="space-y-2">
+              <InfoCard
+                color="gray"
+                title="Cupom de desconto"
+                message="Selecione um cupom na lista de cupons cadastrados."
+              />
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setIsDiscountModalOpen(false)
+                  setIsCouponSheetOpen(true)
+                }}
+              >
+                Ver cupons cadastrados
+              </Button>
+            </div>
+          )}
+        </div>
+      </DefaultModal>
     </FadeIn>
   )
 }

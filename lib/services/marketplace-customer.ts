@@ -1,6 +1,68 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { validateCPF } from "@/lib/input-validator"
 
+export interface ExistingCustomerMatch {
+  customer: { id: string; name: string; email: string | null }
+  matchBy: "email" | "cpf"
+}
+
+/**
+ * Pure lookup — never creates or alters records.
+ * Searches for an existing customer by email first, then by CPF.
+ */
+export async function findExistingCustomer(params: {
+  partnerId: string
+  email?: string | null
+  cpf?: string | null
+}): Promise<ExistingCustomerMatch | null> {
+  const supabase = getAdminClient()
+  const { partnerId, email, cpf } = params
+
+  if (email) {
+    const { data: existing } = await supabase
+      .from("customers")
+      .select("id, name, email")
+      .eq("partner_id", partnerId)
+      .eq("email", email)
+      .maybeSingle()
+
+    if (existing) {
+      return { customer: existing, matchBy: "email" }
+    }
+  }
+
+  if (cpf) {
+    const cleanCpf = cpf.replace(/\D/g, "")
+    if (cleanCpf && validateCPF(cleanCpf)) {
+      const { encryptCPF, decryptCPF } = await import("@/lib/crypto")
+
+      const { data: existingCpfs } = await supabase
+        .from("customers")
+        .select("id, name, email, cpf")
+        .eq("partner_id", partnerId)
+        .not("cpf", "is", null)
+
+      if (existingCpfs) {
+        for (const row of existingCpfs) {
+          try {
+            const decrypted = await decryptCPF(row.cpf)
+            if (decrypted === cleanCpf) {
+              return {
+                customer: { id: row.id, name: row.name, email: row.email },
+                matchBy: "cpf",
+              }
+            }
+          } catch {
+            continue
+          }
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 interface CustomerParams {
   partnerId: string
   name: string

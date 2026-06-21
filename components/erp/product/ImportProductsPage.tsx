@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useMemo, useCallback } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Checkbox, Spinner, SelectionBanner, Pagination } from "@/components/reusable"
-import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, ChevronDownIcon } from "@/lib/icons"
+import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge } from "@/components/reusable"
+import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, ChevronDownIcon, FileTextIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
 import { useStore } from "@/lib/store-context"
@@ -47,17 +47,140 @@ interface ImportProductsPageProps {
   partnerId: string
 }
 
-const CONFIDENCE_LABEL: Record<string, { label: string; color: string }> = {
-  "1.0": { label: "Exato", color: "text-green-600 bg-green-50 dark:bg-green-900/20" },
-  "0.9": { label: "Exato", color: "text-green-600 bg-green-50 dark:bg-green-900/20" },
-  "0.85": { label: "Alto", color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20" },
-  "0.8": { label: "Alto", color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20" },
-  "0.7": { label: "Médio", color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20" },
+function MappingRow({
+  col,
+  availableFields,
+  onMappingChange
+}: {
+  col: any
+  availableFields: FieldOption[]
+  onMappingChange: (headerIndex: number, newField: string | null) => void
+}) {
+  const confidenceKey = col.confidence.toFixed(2)
+  const confidenceVal = parseFloat(confidenceKey)
+  
+  let badgeVariant: "green" | "blue" | "orange" | "red" | "gray" = "gray"
+  let badgeLabel = "Baixo"
+
+  if (confidenceVal >= 0.9) {
+    badgeVariant = "green"
+    badgeLabel = "Exato"
+  } else if (confidenceVal >= 0.8) {
+    badgeVariant = "blue"
+    badgeLabel = "Alto"
+  } else if (confidenceVal >= 0.6) {
+    badgeVariant = "orange"
+    badgeLabel = "Médio"
+  } else if (col.field) {
+    badgeVariant = "red"
+    badgeLabel = "Baixo"
+  }
+
+  return (
+    <tr className="border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
+      <td className="py-4 px-4 align-middle">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+            <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
+              {col.headerIndex + 1}
+            </span>
+          </div>
+          <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+            {col.header}
+          </span>
+        </div>
+      </td>
+      <td className="py-4 px-4 align-middle">
+        <select
+          value={col.field || ""}
+          onChange={(e) => onMappingChange(col.headerIndex, e.target.value || null)}
+          className="w-full max-w-xs px-3 py-2 text-[13px] rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
+        >
+          <option value="">— Não importar —</option>
+          {availableFields.map((f) => (
+            <option key={f.name} value={f.name}>
+              {f.label}{f.required ? " *" : ""}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="py-4 px-4 align-middle">
+        {col.field ? (
+          <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+        ) : (
+          <span className="text-[11px] text-brand-inactive-text dark:text-dark-body italic">Ignorado</span>
+        )}
+      </td>
+    </tr>
+  )
 }
 
-function getConfidenceDisplay(confidence: number) {
-  const key = confidence.toFixed(1)
-  return CONFIDENCE_LABEL[key] || { label: "Baixo", color: "text-red-600 bg-red-50 dark:bg-red-900/20" }
+function MappingMobileItem({
+  col,
+  availableFields,
+  onMappingChange
+}: {
+  col: any
+  availableFields: FieldOption[]
+  onMappingChange: (headerIndex: number, newField: string | null) => void
+}) {
+  const confidenceKey = col.confidence.toFixed(2)
+  const confidenceVal = parseFloat(confidenceKey)
+  
+  let badgeVariant: "green" | "blue" | "orange" | "red" | "gray" = "gray"
+  let badgeLabel = "Baixo"
+
+  if (confidenceVal >= 0.9) {
+    badgeVariant = "green"
+    badgeLabel = "Exato"
+  } else if (confidenceVal >= 0.8) {
+    badgeVariant = "blue"
+    badgeLabel = "Alto"
+  } else if (confidenceVal >= 0.6) {
+    badgeVariant = "orange"
+    badgeLabel = "Médio"
+  } else if (col.field) {
+    badgeVariant = "red"
+    badgeLabel = "Baixo"
+  }
+
+  return (
+    <div className="p-4 border-b border-brand-border dark:border-dark-border last:border-0 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">
+              {col.headerIndex + 1}
+            </span>
+          </div>
+          <h4 className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+            {col.header}
+          </h4>
+        </div>
+        {col.field ? (
+          <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+        ) : (
+          <span className="text-[11px] text-brand-inactive-text dark:text-dark-body italic">Ignorado</span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase font-bold tracking-wider">Campo no Sistema</span>
+        <select
+          value={col.field || ""}
+          onChange={(e) => onMappingChange(col.headerIndex, e.target.value || null)}
+          className="w-full px-3 py-2 text-[13px] rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
+        >
+          <option value="">— Não importar —</option>
+          {availableFields.map((f) => (
+            <option key={f.name} value={f.name}>
+              {f.label}{f.required ? " *" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
 }
 
 export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
@@ -84,6 +207,31 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [importDone, setImportDone] = useState(false)
   const [importCount, setImportCount] = useState(0)
+
+  const [scrollState, setScrollState] = useState({ left: false, right: false })
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+
+  const checkScroll = useCallback(() => {
+    if (!tableContainerRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+    setScrollState((prev) => {
+      const nextLeft = scrollLeft > 0
+      const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+      if (prev.left === nextLeft && prev.right === nextRight) return prev
+      return { left: nextLeft, right: nextRight }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (step === "preview" && viewMode === "list" && parsedProducts.length > 0) {
+      const timer = setTimeout(checkScroll, 50)
+      window.addEventListener("resize", checkScroll)
+      return () => {
+        clearTimeout(timer)
+        window.removeEventListener("resize", checkScroll)
+      }
+    }
+  }, [checkScroll, step, viewMode, parsedProducts])
 
   const onDrop = useCallback(async (accepted: File[]) => {
     const file = accepted[0]
@@ -274,76 +422,74 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
         </div>
 
         {step === "upload" && (
-          <div className="flex-1 px-4 md:px-8">
+          <div className="flex-1 px-4 md:px-8 max-w-[800px] mx-auto w-full pt-8">
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-xl p-16 text-center transition-colors cursor-pointer ${
-                isDragActive ? "border-brand-orange bg-brand-orange/5" : "border-gray-300 hover:border-gray-400"
-              } ${uploading ? "opacity-50 pointer-events-none" : ""}`}
+              className={`cursor-pointer transition-opacity ${uploading ? "opacity-60 pointer-events-none" : ""}`}
               onClick={open}
             >
               <input {...getInputProps()} />
-              <UploadIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              {isDragActive ? (
-                <p className="text-lg text-gray-600 font-medium">Solte o arquivo aqui...</p>
+              {uploading ? (
+                <IconPlaceholder
+                  placeholderType="default"
+                  icon={Spinner}
+                  title="Lendo Planilha..."
+                  subtitle="Processando os dados da sua planilha de produtos. Aguarde um instante."
+                />
               ) : (
-                <>
-                  <p className="text-lg text-gray-600 font-medium">Arraste o arquivo ou clique para selecionar</p>
-                  <p className="text-sm text-gray-400 mt-2">.xlsx .xls .csv — até 10 MB e 2.000 linhas</p>
-                </>
+                <IconPlaceholder
+                  placeholderType="default"
+                  icon={UploadIcon}
+                  title={isDragActive ? "Solte a planilha aqui..." : "Importar Planilha de Produtos"}
+                  subtitle="Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls ou .csv (até 10 MB e 2.000 linhas)."
+                  itemButton={{
+                    text: "Selecionar Planilha",
+                    type: "button",
+                    action: open,
+                    variant: "default"
+                  }}
+                />
               )}
             </div>
-            {uploading && (
-              <div className="flex items-center gap-2 mt-4 text-gray-500">
-                <Spinner /> <span>Lendo planilha...</span>
-              </div>
-            )}
           </div>
         )}
 
         {step === "mapping" && (
-          <div className="flex-1 overflow-auto px-4 md:px-8 pb-8">
-            <div className="max-w-4xl mx-auto">
-              <div className="overflow-hidden rounded-xl border border-brand-border dark:border-dark-border">
-                <table className="w-full text-left">
+          <div className="flex-1 overflow-auto px-4 md:px-8 pb-24 md:pb-8">
+            <div className="max-w-[1300px] mx-auto w-full">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                <table className="w-full text-left border-separate border-spacing-0">
                   <thead>
                     <tr className="bg-brand-gray dark:bg-dark-border/50">
-                      <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body">Coluna da Planilha</th>
-                      <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body">Campo no Sistema</th>
-                      <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body">Confiança</th>
+                      <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-l-lg bg-brand-gray dark:bg-dark-border/50">Coluna da Planilha</th>
+                      <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50">Campo no Sistema</th>
+                      <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-r-lg bg-brand-gray dark:bg-dark-border/50">Confiança</th>
                     </tr>
                   </thead>
                   <tbody>
                     {mapping.map((col) => (
-                      <tr key={col.headerIndex} className="border-t border-brand-border dark:border-dark-border hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors">
-                        <td className="py-3 px-4 text-[13px] font-medium text-brand-dark dark:text-dark-heading">{col.header}</td>
-                        <td className="py-3 px-4">
-                          <select
-                            value={col.field || ""}
-                            onChange={(e) => updateMapping(col.headerIndex, e.target.value || null)}
-                            className="w-full max-w-xs px-3 py-1.5 text-[13px] rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-background text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-orange/50"
-                          >
-                            <option value="">— Não importar —</option>
-                            {availableFields.map((f) => (
-                              <option key={f.name} value={f.name}>
-                                {f.label}{f.required ? " *" : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-3 px-4">
-                          {col.field ? (
-                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${getConfidenceDisplay(col.confidence).color}`}>
-                              {getConfidenceDisplay(col.confidence).label}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-brand-inactive-text">—</span>
-                          )}
-                        </td>
-                      </tr>
+                      <MappingRow
+                        key={col.headerIndex}
+                        col={col}
+                        availableFields={availableFields}
+                        onMappingChange={updateMapping}
+                      />
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Card List View */}
+              <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border overflow-hidden">
+                {mapping.map((col) => (
+                  <MappingMobileItem
+                    key={col.headerIndex}
+                    col={col}
+                    availableFields={availableFields}
+                    onMappingChange={updateMapping}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -374,7 +520,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                 Nenhum produto encontrado
               </div>
             ) : (
-              <div className="flex-1 overflow-auto px-4 md:px-8">
+              <div className="flex-1 overflow-auto px-4 md:px-8 pb-24 md:pb-8">
                 <SelectionBanner
                   selectedCount={selection.size}
                   totalCount={filteredProducts.length}
@@ -406,7 +552,10 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                   </div>
                 ) : (
                   <div className="w-full overflow-hidden rounded-xl relative">
-                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
                       <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                         <thead>
                           <tr className="bg-brand-gray dark:bg-dark-border/50">
@@ -479,6 +628,44 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {/* Mobile Sticky Footers */}
+        {step === "mapping" && (
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+            <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={() => { setStep("upload"); setParsedProducts([]); setMapping([]) }}
+            >
+              <UploadIcon className="w-[18px] h-[18px]" /> Nova planilha
+            </Button>
+            <Button
+              onClick={handleMappingConfirm}
+              disabled={uploading || mappedCount === 0}
+              className="flex-1 h-12"
+            >
+              {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
+            </Button>
+          </div>
+        )}
+
+        {step === "preview" && (
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+            <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={() => setStep("mapping")}
+            >
+              Voltar
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={importing || parsedProducts.length === 0}
+              className="flex-1 h-12"
+            >
+              {importing ? <><Spinner /> Importando...</> : `Importar ${parsedProducts.length} prod.`}
+            </Button>
           </div>
         )}
       </div>

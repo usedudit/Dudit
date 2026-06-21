@@ -1,8 +1,8 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { getQuickModeHomeDataAction } from "@/app/actions/erp/quick-mode"
-import QuickModeHome from "@/components/erp/quick-mode/QuickModeHome"
+import { getOnboardingStatusAction } from "@/app/actions/erp/quick-mode"
+import QuickModeOnboarding from "@/components/erp/quick-mode/QuickModeOnboarding"
 import { SkeletonLoader } from "@/components/reusable"
 
 export const metadata = {
@@ -23,11 +23,12 @@ export default async function QuickModeInicioPage() {
         redirect("/erp/dashboard")
     }
 
-    const result = await getQuickModeHomeDataAction(partnerId)
+    const result = await getOnboardingStatusAction(partnerId)
 
     if (!result.success) {
-        if (result.redirect) {
-            redirect(result.redirect)
+        const errResult = result as any
+        if (errResult.redirect) {
+            redirect(errResult.redirect)
         }
         return (
             <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
@@ -39,14 +40,14 @@ export default async function QuickModeInicioPage() {
 
     return (
         <main className="mx-auto w-full px-4 md:px-8 pt-8 max-w-[1600px]">
-            <Suspense fallback={<QuickModeLoadingSkeleton />}>
-                <QuickModeHome data={result.data as any} partnerId={partnerId} />
+            <Suspense fallback={<QuickModeOnboardingSkeleton />}>
+                <QuickModeOnboarding data={result.data as any} partnerId={partnerId} />
             </Suspense>
         </main>
     )
 }
 
-function QuickModeLoadingSkeleton() {
+function QuickModeOnboardingSkeleton() {
     return (
         <div className="flex flex-col gap-8">
             <div className="flex flex-col gap-2">
@@ -54,15 +55,20 @@ function QuickModeLoadingSkeleton() {
                 <SkeletonLoader className="h-6 w-96" />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <SkeletonLoader className="h-32 rounded-3xl" />
-                <SkeletonLoader className="h-32 rounded-3xl" />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <SkeletonLoader className="h-40 rounded-2xl" />
-                <SkeletonLoader className="h-40 rounded-2xl" />
-                <SkeletonLoader className="h-40 rounded-2xl" />
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
+                    <SkeletonLoader className="h-28 rounded-3xl" />
+                    <div className="space-y-4">
+                        <SkeletonLoader className="h-24 rounded-2xl" />
+                        <SkeletonLoader className="h-24 rounded-2xl" />
+                        <SkeletonLoader className="h-24 rounded-2xl" />
+                        <SkeletonLoader className="h-24 rounded-2xl" />
+                    </div>
+                </div>
+                <div className="space-y-6">
+                    <SkeletonLoader className="h-64 rounded-3xl" />
+                    <SkeletonLoader className="h-48 rounded-3xl" />
+                </div>
             </div>
         </div>
     )

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
@@ -33,7 +34,8 @@ import {
     ArrowUpDownIcon,
     TrashIcon,
     BlockedIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    UploadIcon
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -90,6 +92,7 @@ export default function CustomersPage({
     initialNextCursor: ERPCustomerListCursor | null
     initialHasMore: boolean
 }) {
+    const router = useRouter()
     const { toast } = useToast()
     const { exportData, isExporting } = useErpExport()
     const { selectedStore, isLoading: storeLoading } = useStore()
@@ -451,6 +454,10 @@ export default function CustomersPage({
                                 <div className="flex items-center gap-3">
                                     <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
                                         {isExporting ? "Exportando..." : "Exportar"}
+                                    </Button>
+
+                                    <Button variant="outline" onClick={() => router.push("/erp/customers/import")} leftIcon={<UploadIcon size={18} />}>
+                                        Importar
                                     </Button>
 
                                     <Button onClick={handleAddCustomer} leftIcon={<PlusIcon size={18} />}>

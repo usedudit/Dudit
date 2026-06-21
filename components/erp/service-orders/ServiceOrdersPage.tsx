@@ -309,6 +309,7 @@ export default function ServiceOrdersPage({
               partnerId={partnerId}
               onBack={() => closeEntity()}
               onMutation={() => afterMutation()}
+              onEdit={(id) => openEntity("edit", id)}
             />
           )
         ) : (

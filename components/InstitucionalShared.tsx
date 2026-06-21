@@ -141,7 +141,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                             />
                         </Link>
                         <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-                            Descubra, compre, venda e organize. Tudo em um só lugar.
+                            Descubra oportunidades, anuncie o que quiser e gerencie seu negócio sem complicação.
                         </p>
                     </div>
 

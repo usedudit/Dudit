@@ -1097,35 +1097,28 @@ export async function createPOSCustomerQuickAction(input: {
 
     if (!name) return { success: false as const, error: "Informe o nome do cliente." }
 
-    const supabase = createAdminClient()
-
-    if (email) {
-        const { data: existingEmail } = await supabase
-            .from("customers")
-            .select("id")
-            .eq("partner_id", input.partnerId)
-            .ilike("email", email)
-            .limit(1)
-            .maybeSingle()
-        if (existingEmail?.id) {
-            return { success: false as const, error: "Já existe cliente com este email." }
+    // Check for existing customer before creating
+    if (email || cpfDigits) {
+        const { findExistingCustomer } = await import("@/lib/services/marketplace-customer")
+        const match = await findExistingCustomer({
+            partnerId: input.partnerId,
+            email: email || null,
+            cpf: cpfDigits || null,
+        })
+        if (match) {
+            return {
+                success: false as const,
+                error: `Já existe cliente com este ${match.matchBy === "email" ? "e-mail" : "CPF"}: "${match.customer.name}".`,
+                existingCustomerId: match.customer.id,
+            }
         }
     }
 
+    const supabase = createAdminClient()
     let encryptedCpf: string | null = null
     if (cpfDigits) {
         const { encryptCPF } = await import("@/lib/crypto")
         encryptedCpf = await encryptCPF(cpfDigits)
-        const { data: existingCpf } = await supabase
-            .from("customers")
-            .select("id")
-            .eq("partner_id", input.partnerId)
-            .eq("cpf", encryptedCpf)
-            .limit(1)
-            .maybeSingle()
-        if (existingCpf?.id) {
-            return { success: false as const, error: "Já existe cliente com este CPF." }
-        }
     }
 
     const { data: customer, error } = await supabase

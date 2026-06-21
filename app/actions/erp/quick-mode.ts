@@ -137,3 +137,99 @@ export async function upgradeToERPAction(partnerId: string) {
         return { success: false, error: e.message || "Erro ao atualizar para modo ERP" }
     }
 }
+
+export async function getOnboardingStatusAction(partnerId: string) {
+    try {
+        const user = await requireUser()
+        if (!user) return { success: false, error: "Não autenticado" }
+
+        const supabase = createAdminClient()
+
+        // 1. Fetch Partner
+        const { data: partner, error: partnerError } = await supabase
+            .from("partners")
+            .select("store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active")
+            .eq("id", partnerId)
+            .single()
+
+        if (partnerError || !partner) throw new Error("Parceiro não encontrado")
+
+        // 2. Fetch Addresses
+        const { data: addresses } = await supabase
+            .from("addresses")
+            .select("id, zip_code, street, number, neighborhood, city, state")
+            .eq("partner_id", partnerId)
+            .eq("is_default", true)
+            .limit(1)
+
+        // 3. Fetch Payment Methods
+        const { data: paymentMethods } = await supabase
+            .from("payment_methods")
+            .select("id, type, is_active")
+            .eq("partner_id", partnerId)
+
+        // 4. Fetch Products/Services count
+        const [productsCount, servicesCount] = await Promise.all([
+            supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true),
+            supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true),
+        ])
+
+        const hasPix = (paymentMethods || []).some((m: any) => (m.type === 'pix' || m.payment_type === 'pix') && m.is_active)
+        const hasAddress = (addresses || []).length > 0 && !!addresses[0].zip_code
+        const hasHours = !!partner.opening_hours && Object.keys(partner.opening_hours).length > 0
+        const hasItems = ((productsCount.count || 0) + (servicesCount.count || 0)) > 0
+        const hasShowcase = !!partner.store_image_url && !!partner.banner_url && !partner.banner_url.includes('default/')
+
+        // Checks
+        const checklist = {
+            profile: {
+                completed: !!partner.store_name && !!partner.phone && !!partner.category_id,
+                title: "Dados Gerais e Segmento",
+                description: "Defina o nome da loja, categoria principal e número de WhatsApp.",
+                tab: "dados-do-negocio"
+            },
+            address: {
+                completed: hasAddress,
+                title: "Endereço Comercial",
+                description: "Cadastre o endereço da sua loja para cálculo de rotas e entrega.",
+                tab: "dados-do-negocio"
+            },
+            hours: {
+                completed: hasHours,
+                title: "Horários de Funcionamento",
+                description: "Defina os horários em que seu estabelecimento aceita pedidos.",
+                tab: "dados-do-negocio"
+            },
+            payments: {
+                completed: hasPix,
+                title: "Forma de Recebimento (Pix)",
+                description: "Cadastre uma chave Pix ativa para receber pagamentos diretos.",
+                tab: "formas-de-pagamento"
+            },
+            items: {
+                completed: hasItems,
+                title: "Cadastrar Produto ou Serviço",
+                description: "Adicione pelo menos um item ativo ao seu catálogo.",
+                path: hasItems ? "" : "/erp/products?create=true"
+            },
+            showcase: {
+                completed: hasShowcase,
+                title: "Visual da sua Vitrine",
+                description: "Personalize sua logo e banner para atrair clientes.",
+                tab: "vitrine"
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                storeName: partner.store_name,
+                isShowcaseActive: partner.is_showcase_active,
+                checklist
+            }
+        }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Erro ao obter status de onboarding" }
+    }
+}
+

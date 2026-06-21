@@ -85,11 +85,14 @@ export async function generatePreview(
     duplicateRows: duplicateRows.size,
     errors,
     warnings,
-    duplicates: [...duplicateRows].map((row) => ({
-      row,
-      field: "SKU",
-      value: mappedRows[row - 1]?.["sku"] ?? mappedRows[row - 1]?.["cpf"] ?? "",
-    })),
+    duplicates: [...duplicateRows].map((row) => {
+      const mapped = mappedRows[row - 1] || {}
+      const field = entityType === "customers"
+        ? (mapped["email"] ? "E-mail" : "CPF")
+        : "SKU"
+      const value = mapped["email"] || mapped["cpf"] || mapped["sku"] || ""
+      return { row, field, value }
+    }),
     unknownCategories,
     unknownSuppliers,
     sampleRows,
@@ -145,6 +148,40 @@ async function detectDuplicates(
         for (const e of emails) {
           if (e.email && existingSet.has(e.email)) {
             duplicates.add(e.index + 1)
+          }
+        }
+      }
+    }
+
+    // Also check CPF duplicates
+    const rawCpfs = mappedRows
+      .map((r, i) => ({ cpf: r["cpf"]?.replace(/\D/g, ""), index: i }))
+      .filter((c): c is { cpf: string; index: number } => !!c.cpf && c.cpf.length === 11)
+
+    if (rawCpfs.length > 0) {
+      const uniqueCpfs = [...new Set(rawCpfs.map((c) => c.cpf))]
+      const { data: allCpfs } = await supabase
+        .from("customers")
+        .select("cpf")
+        .eq("partner_id", session.partnerId)
+        .not("cpf", "is", null)
+
+      if (allCpfs?.length) {
+        const { decryptCPF } = await import("@/lib/crypto")
+        const existingCpfSet = new Set<string>()
+        for (const row of allCpfs) {
+          try {
+            const decrypted = await decryptCPF(row.cpf)
+            if (uniqueCpfs.includes(decrypted)) {
+              existingCpfSet.add(decrypted)
+            }
+          } catch {
+            continue
+          }
+        }
+        for (const c of rawCpfs) {
+          if (existingCpfSet.has(c.cpf)) {
+            duplicates.add(c.index + 1)
           }
         }
       }
