@@ -72,6 +72,7 @@ export interface ImportResult {
   duplicateRows: number
   warningRows: number
   durationMs: number
+  errorMessage?: string
 }
 
 export interface ImportSession {

@@ -1003,9 +1003,10 @@ export async function checkoutCartAction(
   }
 
   // Ensure customer exists/is updated for this partner
+  let resolvedCustomerId: string | null = null
   try {
     const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
-    await ensureMarketplaceCustomer({
+    resolvedCustomerId = await ensureMarketplaceCustomer({
       partnerId,
       name: buyerProfile?.full_name || user.email?.split("@")[0] || "Cliente",
       email: user.email,
@@ -1021,6 +1022,7 @@ export async function checkoutCartAction(
     .from("orders")
     .insert({
       buyer_id: user.id,
+      customer_id: resolvedCustomerId,
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
       total_amount: persistedTotal,

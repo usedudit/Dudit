@@ -12,7 +12,7 @@ import { generateSignedUploadUrl } from "@/lib/r2/server"
 import { R2_PREFIXES, ALLOWED_MIME_TYPES, ALLOWED_EXTENSIONS, MAX_FILE_SIZE } from "@/lib/r2/config"
 import { createNotification } from "@/lib/services/notification.service"
 import { revalidatePath } from "next/cache"
-import { increment_usage_counter } from "@/lib/services/subscription.service"
+import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 
 export type ServiceOrderListCursor = { createdAt: string; id: string } | null
 
@@ -166,6 +166,12 @@ export async function createServiceOrderAction(
     const orderNumber = seqRes || `OS-${new Date().getFullYear()}-0001`
 
     const status = input.status || "aberta"
+
+    // -- Plan limit check --
+    const limitCheck = await checkLimit(partnerId, "monthly_service_orders")
+    if (!limitCheck.allowed) {
+      return { success: false, error: limitCheck.message || "Limite mensal de ordens de serviço atingido." }
+    }
 
     const { data, error } = await admin
       .from("service_orders")
@@ -1205,5 +1211,30 @@ export async function confirmServiceOrderPaymentAction(payload: {
     return { success: true, orderId: order.id, orderNumber: order.order_number }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao processar pagamento da ordem de serviço" }
+  }
+}
+
+export async function saveServiceOrderSpecificationsAction(
+  partnerId: string,
+  serviceOrderId: string,
+  specifications: { name: string; value: string }[],
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "service_orders", "edit")
+    const admin = getAdminClient()
+
+    const { error } = await admin
+      .from("service_orders")
+      .update({ specifications: JSON.stringify(specifications) })
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+
+    if (error) throw error
+
+    revalidatePath("/erp/service-orders")
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao salvar especificações" }
   }
 }

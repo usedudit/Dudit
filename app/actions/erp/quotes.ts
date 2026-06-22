@@ -1945,7 +1945,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         addresses (*)
                     ),
                     partners (
-                        id, store_name, store_image_url, email, phone
+                        id, store_name, store_image_url, phone
                     )
                 `)
                 .eq("public_token", publicToken)
@@ -1962,7 +1962,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                             addresses (*)
                         ),
                         partners (
-                            id, store_name, store_image_url, email, phone
+                            id, store_name, store_image_url, phone
                         )
                     `)
                     .eq("id", publicToken)

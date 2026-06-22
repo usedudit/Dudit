@@ -161,6 +161,8 @@ export async function confirmImportAction(
     const result = await executeImport(session, mapping, options)
 
     const supabase = await getSupabaseServerClient()
+    const status = (result.successRows === 0 && result.errorRows > 0) ? "failed" : "completed"
+
     await supabase.from("erp_imports").insert({
       partner_id: partnerId,
       entity_type: session.entityType,
@@ -171,11 +173,15 @@ export async function confirmImportAction(
       duplicate_rows: result.duplicateRows,
       warnings_count: result.warningRows,
       duration_ms: Date.now() - startTime,
-      status: "completed",
+      status: status,
       created_by: user.id,
     })
 
     await deleteImportSession(partnerId, sessionId)
+
+    if (status === "failed") {
+      return { success: false, error: result.errorMessage || "Nenhum dado pôde ser importado. Verifique os erros na planilha." }
+    }
 
     return { success: true, result }
   } catch (err: any) {

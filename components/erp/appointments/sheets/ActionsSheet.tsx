@@ -2,20 +2,18 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Utensils, Briefcase } from 'lucide-react';
-import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea, RadioButton, FormDropdown } from '@/components/reusable';
+import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea, RadioButton, FormDropdown, IconPlaceholder } from '@/components/reusable';
 import AlertModal from "@/components/reusable/AlertModal"
 import { Appointment } from '../types';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { getEndTime, formatDateStr } from '../utils';
 import Portal from '@/components/Portal';
-import { createServiceAction } from '@/app/actions/erp/servicos';
-import { getServiceMetadataAction, createServiceCategoryAction } from '@/app/actions/erp/service-metadata';
 import { createUnavailableTypeAction } from '@/app/actions/erp/unavailable-types';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import BottomSheet from '@/components/BottomSheet';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { formatCurrency } from '@/lib/utils/formatters';
-import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, SearchIcon } from '@/lib/icons';
+import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, SearchIcon, CalendarIcon } from '@/lib/icons';
 import { useRef } from 'react';
 
 const EmojiPicker = ({ onSelect, onClose }: { onSelect: (emoji: string) => void, onClose: () => void }) => {
@@ -604,8 +602,12 @@ export const MoreAppointmentsSheet = ({ date, appointments, onClose, onViewAppoi
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
                 {filteredAppointments.length === 0 ? (
-                    <div className="text-center text-brand-inactive-text py-10">
-                        Nenhum agendamento encontrado.
+                    <div className="py-10">
+                        <IconPlaceholder
+                            icon={CalendarIcon}
+                            title="Nenhum agendamento encontrado"
+                            subtitle="Tente alterar o período ou a busca."
+                        />
                     </div>
                 ) : (
                     filteredAppointments.map(apt => (

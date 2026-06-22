@@ -1562,7 +1562,7 @@ export const AppointmentSheet = ({
                                     <IconPlaceholder
                                         icon={UserIcon}
                                         title="Nenhum cliente encontrado"
-                                        subtitle="Tente outra busca."
+                                        subtitle="Tente outro termo de busca ou cadastre um novo cliente."
                                     />
                                 ) : (
                                     filteredClients.map((client) => {
@@ -2323,7 +2323,7 @@ export const AppointmentSheet = ({
                         <IconPlaceholder
                             icon={UserIcon}
                             title="Nenhum cliente encontrado"
-                            subtitle="Tente outra busca."
+                            subtitle="Tente outro termo de busca ou cadastre um novo cliente."
                         />
                     ) : (
                         filteredClients.map((client) => {

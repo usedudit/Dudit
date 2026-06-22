@@ -692,9 +692,10 @@ async function handler(request: NextRequest) {
       payerCpf = paymentFormData.payer?.identification?.number || null
     }
 
+    let resolvedCustomerId: string | null = null
     try {
       const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
-      await ensureMarketplaceCustomer({
+      resolvedCustomerId = await ensureMarketplaceCustomer({
         partnerId: partnerId,
         name: customerName,
         email: user.email,
@@ -726,6 +727,7 @@ async function handler(request: NextRequest) {
       .insert({
         partner_id: partnerId,
         buyer_id: buyerId,
+        customer_id: resolvedCustomerId,
         customer_name: customerName,
         delivery_type: resolvedOrderDeliveryType,
         delivery_address: resolvedOrderDeliveryAddress,

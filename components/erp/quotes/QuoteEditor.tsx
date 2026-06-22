@@ -658,38 +658,38 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         {/* Financial Inputs Row */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {!discountLocked && (
-                            <div className="relative">
-                                {props.discountType === 'R$' ? (
-                                    <MoneyInput
-                                        label="Desconto"
-                                        value={props.discount}
-                                        onChange={(val) => props.setDiscount(val.toString())}
-                                        disabled={financialLocked}
-                                        suffix={
-                                            <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
-                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('R$')} className="text-[11px] font-black text-brand-primary disabled:opacity-40">R$</button>
-                                                <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
-                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('%')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors disabled:opacity-40">%</button>
-                                            </div>
-                                        }
-                                    />
-                                ) : (
-                                    <PercentageInput
-                                        label="Desconto"
-                                        value={props.discount}
-                                        onChange={(val) => props.setDiscount(val.toString())}
-                                        disabled={financialLocked}
-                                        suffix={
-                                            <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
-                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('R$')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors disabled:opacity-40">R$</button>
-                                                <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
-                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('%')} className="text-[11px] font-black text-brand-primary disabled:opacity-40">%</button>
-                                            </div>
-                                        }
-                                    />
-                                )}
-                            </div>
-                        )}
+                                <div className="relative">
+                                    {props.discountType === 'R$' ? (
+                                        <MoneyInput
+                                            label="Desconto"
+                                            value={props.discount}
+                                            onChange={(val) => props.setDiscount(val.toString())}
+                                            disabled={financialLocked}
+                                            suffix={
+                                                <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
+                                                    <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('R$')} className="text-[11px] font-black text-brand-primary disabled:opacity-40">R$</button>
+                                                    <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
+                                                    <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('%')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors disabled:opacity-40">%</button>
+                                                </div>
+                                            }
+                                        />
+                                    ) : (
+                                        <PercentageInput
+                                            label="Desconto"
+                                            value={props.discount}
+                                            onChange={(val) => props.setDiscount(val.toString())}
+                                            disabled={financialLocked}
+                                            suffix={
+                                                <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
+                                                    <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('R$')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors disabled:opacity-40">R$</button>
+                                                    <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
+                                                    <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('%')} className="text-[11px] font-black text-brand-primary disabled:opacity-40">%</button>
+                                                </div>
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            )}
 
                             <MoneyInput
                                 label="Entrega"

@@ -373,6 +373,7 @@ export async function getUsageCounters(partnerId: string): Promise<UsageCounters
   const quotesReset = counters.quotes_month_reset ? new Date(counters.quotes_month_reset).getTime() : 0
   const ordersReset = counters.orders_month_reset ? new Date(counters.orders_month_reset).getTime() : 0
   const appointmentsReset = counters.appointments_month_reset ? new Date(counters.appointments_month_reset).getTime() : 0
+  const serviceOrdersReset = counters.service_orders_month_reset ? new Date(counters.service_orders_month_reset).getTime() : 0
 
   if (quotesReset < monthStartUtc) {
     updates.quotes_month_count = 0
@@ -385,6 +386,10 @@ export async function getUsageCounters(partnerId: string): Promise<UsageCounters
   if (appointmentsReset < monthStartUtc) {
     updates.appointments_month_count = 0
       ; (updates as any).appointments_month_reset = now.toISOString()
+  }
+  if (serviceOrdersReset < monthStartUtc) {
+    updates.service_orders_month_count = 0
+      ; (updates as any).service_orders_month_reset = now.toISOString()
   }
 
   if (Object.keys(updates).length > 0) {

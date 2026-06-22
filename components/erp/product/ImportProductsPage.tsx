@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge } from "@/components/reusable"
+import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, FormDropdown } from "@/components/reusable"
 import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, ChevronDownIcon, FileTextIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
@@ -77,7 +77,7 @@ function MappingRow({
   }
 
   return (
-    <tr className="border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
+    <tr className="hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
       <td className="py-4 px-4 align-middle">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -91,18 +91,20 @@ function MappingRow({
         </div>
       </td>
       <td className="py-4 px-4 align-middle">
-        <select
-          value={col.field || ""}
-          onChange={(e) => onMappingChange(col.headerIndex, e.target.value || null)}
-          className="w-full max-w-xs px-3 py-2 text-[13px] rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
-        >
-          <option value="">— Não importar —</option>
-          {availableFields.map((f) => (
-            <option key={f.name} value={f.name}>
-              {f.label}{f.required ? " *" : ""}
-            </option>
-          ))}
-        </select>
+        <div className="w-full max-w-xs">
+          <FormDropdown
+            value={col.field || ""}
+            setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
+            options={[
+              { value: "", label: "— Não importar —" },
+              ...availableFields.map((f) => ({
+                value: f.name,
+                label: `${f.label}${f.required ? " *" : ""}`,
+              })),
+            ]}
+            placeholder="— Não importar —"
+          />
+        </div>
       </td>
       <td className="py-4 px-4 align-middle">
         {col.field ? (
@@ -145,7 +147,7 @@ function MappingMobileItem({
   }
 
   return (
-    <div className="p-4 border-b border-brand-border dark:border-dark-border last:border-0 space-y-3">
+    <div className="p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-6 h-6 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -166,18 +168,18 @@ function MappingMobileItem({
 
       <div className="flex flex-col gap-1">
         <span className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase font-bold tracking-wider">Campo no Sistema</span>
-        <select
+        <FormDropdown
           value={col.field || ""}
-          onChange={(e) => onMappingChange(col.headerIndex, e.target.value || null)}
-          className="w-full px-3 py-2 text-[13px] rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
-        >
-          <option value="">— Não importar —</option>
-          {availableFields.map((f) => (
-            <option key={f.name} value={f.name}>
-              {f.label}{f.required ? " *" : ""}
-            </option>
-          ))}
-        </select>
+          setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
+          options={[
+            { value: "", label: "— Não importar —" },
+            ...availableFields.map((f) => ({
+              value: f.name,
+              label: `${f.label}${f.required ? " *" : ""}`,
+            })),
+          ]}
+          placeholder="— Não importar —"
+        />
       </div>
     </div>
   )
@@ -210,6 +212,11 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
 
   const [scrollState, setScrollState] = useState({ left: false, right: false })
   const tableContainerRef = useRef<HTMLDivElement>(null)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const handleScroll = useCallback(() => {
+    if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+  }, [])
 
   const checkScroll = useCallback(() => {
     if (!tableContainerRef.current) return
@@ -366,7 +373,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+    <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background transition-colors duration-300">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -375,90 +382,97 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
         .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
       `}</style>
 
-      <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-          <div className="flex flex-col gap-2 pt-1">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => step === "upload" ? router.push("/erp/products") : setStep("upload")}
-                className="p-1 -ml-1 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border transition-colors"
-              >
-                <ChevronLeftIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
-              </button>
-              <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                {step === "upload" ? "Importar Produtos" : step === "mapping" ? "Revisar Mapeamento" : fileName}
-              </h1>
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+        
+        {/* Sticky Header */}
+        <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4 md:py-6"}`}>
+          <div className="max-w-[1300px] mx-auto px-4 md:px-6 flex items-start justify-between">
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => step === "upload" ? router.push("/erp/products") : setStep("upload")}
+                  className="p-1 -ml-1 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border transition-colors"
+                >
+                  <ChevronLeftIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                </button>
+                <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">
+                  {step === "upload" ? "Importar Produtos" : step === "mapping" ? "Revisar Mapeamento" : fileName}
+                </h1>
+              </div>
+              <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm font-medium">
+                {step === "upload"
+                  ? "Faça upload de uma planilha .xlsx, .xls ou .csv com produtos."
+                  : step === "mapping"
+                    ? `${totalRows} produto(s) encontrados — ${mappedCount} de ${headers.length} colunas mapeadas`
+                    : `${totalRows} produto(s) encontrados`}
+              </p>
             </div>
-            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-              {step === "upload"
-                ? "Faça upload de uma planilha .xlsx, .xls ou .csv com produtos."
-                : step === "mapping"
-                  ? `${totalRows} produto(s) encontrados — ${mappedCount} de ${headers.length} colunas mapeadas`
-                  : `${totalRows} produto(s) encontrados`}
-            </p>
-          </div>
 
-          {step === "mapping" && (
-            <div className="flex items-center gap-3 pt-1">
-              <Button variant="outline" onClick={() => { setStep("upload"); setParsedProducts([]); setMapping([]) }}>
-                <UploadIcon className="w-[18px] h-[18px]" /> Nova planilha
-              </Button>
-              <Button onClick={handleMappingConfirm} disabled={uploading || mappedCount === 0}>
-                {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
-              </Button>
-            </div>
-          )}
-
-          {step === "preview" && (
-            <div className="flex items-center gap-3 pt-1">
-              <Button variant="outline" onClick={() => setStep("mapping")}>
-                Voltar ao mapeamento
-              </Button>
-              <Button onClick={handleImport} disabled={importing || parsedProducts.length === 0}>
-                {importing ? <><Spinner /> Importando...</> : `Importar ${parsedProducts.length} produto(s)`}
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {step === "upload" && (
-          <div className="flex-1 px-4 md:px-8 max-w-[800px] mx-auto w-full pt-8">
-            <div
-              {...getRootProps()}
-              className={`cursor-pointer transition-opacity ${uploading ? "opacity-60 pointer-events-none" : ""}`}
-              onClick={open}
-            >
-              <input {...getInputProps()} />
-              {uploading ? (
-                <IconPlaceholder
-                  placeholderType="default"
-                  icon={Spinner}
-                  title="Lendo Planilha..."
-                  subtitle="Processando os dados da sua planilha de produtos. Aguarde um instante."
-                />
-              ) : (
-                <IconPlaceholder
-                  placeholderType="default"
-                  icon={UploadIcon}
-                  title={isDragActive ? "Solte a planilha aqui..." : "Importar Planilha de Produtos"}
-                  subtitle="Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls ou .csv (até 10 MB e 2.000 linhas)."
-                  itemButton={{
-                    text: "Selecionar Planilha",
-                    type: "button",
-                    action: open,
-                    variant: "default"
-                  }}
-                />
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+              {step === "mapping" && (
+                <>
+                  <Button variant="outline" onClick={() => { setStep("upload"); setParsedProducts([]); setMapping([]) }}>
+                    <UploadIcon className="w-[18px] h-[18px]" /> Nova planilha
+                  </Button>
+                  <Button onClick={handleMappingConfirm} disabled={uploading || mappedCount === 0}>
+                    {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
+                  </Button>
+                </>
+              )}
+              {step === "preview" && (
+                <>
+                  <Button variant="outline" onClick={() => setStep("mapping")}>
+                    Voltar ao mapeamento
+                  </Button>
+                  <Button onClick={handleImport} disabled={importing || parsedProducts.length === 0}>
+                    {importing ? <><Spinner /> Importando...</> : `Importar ${parsedProducts.length} produto(s)`}
+                  </Button>
+                </>
               )}
             </div>
           </div>
-        )}
+        </div>
 
-        {step === "mapping" && (
-          <div className="flex-1 overflow-auto px-4 md:px-8 pb-24 md:pb-8">
-            <div className="max-w-[1300px] mx-auto w-full">
+        {/* Content Area */}
+        <div className="max-w-[1300px] mx-auto w-full px-4 md:px-6 py-6 min-h-[400px]">
+          {step === "upload" && (
+            <div className="max-w-[800px] mx-auto w-full pt-8">
+              <div
+                {...getRootProps()}
+                className={`cursor-pointer transition-opacity ${uploading ? "opacity-60 pointer-events-none" : ""}`}
+                onClick={open}
+              >
+                <input {...getInputProps()} />
+                {uploading ? (
+                  <IconPlaceholder
+                    placeholderType="default"
+                    icon={Spinner}
+                    title="Lendo Planilha..."
+                    subtitle="Processando os dados da sua planilha de produtos. Aguarde um instante."
+                  />
+                ) : (
+                  <IconPlaceholder
+                    placeholderType="default"
+                    icon={UploadIcon}
+                    title={isDragActive ? "Solte a planilha aqui..." : "Importar Planilha de Produtos"}
+                    subtitle="Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls ou .csv (até 10 MB e 2.000 linhas)."
+                    itemButton={{
+                      text: "Selecionar Planilha",
+                      type: "button",
+                      action: open,
+                      variant: "default"
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === "mapping" && (
+            <div>
               {/* Desktop Table View */}
-              <div className="hidden md:block overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+              <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface">
                 <table className="w-full text-left border-separate border-spacing-0">
                   <thead>
                     <tr className="bg-brand-gray dark:bg-dark-border/50">
@@ -481,7 +495,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
               </div>
 
               {/* Mobile Card List View */}
-              <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border overflow-hidden">
+              <div className="md:hidden bg-white dark:bg-dark-surface">
                 {mapping.map((col) => (
                   <MappingMobileItem
                     key={col.headerIndex}
@@ -492,183 +506,184 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {step === "preview" && (
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-none px-4 md:px-8">
-              <ProductPageControls
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                search={search}
-                onSearchChange={setSearch}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                onOpenFilter={() => {}}
-                onOpenImport={() => {}}
-                onOpenExport={() => {}}
-                onAddProduct={() => {}}
-                filters={{ categories: [], brands: [], units: [], stocks: [], status: [], priceRange: { min: "", max: "" } }}
-                setFilters={() => {}}
-                hasActiveFilters={false}
-              />
-            </div>
-
-            {filteredProducts.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-brand-inactive-text dark:text-dark-body text-sm">
-                Nenhum produto encontrado
-              </div>
-            ) : (
-              <div className="flex-1 overflow-auto px-4 md:px-8 pb-24 md:pb-8">
-                <SelectionBanner
-                  selectedCount={selection.size}
-                  totalCount={filteredProducts.length}
-                  onSelectAll={() => setSelection(new Set(filteredProducts.map((p: any) => p.id)))}
-                  onClearSelection={() => setSelection(new Set())}
-                  itemName="produtos"
-                  singularItemName="produto"
+          {step === "preview" && (
+            <div className="flex flex-col overflow-hidden">
+              <div className="flex-none mb-6">
+                <ProductPageControls
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  search={search}
+                  onSearchChange={setSearch}
+                  viewMode={viewMode}
+                  onViewModeChange={setViewMode}
+                  onOpenFilter={() => {}}
+                  onOpenImport={() => {}}
+                  onOpenExport={() => {}}
+                  onAddProduct={() => {}}
+                  filters={{ categories: [], brands: [], units: [], stocks: [], status: [], priceRange: { min: "", max: "" } }}
+                  setFilters={() => {}}
+                  hasActiveFilters={false}
                 />
-
-                {viewMode === "grid" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                    {paginated.map((product: any) => (
-                      <ProductGridCard
-                        key={product.id}
-                        product={product}
-                        selected={selection.has(product.id)}
-                        onSelect={() => setSelection((prev) => {
-                          const next = new Set(prev)
-                          next.has(product.id) ? next.delete(product.id) : next.add(product.id)
-                          return next
-                        })}
-                        onEdit={() => {}}
-                        onDetails={() => {}}
-                        onDelete={() => {}}
-                        onDuplicate={() => {}}
-                        onShare={() => {}}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="w-full overflow-hidden rounded-xl relative">
-                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                      <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                        <thead>
-                          <tr className="bg-brand-gray dark:bg-dark-border/50">
-                            <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
-                              <Checkbox
-                                checked={selection.size === paginated.length && paginated.length > 0}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelection((prev) => {
-                                      const next = new Set(prev)
-                                      paginated.forEach((p: any) => next.add(p.id))
-                                      return next
-                                    })
-                                  } else {
-                                    setSelection((prev) => {
-                                      const next = new Set(prev)
-                                      paginated.forEach((p: any) => next.delete(p.id))
-                                      return next
-                                    })
-                                  }
-                                }}
-                                className="bg-white dark:bg-dark-background"
-                              />
-                            </th>
-                            {FIXED_COLUMNS.map((col) => (
-                              <th
-                                key={col.id}
-                                className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${
-                                  col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                                } ${col.id === "actions" ? "rounded-r-lg" : ""}`}
-                                style={{ width: col.width, minWidth: col.minWidth }}
-                              >
-                                <span>{col.label}</span>
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {paginated.map((product: any) => (
-                            <ProductListItem
-                              key={product.id}
-                              product={product}
-                              columns={FIXED_COLUMNS}
-                              selected={selection.has(product.id)}
-                              onSelect={(id) => setSelection((prev) => {
-                                const next = new Set(prev)
-                                next.has(id) ? next.delete(id) : next.add(id)
-                                return next
-                              })}
-                              onEdit={() => {}}
-                              onDetails={() => {}}
-                              onDelete={() => {}}
-                              onDuplicate={() => {}}
-                              onShare={() => {}}
-                              suppliers={[]}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-center py-4">
-                  <Pagination
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                  />
-                </div>
               </div>
-            )}
-          </div>
-        )}
-        {/* Mobile Sticky Footers */}
-        {step === "mapping" && (
-          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-            <Button
-              variant="outline"
-              className="flex-1 h-12"
-              onClick={() => { setStep("upload"); setParsedProducts([]); setMapping([]) }}
-            >
-              <UploadIcon className="w-[18px] h-[18px]" /> Nova planilha
-            </Button>
-            <Button
-              onClick={handleMappingConfirm}
-              disabled={uploading || mappedCount === 0}
-              className="flex-1 h-12"
-            >
-              {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
-            </Button>
-          </div>
-        )}
 
-        {step === "preview" && (
-          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-            <Button
-              variant="outline"
-              className="flex-1 h-12"
-              onClick={() => setStep("mapping")}
-            >
-              Voltar
-            </Button>
-            <Button
-              onClick={handleImport}
-              disabled={importing || parsedProducts.length === 0}
-              className="flex-1 h-12"
-            >
-              {importing ? <><Spinner /> Importando...</> : `Importar ${parsedProducts.length} prod.`}
-            </Button>
-          </div>
-        )}
+              {filteredProducts.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-brand-inactive-text dark:text-dark-body text-sm py-12">
+                  Nenhum produto encontrado
+                </div>
+              ) : (
+                <div className="flex-1">
+                  <SelectionBanner
+                    selectedCount={selection.size}
+                    totalCount={filteredProducts.length}
+                    onSelectAll={() => setSelection(new Set(filteredProducts.map((p: any) => p.id)))}
+                    onClearSelection={() => setSelection(new Set())}
+                    itemName="produtos"
+                    singularItemName="produto"
+                  />
+
+                  {viewMode === "grid" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                      {paginated.map((product: any) => (
+                        <ProductGridCard
+                          key={product.id}
+                          product={product}
+                          selected={selection.has(product.id)}
+                          onSelect={() => setSelection((prev) => {
+                            const next = new Set(prev)
+                            next.has(product.id) ? next.delete(product.id) : next.add(product.id)
+                            return next
+                          })}
+                          onEdit={() => {}}
+                          onDetails={() => {}}
+                          onDelete={() => {}}
+                          onDuplicate={() => {}}
+                          onShare={() => {}}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="w-full overflow-hidden rounded-xl relative">
+                      <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                      <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                      <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                          <thead>
+                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                              <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                <Checkbox
+                                  checked={selection.size === paginated.length && paginated.length > 0}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelection((prev) => {
+                                        const next = new Set(prev)
+                                        paginated.forEach((p: any) => next.add(p.id))
+                                        return next
+                                      })
+                                    } else {
+                                      setSelection((prev) => {
+                                        const next = new Set(prev)
+                                        paginated.forEach((p: any) => next.delete(p.id))
+                                        return next
+                                      })
+                                    }
+                                  }}
+                                  className="bg-white dark:bg-dark-background"
+                                />
+                              </th>
+                              {FIXED_COLUMNS.map((col) => (
+                                <th
+                                  key={col.id}
+                                  className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${
+                                    col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                  } ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                  style={{ width: col.width, minWidth: col.minWidth }}
+                                >
+                                  <span>{col.label}</span>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginated.map((product: any) => (
+                              <ProductListItem
+                                key={product.id}
+                                product={product}
+                                columns={FIXED_COLUMNS}
+                                selected={selection.has(product.id)}
+                                onSelect={(id) => setSelection((prev) => {
+                                  const next = new Set(prev)
+                                  next.has(id) ? next.delete(id) : next.add(id)
+                                  return next
+                                })}
+                                onEdit={() => {}}
+                                onDetails={() => {}}
+                                onDelete={() => {}}
+                                onDuplicate={() => {}}
+                                onShare={() => {}}
+                                suppliers={[]}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-center py-4">
+                    <Pagination
+                      currentPage={page}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Mobile Sticky Footers */}
+      {step === "mapping" && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+          <Button
+            variant="outline"
+            className="flex-1 h-12"
+            onClick={() => { setStep("upload"); setParsedProducts([]); setMapping([]) }}
+          >
+            <UploadIcon className="w-[18px] h-[18px]" /> Nova planilha
+          </Button>
+          <Button
+            onClick={handleMappingConfirm}
+            disabled={uploading || mappedCount === 0}
+            className="flex-1 h-12"
+          >
+            {uploading ? <><Spinner /> Aplicando...</> : `Continuar (${mappedCount} campos)`}
+          </Button>
+        </div>
+      )}
+
+      {step === "preview" && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+          <Button
+            variant="outline"
+            className="flex-1 h-12"
+            onClick={() => setStep("mapping")}
+          >
+            Voltar
+          </Button>
+          <Button
+            onClick={handleImport}
+            disabled={importing || parsedProducts.length === 0}
+            className="flex-1 h-12"
+          >
+            {importing ? <><Spinner /> Importando...</> : `Importar ${parsedProducts.length} prod.`}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

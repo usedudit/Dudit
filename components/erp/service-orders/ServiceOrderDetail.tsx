@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo } from "react"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem } from "@/components/reusable"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import PaymentModal from "@/components/erp/orders/PaymentModal"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon } from "@/lib/icons"
@@ -9,632 +10,796 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
 import SignatureDialog from "./SignatureDialog"
+import SpecificationsTab from "./SpecificationsTab"
+import AttachmentsTab from "./AttachmentsTab"
 import {
-  updateServiceOrderStatusAction,
-  assignServiceOrderAction,
-  getServiceOrderDetailsAction,
-  confirmServiceOrderPaymentAction,
+    updateServiceOrderStatusAction,
+    assignServiceOrderAction,
+    getServiceOrderDetailsAction,
+    confirmServiceOrderPaymentAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { useToast } from "@/hooks/use-toast"
-import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-  aberta: ["aguardando_aprovacao", "cancelada"],
-  aguardando_aprovacao: ["aprovada", "cancelada"],
-  aprovada: ["em_andamento", "cancelada"],
-  em_andamento: ["aguardando_peca", "concluida", "cancelada"],
-  aguardando_peca: ["em_andamento", "cancelada"],
-  concluida: ["entregue"],
-  entregue: [],
-  cancelada: [],
+    aberta: ["aguardando_aprovacao", "cancelada"],
+    aguardando_aprovacao: ["aprovada", "cancelada"],
+    aprovada: ["em_andamento", "cancelada"],
+    em_andamento: ["aguardando_peca", "concluida", "cancelada"],
+    aguardando_peca: ["em_andamento", "cancelada"],
+    concluida: ["entregue"],
+    entregue: [],
+    cancelada: [],
 }
 
 const PRIORITY_META: Record<string, { label: string; variant: "gray" | "green" | "orange" | "red" }> = {
-  baixa: { label: "Baixa", variant: "gray" },
-  media: { label: "Média", variant: "green" },
-  alta: { label: "Alta", variant: "orange" },
-  urgente: { label: "Urgente", variant: "red" },
+    baixa: { label: "Baixa", variant: "gray" },
+    media: { label: "Média", variant: "green" },
+    alta: { label: "Alta", variant: "orange" },
+    urgente: { label: "Urgente", variant: "red" },
 }
 
 const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-  <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-    {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-    {children}
-  </div>
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {children}
+    </div>
 )
 
 interface ServiceOrderDetailProps {
-  data: any
-  partnerId: string
-  onBack?: () => void
-  onMutation?: () => void
-  onEdit?: (id: string) => void
+    data: any
+    partnerId: string
+    onBack?: () => void
+    onMutation?: () => void
+    onEdit?: (id: string) => void
 }
 
 export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation, onEdit }: ServiceOrderDetailProps) {
-  const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("summary")
-  const [order, setOrder] = useState(data)
-  const [loading, setLoading] = useState(false)
-  const [showSignature, setShowSignature] = useState(false)
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
+    const { toast } = useToast()
+    const [activeTab, setActiveTab] = useState("summary")
+    const [order, setOrder] = useState(data)
+    const [loading, setLoading] = useState(false)
+    const [showSignature, setShowSignature] = useState(false)
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+    const [teamMembers, setTeamMembers] = useState<any[]>([])
+    const [isScrolled, setIsScrolled] = useState(false)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const [showShareModal, setShowShareModal] = useState(false)
 
-  const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
-  const availableTransitions = STATUS_TRANSITIONS[order.status] || []
-
-  // Load team members to resolve technician's name
-  useEffect(() => {
-    async function loadTeam() {
-      try {
-        const { getTeamMembers } = await import("@/app/actions/erp/team")
-        const res = await getTeamMembers()
-        if (res && res.members) {
-          setTeamMembers(res.members)
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) {
+            setIsScrolled(scrollContainerRef.current.scrollTop > 5)
         }
-      } catch (err) {
-        console.error("Erro ao carregar equipe:", err)
-      }
+    }, [])
+
+    const handleBack = () => {
+        if (onBack) {
+            onBack()
+        } else {
+            window.location.href = "/erp/service-orders"
+        }
     }
-    loadTeam()
-  }, [])
 
-  const handleStatusChange = async (newStatus: string) => {
-    setLoading(true)
-    const res = await updateServiceOrderStatusAction(partnerId, order.id, newStatus)
-    if (res.success) {
-      setOrder((prev: any) => ({ ...prev, ...res.data }))
-      toast({ description: `Status atualizado para ${SERVICE_ORDER_STATUS_META[newStatus as ServiceOrderStatus]?.label}` })
-      onMutation?.()
-    } else {
-      toast({ description: res.error || "Erro ao atualizar status" })
+    const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
+    const availableTransitions = STATUS_TRANSITIONS[order.status] || []
+
+    // Load team members to resolve technician's name
+    useEffect(() => {
+        async function loadTeam() {
+            try {
+                const { getTeamMembers } = await import("@/app/actions/erp/team")
+                const res = await getTeamMembers()
+                if (res && res.members) {
+                    setTeamMembers(res.members)
+                }
+            } catch (err) {
+                console.error("Erro ao carregar equipe:", err)
+            }
+        }
+        loadTeam()
+    }, [])
+
+    const handleStatusChange = async (newStatus: string) => {
+        setLoading(true)
+        const res = await updateServiceOrderStatusAction(partnerId, order.id, newStatus)
+        if (res.success) {
+            // Reload full service order details to get correct history / updates
+            const detailsRes = await getServiceOrderDetailsAction(order.id, partnerId)
+            if (detailsRes.success) {
+                setOrder(detailsRes.data)
+            } else {
+                setOrder((prev: any) => ({ ...prev, ...res.data }))
+            }
+            toast({ description: `Status atualizado para ${SERVICE_ORDER_STATUS_META[newStatus as ServiceOrderStatus]?.label}` })
+            onMutation?.()
+        } else {
+            toast({ description: res.error || "Erro ao atualizar status" })
+        }
+        setLoading(false)
     }
-    setLoading(false)
-  }
 
-  const handleSignatureSaved = (key: string) => {
-    setOrder((prev: any) => ({ ...prev, signature_image_key: key, signed_at: new Date().toISOString() }))
-    setShowSignature(false)
-    onMutation?.()
-  }
-
-  const handleEditClick = () => {
-    if (onEdit) {
-      onEdit(order.id)
-    } else {
-      window.location.href = `/erp/service-orders?edit=${order.id}`
-    }
-  }
-
-  const formatDateStr = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
-  const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "—"
-
-  const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`
-
-  // Financial calculations
-  const subtotal = useMemo(() => {
-    const totalS = (order.services || []).reduce((sum: number, s: any) => sum + (Number(svcPrice(s)) * (s.quantity || 1)), 0)
-    const totalP = (order.products || []).reduce((sum: number, p: any) => sum + (Number(prodPrice(p)) * (p.quantity || 1)), 0)
-    return totalS + totalP
-  }, [order.services, order.products])
-
-  const discountAmount = useMemo(() => {
-    if (order.discount_type === 'percentage') {
-      return (subtotal * Number(order.discount_value || 0)) / 100
-    }
-    return Number(order.discount_value || 0)
-  }, [subtotal, order.discount_value, order.discount_type])
-
-  const cart = useMemo(() => {
-    const list: any[] = []
-    ;(order.services || []).forEach((s: any) => {
-      list.push({
-        id: s.id,
-        productId: null,
-        variantId: null,
-        name: s.service_name || "Mão de Obra",
-        unitPrice: Number(svcPrice(s)),
-        quantity: Number(s.quantity || 1),
-        isService: true,
-      })
-    })
-    ;(order.products || []).forEach((p: any) => {
-      list.push({
-        id: p.id,
-        productId: p.product_id,
-        variantId: p.variant_id || null,
-        name: p.product_name || "Produto",
-        unitPrice: Number(prodPrice(p)),
-        quantity: Number(p.quantity || 1),
-        isService: false,
-      })
-    })
-    return list
-  }, [order.services, order.products])
-
-  const handleConfirmPayment = async (paymentData: any) => {
-    setLoading(true)
-    try {
-      const res = await confirmServiceOrderPaymentAction({
-        serviceOrderId: order.id,
-        partnerId,
-        paymentStatus: paymentData.paymentStatus,
-        paidAmount: paymentData.paidAmount,
-        paymentMethod: paymentData.paymentMethod,
-        paymentBreakdown: paymentData.paymentBreakdown,
-        paymentProvider: paymentData.paymentProvider,
-        mpPaymentId: paymentData.mpPaymentId,
-        financeAccountId: paymentData.financeAccountId,
-        notes: paymentData.notes,
-      })
-
-      if (res.success) {
-        toast({ description: "Pagamento registrado com sucesso!" })
-        setIsPaymentModalOpen(false)
+    const handleSignatureSaved = async (key: string) => {
+        setShowSignature(false)
+        // Reload full details to reflect signature in DB
         const detailsRes = await getServiceOrderDetailsAction(order.id, partnerId)
         if (detailsRes.success) {
-          setOrder(detailsRes.data)
+            setOrder(detailsRes.data)
+        } else {
+            setOrder((prev: any) => ({ ...prev, signature_image_key: key, signed_at: new Date().toISOString() }))
         }
         onMutation?.()
-        return { success: true }
-      } else {
-        toast({ description: res.error || "Erro ao processar pagamento" })
-        return { error: res.error || "Erro ao processar pagamento" }
-      }
-    } catch (err: any) {
-      toast({ description: err.message || "Erro inesperado" })
-      return { error: err.message || "Erro inesperado" }
-    } finally {
-      setLoading(false)
     }
-  }
 
-  function svcPrice(s: any) {
-    return s.service_price !== undefined ? s.service_price : (s.price || 0)
-  }
+    const handleEditClick = () => {
+        if (onEdit) {
+            onEdit(order.id)
+        } else {
+            window.location.href = `/erp/service-orders?edit=${order.id}`
+        }
+    }
 
-  function prodPrice(p: any) {
-    return p.unit_price !== undefined ? p.unit_price : (p.price || 0)
-  }
+    const formatDateStr = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
+    const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "—"
 
-  const assignedMember = teamMembers.find(m => m.user_id === order.assigned_user_id)
-  const assignedName = assignedMember ? assignedMember.name : "Não atribuído"
+    const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`
 
-  const steps = order.status === "cancelada"
-    ? [
-        { label: "Aberta", active: true },
-        { label: "Cancelada", active: true, isCancelled: true }
-      ]
-    : [
-        { label: "Aberta", active: true },
-        { label: "Em Andamento", active: ["em_andamento", "aguardando_peca", "concluida", "entregue"].includes(order.status) },
-        { label: "Concluída", active: ["concluida", "entregue"].includes(order.status) }
-      ]
+    // Financial calculations
+    const subtotal = useMemo(() => {
+        const totalS = (order.services || []).reduce((sum: number, s: any) => sum + (Number(svcPrice(s)) * (s.quantity || 1)), 0)
+        const totalP = (order.products || []).reduce((sum: number, p: any) => sum + (Number(prodPrice(p)) * (p.quantity || 1)), 0)
+        return totalS + totalP
+    }, [order.services, order.products])
 
-  const activeCount = steps.filter(s => s.active).length
-  const progressPercent = steps.length <= 1 ? 0 : ((activeCount - 1) / (steps.length - 1)) * 100
+    const discountAmount = useMemo(() => {
+        if (order.discount_type === 'percentage') {
+            return (subtotal * Number(order.discount_value || 0)) / 100
+        }
+        return Number(order.discount_value || 0)
+    }, [subtotal, order.discount_value, order.discount_type])
 
-  return (
-    <FadeIn>
-      <div className="max-w-[1200px] mx-auto pb-12">
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-30 bg-white dark:bg-dark-background border-b border-brand-border dark:border-dark-border py-4 px-6 -mx-6 mb-6 flex items-center justify-between transition-colors duration-300">
-          <div className="flex items-center gap-4 min-w-0">
-            {onBack && (
-              <button onClick={onBack} className="p-2 rounded-full hover:bg-brand-gray dark:hover:bg-dark-border transition-colors">
-                <ChevronLeftIcon className="w-5 h-5" />
-              </button>
-            )}
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading truncate">
-                  OS #{order.order_number}
-                </h1>
-                {statusMeta && (
-                  <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
-                )}
-                {order.payment_status && (
-                  <Badge variant={order.payment_status === "paid" ? "green" : order.payment_status === "partially_paid" ? "orange" : "gray"}>
-                    {order.payment_status === "paid" ? "Pago" : order.payment_status === "partially_paid" ? "Parcialmente Pago" : "Não Pago"}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-xs text-brand-inactive-text mt-1">
-                Criada em {formatDateTime(order.created_at)}
-              </p>
-            </div>
-          </div>
+    const cart = useMemo(() => {
+        const list: any[] = []
+            ; (order.services || []).forEach((s: any) => {
+                list.push({
+                    id: s.id,
+                    productId: null,
+                    variantId: null,
+                    name: s.service_name || "Mão de Obra",
+                    unitPrice: Number(svcPrice(s)),
+                    quantity: Number(s.quantity || 1),
+                    isService: true,
+                })
+            })
+            ; (order.products || []).forEach((p: any) => {
+                list.push({
+                    id: p.id,
+                    productId: p.product_id,
+                    variantId: p.variant_id || null,
+                    name: p.product_name || "Produto",
+                    unitPrice: Number(prodPrice(p)),
+                    quantity: Number(p.quantity || 1),
+                    isService: false,
+                })
+            })
+        return list
+    }, [order.services, order.products])
 
-          <div className="flex items-center gap-3 shrink-0">
-            <Button size="sm" onClick={handleEditClick} variant="outline">
-              <EditIcon className="w-4 h-4 mr-1.5" />
-              Editar
-            </Button>
+    const handleConfirmPayment = async (paymentData: any) => {
+        setLoading(true)
+        try {
+            const res = await confirmServiceOrderPaymentAction({
+                serviceOrderId: order.id,
+                partnerId,
+                paymentStatus: paymentData.paymentStatus,
+                paidAmount: paymentData.paidAmount,
+                paymentMethod: paymentData.paymentMethod,
+                paymentBreakdown: paymentData.paymentBreakdown,
+                paymentProvider: paymentData.paymentProvider,
+                mpPaymentId: paymentData.mpPaymentId,
+                financeAccountId: paymentData.financeAccountId,
+                notes: paymentData.notes,
+            })
 
-            <ActionsDropdown>
-              {availableTransitions.map((status) => {
-                const meta = SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]
-                return (
-                  <DropdownItem key={status} onClick={() => handleStatusChange(status)} disabled={loading}>
-                    Marcar como: {meta?.label}
-                  </DropdownItem>
-                )
-              })}
-              {!order.signature_image_key && (
-                <DropdownItem onClick={() => setShowSignature(true)}>
-                  Assinar OS
-                </DropdownItem>
-              )}
-            </ActionsDropdown>
-          </div>
-        </div>
+            if (res.success) {
+                toast({ description: "Pagamento registrado com sucesso!" })
+                setIsPaymentModalOpen(false)
+                const detailsRes = await getServiceOrderDetailsAction(order.id, partnerId)
+                if (detailsRes.success) {
+                    setOrder(detailsRes.data)
+                }
+                onMutation?.()
+                return { success: true }
+            } else {
+                toast({ description: res.error || "Erro ao processar pagamento" })
+                return { error: res.error || "Erro ao processar pagamento" }
+            }
+        } catch (err: any) {
+            toast({ description: err.message || "Erro inesperado" })
+            return { error: err.message || "Erro inesperado" }
+        } finally {
+            setLoading(false)
+        }
+    }
 
-        {/* Tabs Header */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="summary">Resumo</TabsTrigger>
-            <TabsTrigger value="services">Mão de obra</TabsTrigger>
-            <TabsTrigger value="products">Produtos</TabsTrigger>
-            <TabsTrigger value="attachments">Anexos</TabsTrigger>
-            <TabsTrigger value="history">Histórico</TabsTrigger>
-          </TabsList>
+    function svcPrice(s: any) {
+        return s.service_price !== undefined ? s.service_price : (s.price || 0)
+    }
 
-          <TabsContent value="summary">
-            {/* Steps Progress Bar */}
-            <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6 mb-6">
-              <div className="relative px-8 pt-6 pb-6">
-                <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                  <div
-                    className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.status === "cancelada" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                    style={{ width: `${progressPercent}%` }}
-                  ></div>
+    function prodPrice(p: any) {
+        return p.unit_price !== undefined ? p.unit_price : (p.price || 0)
+    }
 
-                  {steps.map((step, idx) => {
-                    const isCancelled = step.isCancelled
-                    return (
-                      <div key={idx} className="relative flex flex-col items-center">
-                        <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                          <span className={`text-xs font-semibold ${step.active ? (isCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                            {step.label}
-                          </span>
+    const assignedMember = teamMembers.find(m => m.user_id === order.assigned_user_id)
+    const assignedName = assignedMember ? assignedMember.name : "Não atribuído"
+
+    // Order Details style steps timeline
+    const getTimelineSteps = () => {
+        const findHistoryTime = (statusName: string) => {
+            const entry = (order.statusHistory || []).find((h: any) => h.new_status === statusName)
+            if (entry) {
+                const d = new Date(entry.created_at)
+                return {
+                    date: d.toLocaleDateString("pt-BR"),
+                    time: d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                }
+            }
+            return null
+        }
+
+        const baseDate = new Date(order.created_at).toLocaleDateString("pt-BR")
+        const baseTime = new Date(order.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+
+        const steps = [
+            {
+                label: "OS Aberta",
+                date: baseDate,
+                time: baseTime,
+                active: true
+            },
+            {
+                label: "Aprovada",
+                date: findHistoryTime("aprovada")?.date,
+                time: findHistoryTime("aprovada")?.time,
+                active: ["aprovada", "em_andamento", "aguardando_peca", "concluida", "entregue"].includes(order.status)
+            },
+            {
+                label: "Em Andamento",
+                date: findHistoryTime("em_andamento")?.date,
+                time: findHistoryTime("em_andamento")?.time,
+                active: ["em_andamento", "aguardando_peca", "concluida", "entregue"].includes(order.status)
+            },
+            {
+                label: "Concluída",
+                date: order.completed_at ? new Date(order.completed_at).toLocaleDateString("pt-BR") : findHistoryTime("concluida")?.date,
+                time: order.completed_at ? new Date(order.completed_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : findHistoryTime("concluida")?.time,
+                active: ["concluida", "entregue"].includes(order.status)
+            }
+        ]
+
+        if (order.status === "cancelada") {
+            const cancelTime = findHistoryTime("cancelada")
+            steps.push({
+                label: "Cancelada",
+                date: cancelTime?.date || new Date().toLocaleDateString("pt-BR"),
+                time: cancelTime?.time || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                active: true,
+                isCancelled: true
+            } as any)
+        } else {
+            steps.push({
+                label: "Entregue",
+                date: findHistoryTime("entregue")?.date,
+                time: findHistoryTime("entregue")?.time,
+                active: order.status === "entregue"
+            })
+        }
+
+        return steps
+    }
+
+    const timelineSteps = getTimelineSteps() as Array<{ label: string; date?: string; time?: string; active: boolean; isCancelled?: boolean }>
+    const activeSteps = timelineSteps.filter(s => s.active)
+    const isCancelled = order.status === "cancelada"
+    const progressPercent = timelineSteps.length <= 1 ? 0 : ((activeSteps.length - 1) / (timelineSteps.length - 1)) * 100
+
+    return (
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="hidden md:inline truncate">OS #{order.order_number}</span>
+                                            {statusMeta && (
+                                                <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+                                            )}
+                                            {order.payment_status && (
+                                                <Badge variant={order.payment_status === "paid" ? "green" : order.payment_status === "partially_paid" ? "orange" : "gray"}>
+                                                    {order.payment_status === "paid" ? "Pago" : order.payment_status === "partially_paid" ? "Parcialmente Pago" : "Não Pago"}
+                                                </Badge>
+                                            )}
+                                        </h1>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            Criada em {formatDateTime(order.created_at)}
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <ActionsDropdown>
+                                            {availableTransitions.map((status) => {
+                                                const meta = SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]
+                                                return (
+                                                    <DropdownItem key={status} onClick={() => handleStatusChange(status)} disabled={loading}>
+                                                        Marcar como: {meta?.label}
+                                                    </DropdownItem>
+                                                )
+                                            })}
+                                            {!order.signature_image_key && (
+                                                <DropdownItem onClick={() => setShowSignature(true)}>
+                                                    Assinar OS
+                                                </DropdownItem>
+                                            )}
+                                            <DropdownItem onClick={() => window.print()}>
+                                                Imprimir OS
+                                            </DropdownItem>
+                                            <DropdownItem onClick={() => setShowShareModal(true)}>
+                                                Compartilhar
+                                            </DropdownItem>
+                                        </ActionsDropdown>
+                                        <Button onClick={handleEditClick} leftIcon={<EditIcon size={18} />}>
+                                            Editar OS
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Tabs Navigation */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="summary">Resumo</TabsTrigger>
+                                        <TabsTrigger value="services">Mão de obra</TabsTrigger>
+                                        <TabsTrigger value="products">Produtos</TabsTrigger>
+                                        <TabsTrigger value="specifications">Especificações</TabsTrigger>
+                                        <TabsTrigger value="attachments">Anexos</TabsTrigger>
+                                        <TabsTrigger value="history">Histórico</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                            </div>
                         </div>
-                        <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                          {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            <TabsContent value="summary">
+                                {/* Steps Timeline (Same as Order Details Page) */}
+                                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl px-12 pt-12 pb-12 mb-6">
+                                    <div className="relative px-4">
+                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                            <div
+                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isCancelled ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                style={{ width: `${progressPercent}%` }}
+                                            ></div>
+
+                                            {timelineSteps.map((step, idx) => {
+                                                const isStepCancelled = step.isCancelled
+                                                return (
+                                                    <div key={idx} className="relative flex flex-col items-center">
+                                                        <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                            <span className={`text-xs font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                {step.label}
+                                                            </span>
+                                                        </div>
+                                                        <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                            {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                        </div>
+                                                        <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                            {step.date ? (
+                                                                <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                    <span>{step.date}</span>
+                                                                    {step.time && <span>{step.time}</span>}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Two Column Layout with Vertical Divider in the Middle */}
+                                <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0 relative">
+
+                                    {/* Left Column (col-span-8) */}
+                                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-6">
+
+                                        {/* Details OS FormSection */}
+                                        <FormSection title="Detalhes da OS" hasSeparator>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Título</label>
+                                                    <p className="text-[14px] font-medium text-brand-dark dark:text-dark-heading mt-0.5">{order.title}</p>
+                                                </div>
+                                                {order.description && (
+                                                    <div>
+                                                        <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Descrição</label>
+                                                        <p className="text-[14px] text-brand-dark dark:text-dark-heading mt-0.5 whitespace-pre-wrap">{order.description}</p>
+                                                    </div>
+                                                )}
+                                                {order.internal_notes && (
+                                                    <div>
+                                                        <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Observações internas</label>
+                                                        <p className="text-[14px] text-brand-inactive-text mt-0.5 whitespace-pre-wrap">{order.internal_notes}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </FormSection>
+
+                                        {/* Execution Info FormSection with ListItems */}
+                                        <FormSection title="Informações de Execução" hasSeparator>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <ListItem
+                                                    icon={UserIcon}
+                                                    title="Responsável"
+                                                    description={assignedName}
+                                                    className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
+                                                />
+                                                <ListItem
+                                                    icon={WrenchIcon}
+                                                    title="Prioridade"
+                                                    description={order.priority ? (PRIORITY_META[order.priority]?.label || order.priority) : "—"}
+                                                    className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
+                                                    right={
+                                                        order.priority ? (
+                                                            <div className="flex items-center h-full">
+                                                                <Badge variant={PRIORITY_META[order.priority]?.variant || "gray"}>
+                                                                    {PRIORITY_META[order.priority]?.label || order.priority}
+                                                                </Badge>
+                                                            </div>
+                                                        ) : null
+                                                    }
+                                                />
+                                                <ListItem
+                                                    icon={ClockIcon}
+                                                    title="Tempo Estimado"
+                                                    description={order.estimated_hours ? `${order.estimated_hours} ${order.estimated_hours === 1 ? 'hora' : 'horas'}` : "—"}
+                                                    className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
+                                                />
+                                                <ListItem
+                                                    icon={CalendarIcon}
+                                                    title="Previsão de Conclusão"
+                                                    description={order.expected_completion_date
+                                                        ? `${formatDateStr(order.expected_completion_date)}${order.expected_completion_time ? ` às ${order.expected_completion_time}` : ""}`
+                                                        : "—"
+                                                    }
+                                                    className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
+                                                />
+                                            </div>
+                                        </FormSection>
+
+                                        {/* Payment Details FormSection (Exactly like Order Details) */}
+                                        <FormSection title="Detalhes do Pagamento" hasSeparator>
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center text-[14px]">
+                                                    <span className="text-brand-inactive-text font-medium">Mão de obra</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_service_amount || 0)}</span>
+                                                </div>
+
+                                                <div className="flex justify-between items-center text-[14px]">
+                                                    <span className="text-brand-inactive-text font-medium">Produtos</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_product_amount || 0)}</span>
+                                                </div>
+
+                                                {Number(order.other_costs || 0) > 0 && (
+                                                    <div className="flex justify-between items-center text-[14px]">
+                                                        <span className="text-brand-inactive-text font-medium">Outros custos</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">+ {formatCurrency(order.other_costs)}</span>
+                                                    </div>
+                                                )}
+
+                                                {discountAmount > 0 && (
+                                                    <div className="flex justify-between items-center text-[14px]">
+                                                        <span className="text-brand-inactive-text font-medium">
+                                                            Desconto {order.discount_type === 'percentage' ? `(${order.discount_value}%)` : ''}
+                                                        </span>
+                                                        <span className="font-bold text-brand-green">- {formatCurrency(discountAmount)}</span>
+                                                    </div>
+                                                )}
+
+                                                {Number(order.coupon_discount_amount || 0) > 0 && (
+                                                    <div className="flex justify-between items-center text-[14px]">
+                                                        <span className="text-brand-inactive-text font-medium">
+                                                            Cupom {order.coupon_code ? `(${order.coupon_code})` : ''}
+                                                        </span>
+                                                        <span className="font-bold text-brand-green">- {formatCurrency(order.coupon_discount_amount)}</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-2 flex justify-between items-center text-[14px]">
+                                                    <span className="text-brand-inactive-text font-medium">Status de Pagamento</span>
+                                                    <Badge variant={order.payment_status === "paid" ? "green" : order.payment_status === "partially_paid" ? "orange" : "gray"}>
+                                                        {order.payment_status === "paid" ? "Pago" : order.payment_status === "partially_paid" ? "Parcialmente Pago" : "Não Pago"}
+                                                    </Badge>
+                                                </div>
+
+                                                <div className="flex justify-between items-center text-[14px]">
+                                                    <span className="text-brand-inactive-text font-medium">Valor Pago</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.paid_amount || 0)}</span>
+                                                </div>
+
+                                                {order.payment_method && (
+                                                    <div className="flex justify-between items-center text-[14px]">
+                                                        <span className="text-brand-inactive-text font-medium">Meio de Pagamento</span>
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">{order.payment_method}</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total da OS</span>
+                                                    <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount || 0)}</span>
+                                                </div>
+
+                                                {order.payment_status !== "paid" && (
+                                                    <div className="pt-4 flex justify-end">
+                                                        <Button onClick={() => setIsPaymentModalOpen(true)} className="w-full md:w-auto">
+                                                            Registrar Pagamento
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </FormSection>
+
+                                    </div>
+
+                                    {/* Right Sidebar Column with vertical border-l (col-span-4) */}
+                                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+
+                                        {/* Customer Info Card */}
+                                        <CustomerCard
+                                            customer={order.customer_snapshot}
+                                            address={order.customer_snapshot ? {
+                                                city: order.customer_snapshot.city,
+                                                state: order.customer_snapshot.state,
+                                                zipCode: order.customer_snapshot.zip_code,
+                                            } : null}
+                                            showMap={false}
+                                        />
+
+                                        {/* Client Signature Card where Totals used to be */}
+                                        {order.signature_image_key ? (
+                                            <SidebarCard hasTopStrip>
+                                                <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Assinatura do Cliente</h3>
+                                                <div className="flex flex-col items-center">
+                                                    <img
+                                                        src={buildImageUrl(order.signature_image_key)}
+                                                        alt="Assinatura do cliente"
+                                                        className="w-full max-h-[120px] object-contain border border-brand-border rounded-lg p-2 bg-white"
+                                                    />
+                                                    <p className="text-xs text-brand-inactive-text mt-2 text-center">
+                                                        Assinado em: {formatDateTime(order.signed_at)}
+                                                    </p>
+                                                </div>
+                                            </SidebarCard>
+                                        ) : (
+                                            order.status === "concluida" && (
+                                                <SidebarCard hasTopStrip>
+                                                    <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Assinatura do Cliente</h3>
+                                                    <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
+                                                        <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço foi concluída mas ainda não foi assinada.</p>
+                                                        <Button variant="outline" size="sm" onClick={() => setShowSignature(true)} className="w-full">
+                                                            <CheckCircleIcon className="w-4 h-4 mr-2" />
+                                                            Assinar OS
+                                                        </Button>
+                                                    </div>
+                                                </SidebarCard>
+                                            )
+                                        )}
+
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* Tab Serviços / Mão de Obra */}
+                            <TabsContent value="services" className="mt-6">
+                                {order.services?.length > 0 ? (
+                                    <div className="w-full overflow-x-auto pb-4 custom-scrollbar mb-4 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        <table className="w-full text-left border-separate border-spacing-0">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Serviço</th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36 rounded-r-lg">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {order.services.map((svc: any, index: number) => {
+                                                    const unitPrice = svcPrice(svc)
+                                                    const qty = svc.quantity || 1
+                                                    return (
+                                                        <tr key={svc.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                        <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                    </div>
+                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                                                        {svc.service_name || svc.name}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                {formatCurrency(unitPrice)}
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                {qty}
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                {formatCurrency(unitPrice * qty)}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        Nenhuma mão de obra adicionada
+                                    </div>
+                                )}
+                            </TabsContent>
+
+                            {/* Tab Produtos */}
+                            <TabsContent value="products" className="mt-6">
+                                {order.products?.length > 0 ? (
+                                    <div className="w-full overflow-x-auto pb-4 custom-scrollbar mb-4 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        <table className="w-full text-left border-separate border-spacing-0">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36 rounded-r-lg">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {order.products.map((prod: any, index: number) => {
+                                                    const unitPrice = prodPrice(prod)
+                                                    const qty = prod.quantity || 1
+                                                    return (
+                                                        <tr key={prod.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                        <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                    </div>
+                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                                                        {prod.product_name || prod.name}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                {formatCurrency(unitPrice)}
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                {qty}
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                {formatCurrency(unitPrice * qty)}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        Nenhum produto adicionado
+                                    </div>
+                                )}
+                            </TabsContent>
+
+                            {/* Tab Especificações */}
+                            <TabsContent value="specifications" className="mt-6">
+                                <SpecificationsTab
+                                    partnerId={partnerId}
+                                    serviceOrderId={order.id}
+                                    specifications={order.specifications || []}
+                                    onMutation={async () => {
+                                        const res = await getServiceOrderDetailsAction(order.id, partnerId)
+                                        if (res.success) setOrder(res.data)
+                                    }}
+                                />
+                            </TabsContent>
+
+                            {/* Tab Anexos */}
+                            <TabsContent value="attachments" className="mt-6">
+                                <AttachmentsTab
+                                    partnerId={partnerId}
+                                    serviceOrderId={order.id}
+                                    attachments={order.attachments || []}
+                                    onMutation={async () => {
+                                        const res = await getServiceOrderDetailsAction(order.id, partnerId)
+                                        if (res.success) setOrder(res.data)
+                                    }}
+                                />
+                            </TabsContent>
+
+                            {/* Tab Histórico */}
+                            <TabsContent value="history" className="mt-6">
+                                {order.history?.length > 0 ? (
+                                    <HistoryTimeline entries={order.history.map((h: any) => ({
+                                        id: h.id,
+                                        actor_name: h.actor_user_id || "Sistema",
+                                        change_lines: h.change_lines || [],
+                                        created_at: h.created_at,
+                                        metadata: h.metadata,
+                                        entry_type: h.action_type,
+                                    }))} />
+                                ) : (
+                                    <div className="p-8 text-center text-sm text-brand-inactive-text">Nenhum histórico</div>
+                                )}
+                            </TabsContent>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+                    </div>
+                </Tabs>
             </div>
 
-            {/* Layout Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Main Column */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Details Card */}
-                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                  <h3 className="font-bold text-[15px] mb-4 text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                    <FileIcon className="w-5 h-5 text-brand-inactive-text" />
-                    Detalhes da OS
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Título</label>
-                      <p className="text-[14px] font-medium text-brand-dark dark:text-dark-heading mt-0.5">{order.title}</p>
-                    </div>
-                    {order.description && (
-                      <div>
-                        <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Descrição</label>
-                        <p className="text-[14px] text-brand-dark dark:text-dark-heading mt-0.5 whitespace-pre-wrap">{order.description}</p>
-                      </div>
-                    )}
-                    {order.internal_notes && (
-                      <div>
-                        <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Observações internas</label>
-                        <p className="text-[14px] text-brand-inactive-text mt-0.5 whitespace-pre-wrap">{order.internal_notes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Execution Metadata Grid Card */}
-                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                  <h3 className="font-bold text-[15px] mb-4 text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                    <WrenchIcon className="w-5 h-5 text-brand-inactive-text" />
-                    Informações de Execução
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div>
-                      <label className="text-[11px] font-bold uppercase text-brand-inactive-text block mb-1">Responsável</label>
-                      <div className="flex items-center gap-2">
-                        <UserIcon className="w-4 h-4 text-brand-inactive-text" />
-                        <span className="text-[14px] font-medium text-brand-dark dark:text-dark-heading truncate">{assignedName}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold uppercase text-brand-inactive-text block mb-1">Prioridade</label>
-                      {order.priority ? (
-                        <Badge variant={PRIORITY_META[order.priority]?.variant || "gray"}>
-                          {PRIORITY_META[order.priority]?.label || order.priority}
-                        </Badge>
-                      ) : (
-                        <span className="text-[14px] font-medium text-brand-dark dark:text-dark-heading">—</span>
-                      )}
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold uppercase text-brand-inactive-text block mb-1">Tempo Estimado</label>
-                      <div className="flex items-center gap-2">
-                        <ClockIcon className="w-4 h-4 text-brand-inactive-text" />
-                        <span className="text-[14px] font-medium text-brand-dark dark:text-dark-heading">
-                          {order.estimated_hours ? `${order.estimated_hours} ${order.estimated_hours === 1 ? 'hora' : 'horas'}` : "—"}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold uppercase text-brand-inactive-text block mb-1">Previsão</label>
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4 text-brand-inactive-text" />
-                        <span className="text-[14px] font-medium text-brand-dark dark:text-dark-heading truncate">
-                          {order.expected_completion_date 
-                            ? `${formatDateStr(order.expected_completion_date)}${order.expected_completion_time ? ` às ${order.expected_completion_time}` : ""}` 
-                            : "—"
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Client Signature Card */}
-                {order.signature_image_key && (
-                  <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                    <h3 className="font-bold text-[15px] mb-3 text-brand-dark dark:text-dark-heading">Assinatura do Cliente</h3>
-                    <img
-                      src={buildImageUrl(order.signature_image_key)}
-                      alt="Assinatura do cliente"
-                      className="max-w-[300px] max-h-[120px] border border-brand-border rounded-lg p-2 bg-white"
-                    />
-                    <p className="text-xs text-brand-inactive-text mt-2">
-                      Assinado em: {formatDateTime(order.signed_at)}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Sidebar Column */}
-              <div className="space-y-6">
-                {/* Customer Info Card */}
-                <CustomerCard
-                  customer={order.customer_snapshot}
-                  address={order.customer_snapshot ? {
-                    city: order.customer_snapshot.city,
-                    state: order.customer_snapshot.state,
-                    zipCode: order.customer_snapshot.zip_code,
-                  } : null}
-                  showMap={false}
+            {showSignature && (
+                <SignatureDialog
+                    partnerId={partnerId}
+                    serviceOrderId={order.id}
+                    onSaved={handleSignatureSaved}
+                    onClose={() => setShowSignature(false)}
                 />
-
-                {/* Totals SidebarCard */}
-                <SidebarCard hasTopStrip>
-                  <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Resumo Financeiro</h3>
-                  
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-brand-inactive-text">Mão de obra</span>
-                      <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_service_amount || 0)}</span>
-                    </div>
-                    
-                    <div className="flex justify-between text-sm">
-                      <span className="text-brand-inactive-text">Produtos</span>
-                      <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_product_amount || 0)}</span>
-                    </div>
-
-                    {Number(order.other_costs || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-brand-inactive-text">Outros custos</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">+ {formatCurrency(order.other_costs)}</span>
-                      </div>
-                    )}
-
-                    {discountAmount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-brand-inactive-text">
-                          Desconto {order.discount_type === 'percentage' ? `(${order.discount_value}%)` : ''}
-                        </span>
-                        <span className="font-bold text-brand-green">- {formatCurrency(discountAmount)}</span>
-                      </div>
-                    )}
-
-                    {Number(order.coupon_discount_amount || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-brand-inactive-text">
-                          Cupom {order.coupon_code ? `(${order.coupon_code})` : ''}
-                        </span>
-                        <span className="font-bold text-brand-green">- {formatCurrency(order.coupon_discount_amount)}</span>
-                      </div>
-                    )}
-
-                    <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between text-base font-bold">
-                      <span className="text-brand-dark dark:text-dark-heading">Total</span>
-                      <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_amount || 0)}</span>
-                    </div>
-
-                    <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-brand-inactive-text">Status</span>
-                        <Badge variant={order.payment_status === "paid" ? "green" : order.payment_status === "partially_paid" ? "orange" : "gray"}>
-                          {order.payment_status === "paid" ? "Pago" : order.payment_status === "partially_paid" ? "Parcialmente Pago" : "Não Pago"}
-                        </Badge>
-                      </div>
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-brand-inactive-text">Valor Pago</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.paid_amount || 0)}</span>
-                      </div>
-                      
-                      {order.payment_method && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-brand-inactive-text">Meio de Pagamento</span>
-                          <span className="font-medium text-brand-dark dark:text-dark-heading truncate max-w-[120px]">{order.payment_method}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {order.payment_status !== "paid" && (
-                      <Button onClick={() => setIsPaymentModalOpen(true)} className="w-full mt-4">
-                        Registrar Pagamento
-                      </Button>
-                    )}
-                  </div>
-                </SidebarCard>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Tab Serviços / Mão de Obra */}
-          <TabsContent value="services" className="mt-6">
-            {order.services?.length > 0 ? (
-              <div className="space-y-4 p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                {order.services.map((svc: any) => (
-                  <div key={svc.id} className="flex items-start gap-4 pb-4 border-b border-brand-border/50 last:border-b-0 last:pb-0">
-                    <div className="w-12 h-12 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center">
-                      <WrenchIcon className="w-6 h-6 text-brand-inactive-text" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{svc.service_name}</h4>
-                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                          {formatCurrency(svc.total_price)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-brand-inactive-text mt-1">
-                        <span>Qtd: {svc.quantity}</span>
-                        <span>•</span>
-                        <span>Preço Unitário: {formatCurrency(svcPrice(svc))}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                Nenhuma mão de obra adicionada
-              </div>
             )}
-          </TabsContent>
 
-          {/* Tab Produtos */}
-          <TabsContent value="products" className="mt-6">
-            {order.products?.length > 0 ? (
-              <div className="space-y-4 p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                {order.products.map((prod: any) => (
-                  <div key={prod.id} className="flex items-start gap-4 pb-4 border-b border-brand-border/50 last:border-b-0 last:pb-0">
-                    <div className="w-12 h-12 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center">
-                      <FileIcon className="w-6 h-6 text-brand-inactive-text" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{prod.product_name}</h4>
-                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                          {formatCurrency(prod.total_price)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-brand-inactive-text mt-1">
-                        <span>Qtd: {prod.quantity}</span>
-                        <span>•</span>
-                        <span>Preço Unitário: {formatCurrency(prodPrice(prod))}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                Nenhum produto adicionado
-              </div>
+            {isPaymentModalOpen && (
+                <PaymentModal
+                    isOpen={isPaymentModalOpen}
+                    onClose={() => setIsPaymentModalOpen(false)}
+                    cart={cart}
+                    customer={order.customer_snapshot}
+                    partnerId={partnerId}
+                    shippingFee={0}
+                    otherCosts={Number(order.other_costs || 0)}
+                    discountAmount={discountAmount + Number(order.coupon_discount_amount || 0)}
+                    headerSubtitle="Recebimento de Ordem de Serviço"
+                    amountDue={order.total_amount - (order.paid_amount || 0)}
+                    existingPaidAmount={order.paid_amount || 0}
+                    existingPaymentBreakdown={order.payment_breakdown ? (typeof order.payment_breakdown === 'string' ? JSON.parse(order.payment_breakdown) : order.payment_breakdown) : []}
+                    onConfirm={handleConfirmPayment}
+                />
             )}
-          </TabsContent>
 
-          {/* Tab Anexos */}
-          <TabsContent value="attachments" className="mt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {order.attachments?.length > 0 ? (
-                order.attachments.map((att: any) => (
-                  <div
-                    key={att.id}
-                    className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-3"
-                  >
-                    {att.file_type?.startsWith("image/") ? (
-                      <img
-                        src={buildImageUrl(att.file_key)}
-                        alt={att.file_name || ""}
-                        className="w-full h-32 object-cover rounded-lg mb-2"
-                      />
-                    ) : (
-                      <div className="w-full h-32 bg-brand-gray dark:bg-dark-border rounded-lg mb-2 flex items-center justify-center">
-                        <FileIcon className="w-8 h-8 text-brand-inactive-text" />
-                      </div>
-                    )}
-                    <p className="text-[11px] font-medium text-brand-dark dark:text-dark-heading truncate">
-                      {att.file_name || "Sem nome"}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-full p-8 text-center text-sm text-brand-inactive-text">Nenhum anexo</div>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Tab Histórico */}
-          <TabsContent value="history" className="mt-6">
-            {order.history?.length > 0 ? (
-              <HistoryTimeline entries={order.history.map((h: any) => ({
-                id: h.id,
-                actor_name: h.actor_user_id || "Sistema",
-                change_lines: h.change_lines || [],
-                created_at: h.created_at,
-                metadata: h.metadata,
-                entry_type: h.action_type,
-              }))} />
-            ) : (
-              <div className="p-8 text-center text-sm text-brand-inactive-text">Nenhum histórico</div>
+            {showShareModal && (
+                <ShareModal
+                    isOpen={showShareModal}
+                    onClose={() => setShowShareModal(false)}
+                    url={`${typeof window !== 'undefined' ? window.location.origin : ''}/os/${order.public_token}`}
+                    title={`OS #${order.order_number}`}
+                    shareMessage={`Olá! Segue o link para visualizar a Ordem de Serviço *#${order.order_number}*:`}
+                    label="Link da OS"
+                />
             )}
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {showSignature && (
-        <SignatureDialog
-          partnerId={partnerId}
-          serviceOrderId={order.id}
-          onSaved={handleSignatureSaved}
-          onClose={() => setShowSignature(false)}
-        />
-      )}
-
-      {isPaymentModalOpen && (
-        <PaymentModal
-          isOpen={isPaymentModalOpen}
-          onClose={() => setIsPaymentModalOpen(false)}
-          cart={cart}
-          customer={order.customer_snapshot}
-          partnerId={partnerId}
-          shippingFee={0}
-          otherCosts={Number(order.other_costs || 0)}
-          discountAmount={discountAmount + Number(order.coupon_discount_amount || 0)}
-          headerSubtitle="Recebimento de Ordem de Serviço"
-          amountDue={order.total_amount - (order.paid_amount || 0)}
-          existingPaidAmount={order.paid_amount || 0}
-          existingPaymentBreakdown={order.payment_breakdown ? (typeof order.payment_breakdown === 'string' ? JSON.parse(order.payment_breakdown) : order.payment_breakdown) : []}
-          onConfirm={handleConfirmPayment}
-        />
-      )}
-    </FadeIn>
-  )
+        </FadeIn>
+    )
 }

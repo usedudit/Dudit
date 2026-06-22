@@ -621,10 +621,124 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                     <div className="h-px bg-brand-border dark:bg-dark-border w-full my-4" />
 
-                    {isPaidOrder ? (
-                        <section className="flex flex-col gap-6">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do Pagamento</h3>
+                    <section className="flex flex-col gap-6">
+                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                            Configurações do Pedido
+                        </h2>
 
+                        {isPaidOrder ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
+                                <PaymentRow label="Canal de Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
+                                <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                                {!isQuickMode && (
+                                    <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
+                                )}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <DatePicker
+                                    label="Data do Pedido"
+                                    disabled={isMarketplaceLocked}
+                                    value={orderDate}
+                                    onChange={(date) => {
+                                        if (date) {
+                                            const d = new Date(date)
+                                            setOrderDate(formatLocalISODate(d))
+                                        }
+                                    }}
+                                />
+
+                                <FormDropdown
+                                    label="Canal de Venda"
+                                    disabled={isMarketplaceLocked}
+                                    value={salesChannel}
+                                    setValue={(val: any) => setSalesChannel(val)}
+                                    options={salesChannelOptions}
+                                />
+
+                                <FormDropdown
+                                    label="Método de Entrega"
+                                    disabled={isMarketplaceLocked && isPaidOrder}
+                                    value={deliveryMethod}
+                                    setValue={(val: any) => setDeliveryMethod(val)}
+                                    options={deliveryMethodOptions}
+                                />
+
+                                {!isQuickMode && (
+                                    <Combobox
+                                        label="Conta de recebimento"
+                                        disabled={isMarketplaceLocked && isPaidOrder}
+                                        value={financeAccountId || undefined}
+                                        onChange={(val) => {
+                                            setFinanceAccountId(val)
+                                            if (setFieldErrors) {
+                                                setFieldErrors((prev) => {
+                                                    const next = new Set(prev)
+                                                    next.delete("financeAccountId")
+                                                    return next
+                                                })
+                                            }
+                                        }}
+                                        options={accountOptions}
+                                        actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: onCreateAccount }}
+                                        error={fieldErrors?.has("financeAccountId")}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </section>
+                </div>
+
+                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    {paymentStatus !== "paid" && remainingPaymentAmount > 0.009 && (
+                        <div className="mb-6">
+                            <InfoCard
+                                title="Valor ainda em aberto"
+                                message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
+                                color="orange"
+                            />
+                        </div>
+                    )}
+
+                    {/* --- 1. CUSTOMER CARD --- */}
+                    {!isQuickMode && (
+                        <div>
+                            {selectedCustomer ? (
+                                <CustomerCard
+                                    customer={selectedCustomer}
+                                    address={selectedCustomer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses?.[0]}
+                                    billingAddress={selectedCustomer.addresses?.find((a: any) => a.address_type === "billing")}
+                                    onRemove={isMarketplaceLocked ? undefined : () => setSelectedCustomer(null)}
+                                />
+                            ) : (
+                                <div
+                                    className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                    onClick={() => !isMarketplaceLocked && setIsCustomerSheetOpen(true)}
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+
+                                    <IconPlaceholder
+                                        icon={UserIcon}
+                                        title="Nenhum cliente selecionado"
+                                        subtitle="Selecione um cliente para vincular ao pedido."
+                                        itemButton={isMarketplaceLocked ? undefined : {
+                                            text: "Selecionar Cliente",
+                                            action: () => setIsCustomerSheetOpen(true),
+                                            variant: "outline",
+                                            className: "rounded-full px-8"
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* --- 2. PAYMENT CARD --- */}
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
+                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
+
+                        {isPaidOrder ? (
                             <div className="space-y-3">
                                 <PaymentRow
                                     label="Método de Pagamento"
@@ -710,218 +824,99 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalAmount)}</span>
                                 </div>
                             </div>
-                        </section>
-                    ) : (
-                        <section className="flex flex-col gap-6">
-                            <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                Pagamento
-                            </h2>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                {!isQuickMode && (
-                                    <>
-                                        {onOpenDiscount && (
-                                            <ListItem
-                                                icon={TagIcon}
-                                                title="Aplicar desconto"
-                                                description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
-                                                onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
-                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                            />
-                                        )}
-                                        <ListItem
-                                            icon={TruckIcon}
-                                            title="Adicionar entrega"
-                                            description="Define o valor da entrega do pedido"
-                                            onClick={isMarketplaceLocked ? undefined : onOpenShipping}
-                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                        />
-                                    </>
-                                )}
-                                <MoneyInput
-                                    label="Outros Custos"
-                                    disabled={isMarketplaceLocked}
-                                    value={parseFloat(otherCosts || "0")}
-                                    onChange={(val) => setOtherCosts(val.toString())}
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-3 mt-4">
-                                <div className="flex justify-between items-center text-[15px]">
-                                    <span className="text-brand-inactive-text font-medium">Subtotal</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                        {formatCurrency(subtotal)}
-                                    </span>
-                                </div>
-
-                                {discountAmount > 0 && (
-                                    <div className="flex justify-between items-center text-[15px]">
-                                        <span className="text-brand-inactive-text font-medium">Desconto</span>
-                                        <span className="font-bold text-brand-green">
-                                            -{formatCurrency(discountAmount)}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {couponDiscountAmount > 0 && (
-                                    <div className="flex justify-between items-center text-[15px]">
-                                        <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
-                                        <span className="font-bold text-brand-green">
-                                            -{formatCurrency(couponDiscountAmount)}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {parseFloat(shippingFee || "0") > 0 && (
-                                    <div className="flex justify-between items-center text-[15px]">
-                                        <span className="text-brand-inactive-text font-medium">Entrega</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(shippingFee)}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {parseFloat(otherCosts || "0") > 0 && (
-                                    <div className="flex justify-between items-center text-[15px]">
-                                        <span className="text-brand-inactive-text font-medium">Outros Custos</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(otherCosts)}
-                                        </span>
-                                    </div>
-                                )}
-
-                                <div className="border-t border-dashed border-brand-border dark:border-dark-border pt-4 mt-2">
-                                    <div className="flex justify-between items-end">
-                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
-                                        <span className="text-[32px] font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
-                                            {formatCurrency(totalAmount)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    size="lg"
-                                    className="w-full mt-6"
-                                    onClick={handleSaveOrder}
-                                    disabled={isSaving}
-                                >
-                                    Ir para Pagamento
-                                </Button>
-                            </div>
-                        </section>
-                    )}
-                </div>
-
-                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    {paymentStatus !== "paid" && remainingPaymentAmount > 0.009 && (
-                        <div className="mb-6">
-                            <InfoCard
-                                title="Valor ainda em aberto"
-                                message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
-                                color="orange"
-                            />
-                        </div>
-                    )}
-
-                    {/* --- 1. CUSTOMER CARD --- */}
-                    {!isQuickMode && (
-                        <div>
-                            {selectedCustomer ? (
-                                <CustomerCard
-                                    customer={selectedCustomer}
-                                    address={selectedCustomer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses?.[0]}
-                                    billingAddress={selectedCustomer.addresses?.find((a: any) => a.address_type === "billing")}
-                                    onRemove={isMarketplaceLocked ? undefined : () => setSelectedCustomer(null)}
-                                />
-                            ) : (
-                                <div
-                                    className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                    onClick={() => !isMarketplaceLocked && setIsCustomerSheetOpen(true)}
-                                >
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
-
-                                    <IconPlaceholder
-                                        icon={UserIcon}
-                                        title="Nenhum cliente selecionado"
-                                        subtitle="Selecione um cliente para vincular ao pedido."
-                                        itemButton={isMarketplaceLocked ? undefined : {
-                                            text: "Selecionar Cliente",
-                                            action: () => setIsCustomerSheetOpen(true),
-                                            variant: "outline",
-                                            className: "rounded-full px-8"
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* --- 2. ORDER SETTINGS --- */}
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Configurações do Pedido</h3>
-
-                        {isPaidOrder ? (
-                            <div className="space-y-4">
-                                <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
-                                <PaymentRow label="Canal de Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
-                                <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
-                                {!isQuickMode && (
-                                    <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
-                                )}
-                            </div>
                         ) : (
                             <div className="space-y-4">
-                                <DatePicker
-                                    label="Data do Pedido"
-                                    disabled={isMarketplaceLocked}
-                                    value={orderDate}
-                                    onChange={(date) => {
-                                        if (date) {
-                                            // Usar data local para evitar "amanhã" por timezone.
-                                            const d = new Date(date)
-                                            setOrderDate(formatLocalISODate(d))
-                                        }
-                                    }}
-                                />
-
-                                <FormDropdown
-                                    label="Canal de Venda"
-                                    disabled={isMarketplaceLocked}
-                                    value={salesChannel}
-                                    setValue={(val: any) => setSalesChannel(val)}
-                                    options={salesChannelOptions}
-                                />
-
-                                <FormDropdown
-                                    label="Método de Entrega"
-                                    disabled={isMarketplaceLocked && isPaidOrder}
-                                    value={deliveryMethod}
-                                    setValue={(val: any) => setDeliveryMethod(val)}
-                                    options={deliveryMethodOptions}
-                                />
-
-                                {!isQuickMode && (
-                                    <Combobox
-                                        label="Conta de recebimento"
-                                        disabled={isMarketplaceLocked && isPaidOrder}
-                                        value={financeAccountId || undefined}
-                                        onChange={(val) => {
-                                            setFinanceAccountId(val)
-                                            if (setFieldErrors) {
-                                                setFieldErrors((prev) => {
-                                                    const next = new Set(prev)
-                                                    next.delete("financeAccountId")
-                                                    return next
-                                                })
-                                            }
-                                        }}
-                                        options={accountOptions}
-                                        actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: onCreateAccount }}
-                                        error={fieldErrors?.has("financeAccountId")}
+                                <div className="flex flex-col gap-3">
+                                    {!isQuickMode && (
+                                        <>
+                                            {onOpenDiscount && (
+                                                <ListItem
+                                                    icon={TagIcon}
+                                                    title="Aplicar desconto"
+                                                    description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
+                                                    onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
+                                                    className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                />
+                                            )}
+                                            <ListItem
+                                                icon={TruckIcon}
+                                                title="Adicionar entrega"
+                                                description="Define o valor da entrega do pedido"
+                                                onClick={isMarketplaceLocked ? undefined : onOpenShipping}
+                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                            />
+                                        </>
+                                    )}
+                                    <MoneyInput
+                                        label="Outros Custos"
+                                        disabled={isMarketplaceLocked}
+                                        value={parseFloat(otherCosts || "0")}
+                                        onChange={(val) => setOtherCosts(val.toString())}
                                     />
-                                )}
+                                </div>
 
-                                {/* Status de entrega foi movido para a aba de Entrega */}
+                                <div className="flex flex-col gap-3 pt-2">
+                                    <div className="flex justify-between items-center text-[15px]">
+                                        <span className="text-brand-inactive-text font-medium">Subtotal</span>
+                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(subtotal)}
+                                        </span>
+                                    </div>
+
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between items-center text-[15px]">
+                                            <span className="text-brand-inactive-text font-medium">Desconto</span>
+                                            <span className="font-bold text-brand-green">
+                                                -{formatCurrency(discountAmount)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {couponDiscountAmount > 0 && (
+                                        <div className="flex justify-between items-center text-[15px]">
+                                            <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
+                                            <span className="font-bold text-brand-green">
+                                                -{formatCurrency(couponDiscountAmount)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {parseFloat(shippingFee || "0") > 0 && (
+                                        <div className="flex justify-between items-center text-[15px]">
+                                            <span className="text-brand-inactive-text font-medium">Entrega</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(shippingFee)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {parseFloat(otherCosts || "0") > 0 && (
+                                        <div className="flex justify-between items-center text-[15px]">
+                                            <span className="text-brand-inactive-text font-medium">Outros Custos</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(otherCosts)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <div className="border-t border-dashed border-brand-border dark:border-dark-border pt-4 mt-2">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
+                                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
+                                                {formatCurrency(totalAmount)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        size="lg"
+                                        className="w-full mt-4"
+                                        onClick={handleSaveOrder}
+                                        disabled={isSaving}
+                                    >
+                                        Ir para Pagamento
+                                    </Button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1215,173 +1210,70 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     )}
                 </FormSection>
 
-                {/* 3. Pagamento */}
-                <FormSection title="Pagamento" hasSeparator={false}>
+                {/* 3. Configurações do Pedido (Mobile) */}
+                <FormSection title="Configurações do Pedido" hasSeparator={false}>
                     {isPaidOrder ? (
-                        <div className="space-y-3">
-                            <PaymentRow
-                                label="Método de Pagamento"
-                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
-                            />
-                            {paymentBreakdown.length > 1 && (
-                                <PaymentRow
-                                    label="Valores por meio"
-                                    value={
-                                        <div className="flex flex-col gap-1">
-                                            {paymentBreakdown.map((entry: any, index: number) => (
-                                                <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                    {entry.method}: {formatCurrency(entry.amount || 0)}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    }
-                                />
-                            )}
-                            <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
-                            <PaymentRow
-                                label="Tipo de Entrega"
-                                value={
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                        {deliveryMethod === "pickup" ? "Retirada no local" : "Entrega no endereço"}
-                                    </span>
-                                }
-                            />
-                            {Number(shippingFee || 0) > 0 && (
-                                <PaymentRow
-                                    label="Valor da Entrega"
-                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>}
-                                />
-                            )}
-                            {Number(otherCosts || 0) > 0 && (
-                                <PaymentRow
-                                    label="Outros Custos"
-                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(otherCosts)}</span>}
-                                />
-                            )}
-                            {Number(discountAmount || 0) > 0 && (
-                                <PaymentRow
-                                    label="Desconto do Pedido"
-                                    value={<span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>}
-                                />
-                            )}
-                            {couponDiscountAmount > 0 && (
-                                <PaymentRow
-                                    label="Desconto por Cupom"
-                                    value={<span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
-                                />
-                            )}
-                            {paymentMethodDiscountAmount > 0 && (
-                                <PaymentRow
-                                    label="Desconto do Método"
-                                    value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
-                                />
-                            )}
-                            {paymentMethodExtraAmount > 0 && (
-                                <PaymentRow
-                                    label="Taxa do Método"
-                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
-                                />
+                        <div className="space-y-4 text-left">
+                            <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
+                            <PaymentRow label="Canal de Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
+                            <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                            {!isQuickMode && (
+                                <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
                             )}
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {!isQuickMode && (
-                                    <>
-                                        {onOpenDiscount && (
-                                            <ListItem
-                                                icon={TagIcon}
-                                                title="Aplicar desconto"
-                                                description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
-                                                onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
-                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                            />
-                                        )}
-                                        <ListItem
-                                            icon={TruckIcon}
-                                            title="Adicionar entrega"
-                                            description="Define o valor da entrega do pedido"
-                                            onClick={isMarketplaceLocked ? undefined : onOpenShipping}
-                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                        />
-                                    </>
-                                )}
-                                <MoneyInput
-                                    label="Outros Custos"
-                                    disabled={isMarketplaceLocked}
-                                    value={parseFloat(otherCosts || "0")}
-                                    onChange={(val) => setOtherCosts(val.toString())}
+                        <div className="space-y-4 text-left">
+                            <DatePicker
+                                label="Data do Pedido"
+                                disabled={isMarketplaceLocked}
+                                value={orderDate}
+                                onChange={(date) => {
+                                    if (date) {
+                                        const d = new Date(date)
+                                        setOrderDate(formatLocalISODate(d))
+                                    }
+                                }}
+                            />
+
+                            <FormDropdown
+                                label="Canal de Venda"
+                                disabled={isMarketplaceLocked}
+                                value={salesChannel}
+                                setValue={(val: any) => setSalesChannel(val)}
+                                options={salesChannelOptions}
+                            />
+
+                            <FormDropdown
+                                label="Método de Entrega"
+                                disabled={isMarketplaceLocked && isPaidOrder}
+                                value={deliveryMethod}
+                                setValue={(val: any) => setDeliveryMethod(val)}
+                                options={deliveryMethodOptions}
+                            />
+
+                            {!isQuickMode && (
+                                <Combobox
+                                    label="Conta de recebimento"
+                                    disabled={isMarketplaceLocked && isPaidOrder}
+                                    value={financeAccountId || undefined}
+                                    onChange={(val) => {
+                                        setFinanceAccountId(val)
+                                        if (setFieldErrors) {
+                                            setFieldErrors((prev) => {
+                                                const next = new Set(prev)
+                                                next.delete("financeAccountId")
+                                                return next
+                                            })
+                                        }
+                                    }}
+                                    options={accountOptions}
+                                    actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: onCreateAccount }}
+                                    error={fieldErrors?.has("financeAccountId")}
                                 />
-                            </div>
+                            )}
                         </div>
                     )}
                 </FormSection>
-
-                {/* 4. Resumo de Valores */}
-                <div className="flex flex-col gap-3 mt-4 border-t border-dashed border-brand-border dark:border-dark-border pt-6">
-                    <div className="flex justify-between items-center text-[15px]">
-                        <span className="text-brand-inactive-text font-medium">Subtotal</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                            {formatCurrency(subtotal)}
-                        </span>
-                    </div>
-
-                    {discountAmount > 0 && (
-                        <div className="flex justify-between items-center text-[15px]">
-                            <span className="text-brand-inactive-text font-medium">Desconto</span>
-                            <span className="font-bold text-brand-green">
-                                -{formatCurrency(discountAmount)}
-                            </span>
-                        </div>
-                    )}
-
-                    {couponDiscountAmount > 0 && (
-                        <div className="flex justify-between items-center text-[15px]">
-                            <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
-                            <span className="font-bold text-brand-green">
-                                -{formatCurrency(couponDiscountAmount)}
-                            </span>
-                        </div>
-                    )}
-
-                    {parseFloat(shippingFee || "0") > 0 && (
-                        <div className="flex justify-between items-center text-[15px]">
-                            <span className="text-brand-inactive-text font-medium">Entrega</span>
-                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(shippingFee)}
-                            </span>
-                        </div>
-                    )}
-
-                    {parseFloat(otherCosts || "0") > 0 && (
-                        <div className="flex justify-between items-center text-[15px]">
-                            <span className="text-brand-inactive-text font-medium">Outros Custos</span>
-                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(otherCosts)}
-                            </span>
-                        </div>
-                    )}
-
-                    <div className="border-t border-dashed border-brand-border dark:border-dark-border pt-4 mt-2">
-                        <div className="flex justify-between items-end">
-                            <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
-                            <span className="text-[32px] font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
-                                {formatCurrency(totalAmount)}
-                            </span>
-                        </div>
-                    </div>
-
-                    {!isPaidOrder && (
-                        <Button
-                            size="lg"
-                            className="w-full mt-6"
-                            onClick={handleSaveOrder}
-                            disabled={isSaving}
-                        >
-                            Ir para Pagamento
-                        </Button>
-                    )}
-                </div>
             </div>
         </FadeIn>
     )

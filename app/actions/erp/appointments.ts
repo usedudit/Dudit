@@ -12,7 +12,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
 import { applyServiceOrderToGoals } from "@/lib/services/sales-goals.service"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { getAdminTimeline } from "@/lib/services/timeline.service"
-import { increment_usage_counter } from "@/lib/services/subscription.service"
+import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { reserveOrderInventory, releaseOrderInventory, finalizeOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
@@ -650,6 +650,12 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       if (recentDup && recentDup.length > 0) {
         return { success: false, error: "Agendamento duplicado detectado. Aguarde alguns segundos.", created: [] }
       }
+    }
+
+    // -- Plan limit check --
+    const limitCheck = await checkLimit(partnerId, "monthly_appointments")
+    if (!limitCheck.allowed) {
+      return { success: false, error: limitCheck.message || "Limite mensal de agendamentos atingido.", created: [] }
     }
 
     const { data, error } = await supabase.from("appointments").insert(rows).select("*")

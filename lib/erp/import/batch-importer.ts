@@ -88,6 +88,26 @@ export async function executeImport(
     }
   }
 
+  const hasBrandCol = mapping.some((m) => m.field === "brand")
+  const brandCache = new Map<string, string>()
+
+  if (hasBrandCol) {
+    const allBrandNames = [
+      ...new Set(mappedRows.map((r) => r["brand"]?.trim()).filter(Boolean)),
+    ]
+    if (allBrandNames.length > 0) {
+      const { data: existing } = await supabase
+        .from("brands")
+        .select("id, name")
+        .eq("partner_id", partnerId)
+      for (const b of existing || []) {
+        brandCache.set(b.name.trim().toLowerCase(), b.id)
+      }
+    }
+  }
+
+  let errorMessages: string[] = []
+
   for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
     const batch = mappedRows.slice(i, i + BATCH_SIZE)
     const startIndex = i
@@ -108,12 +128,16 @@ export async function executeImport(
         startIndex,
         supplierCache,
         categoryCache,
+        brandCache,
         options,
       )
       successRows += result.success
       errorRows += result.errors
       duplicateRows += result.duplicates
       warningRows += result.warnings
+      if (result.errorMessage) {
+        errorMessages.push(result.errorMessage)
+      }
     } else if (entityType === "customers") {
       const result = await importCustomerBatch(
         supabase,
@@ -126,6 +150,9 @@ export async function executeImport(
       errorRows += result.errors
       duplicateRows += result.duplicates
       warningRows += result.warnings
+      if (result.errorMessage) {
+        errorMessages.push(result.errorMessage)
+      }
     } else if (entityType === "services") {
       const result = await importServiceBatch(
         supabase,
@@ -140,6 +167,9 @@ export async function executeImport(
       errorRows += result.errors
       duplicateRows += result.duplicates
       warningRows += result.warnings
+      if (result.errorMessage) {
+        errorMessages.push(result.errorMessage)
+      }
     }
   }
 
@@ -152,6 +182,7 @@ export async function executeImport(
     duplicateRows,
     warningRows,
     durationMs,
+    errorMessage: errorMessages.length > 0 ? errorMessages.join(" | ") : undefined,
   }
 }
 
@@ -166,12 +197,14 @@ async function importProductBatch(
   startIndex: number,
   supplierCache: Map<string, string>,
   categoryCache: Map<string, string>,
+  brandCache: Map<string, string>,
   options: { skipDuplicates: boolean; skipErrors: boolean },
-): Promise<{ success: number; errors: number; duplicates: number; warnings: number }> {
+): Promise<{ success: number; errors: number; duplicates: number; warnings: number; errorMessage?: string }> {
   let success = 0
   let errors = 0
   let duplicates = 0
   let warnings = 0
+  let errorMessage: string | undefined = undefined
 
   const skus = batch.map((r) => r["sku"]?.trim()).filter(Boolean) as string[]
   let existingSkus = new Set<string>()
@@ -186,7 +219,7 @@ async function importProductBatch(
   }
 
   const toInsert: any[] = []
-  const specEntries: { productIndex: number; specs: Record<string, string> }[] = []
+  const productProfiles: Record<string, { fiscal: any; logistics: any }> = {}
 
   for (let i = 0; i < batch.length; i++) {
     const row = batch[i]
@@ -227,15 +260,8 @@ async function importProductBatch(
       product_type: row["product_type"] || null,
       condition: row["condition"] || null,
       promotional_price: cleanNumber(row["promotional_price"] ?? ""),
-      ncm: row["ncm"] || null,
-      cest: row["cest"] || null,
-      origin: row["origin"] ? parseInt(row["origin"].replace(/\D/g, "")) || null : null,
-      weight_gross: cleanNumber(row["weight_gross"] ?? ""),
-      weight_net: cleanNumber(row["weight_net"] ?? ""),
-      width: cleanNumber(row["width"] ?? ""),
-      height: cleanNumber(row["height"] ?? ""),
-      length: cleanNumber(row["length"] ?? ""),
       is_active: true,
+      show_in_marketplace: true,
     }
 
     if (row["category"]) {
@@ -246,7 +272,21 @@ async function importProductBatch(
     }
 
     if (row["brand"]) {
-      productData.brand = row["brand"]
+      const brandKey = row["brand"].trim().toLowerCase()
+      if (brandCache.has(brandKey)) {
+        productData.brand_id = brandCache.get(brandKey)
+      }
+    }
+
+    if (row["supplier"]) {
+      const supplierKey = row["supplier"].trim().toLowerCase()
+      if (supplierCache.has(supplierKey)) {
+        productData.supplier_id = supplierCache.get(supplierKey)
+      }
+    }
+
+    if (row["tags"]) {
+      productData.tags = row["tags"].split(",").map(t => t.trim()).filter(Boolean)
     }
 
     const knownFields = new Set([
@@ -267,6 +307,32 @@ async function importProductBatch(
       productData.technical_specs = specs
     }
 
+    productProfiles[finalSku] = {
+      fiscal: {
+        ncm: row["ncm"] || null,
+        cest: row["cest"] || null,
+        origin: row["origin"] ? parseInt(row["origin"].replace(/\D/g, "")) || 0 : 0,
+        item_type: "00",
+        cfop_internal: "5102",
+        cfop_external: "6102",
+        csosn: "102",
+        pis_cst: "99",
+        pis_rate: 0.0,
+        cofins_cst: "99",
+        cofins_rate: 0.0,
+        ipi_cst: "99",
+      },
+      logistics: {
+        weight_gross: cleanNumber(row["weight_gross"] ?? "") ?? 0,
+        weight_net: cleanNumber(row["weight_net"] ?? "") ?? 0,
+        width: cleanNumber(row["width"] ?? "") ?? 0,
+        height: cleanNumber(row["height"] ?? "") ?? 0,
+        length: cleanNumber(row["length"] ?? "") ?? 0,
+        packaging_type: "package",
+        preparation_days: 0,
+      }
+    }
+
     toInsert.push(productData)
   }
 
@@ -274,17 +340,58 @@ async function importProductBatch(
     const { data: inserted, error } = await supabase
       .from("products")
       .insert(toInsert)
-      .select("id, name")
+      .select("id, name, sku")
 
     if (error) {
       console.error("[BatchImport] Erro ao inserir produtos:", error)
       errors += toInsert.length
+      errorMessage = error.message
     } else {
       success = inserted?.length ?? 0
+
+      // Now insert profiles!
+      const fiscalToInsert: any[] = []
+      const logisticsToInsert: any[] = []
+
+      for (const item of inserted || []) {
+        if (item.sku && item.id) {
+          const profiles = productProfiles[item.sku]
+          if (profiles) {
+            fiscalToInsert.push({
+              product_id: item.id,
+              ...profiles.fiscal
+            })
+            logisticsToInsert.push({
+              product_id: item.id,
+              ...profiles.logistics
+            })
+          }
+        }
+      }
+
+      if (fiscalToInsert.length > 0) {
+        const { error: fiscalError } = await supabase
+          .from("product_fiscal_profiles")
+          .insert(fiscalToInsert)
+        if (fiscalError) {
+          console.error("[BatchImport] Erro ao inserir perfis fiscais:", fiscalError)
+          errorMessage = fiscalError.message
+        }
+      }
+
+      if (logisticsToInsert.length > 0) {
+        const { error: logisticsError } = await supabase
+          .from("product_logistics")
+          .insert(logisticsToInsert)
+        if (logisticsError) {
+          console.error("[BatchImport] Erro ao inserir perfis logísticos:", logisticsError)
+          errorMessage = logisticsError.message
+        }
+      }
     }
   }
 
-  return { success, errors, duplicates, warnings }
+  return { success, errors, duplicates, warnings, errorMessage }
 }
 
 async function importCustomerBatch(
@@ -293,11 +400,12 @@ async function importCustomerBatch(
   batch: Record<string, string>[],
   startIndex: number,
   options: { skipDuplicates: boolean; skipErrors: boolean },
-): Promise<{ success: number; errors: number; duplicates: number; warnings: number }> {
+): Promise<{ success: number; errors: number; duplicates: number; warnings: number; errorMessage?: string }> {
   let success = 0
   let errors = 0
   let duplicates = 0
   let warnings = 0
+  let errorMessage: string | undefined = undefined
 
   // Collect all unique emails and CPFs to check in bulk
   const emails = [...new Set(batch.map((r) => r["email"]?.trim()).filter(Boolean))] as string[]
@@ -348,7 +456,14 @@ async function importCustomerBatch(
       continue
     }
 
-    const email = row["email"]?.trim()
+    let email = row["email"]?.trim() || null
+    if (email) {
+      const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+      if (!emailRegex.test(email)) {
+        email = null
+      }
+    }
+
     if (email && existingEmails.has(email)) {
       duplicates++
       continue
@@ -369,13 +484,16 @@ async function importCustomerBatch(
       }
     }
 
-    const cnpj = row["cnpj"]?.replace(/\D/g, "") || null
+    let cnpj = row["cnpj"]?.replace(/\D/g, "") || null
+    if (cnpj && cnpj.length !== 14) {
+      cnpj = null
+    }
     const personType = rawCpf && rawCpf.length === 11 ? "pf" : cnpj ? "pj" : "pf"
 
     const customerData: any = {
       partner_id: partnerId,
       name,
-      email: email || null,
+      email: email,
       phone: row["phone"]?.trim() || null,
       phone_fixed: row["phone_fixed"]?.trim() || null,
       person_type: personType,
@@ -383,6 +501,7 @@ async function importCustomerBatch(
       cnpj,
       birth_date: row["birth_date"] || null,
       notes: row["notes"] || null,
+      status: "ativo",
     }
 
     toInsert.push(customerData)
@@ -407,6 +526,7 @@ async function importCustomerBatch(
     if (error) {
       console.error("[BatchImport] Erro ao inserir clientes:", error)
       errors += toInsert.length
+      errorMessage = error.message
     } else {
       success = inserted?.length ?? 0
 
@@ -435,7 +555,7 @@ async function importCustomerBatch(
     }
   }
 
-  return { success, errors, duplicates, warnings }
+  return { success, errors, duplicates, warnings, errorMessage }
 }
 
 async function importServiceBatch(
@@ -446,11 +566,12 @@ async function importServiceBatch(
   startIndex: number,
   categoryCache: Map<string, string>,
   options: { skipDuplicates: boolean; skipErrors: boolean },
-): Promise<{ success: number; errors: number; duplicates: number; warnings: number }> {
+): Promise<{ success: number; errors: number; duplicates: number; warnings: number; errorMessage?: string }> {
   let success = 0
   let errors = 0
   let duplicates = 0
   let warnings = 0
+  let errorMessage: string | undefined = undefined
 
   const skus = batch.map((r) => r["sku"]?.trim()).filter(Boolean) as string[]
   let existingSkus = new Set<string>()
@@ -510,10 +631,11 @@ async function importServiceBatch(
     if (error) {
       console.error("[BatchImport] Erro ao inserir serviços:", error)
       errors += toInsert.length
+      errorMessage = error.message
     } else {
       success = inserted?.length ?? 0
     }
   }
 
-  return { success, errors, duplicates, warnings }
+  return { success, errors, duplicates, warnings, errorMessage }
 }
