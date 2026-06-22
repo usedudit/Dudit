@@ -21,6 +21,9 @@ import {
     syncServiceOrderServicesAction,
     syncServiceOrderProductsAction,
 } from "@/app/actions/erp/service-orders"
+import SpecificationsTab from "./SpecificationsTab"
+import AttachmentsTab from "./AttachmentsTab"
+import { SERVICE_ORDER_STATUS_META } from "@/lib/types/service-order"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectServiceSheet from "./SelectServiceSheet"
 import SelectProductSheet from "./SelectProductSheet"
@@ -63,9 +66,12 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     const [assignedUserId, setAssignedUserId] = useState(editData?.assigned_user_id || "")
 
     // Custom OS fields
-    const [priority, setPriority] = useState(editData?.priority || "media")
+    const [status, setStatus] = useState(editData?.status || "aberta")
+    const [priority, setPriority] = useState(editData?.priority || "baixa")
     const [estimatedHours, setEstimatedHours] = useState(editData?.estimated_hours != null ? String(editData.estimated_hours) : "")
     const [expectedCompletionTime, setExpectedCompletionTime] = useState(editData?.expected_completion_time || "")
+    const [openingDate, setOpeningDate] = useState(editData?.created_at?.split("T")[0] || new Date().toISOString().split("T")[0])
+    const [openingTime, setOpeningTime] = useState(editData?.created_at ? new Date(editData.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))
     const [teamMembers, setTeamMembers] = useState<any[]>([])
 
     // Financial fields matching CreateOrder / pdv
@@ -295,6 +301,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
         setSaving(true)
 
+        const createdAt = `${openingDate}T${openingTime}:00`
+
         const payload = {
             title: title.trim(),
             description: description.trim() || "",
@@ -302,6 +310,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
             customer_id: customerId || null,
             expected_completion_date: expectedDate || null,
             assigned_user_id: assignedUserId || null,
+            status,
             priority,
             estimated_hours: estimatedHours ? Number(estimatedHours) : null,
             expected_completion_time: expectedCompletionTime || null,
@@ -311,6 +320,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
             coupon_code: couponCode || null,
             coupon_discount_amount: effectiveCouponDiscountAmount,
             other_costs: Number(otherCosts || 0),
+            created_at: editData ? undefined : createdAt,
         }
 
         if (editData) {
@@ -555,28 +565,32 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             {saving ? "Salvando..." : editData ? "Salvar" : "Criar OS"}
                                         </Button>
                                     </div>
+                                </div>
 
-                                    {/* Tabs Navigation */}
-                                    <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                            <TabsTrigger value="general">
-                                                Dados gerais
-                                                {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                            </TabsTrigger>
-                                            <TabsTrigger value="notes">
-                                                Observações
-                                                {getTabErrorCount("notes") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                            </TabsTrigger>
-                                            <TabsTrigger value="services">
-                                                Serviços
-                                                {getTabErrorCount("services") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                            </TabsTrigger>
-                                            <TabsTrigger value="products">
-                                                Produtos
-                                                {getTabErrorCount("products") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                            </TabsTrigger>
-                                        </TabsList>
-                                    </div>
+                                {/* Tabs Navigation */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        <TabsTrigger value="notes">
+                                            Observações
+                                        </TabsTrigger>
+                                        <TabsTrigger value="services">
+                                            Serviços
+                                            {getTabErrorCount("services") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        <TabsTrigger value="products">
+                                            Produtos
+                                        </TabsTrigger>
+                                        <TabsTrigger value="specifications">
+                                            Especificações
+                                        </TabsTrigger>
+                                        <TabsTrigger value="attachments">
+                                            Anexos
+                                        </TabsTrigger>
+                                    </TabsList>
                                 </div>
                             </div>
                         </div>
@@ -610,6 +624,20 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             <FormSection title="Agendamento e Responsabilidade">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <DatePicker
+                                                        label="Data de abertura"
+                                                        value={openingDate}
+                                                        onChange={setOpeningDate}
+                                                        placeholder="Data de hoje"
+                                                    />
+
+                                                    <TimePicker
+                                                        label="Hora de abertura"
+                                                        value={openingTime}
+                                                        onChange={(time) => setOpeningTime(time)}
+                                                        placeholder="Agora"
+                                                    />
+
+                                                    <DatePicker
                                                         label="Data prevista de conclusão"
                                                         value={expectedDate}
                                                         onChange={setExpectedDate}
@@ -621,6 +649,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         value={expectedCompletionTime}
                                                         onChange={(time) => setExpectedCompletionTime(time)}
                                                         placeholder="14:30"
+                                                    />
+
+                                                    <FormDropdown
+                                                        label="Status"
+                                                        value={status}
+                                                        setValue={(val) => setStatus(val)}
+                                                        options={Object.entries(SERVICE_ORDER_STATUS_META).map(([value, meta]) => ({
+                                                            value,
+                                                            label: meta.label,
+                                                        }))}
                                                     />
 
                                                     <FormDropdown
@@ -1120,6 +1158,46 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     onPageChange={setProductsPage}
                                                 />
                                             </>
+                                        )}
+                                    </FadeIn>
+                                )}
+
+                                {activeTab === "specifications" && (
+                                    <FadeIn key="specifications" className="space-y-6 w-full">
+                                        <SpecificationsTab
+                                            partnerId={partnerId}
+                                            serviceOrderId={editData?.id || ""}
+                                            specifications={editData?.specifications || []}
+                                            onMutation={async () => {
+                                                if (editData?.id) {
+                                                    const { getServiceOrderDetailsAction } = await import("@/app/actions/erp/service-orders")
+                                                    const res = await getServiceOrderDetailsAction(editData.id, partnerId)
+                                                    if (res.success) {
+                                                        // Can't fully re-render but mutation happened
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </FadeIn>
+                                )}
+
+                                {activeTab === "attachments" && (
+                                    <FadeIn key="attachments" className="space-y-6 w-full">
+                                        <AttachmentsTab
+                                            partnerId={partnerId}
+                                            serviceOrderId={editData?.id || ""}
+                                            attachments={editData?.attachments || []}
+                                            onMutation={async () => {
+                                                if (editData?.id) {
+                                                    const { getServiceOrderDetailsAction } = await import("@/app/actions/erp/service-orders")
+                                                    const res = await getServiceOrderDetailsAction(editData.id, partnerId)
+                                                }
+                                            }}
+                                        />
+                                        {!editData && (
+                                            <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                                Salve a OS primeiro para gerenciar anexos
+                                            </div>
                                         )}
                                     </FadeIn>
                                 )}

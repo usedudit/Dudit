@@ -33,7 +33,7 @@ export default async function ClientPortalPage({
     )
   }
 
-  const { serviceOrder: order, services, products, attachments, history } = result.data
+  const { serviceOrder: order, services, products, attachments, history, sale } = result.data
   const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
   const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`
@@ -133,6 +133,37 @@ export default async function ClientPortalPage({
             <span className="text-[18px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_amount || 0)}</span>
           </div>
         </div>
+
+        {/* Venda Vinculada (portal) */}
+        {sale && (
+          <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
+            <h3 className="font-bold text-[15px] mb-3 text-brand-dark dark:text-dark-heading">Pagamento</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-[13px]">
+                <span className="text-brand-inactive-text">Valor</span>
+                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(sale.final_amount || sale.total_amount || 0)}</span>
+              </div>
+              <div className="flex justify-between items-center text-[13px]">
+                <span className="text-brand-inactive-text">Pago</span>
+                <span className="font-bold text-brand-green">{formatCurrency(sale.paid_amount || 0)}</span>
+              </div>
+              {sale.payment_status === "partially_paid" && (
+                <div className="flex justify-between items-center text-[13px]">
+                  <span className="text-brand-inactive-text">Restante</span>
+                  <span className="font-bold text-brand-red">
+                    {formatCurrency((sale.final_amount || sale.total_amount || 0) - (sale.paid_amount || 0))}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                <span className="text-brand-inactive-text">Status</span>
+                <Badge variant={sale.payment_status === "paid" ? "green" : sale.payment_status === "partially_paid" ? "orange" : "gray"}>
+                  {sale.payment_status === "paid" ? "Pago" : sale.payment_status === "partially_paid" ? "Parcialmente Pago" : "Pendente"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Assinatura */}
         {order.signature_image_key && (

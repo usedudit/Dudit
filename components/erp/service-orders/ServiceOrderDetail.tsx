@@ -385,66 +385,84 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <TabsContent value="summary">
-                                {/* Steps Timeline (Same as Order Details Page) */}
-                                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl px-12 pt-12 pb-12 mb-6">
-                                    <div className="relative px-4">
-                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                            <div
-                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isCancelled ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                style={{ width: `${progressPercent}%` }}
-                                            ></div>
-
-                                            {timelineSteps.map((step, idx) => {
-                                                const isStepCancelled = step.isCancelled
-                                                return (
-                                                    <div key={idx} className="relative flex flex-col items-center">
-                                                        <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                            <span className={`text-xs font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                {step.label}
-                                                            </span>
-                                                        </div>
-                                                        <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                            {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                        </div>
-                                                        <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                            {step.date ? (
-                                                                <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                    <span>{step.date}</span>
-                                                                    {step.time && <span>{step.time}</span>}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-
                                 {/* Two Column Layout with Vertical Divider in the Middle */}
                                 <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0 relative">
 
                                     {/* Left Column (col-span-8) */}
                                     <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-6">
 
+                                        {/* Steps Timeline Card (Exactly like Order Details Page) */}
+                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
+                                            <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                            Responsável pelo serviço:
+                                                        </span>
+                                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                            {assignedName}
+                                                        </div>
+                                                    </div>
+                                                    <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                        Prioridade: <strong className="text-brand-dark dark:text-dark-heading">{PRIORITY_META[order.priority]?.label || "Média"}</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
+                                                <div className="relative px-4">
+                                                    <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                        <div
+                                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isCancelled ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                            style={{ width: `${progressPercent}%` }}
+                                                        ></div>
+
+                                                        {timelineSteps.map((step, idx) => {
+                                                            const isStepCancelled = step.isCancelled
+                                                            return (
+                                                                <div key={idx} className="relative flex flex-col items-center">
+                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                        <span className={`text-xs font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                            {step.label}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                        {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                    </div>
+                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                        {step.date ? (
+                                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                                <span>{step.date}</span>
+                                                                                {step.time && <span>{step.time}</span>}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         {/* Details OS FormSection */}
                                         <FormSection title="Detalhes da OS" hasSeparator>
                                             <div className="space-y-4">
                                                 <div>
-                                                    <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Título</label>
+                                                    <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Título</label>
                                                     <p className="text-[14px] font-medium text-brand-dark dark:text-dark-heading mt-0.5">{order.title}</p>
                                                 </div>
                                                 {order.description && (
                                                     <div>
-                                                        <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Descrição</label>
+                                                        <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Descrição</label>
                                                         <p className="text-[14px] text-brand-dark dark:text-dark-heading mt-0.5 whitespace-pre-wrap">{order.description}</p>
                                                     </div>
                                                 )}
                                                 {order.internal_notes && (
                                                     <div>
-                                                        <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Observações internas</label>
+                                                        <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Observações internas</label>
                                                         <p className="text-[14px] text-brand-inactive-text mt-0.5 whitespace-pre-wrap">{order.internal_notes}</p>
                                                     </div>
                                                 )}
@@ -569,6 +587,114 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                     {/* Right Sidebar Column with vertical border-l (col-span-4) */}
                                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+
+                                        {/* Venda Vinculada Card */}
+                                        {order.sale && (
+                                            <SidebarCard>
+                                                <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Venda Vinculada</h3>
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between items-center text-[13px]">
+                                                        <span className="text-brand-inactive-text">Venda</span>
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
+                                                            #{order.sale.sale_number || "—"}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-[13px]">
+                                                        <span className="text-brand-inactive-text">Total</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                            {formatCurrency(order.sale.final_amount || order.sale.total_amount || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-[13px]">
+                                                        <span className="text-brand-inactive-text">Pago</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                            {formatCurrency(order.sale.paid_amount || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-[13px]">
+                                                        <span className="text-brand-inactive-text">Status</span>
+                                                        <Badge
+                                                            variant={order.sale.payment_status === "paid" ? "green" : order.sale.payment_status === "partially_paid" ? "orange" : "gray"}
+                                                            className="text-[11px]"
+                                                        >
+                                                            {order.sale.payment_status === "paid" ? "Pago" : order.sale.payment_status === "partially_paid" ? "Parcial" : "Pendente"}
+                                                        </Badge>
+                                                    </div>
+                                                    {order.sale.status === "cancelled" && (
+                                                        <div className="flex justify-between items-center text-[13px]">
+                                                            <span className="text-brand-red font-medium">Cancelada</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </SidebarCard>
+                                        )}
+
+                                        {/* Timing Info Card */}
+                                        {order.created_at && (
+                                            <SidebarCard>
+                                                <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Tempo</h3>
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between items-center text-[13px]">
+                                                        <span className="text-brand-inactive-text">Abertura</span>
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
+                                                            {formatDateTime(order.created_at)}
+                                                        </span>
+                                                    </div>
+                                                    {order.completed_at && (
+                                                        <>
+                                                            <div className="flex justify-between items-center text-[13px]">
+                                                                <span className="text-brand-inactive-text">Conclusão</span>
+                                                                <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
+                                                                    {formatDateTime(order.completed_at)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                <span className="text-brand-inactive-text">Tempo total</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                                    {(() => {
+                                                                        const start = new Date(order.created_at).getTime()
+                                                                        const end = new Date(order.completed_at).getTime()
+                                                                        const diffMs = Math.max(0, end - start)
+                                                                        const diffH = Math.floor(diffMs / 3600000)
+                                                                        const diffM = Math.floor((diffMs % 3600000) / 60000)
+                                                                        if (diffH >= 24) {
+                                                                            const days = Math.floor(diffH / 24)
+                                                                            return `${days}d ${diffH % 24}h`
+                                                                        }
+                                                                        return `${diffH}h ${diffM}m`
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                            {order.expected_completion_date && (() => {
+                                                                const expectedDate = new Date(order.expected_completion_date)
+                                                                if (order.expected_completion_time) {
+                                                                    const [h, m] = order.expected_completion_time.split(":").map(Number)
+                                                                    expectedDate.setHours(h || 0, m || 0)
+                                                                }
+                                                                const completed = new Date(order.completed_at)
+                                                                const isLate = completed.getTime() > expectedDate.getTime()
+                                                                const diffLateMs = Math.max(0, completed.getTime() - expectedDate.getTime())
+                                                                const diffLateH = Math.floor(diffLateMs / 3600000)
+                                                                const diffLateD = Math.floor(diffLateH / 24)
+                                                                return isLate ? (
+                                                                    <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                        <span className="text-brand-red font-medium">Atraso</span>
+                                                                        <span className="font-bold text-brand-red">
+                                                                            {diffLateD > 0 ? `${diffLateD}d ${diffLateH % 24}h` : `${diffLateH}h ${Math.floor((diffLateMs % 3600000) / 60000)}m`}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                        <span className="text-brand-green font-medium">Prazo</span>
+                                                                        <span className="font-bold text-brand-green">No prazo</span>
+                                                                    </div>
+                                                                )
+                                                            })()}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </SidebarCard>
+                                        )}
 
                                         {/* Customer Info Card */}
                                         <CustomerCard

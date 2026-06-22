@@ -92,12 +92,13 @@ export async function getServiceOrderDetailsAction(
     if (error) throw error
     if (!order) throw new Error("Ordem de serviço não encontrada")
 
-    const [servicesRes, productsRes, attachmentsRes, historyRes, historyRes2] = await Promise.all([
+    const [servicesRes, productsRes, attachmentsRes, historyRes, historyRes2, saleRes] = await Promise.all([
       supabase.from("service_order_services").select("*, services(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
       supabase.from("service_order_products").select("*, products(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
       supabase.from("service_order_attachments").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
       fetchTimelineForEntity("service_order", serviceOrderId, partnerId),
       supabase.from("service_order_history").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
+      order.sale_id ? supabase.from("sales").select("*").eq("id", order.sale_id).single() : Promise.resolve({ data: null }),
     ])
 
     return {
@@ -109,6 +110,7 @@ export async function getServiceOrderDetailsAction(
         attachments: attachmentsRes.data || [],
         history: historyRes,
         statusHistory: historyRes2?.data || [],
+        sale: saleRes?.data || null,
       },
     }
   } catch (err: any) {
@@ -152,6 +154,7 @@ export async function createServiceOrderAction(
     paid_amount?: number
     payment_method?: string | null
     payment_breakdown?: any
+    created_at?: string | null
   },
 ): Promise<{ success: true; data: any; orderNumber: string } | { success: false; error: string }> {
   try {
@@ -187,7 +190,7 @@ export async function createServiceOrderAction(
         assigned_user_id: input.assigned_user_id || null,
         status,
         created_by: user.id,
-        priority: input.priority || 'media',
+        priority: input.priority || 'baixa',
         estimated_hours: input.estimated_hours || null,
         expected_completion_time: input.expected_completion_time || null,
         discount_value: input.discount_value || 0,
@@ -200,6 +203,7 @@ export async function createServiceOrderAction(
         paid_amount: input.paid_amount || 0,
         payment_method: input.payment_method || null,
         payment_breakdown: input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null,
+        created_at: input.created_at || undefined,
       })
       .select("*")
       .single()
@@ -553,6 +557,7 @@ export async function saveAttachmentAction(
   fileName: string,
   fileType: string,
   fileSize: number,
+  category?: "normal" | "antes" | "depois",
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requirePermission(partnerId, "service_orders", "edit")
@@ -568,6 +573,7 @@ export async function saveAttachmentAction(
         file_type: fileType,
         file_size: fileSize,
         uploaded_by: user.id,
+        category: category || "normal",
       })
       .select("*")
       .single()
@@ -693,25 +699,26 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
 
 export async function getServiceOrderByTokenAction(
   token: string,
-  ): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; statusHistory: any[] } } | { success: false; error: string }> {
+  ): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; statusHistory: any[]; sale: any } } | { success: false; error: string }> {
   try {
     const admin = getAdminClient()
 
     const { data: row, error } = await admin
       .from("service_orders")
-      .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, token_revoked_at, customer_snapshot, created_at")
+      .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, token_revoked_at, customer_snapshot, created_at, sale_id, specifications")
       .eq("public_token", token)
       .single()
 
     if (error || !row) throw new Error("Ordem de serviço não encontrada")
     if (row.token_revoked_at) throw new Error("Link expirado ou revogado")
 
-    const [services, products, attachments, historyRes, statusHistoryRes] = await Promise.all([
+    const [services, products, attachments, historyRes, statusHistoryRes, saleRes] = await Promise.all([
       admin.from("service_order_services").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_products").select("*").eq("service_order_id", row.id).order("sort_order"),
-      admin.from("service_order_attachments").select("file_name, file_key, file_type, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
+      admin.from("service_order_attachments").select("file_name, file_key, file_type, category, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       admin.from("audit_logs").select("id, action_type, change_lines, created_at").eq("entity_type", "service_order").eq("entity_id", row.id).order("created_at", { ascending: false }).limit(50),
       admin.from("service_order_history").select("*").eq("service_order_id", row.id).order("created_at", { ascending: false }),
+      row.sale_id ? admin.from("sales").select("id, sale_number, total_amount, discount_amount, final_amount, paid_amount, payment_status, status, created_at").eq("id", row.sale_id).single() : Promise.resolve({ data: null }),
     ])
 
     const customerName = (row.customer_snapshot as any)?.name || null
@@ -731,6 +738,8 @@ export async function getServiceOrderByTokenAction(
       signature_image_key: row.signature_image_key,
       signed_at: row.signed_at,
       customer_name: customerName,
+      sale_id: row.sale_id,
+      specifications: row.specifications,
     }
 
     return {
@@ -742,6 +751,7 @@ export async function getServiceOrderByTokenAction(
         attachments: attachments.data || [],
         history: historyRes.data || [],
         statusHistory: statusHistoryRes.data || [],
+        sale: saleRes?.data || null,
       },
     }
   } catch (err: any) {
@@ -773,6 +783,7 @@ export async function updateServiceOrderAction(
     paid_amount?: number
     payment_method?: string | null
     payment_breakdown?: any
+    created_at?: string | null
   },
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
@@ -816,6 +827,8 @@ export async function updateServiceOrderAction(
     if (input.payment_breakdown !== undefined) {
       updateData.payment_breakdown = input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null
     }
+    if (input.created_at !== undefined) updateData.created_at = input.created_at
+    if (input.status !== undefined) updateData.status = input.status
 
     const { data, error } = await admin
       .from("service_orders")
@@ -1055,6 +1068,8 @@ export async function confirmServiceOrderPaymentAction(payload: {
           notes: saleRefNote,
           finalized_by_user_id: user.id,
           sale_number: saleNumber,
+          origin_type: "service_order",
+          origin_id: order.id,
         })
         .select("id")
         .single()
@@ -1063,6 +1078,11 @@ export async function confirmServiceOrderPaymentAction(payload: {
       saleId = sale?.id || null
 
       if (saleId) {
+        // Link sale to OS bidirecionalmente
+        const admin = getAdminClient()
+        await admin.from("service_orders").update({ sale_id: saleId }).eq("id", order.id).eq("partner_id", payload.partnerId)
+        await admin.from("sales").update({ origin_type: "service_order", origin_id: order.id }).eq("id", saleId)
+
         // Insert sale_items for services and products
         const saleItems: any[] = []
         orderServices.forEach((s: any) => {
@@ -1102,6 +1122,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
       }
     } else {
       // Update existing sale
+      const admin = getAdminClient()
       const { error: saleUpdateError } = await supabase
         .from("sales")
         .update({
@@ -1116,6 +1137,8 @@ export async function confirmServiceOrderPaymentAction(payload: {
         .eq("id", saleId)
 
       if (saleUpdateError) throw saleUpdateError
+      await admin.from("sales").update({ origin_type: "service_order", origin_id: order.id }).eq("id", saleId)
+      await admin.from("service_orders").update({ sale_id: saleId }).eq("id", order.id)
     }
 
     // 5. Create or update transaction in `transactions` table (if paidAmount > 0)

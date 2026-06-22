@@ -31,6 +31,7 @@ export interface ServiceOrder {
   total_product_amount: number
   total_amount: number
   transaction_id: string | null
+  sale_id: string | null
   created_at: string
   updated_at: string
 }
@@ -69,6 +70,7 @@ export interface ServiceOrderAttachment {
   file_type: string | null
   file_size: number | null
   uploaded_by: string | null
+  category: "normal" | "antes" | "depois"
   created_at: string
 }
 

@@ -906,8 +906,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                     video_duration: productData.video_duration || null,
                                                     video_provider_id: productData.video_provider_id || null,
                                                 }}
-                                                    onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
-                                                    videoPlanBlocked={videoPlanBlocked}
+                                                onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
+                                                videoPlanBlocked={videoPlanBlocked}
                                             />
                                         )}
                                     </FadeIn>
