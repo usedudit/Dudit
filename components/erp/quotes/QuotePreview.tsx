@@ -28,6 +28,7 @@ interface QuotePreviewProps {
     partnerAvatar?: string;
     printMode?: boolean;
     showDecoration?: boolean;
+    showCustomerContact?: boolean;
 }
 
 const QuotePreview = ({
@@ -44,13 +45,14 @@ const QuotePreview = ({
     note,
     primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR,
     secondaryColor = QUOTE_PREVIEW_SECONDARY_COLOR,
-    quoteTitle = 'ORÇAMENTO',
+    quoteTitle = 'Orçamento',
     quoteSubtitle,
     partnerName = 'Parceiro',
     partnerAddress = 'Endereço não cadastrado',
     partnerAvatar,
     printMode = false,
-    showDecoration = true
+    showDecoration = true,
+    showCustomerContact = true
 }: QuotePreviewProps) => {
 
     const resolvedColors = useMemo(() => {
@@ -209,8 +211,8 @@ const QuotePreview = ({
 
                                     <div>
                                         <h1 className="text-3xl font-medium text-white">{quoteTitle}</h1>
-                                        <p className="text-white/80 text-xs tracking-widest font-light mt-1 uppercase">
-                                            {quoteSubtitle || `Proposta Comercial #${invoiceNumber}`}
+                                        <p className="text-white/80 text-xs tracking-widest font-light mt-1">
+                                            {quoteSubtitle || `Proposta comercial #${invoiceNumber}`}
                                         </p>
                                     </div>
                                 </div>
@@ -224,15 +226,15 @@ const QuotePreview = ({
                                         <div className="px-8 py-6">
                                             <div className="grid grid-cols-3 gap-4 border-b border-brand-border pb-6 w-full">
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">Número</span>
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
                                                     <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">Data</span>
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Data</span>
                                                     <span className="font-bold text-sm text-brand-dark">{formatDate(quoteDate)}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">Vencimento</span>
+                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vencimento</span>
                                                     <span className="font-bold text-sm text-brand-dark">{formatDate(expiryDate)}</span>
                                                 </div>
                                             </div>
@@ -243,7 +245,7 @@ const QuotePreview = ({
                                                 <div>
                                                     <h3 className="font-bold text-sm text-brand-dark mb-3">Emitente</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
-                                                        <p className="font-bold uppercase text-brand-dark">{partnerName}</p>
+                                                        <p className="font-bold text-brand-dark">{partnerName}</p>
                                                         <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                                     </div>
                                                 </div>
@@ -252,8 +254,8 @@ const QuotePreview = ({
                                                     {selectedCustomer ? (
                                                         <div className="text-xs text-gray-600 space-y-1">
                                                             <p className="font-bold text-brand-dark">{selectedCustomer.name}</p>
-                                                            <p>{selectedCustomer.email}</p>
-                                                            {selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
+                                                            {showCustomerContact && selectedCustomer.email && <p>{selectedCustomer.email}</p>}
+                                                            {showCustomerContact && selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
                                                             {customerAddressText && <p className="whitespace-pre-wrap">{customerAddressText}</p>}
                                                         </div>
                                                     ) : (
@@ -271,10 +273,10 @@ const QuotePreview = ({
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
                                             <tr className="bg-brand-gray/40">
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Item</th>
-                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-24 border-b border-gray-100">Qtd</th>
-                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-28 border-b border-gray-100">Preço</th>
-                                                <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-32 rounded-tr-xl border-b border-gray-100">Total</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 tracking-wider rounded-tl-xl border-b border-gray-100">Item</th>
+                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 tracking-wider text-center w-24 border-b border-gray-100">Qtd</th>
+                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 tracking-wider text-right w-28 border-b border-gray-100">Preço</th>
+                                                <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 tracking-wider text-right w-32 rounded-tr-xl border-b border-gray-100">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody>

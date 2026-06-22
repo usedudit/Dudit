@@ -22,6 +22,7 @@ import CreateQuote from "./CreateQuote"
 import QuoteDetail from "./QuoteDetail"
 import QuotePrintModal from "./QuotePrintModal"
 import { useNotification } from "@/hooks/use-notification"
+import { ShareModal } from "@/components/marketplace/ShareModal"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -68,6 +69,7 @@ interface Quote {
     created_at_time: number;
     status: string;
     user_profiles?: { full_name: string } | null;
+    public_token?: string | null;
 }
 
 interface FilterState {
@@ -106,7 +108,8 @@ export default function QuotesPage({
 }) {
     const { success, error } = useNotification()
     const debouncedRefresh = useDebouncedRefresh()
-    const { isLoading: storeLoading } = useStore()
+    const { isLoading: storeLoading, selectedStore } = useStore()
+    const partnerName = selectedStore?.name || "Sua Loja"
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -186,6 +189,8 @@ export default function QuotesPage({
     const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
     const [confirmations, setConfirmations] = useState({ bulkDelete: false })
     const [printQuoteId, setPrintQuoteId] = useState<string | null>(null)
+    const [showShareModal, setShowShareModal] = useState(false)
+    const [quoteToShare, setQuoteToShare] = useState<Quote | null>(null)
 
     const isLoading = storeLoading || isQueryLoading
     const itemsPerPage = 8
@@ -268,7 +273,8 @@ export default function QuotesPage({
                     formattedExpirationDate,
                     created_at_time: parsedIssueDate ? parsedIssueDate.getTime() : 0,
                     status: q.status,
-                    user_profiles: q.user_profiles
+                    user_profiles: q.user_profiles,
+                    public_token: q.public_token || null
                 }
             })
             .filter((q: Quote) => {
@@ -391,19 +397,10 @@ export default function QuotesPage({
         setPrintQuoteId(quote.originalId || quote.id)
     }, [])
 
-    const handleShareQuote = useCallback((quote: any) => {
-        const shareUrl = `${window.location.origin}/quote/${quote.public_token || quote.originalId || quote.id}`;
-        if (navigator.share) {
-            navigator.share({
-                title: `Orçamento ${quote.quote_number || quote.displayId || quote.id}`,
-                text: `Confira a proposta comercial`,
-                url: shareUrl
-            }).catch(console.error);
-        } else {
-            navigator.clipboard.writeText(shareUrl);
-            success("Link copiado", "Link do orçamento copiado para a área de transferência.");
-        }
-    }, [success])
+    const handleShareQuote = useCallback((quote: Quote) => {
+        setQuoteToShare(quote)
+        setShowShareModal(true)
+    }, [])
 
     const handleConfirmDelete = async () => {
         if (!quoteToDelete) return
@@ -829,6 +826,20 @@ export default function QuotesPage({
                     onClose={() => setPrintQuoteId(null)}
                     quoteId={printQuoteId}
                     partnerId={partnerId}
+                />
+            )}
+
+            {showShareModal && quoteToShare && (
+                <ShareModal
+                    isOpen={showShareModal}
+                    onClose={() => {
+                        setShowShareModal(false)
+                        setQuoteToShare(null)
+                    }}
+                    url={typeof window !== "undefined" ? `${window.location.origin}/quote/${quoteToShare.public_token || quoteToShare.originalId}` : ""}
+                    title={`Orçamento ${quoteToShare.displayId}`}
+                    shareMessage={`Confira a proposta comercial de ${partnerName}`}
+                    label="Link do orçamento"
                 />
             )}
         </>

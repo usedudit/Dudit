@@ -15,7 +15,11 @@ import {
     TabsTrigger,
     TabsContent,
     CustomerCard,
-    ThreeDotsLoader
+    ThreeDotsLoader,
+    FormSection,
+    DefaultModal,
+    Input,
+    FormTextarea
 } from "@/components/reusable"
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -216,11 +220,25 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const dataQuote = snapshot || quote
     const items = snapshot?.items || quote.items || []
 
-    const partnerName = snapshot?.partner?.name || quote.partners?.store_name || "Parceiro"
-    const partnerLogo = getR2ImageUrl(snapshot?.partner?.image_url || quote.partners?.store_image_url || null)
+    const resolvedPartner = useMemo(() => {
+        const qp = quote.partners
+        return Array.isArray(qp) ? qp[0] : qp
+    }, [quote.partners])
+
+    const partnerName = useMemo(() => {
+        const snapName = snapshot?.partner?.name
+        if (snapName && snapName !== "Parceiro") return snapName
+        return resolvedPartner?.store_name || snapName || "Parceiro"
+    }, [snapshot, resolvedPartner])
+
+    const partnerLogo = useMemo(() => {
+        const snapLogo = snapshot?.partner?.image_url
+        return getR2ImageUrl(snapLogo || resolvedPartner?.store_image_url || null)
+    }, [snapshot, resolvedPartner])
+
     const partnerAddress = snapshot?.partner?.address || "Endereço comercial não disponível"
-    const partnerEmail = snapshot?.partner?.email || quote.partners?.email || "vendas@dudit.com"
-    const partnerPhone = snapshot?.partner?.phone || quote.partners?.phone || ""
+    const partnerEmail = snapshot?.partner?.email || resolvedPartner?.email || "vendas@dudit.com"
+    const partnerPhone = snapshot?.partner?.phone || resolvedPartner?.phone || ""
 
     const sellerName = snapshot?.seller?.name || "Vendedor Responsável"
     const sellerEmail = snapshot?.seller?.email || ""
@@ -279,7 +297,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                             )}
                                             <div>
                                                 <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block leading-tight">{partnerName}</span>
-                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block uppercase tracking-wider">Proposta Comercial</span>
+                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block tracking-wider">Proposta comercial</span>
                                             </div>
                                         </div>
 
@@ -323,132 +341,72 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                                     {/* ─── TAB: DADOS GERAIS ─── */}
                                     {activeTab === "Dados Gerais" && (
-                                        <div className="space-y-6 text-left">
-                                            {/* Code & Expiry Card */}
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-brand-gray/10 dark:bg-dark-surface/10 space-y-3">
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body uppercase tracking-wider font-semibold">Código da Proposta</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{dataQuote.quote_number || "Orçamento"}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body uppercase tracking-wider font-semibold">Data de Emissão</span>
-                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.issue_date)}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body uppercase tracking-wider font-semibold">Validade da Proposta</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.expiration_date)}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Issuer / Seller Card */}
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-2">
-                                                <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide border-b border-brand-border dark:border-dark-border pb-1.5">Fornecedor</h3>
-                                                <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{partnerName}</p>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">{partnerAddress}</p>
-                                                {partnerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {partnerPhone}</p>}
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {partnerEmail}</p>
-                                                {sellerName && <p className="text-xs font-semibold text-brand-green mt-2">Vendedor: {sellerName} ({sellerEmail})</p>}
-                                            </div>
-
-                                            {/* Customer Card */}
-                                            {selectedCustomer ? (
-                                                <CustomerCard customer={selectedCustomer} />
-                                            ) : (
-                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-2">
-                                                    <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide border-b border-brand-border dark:border-dark-border pb-1.5">Destinatário</h3>
-                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{customerName}</p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço especificado.</p>
-                                                    {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {customerPhone}</p>}
-                                                    {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {customerEmail}</p>}
-                                                </div>
-                                            )}
-
-                                            {/* Items List */}
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                                <div className="p-4 border-b border-brand-border dark:border-dark-border">
-                                                    <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide">Itens do Orçamento</h3>
-                                                </div>
-                                                <div className="divide-y divide-brand-border dark:divide-dark-border">
-                                                    {items.map((item: any, idx: number) => {
-                                                        const itemTotal = Number(item.unit_price || 0) * Number(item.quantity || 0)
-                                                        const itemImage = getR2ImageUrl(item.image || item.products?.images?.[0] || null)
-                                                        return (
-                                                            <div key={item.id || idx} className="flex gap-3 p-4 hover:bg-brand-gray/10 dark:hover:bg-dark-surface/10 transition-colors">
-                                                                <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-brand-border dark:border-dark-border bg-white flex items-center justify-center">
-                                                                    <img src={itemImage} alt={item.name} className="w-full h-full object-cover" onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start">
-                                                                        <h4 className="font-bold text-xs text-brand-dark dark:text-dark-heading truncate">{item.name || item.custom_name}</h4>
-                                                                        <span className="font-bold text-xs text-brand-dark dark:text-dark-heading ml-2">{formatCurrency(itemTotal)}</span>
-                                                                    </div>
-                                                                    {item.sku && <p className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">{item.sku}</p>}
-                                                                    <div className="flex justify-between items-center text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
-                                                                        <span>{item.quantity} {item.unit || "un"} • {formatCurrency(item.unit_price)} / un</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            </div>
-
-                                            {/* Totals Summary */}
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-brand-gray/5 dark:bg-dark-surface/5 space-y-3">
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Subtotal</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(dataQuote.subtotal || 0))}</span>
-                                                </div>
-                                                {Number(dataQuote.shipping_cost || 0) > 0 && (
+                                        <div className="space-y-8 text-left">
+                                            {/* Code & Expiry FormSection */}
+                                            <FormSection title="Informações da proposta">
+                                                <div className="space-y-3">
                                                     <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(dataQuote.shipping_cost))}</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Código da proposta</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{dataQuote.quote_number || "Orçamento"}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de emissão</span>
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.issue_date)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Validade da proposta</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.expiration_date)}</span>
+                                                    </div>
+                                                </div>
+                                            </FormSection>
+
+                                            {/* Issuer / Seller FormSection */}
+                                            <FormSection title="Fornecedor" hasSeparator>
+                                                <div className="space-y-2">
+                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{partnerName}</p>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">{partnerAddress}</p>
+                                                    {partnerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {partnerPhone}</p>}
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {partnerEmail}</p>
+                                                    {sellerName && <p className="text-xs font-semibold text-brand-green mt-2">Vendedor: {sellerName} ({sellerEmail})</p>}
+                                                </div>
+                                            </FormSection>
+
+                                            {/* Customer FormSection */}
+                                            <FormSection title="Cliente" hasSeparator>
+                                                {selectedCustomer ? (
+                                                    <CustomerCard customer={selectedCustomer} chrome="minimal" />
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{customerName}</p>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço especificado.</p>
+                                                        {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {customerPhone}</p>}
+                                                        {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {customerEmail}</p>}
                                                     </div>
                                                 )}
-                                                {Number(dataQuote.additional_costs || 0) > 0 && (
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outras taxas</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(dataQuote.additional_costs))}</span>
-                                                    </div>
-                                                )}
-                                                {Number(dataQuote.discount_value || 0) > 0 && (
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
-                                                        <span className="font-bold text-red-600">-{formatCurrency(Number(dataQuote.discount_value))}</span>
-                                                    </div>
-                                                )}
-                                                <div className="border-t border-brand-border dark:border-dark-border my-2"></div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Valor Total</span>
-                                                    <span className="bg-brand-dark dark:bg-dark-surface text-white dark:text-dark-heading font-extrabold text-base px-3 py-1.5 rounded-lg">
-                                                        {formatCurrency(Number(dataQuote.total || 0))}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                            </FormSection>
 
-                                            {/* Commercial Notes / Observation */}
+                                            {/* Commercial Notes / Observation FormSection */}
                                             {dataQuote.notes && (
-                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-2 bg-brand-gray/10 dark:bg-dark-surface/5">
-                                                    <h4 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide">Observações Comerciais</h4>
+                                                <FormSection title="Observações comerciais" hasSeparator>
                                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{dataQuote.notes}</p>
-                                                </div>
+                                                </FormSection>
                                             )}
 
                                             {/* Decision Action Buttons */}
                                             {!isFinalized ? (
-                                                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                                                <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-brand-border dark:border-dark-border">
                                                     <Button
                                                         onClick={() => setShowApproveModal(true)}
                                                         className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm h-11"
                                                     >
-                                                        ✓ Aprovar Proposta
+                                                        ✓ Aprovar proposta
                                                     </Button>
                                                     <Button
                                                         onClick={() => setShowRejectModal(true)}
                                                         variant="outline"
                                                         className="flex-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 font-bold text-sm h-11 border-red-200 dark:border-red-900/30"
                                                     >
-                                                        ✕ Recusar Proposta
+                                                        ✕ Recusar proposta
                                                     </Button>
                                                 </div>
                                             ) : (
@@ -457,7 +415,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                         <div className="bg-green-50 border-green-100 text-green-800 p-2.5 rounded-xl space-y-1">
                                                             <div className="font-bold text-sm text-green-900 flex items-center gap-1.5">
                                                                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                                                Aprovado pelo Cliente
+                                                                Aprovado pelo cliente
                                                             </div>
                                                             <div>Aprovador: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
                                                             <div>Data: {formatDateTime(quote.approved_at)}</div>
@@ -466,7 +424,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                         <div className="bg-red-50 border-red-100 text-red-800 p-2.5 rounded-xl space-y-1">
                                                             <div className="font-bold text-sm text-red-900 flex items-center gap-1.5">
                                                                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                                                                Recusado pelo Cliente
+                                                                Recusado pelo cliente
                                                             </div>
                                                             <div>Autor: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
                                                             <div>Data: {formatDateTime(quote.rejected_at)}</div>
@@ -490,7 +448,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                     {activeTab === "Canal de Negociação" && (
                                         <div className="space-y-4 text-left h-full flex flex-col">
                                             <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-brand-gray/5 dark:bg-dark-surface/5">
-                                                <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide">Mensagens</h3>
+                                                <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading tracking-wide">Mensagens</h3>
                                                 <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">Dúvidas, pedidos de desconto ou prazos diferenciados? Negocie diretamente com o vendedor.</p>
                                             </div>
 
@@ -551,29 +509,32 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                 </div>
 
                                 {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
-                                <TabsContent value="Visualização" className="m-0 p-0 h-full flex flex-col focus-visible:outline-none lg:hidden" forceMount>
+                                <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
                                     <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
-                                        <QuotePreview
-                                            invoiceNumber={dataQuote.quote_number || "ORC-0000"}
-                                            quoteDate={dataQuote.issue_date || ""}
-                                            expiryDate={dataQuote.expiration_date || ""}
-                                            selectedCustomer={selectedCustomer}
-                                            quoteItems={mappedPreviewItems}
-                                            subtotal={Number(dataQuote.subtotal || 0)}
-                                            shippingNum={Number(dataQuote.shipping_cost || 0)}
-                                            otherCosts={Number(dataQuote.additional_costs || 0)}
-                                            discountValue={Number(dataQuote.discount_value || 0)}
-                                            total={Number(dataQuote.total || 0)}
-                                            note={dataQuote.notes || undefined}
-                                            primaryColor={dataQuote.primary_color || undefined}
-                                            secondaryColor={dataQuote.secondary_color || undefined}
-                                            quoteTitle={dataQuote.quote_title || undefined}
-                                            quoteSubtitle={dataQuote.quote_subtitle || undefined}
-                                            partnerName={partnerName}
-                                            partnerAddress={partnerAddress}
-                                            partnerAvatar={partnerLogo || undefined}
-                                            printMode={false}
-                                        />
+                                        <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
+                                            <QuotePreview
+                                                invoiceNumber={dataQuote.quote_number || "ORC-0000"}
+                                                quoteDate={dataQuote.issue_date || ""}
+                                                expiryDate={dataQuote.expiration_date || ""}
+                                                selectedCustomer={selectedCustomer}
+                                                quoteItems={mappedPreviewItems}
+                                                subtotal={Number(dataQuote.subtotal || 0)}
+                                                shippingNum={Number(dataQuote.shipping_cost || 0)}
+                                                otherCosts={Number(dataQuote.additional_costs || 0)}
+                                                discountValue={Number(dataQuote.discount_value || 0)}
+                                                total={Number(dataQuote.total || 0)}
+                                                note={dataQuote.notes || undefined}
+                                                primaryColor={dataQuote.primary_color || undefined}
+                                                secondaryColor={dataQuote.secondary_color || undefined}
+                                                quoteTitle={dataQuote.quote_title || undefined}
+                                                quoteSubtitle={dataQuote.quote_subtitle || undefined}
+                                                partnerName={partnerName}
+                                                partnerAddress={partnerAddress}
+                                                partnerAvatar={partnerLogo || undefined}
+                                                printMode={false}
+                                                showCustomerContact={false}
+                                            />
+                                        </div>
                                     </div>
                                 </TabsContent>
                             </div>
@@ -601,6 +562,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                 partnerAddress={partnerAddress}
                                 partnerAvatar={partnerLogo || undefined}
                                 printMode={false}
+                                showCustomerContact={false}
                             />
                         </div>
 
@@ -609,131 +571,111 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
             </Tabs>
 
             {/* ─── MODAL: APPROVE PROPOSAL ─────────────────────────────────────── */}
-            {showApproveModal && (
-                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-left">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-bold text-slate-900 text-lg">Aprovar Proposta</h3>
-                            <button onClick={() => setShowApproveModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
-                        </div>
+            <DefaultModal
+                isOpen={showApproveModal}
+                onClose={() => setShowApproveModal(false)}
+                title="Aprovar proposta"
+                maxWidth="md"
+                footer={
+                    <div className="flex gap-3 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowApproveModal(false)}
+                            className="flex-1 py-2.5 h-auto"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleApprove}
+                            disabled={!approverName.trim() || approvalCode.length < 4 || isProcessingAction}
+                            className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
+                        >
+                            {isProcessingAction ? "Aprovando..." : "Confirmar aprovação"}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        Insira suas credenciais abaixo. O código de aprovação de 4 dígitos foi gerado pelo vendedor responsável.
+                    </p>
 
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                            Insira suas credenciais abaixo. O código de aprovação de 4 dígitos foi gerado pelo vendedor responsável.
-                        </p>
+                    <div className="space-y-3">
+                        <Input
+                            label="Seu nome completo"
+                            value={approverName}
+                            onChange={(e) => setApproverName(e.target.value)}
+                            placeholder="Ex: João da Silva"
+                        />
 
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-bold text-slate-700 block mb-1">Seu Nome Completo</label>
-                                <input
-                                    type="text"
-                                    value={approverName}
-                                    onChange={(e) => setApproverName(e.target.value)}
-                                    placeholder="Ex: João da Silva"
-                                    className="w-full bg-slate-50 p-2.5 rounded-xl border border-slate-200 outline-none text-sm text-slate-800"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-slate-700 block mb-1">Código de Aprovação (4 dígitos)</label>
-                                <input
-                                    type="text"
-                                    maxLength={4}
-                                    value={approvalCode}
-                                    onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
-                                    placeholder="0000"
-                                    className="w-full bg-slate-50 p-2.5 rounded-xl border border-slate-200 outline-none text-center font-bold tracking-widest text-lg text-slate-800"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 pt-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setShowApproveModal(false)}
-                                className="flex-1 text-slate-700 text-sm py-2.5 h-auto"
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                onClick={handleApprove}
-                                disabled={!approverName.trim() || approvalCode.length < 4 || isProcessingAction}
-                                className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm py-2.5 h-auto"
-                            >
-                                {isProcessingAction ? "Aprovando..." : "Confirmar Aprovação"}
-                            </Button>
-                        </div>
+                        <Input
+                            label="Código de aprovação (4 dígitos)"
+                            maxLength={4}
+                            value={approvalCode}
+                            onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
+                            placeholder="0000"
+                        />
                     </div>
                 </div>
-            )}
+            </DefaultModal>
 
             {/* ─── MODAL: REJECT PROPOSAL ─────────────────────────────────────── */}
-            {showRejectModal && (
-                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-left">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-bold text-slate-900 text-lg text-red-600">Recusar Proposta</h3>
-                            <button onClick={() => setShowRejectModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
-                        </div>
+            <DefaultModal
+                isOpen={showRejectModal}
+                onClose={() => setShowRejectModal(false)}
+                title="Recusar proposta"
+                maxWidth="md"
+                footer={
+                    <div className="flex gap-3 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowRejectModal(false)}
+                            className="flex-1 py-2.5 h-auto"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleReject}
+                            disabled={!approverName.trim() || approvalCode.length < 4 || !rejectionReason.trim() || isProcessingAction}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 h-auto border-none"
+                        >
+                            {isProcessingAction ? "Recusando..." : "Confirmar recusa"}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        Insira suas credenciais e informe o motivo comercial. O vendedor receberá uma notificação imediata.
+                    </p>
 
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                            Insira suas credenciais e informe o motivo comercial. O vendedor receberá uma notificação imediata.
-                        </p>
+                    <div className="space-y-3">
+                        <Input
+                            label="Seu nome completo"
+                            value={approverName}
+                            onChange={(e) => setApproverName(e.target.value)}
+                            placeholder="Ex: João da Silva"
+                        />
 
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-bold text-slate-700 block mb-1">Seu Nome Completo</label>
-                                <input
-                                    type="text"
-                                    value={approverName}
-                                    onChange={(e) => setApproverName(e.target.value)}
-                                    placeholder="Ex: João da Silva"
-                                    className="w-full bg-slate-50 p-2.5 rounded-xl border border-slate-200 outline-none text-sm text-slate-800"
-                                />
-                            </div>
+                        <Input
+                            label="Código de aprovação (4 dígitos)"
+                            maxLength={4}
+                            value={approvalCode}
+                            onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
+                            placeholder="0000"
+                        />
 
-                            <div>
-                                <label className="text-xs font-bold text-slate-700 block mb-1">Código de Aprovação (4 dígitos)</label>
-                                <input
-                                    type="text"
-                                    maxLength={4}
-                                    value={approvalCode}
-                                    onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
-                                    placeholder="0000"
-                                    className="w-full bg-slate-50 p-2.5 rounded-xl border border-slate-200 outline-none text-center font-bold tracking-widest text-lg text-slate-800"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-slate-700 block mb-1">Motivo da Recusa</label>
-                                <textarea
-                                    rows={3}
-                                    value={rejectionReason}
-                                    onChange={(e) => setRejectionReason(e.target.value)}
-                                    placeholder="Ex: Preço acima do orçamento planejado / Prazo de entrega inviável..."
-                                    className="w-full bg-slate-50 p-2.5 rounded-xl border border-slate-200 outline-none text-xs text-slate-800 resize-none"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 pt-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setShowRejectModal(false)}
-                                className="flex-1 text-slate-700 text-sm py-2.5 h-auto"
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                onClick={handleReject}
-                                disabled={!approverName.trim() || approvalCode.length < 4 || !rejectionReason.trim() || isProcessingAction}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-2.5 h-auto"
-                            >
-                                {isProcessingAction ? "Recusando..." : "Confirmar Recusa"}
-                            </Button>
-                        </div>
+                        <FormTextarea
+                            label="Motivo da recusa"
+                            name="rejectionReason"
+                            rows={3}
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            placeholder="Ex: Preço acima do orçamento planejado / Prazo de entrega inviável..."
+                        />
                     </div>
                 </div>
-            )}
+            </DefaultModal>
         </div>
     )
 }

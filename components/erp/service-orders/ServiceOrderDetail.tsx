@@ -849,10 +849,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                     partnerId={partnerId}
                                     serviceOrderId={order.id}
                                     specifications={order.specifications || []}
-                                    onMutation={async () => {
-                                        const res = await getServiceOrderDetailsAction(order.id, partnerId)
-                                        if (res.success) setOrder(res.data)
-                                    }}
+                                    isEditing={false}
                                 />
                             </TabsContent>
 

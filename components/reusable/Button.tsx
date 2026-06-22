@@ -6,7 +6,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: "default" | "outline" | "outlinered" | "destructive" | "warning" | "ghost" | "ghostred" | "filled" | "link"
+    variant?: "default" | "outline" | "outlinered" | "outlineorange" | "destructive" | "warning" | "ghost" | "ghostred" | "filled" | "link"
     size?: "default" | "sm" | "lg" | "icon"
     asChild?: boolean
     isLoading?: boolean
@@ -38,6 +38,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 "bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border focus-visible:ring-brand-border",
             outlinered:
                 "border border-brand-red/20 text-brand-red hover:bg-brand-red/5 hover:border-brand-red/50 dark:text-brand-red dark:border-brand-red/20 dark:hover:bg-brand-red/10 dark:hover:bg-brand-red/5 dark:hover:border-brand-red/50",
+            outlineorange:
+                "border border-brand-orange/20 text-brand-orange hover:bg-brand-orange/5 hover:border-brand-orange/50 dark:text-brand-orange dark:border-brand-orange/20 dark:hover:bg-brand-orange/10 dark:hover:bg-brand-orange/5 dark:hover:border-brand-orange/50",
             destructive:
                 "bg-brand-red text-white hover:bg-brand-red/90 focus-visible:ring-brand-red/50 dark:bg-brand-red/70 dark:text-white dark:hover:bg-brand-red/80",
             ghost:

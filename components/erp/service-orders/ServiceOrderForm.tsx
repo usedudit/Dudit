@@ -20,6 +20,10 @@ import {
     addProductsToOrderAction,
     syncServiceOrderServicesAction,
     syncServiceOrderProductsAction,
+    saveServiceOrderSpecificationsAction,
+    getPresignedUploadUrlAction,
+    saveAttachmentAction,
+    deleteAttachmentAction,
 } from "@/app/actions/erp/service-orders"
 import SpecificationsTab from "./SpecificationsTab"
 import AttachmentsTab from "./AttachmentsTab"
@@ -41,6 +45,7 @@ interface ServiceOrderFormProps {
 
 const REQUIRED_FIELDS = [
     { field: "title", tab: "general" },
+    { field: "customerId", tab: "general" },
     { field: "assignedUserId", tab: "general" },
     { field: "services", tab: "general" },
     { field: "services", tab: "services" },
@@ -93,6 +98,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
     const [services, setServices] = useState<any[]>(editData?.services || [])
     const [products, setProducts] = useState<any[]>(editData?.products || [])
+    const [attachments, setAttachments] = useState<any[]>(editData?.attachments || [])
+    const [deletedAttachmentIds, setDeletedAttachmentIds] = useState<string[]>([])
     const [saving, setSaving] = useState(false)
     const [showCustomerSheet, setShowCustomerSheet] = useState(false)
     const [showServiceSheet, setShowServiceSheet] = useState(false)
@@ -110,6 +117,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const pendingSpecsRef = useRef<{ name: string; value: string }[] | null>(null)
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {
@@ -131,6 +139,19 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         }
         loadTeam()
     }, [])
+
+    useEffect(() => {
+        if (customerId) {
+            setFieldErrors(prev => {
+                if (prev.has("customerId")) {
+                    const next = new Set(prev)
+                    next.delete("customerId")
+                    return next
+                }
+                return prev
+            })
+        }
+    }, [customerId])
 
     useEffect(() => {
         if (title.trim()) {
@@ -285,6 +306,9 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         if (!title.trim()) {
             newErrors.add("title")
         }
+        if (!customerId) {
+            newErrors.add("customerId")
+        }
         if (!assignedUserId) {
             newErrors.add("assignedUserId")
         }
@@ -322,6 +346,10 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
             other_costs: Number(otherCosts || 0),
             created_at: editData ? undefined : createdAt,
         }
+
+        let orderId = editData?.id || ""
+        let success = false
+        let savedData = null
 
         if (editData) {
             // 1. Update OS details
@@ -364,8 +392,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 toast({ description: prodRes.error || "Erro ao atualizar produtos" })
             }
 
-            toast({ description: `OS #${editData.order_number} atualizada com sucesso!` })
-            onSaved(res.data)
+            success = true
+            savedData = res.data
         } else {
             // Create OS
             const res = await createServiceOrderAction(partnerId, {
@@ -380,7 +408,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 return
             }
 
-            const orderId = res.data.id
+            orderId = res.data.id
 
             // Add services after creation
             if (services.length > 0) {
@@ -417,9 +445,65 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 }
             }
 
-            toast({ description: `OS #${res.orderNumber} criada com sucesso!` })
-            onSaved(res.data)
+            // Save specifications after creation
+            if (pendingSpecsRef.current) {
+                await saveServiceOrderSpecificationsAction(partnerId, orderId, pendingSpecsRef.current)
+                pendingSpecsRef.current = null
+            }
+
+            success = true
+            savedData = res.data
         }
+
+        if (success && orderId) {
+            // Process attachment deletions
+            if (deletedAttachmentIds.length > 0) {
+                await Promise.all(deletedAttachmentIds.map(async (id) => {
+                    try {
+                        await deleteAttachmentAction(partnerId, id, orderId)
+                    } catch (err) {
+                        console.error("Erro ao deletar anexo:", err)
+                    }
+                }))
+            }
+
+            // Process new attachment uploads
+            const newAttachments = attachments.filter(att => att.file instanceof File)
+            if (newAttachments.length > 0) {
+                await Promise.all(newAttachments.map(async (att) => {
+                    try {
+                        const file = att.file
+                        const urlRes = await getPresignedUploadUrlAction(
+                            partnerId, "serviceOrderAttachments", file.name, file.type, file.size
+                        )
+                        if (!urlRes.success) throw new Error(urlRes.error || "Erro ao gerar URL")
+
+                        const uploadRes = await fetch(urlRes.uploadUrl, {
+                            method: "PUT",
+                            headers: { "Content-Type": file.type },
+                            body: file,
+                        })
+                        if (!uploadRes.ok) throw new Error("Erro ao fazer upload para R2")
+
+                        const saveRes = await saveAttachmentAction(
+                            partnerId, orderId, urlRes.key, file.name, file.type, file.size, att.category || "normal"
+                        )
+                        if (!saveRes.success) throw new Error(saveRes.error || "Erro ao salvar anexo")
+                    } catch (err: any) {
+                        console.error("Erro ao fazer upload de anexo:", err)
+                        toast({ description: `Erro ao fazer upload de ${att.file_name || att.file?.name}` })
+                    }
+                }))
+            }
+
+            if (editData) {
+                toast({ description: `OS #${editData.order_number} atualizada com sucesso!` })
+            } else {
+                toast({ description: `OS criada com sucesso!` })
+            }
+            onSaved(savedData)
+        }
+
         setSaving(false)
     }
 
@@ -713,10 +797,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     />
                                                 ) : (
                                                     <div
-                                                        className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40 transition-colors"
+                                                        className={`bg-white dark:bg-dark-surface rounded-2xl border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40 transition-colors ${
+                                                            fieldErrors.has("customerId") 
+                                                                ? "border-brand-red dark:border-brand-red-dark" 
+                                                                : "border-brand-border dark:border-dark-border"
+                                                        }`}
                                                         onClick={() => setShowCustomerSheet(true)}
                                                     >
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+                                                        <div className={`absolute top-0 left-0 w-full h-1 ${
+                                                            fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"
+                                                        }`}></div>
                                                         <IconPlaceholder
                                                             icon={UserIcon}
                                                             title="Nenhum cliente selecionado"
@@ -1168,13 +1258,13 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             partnerId={partnerId}
                                             serviceOrderId={editData?.id || ""}
                                             specifications={editData?.specifications || []}
-                                            onMutation={async () => {
+                                            isEditing={true}
+                                            onSave={async (specs) => {
                                                 if (editData?.id) {
-                                                    const { getServiceOrderDetailsAction } = await import("@/app/actions/erp/service-orders")
-                                                    const res = await getServiceOrderDetailsAction(editData.id, partnerId)
-                                                    if (res.success) {
-                                                        // Can't fully re-render but mutation happened
-                                                    }
+                                                    const res = await saveServiceOrderSpecificationsAction(partnerId, editData.id, specs)
+                                                    if (!res.success) throw new Error(res.error)
+                                                } else {
+                                                    pendingSpecsRef.current = specs
                                                 }
                                             }}
                                         />
@@ -1186,19 +1276,18 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                         <AttachmentsTab
                                             partnerId={partnerId}
                                             serviceOrderId={editData?.id || ""}
-                                            attachments={editData?.attachments || []}
-                                            onMutation={async () => {
-                                                if (editData?.id) {
-                                                    const { getServiceOrderDetailsAction } = await import("@/app/actions/erp/service-orders")
-                                                    const res = await getServiceOrderDetailsAction(editData.id, partnerId)
+                                            attachments={attachments}
+                                            isEditing={true}
+                                            onChange={(newAtts, deletedIds) => {
+                                                setAttachments(newAtts)
+                                                if (deletedIds && deletedIds.length > 0) {
+                                                    setDeletedAttachmentIds(prev => [
+                                                        ...prev,
+                                                        ...deletedIds.filter(id => !prev.includes(id))
+                                                    ])
                                                 }
                                             }}
                                         />
-                                        {!editData && (
-                                            <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                                Salve a OS primeiro para gerenciar anexos
-                                            </div>
-                                        )}
                                     </FadeIn>
                                 )}
                             </AnimatePresence>

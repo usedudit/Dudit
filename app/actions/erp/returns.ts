@@ -213,7 +213,7 @@ export async function getReturnRequestsPageAction(
         reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
         orders!order_id(order_number, customer_name, situation, delivery_status, delivery_address, buyer_id, payment_provider, mp_payment_id),
-        return_items(
+        return_items!return_items_return_request_id_fkey(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
           products!product_id(images, video_thumbnail)
@@ -271,7 +271,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .select(`
         *,
         orders!order_id(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id),
-        return_items(*, products!product_id(images, video_thumbnail)),
+        return_items!return_items_return_request_id_fkey(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_events(*),
         return_refunds(*),
@@ -669,7 +669,7 @@ export async function processReturnRequestAction(input: unknown) {
             .select(`
                 id, partner_id, order_id, status, request_type, desired_resolution, approved_resolution, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
                 orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name),
-                return_items(net_item_value_snapshot)
+                return_items!return_items_return_request_id_fkey(net_item_value_snapshot)
             `)
             .eq("id", data.requestId)
             .eq("partner_id", data.partnerId)

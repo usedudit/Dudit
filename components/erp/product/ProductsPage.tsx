@@ -70,6 +70,9 @@ import {
     EditIcon,
     CameraIcon,
     PackageIcon,
+    UploadSheetIcon,
+    TagIcon,
+    StarIcon,
 } from "@/lib/icons"
 
 import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
@@ -797,13 +800,13 @@ export default function ProductsPage({
 
                                 <div className="flex items-center gap-3">
                                     <Button
-                                        variant="outline"
-                                        className="text-brand-orange border-brand-orange/30 hover:bg-brand-orange/5"
+                                        variant="outlineorange"
+                                        className="w-[42px] h-[42px]"
                                         onClick={() => {
                                             if (hasMinimumPlan(planSlug, "escalar")) setShowReplenishment(true)
                                             else openPlanUpgrade("escalar")
                                         }}
-                                        leftIcon={<PackageIcon size={18} />}
+                                        leftIcon={<StarIcon size={18} />}
                                     >
                                         Sugestões
                                     </Button>
@@ -817,20 +820,14 @@ export default function ProductsPage({
                                         showChevron={false}
                                         fullWidth={false}
                                     >
-                                        <DropdownItem onClick={() => setIsCameraOpen(true)}>
-                                            <CameraIcon size={18} /> Escanear Câmera
-                                        </DropdownItem>
                                         <DropdownItem onClick={() => router.push("/erp/products/import")}>
-                                            <UploadIcon size={18} /> Importar Planilha
-                                        </DropdownItem>
-                                        <DropdownItem onClick={() => router.push("/erp/xml-import")}>
-                                            <UploadIcon size={18} /> Importar XML
+                                            <UploadSheetIcon size={18} /> Importar Planilha
                                         </DropdownItem>
                                         <DropdownItem onClick={handleExport} disabled={isExporting}>
                                             <ExportFileIcon size={18} /> {isExporting ? "Exportando..." : "Exportar"}
                                         </DropdownItem>
                                         <DropdownItem onClick={() => setShowLabelModal(true)}>
-                                            <PackageIcon size={18} /> Gerar Etiquetas
+                                            <TagIcon size={18} /> Gerar Etiquetas
                                         </DropdownItem>
                                     </Dropdown>
 

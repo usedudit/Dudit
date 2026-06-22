@@ -609,12 +609,13 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
         .single()
     if (quoteErr || !quote) return
 
-    // 2. Fetch partner and default address
-    const { data: partner } = await supabase
-        .from("partners")
-        .select("store_name, image_url, email, phone")
-        .eq("id", partnerId)
-        .maybeSingle()
+    // 2. Fetch partner, store and default address
+    const [partnerRes, storeRes] = await Promise.all([
+        supabase.from("partners").select("store_name, store_image_url, email, phone").eq("id", partnerId).maybeSingle(),
+        supabase.from("stores").select("name, image_url").eq("partner_id", partnerId).limit(1).maybeSingle()
+    ])
+    const partner = partnerRes.data
+    const store = storeRes.data
 
     const { data: partnerAddr } = await supabase
         .from("addresses")
@@ -705,8 +706,8 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
         additional_costs: Number(quote.additional_costs || 0),
         total: Number(quote.total || 0),
         partner: {
-            name: partner?.store_name || "Parceiro",
-            image_url: partner?.image_url || null,
+            name: store?.name || partner?.store_name || "Parceiro",
+            image_url: store?.image_url || partner?.store_image_url || null,
             email: partner?.email || null,
             phone: partner?.phone || null,
             address: partnerAddressFormatted
@@ -2081,6 +2082,14 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 .eq("quote_id", quote.id)
                 .order("created_at", { ascending: true })
 
+            // Fetch store details to resolve partner name/logo override
+            const { data: store } = await admin
+                .from("stores")
+                .select("name, image_url")
+                .eq("partner_id", quote.partner_id)
+                .limit(1)
+                .maybeSingle()
+
             // 5. Fetch details for fallback snapshot if formal snapshot is null
             let sellerInfo = null
             let items: any[] = []
@@ -2137,12 +2146,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     partnerAddressFormatted = `${partnerAddr.street}, ${partnerAddr.number}${partnerAddr.complement ? ` - ${partnerAddr.complement}` : ""}\n${partnerAddr.neighborhood} - ${partnerAddr.city}/${partnerAddr.state}\nCEP: ${partnerAddr.zip_code}`
                 }
 
-                const { data: store } = await admin
-                    .from("stores")
-                    .select("name, image_url")
-                    .eq("partner_id", quote.partner_id)
-                    .limit(1)
-                    .maybeSingle()
+                // Store already fetched above
 
                 fallbackSnapshot = {
                     quote_number: quote.quote_number,
@@ -2174,6 +2178,18 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 }
             }
 
+            let resolvedSnapshot = quote.snapshot || fallbackSnapshot
+            if (resolvedSnapshot && resolvedSnapshot.partner) {
+                if (!resolvedSnapshot.partner.name || resolvedSnapshot.partner.name === "Parceiro") {
+                    const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
+                    resolvedSnapshot.partner.name = store?.name || partnerObj?.store_name || "Parceiro"
+                }
+                if (!resolvedSnapshot.partner.image_url) {
+                    const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
+                    resolvedSnapshot.partner.image_url = store?.image_url || partnerObj?.store_image_url || null
+                }
+            }
+
             return successResponse({
                 quote: {
                     id: quote.id,
@@ -2198,10 +2214,10 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     lockout_until: quote.lockout_until,
                     partner_id: quote.partner_id,
                     customers: quote.customers || null,
-                    partners: quote.partners || null,
+                    partners: Array.isArray(quote.partners) ? quote.partners[0] : (quote.partners || null),
                     items: items
                 },
-                snapshot: quote.snapshot || fallbackSnapshot,
+                snapshot: resolvedSnapshot,
                 interactions: interactions || []
             })
         } catch (err: any) {

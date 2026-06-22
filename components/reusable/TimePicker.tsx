@@ -83,7 +83,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                             className={cn(
                                 "w-full py-2 px-3 text-sm font-medium rounded-lg transition-colors mb-0.5",
                                 hour === h
-                                    ? "bg-brand-primary text-white"
+                                    ? "bg-brand-primary text-brand-green"
                                     : "text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
                             )}
                         >
@@ -103,7 +103,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                             className={cn(
                                 "w-full py-2 px-3 text-sm font-medium rounded-lg transition-colors mb-0.5",
                                 minute === m
-                                    ? "bg-brand-primary text-white"
+                                    ? "bg-brand-primary text-brand-green"
                                     : "text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
                             )}
                         >
@@ -148,12 +148,14 @@ export const TimePicker: React.FC<TimePickerProps> = ({
     )
 
     return (
-        <div className={cn("w-full", className)}>
+        <div className={cn("flex-1 w-full", className)}>
             {label && (
-                <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-1.5">
-                    {label}
-                    {required && <span className="text-brand-red ml-1">*</span>}
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                        {label}
+                        {required && <span className="text-brand-red"> *</span>}
+                    </label>
+                </div>
             )}
 
             {isMobile ? (

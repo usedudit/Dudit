@@ -184,6 +184,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const commissionsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const serviceCheckoutPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const deliveryPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+  const integrationsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
   React.useEffect(() => {
     if (activePage === "subscription" && !canAccessSubscription) setActivePage("home")
@@ -388,7 +389,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             {canAccessIntegrations && (
                               <ListItem
                                 icon={LinkIcon}
-                                title="Integrações"
+                                title={integrationsPlanBlocked ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    Integrações
+                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                  </span>
+                                ) : "Integrações"}
                                 description="Conecte-se com plataformas externas e APIs de terceiros."
                                 onClick={() => setActivePage("integrations")}
                                 showChevron

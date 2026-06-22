@@ -273,11 +273,11 @@ export const ShowcaseSubPage = ({
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                             {/* Back button - desktop only */}
@@ -294,7 +294,7 @@ export const ShowcaseSubPage = ({
                                         <span className="hidden md:inline truncate">Minha Vitrine</span>
                                     </h1>
 
-                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                         Personalize a logo, banner, galeria e status de exibição da sua vitrine
                                     </div>
                                 </div>
@@ -365,7 +365,7 @@ export const ShowcaseSubPage = ({
                                             )}
                                         </div>
                                     </div>
-                                    <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1300x300px. Máximo 3MB.</p>
+                                    <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1400x300px. Máximo 3MB.</p>
                                     <input ref={bannerInputRef} type="file" hidden accept="image/*" onChange={handleBannerChange} />
                                 </FormSection>
 

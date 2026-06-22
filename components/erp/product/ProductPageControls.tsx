@@ -5,7 +5,6 @@ import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs" // Importando o componente Tabs atualizado
-import { Lock, Unlock } from "lucide-react"
 
 import {
     SearchIcon,
@@ -25,6 +24,7 @@ import {
     TagIcon,
     BoxIcon,
     CameraIcon,
+    StarIcon,
 } from "@/lib/icons"
 
 // Tipos necessários
@@ -106,27 +106,6 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
             }
         }
     }
-
-    const focusLockSuffix = (
-        <button
-            type="button"
-            onClick={(e) => {
-                e.stopPropagation()
-                setFocusLock(!focusLock)
-                setTimeout(() => {
-                    const activeRef = window.innerWidth >= 768 ? desktopInputRef : mobileInputRef
-                    activeRef.current?.focus()
-                }, 50)
-            }}
-            className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${focusLock
-                ? "text-brand-primary bg-brand-primary/15"
-                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
-                }`}
-            title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
-        >
-            {focusLock ? <Lock size={16} /> : <Unlock size={16} />}
-        </button>
-    )
 
     // Lógica de Scroll dos Badges
     const checkFilterScroll = useCallback(() => {
@@ -235,7 +214,6 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                                     className="text-brand-inactive-text shrink-0"
                                 />
                             }
-                            suffix={focusLockSuffix}
                             label=""
                         />
                     </div>
@@ -259,8 +237,8 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                         >
                             <DropdownItem onClick={onOpenReplenishment}>
                                 <div className="flex items-center gap-2">
-                                    <PackageIcon size={14} className={hasEscalarPlan ? "" : "text-brand-inactive-text"} />
-                                    <span>Sugestões de Reposição</span>
+                                    <StarIcon size={14} className={hasEscalarPlan ? "" : "text-brand-inactive-text"} />
+                                    <span>Sugestões</span>
                                     {!hasEscalarPlan && (
                                         <span className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 px-1.5 py-0.5 rounded ml-auto">Premium</span>
                                     )}
@@ -305,7 +283,6 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                                         className="text-brand-inactive-text shrink-0"
                                     />
                                 }
-                                suffix={focusLockSuffix}
                                 label=""
                             />
                         </div>

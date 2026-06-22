@@ -132,7 +132,8 @@ import {
     Rocket01Icon,
     Briefcase01Icon,
     File02Icon as File02Icon01,
-    Key01Icon
+    Key01Icon,
+    Xls01Icon,
 } from "@hugeicons/core-free-icons"
 
 
@@ -203,6 +204,7 @@ export const SaveIcon = CreateIcon(FloppyDiskIcon)
 
 export const UploadIcon = CreateIcon(ImageUploadIcon)
 export const ExportFileIcon = CreateIcon(FileUploadIcon)
+export const UploadSheetIcon = CreateIcon(Xls01Icon)
 export const TrendingUpIcon = CreateIcon(AnalyticsUpIcon)
 export const ShieldIcon = CreateIcon(Shield01Icon)
 

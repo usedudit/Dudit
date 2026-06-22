@@ -105,7 +105,7 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                             {/* Back button - desktop only */}
@@ -129,9 +129,6 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
 
                                 {/* Desktop action buttons */}
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <Button variant="outline" onClick={handleBack}>
-                                        Voltar
-                                    </Button>
                                     <Button onClick={handleSave} isLoading={saving} disabled={!hasChanges || saving} leftIcon={<SaveIcon className="w-4 h-4" />}>
                                         Salvar
                                     </Button>

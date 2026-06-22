@@ -155,6 +155,7 @@ export async function createServiceOrderAction(
     payment_method?: string | null
     payment_breakdown?: any
     created_at?: string | null
+    specifications?: { name: string; value: string }[]
   },
 ): Promise<{ success: true; data: any; orderNumber: string } | { success: false; error: string }> {
   try {
@@ -204,6 +205,7 @@ export async function createServiceOrderAction(
         payment_method: input.payment_method || null,
         payment_breakdown: input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null,
         created_at: input.created_at || undefined,
+        specifications: input.specifications ? JSON.stringify(input.specifications) : undefined,
       })
       .select("*")
       .single()
@@ -784,6 +786,7 @@ export async function updateServiceOrderAction(
     payment_method?: string | null
     payment_breakdown?: any
     created_at?: string | null
+    specifications?: { name: string; value: string }[]
   },
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
@@ -828,6 +831,7 @@ export async function updateServiceOrderAction(
       updateData.payment_breakdown = input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null
     }
     if (input.created_at !== undefined) updateData.created_at = input.created_at
+    if (input.specifications !== undefined) updateData.specifications = input.specifications.length > 0 ? JSON.stringify(input.specifications) : null
     if (input.status !== undefined) updateData.status = input.status
 
     const { data, error } = await admin

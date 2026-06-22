@@ -1,7 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 
@@ -15,8 +14,6 @@ import {
     CheckCircleIcon,
     CancelCircleIcon,
     BlockedIcon,
-    Settings2Icon,
-    ExportFileIcon,
     InfoIcon,
 } from "@/lib/icons"
 

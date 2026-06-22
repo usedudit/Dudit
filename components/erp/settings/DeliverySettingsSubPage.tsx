@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
-import { ChevronLeftIcon, ClockIcon, PlusIcon, TrashIcon, SaveIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockIcon, PlusIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import {
@@ -112,37 +112,6 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
         () => isCrescer ? "Desbloqueie cálculo por distância e horários com o plano Escalar" : null,
         [isCrescer]
     )
-
-    if (planGate) {
-        return (
-            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
-                        <div className="hidden md:flex items-start justify-between py-6">
-                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
-                                    <span className="truncate">Configurações de Entrega</span>
-                                </h1>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
-                    <IconPlaceholder
-                        placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                        imageAlt="Recurso bloqueado"
-                        title="Configurações de Entrega"
-                        subtitle="Gerencie taxas e regras de entrega. Disponível nos planos Crescer e Escalar."
-                        itemButton={{
-                            text: "Fazer upgrade",
-                            action: () => openPlanUpgrade(planGate.requiredPlanSlug)
-                        }}
-                    />
-                </div>
-            </FadeIn>
-        )
-    }
 
     if (loading) return <FadeIn className="p-6">Carregando configurações de entrega...</FadeIn>
 
@@ -396,10 +365,10 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                                         <table className="w-full border-separate border-spacing-0">
                                                             <thead>
                                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-l-lg">Início</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Fim</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Tipo</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Valor</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">Início</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Fim</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ">Tipo</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Valor</th>
                                                                     <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
                                                                 </tr>
                                                             </thead>

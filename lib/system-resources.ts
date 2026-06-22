@@ -62,17 +62,17 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     module: "sales",
   },
   {
+    id: "pos",
+    label: "PDV",
+    description: "Frente de caixa para vendas presenciais.",
+    module: "sales",
+  },
+  {
     id: "returns",
     label: "Devoluções",
     description: "Devoluções de pedidos e estorno de valores.",
     module: "sales",
     minimumPlan: "crescer",
-  },
-  {
-    id: "pos",
-    label: "PDV",
-    description: "Frente de caixa para vendas presenciais.",
-    module: "sales",
   },
   {
     id: "products",
@@ -135,17 +135,17 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     minimumPlan: "crescer",
   },
   {
+    id: "customers",
+    label: "Clientes",
+    description: "Cadastro e gestão de clientes do negócio.",
+    module: "management",
+  },
+  {
     id: "team",
     label: "Equipe",
     description: "Convites, usuários e acessos da equipe.",
     module: "management",
     minimumPlan: "crescer",
-  },
-  {
-    id: "customers",
-    label: "Clientes",
-    description: "Cadastro e gestão de clientes do negócio.",
-    module: "management",
   },
   {
     id: "reports",
