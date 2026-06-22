@@ -19,6 +19,8 @@ import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-image
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency, formatDate, formatFullDate, formatTime } from '@/lib/utils';
+import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
+import { canReportReturnToDudit, getEligibilityLabel, getSlaStatusLabel } from '@/lib/returns/policy';
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -425,6 +427,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [cancelReason, setCancelReason] = useState("changed_mind");
     const [cancelDetails, setCancelDetails] = useState("");
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [reportReturnOpen, setReportReturnOpen] = useState(false);
     const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
     const [returnReason, setReturnReason] = useState("changed_mind");
     const [returnResolution, setReturnResolution] = useState<"exchange" | "refund" | "store_credit">("refund");
@@ -1062,6 +1065,39 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 <span className="font-bold">Observações do vendedor:</span> {activeReturnRequest.seller_notes}
                                             </div>
                                         )}
+                                        <div className="mt-4 pt-3 border-t border-current/20 text-sm space-y-1">
+                                            {activeReturnRequest.eligibility_status && (
+                                                <div><span className="font-bold">Elegibilidade:</span> {getEligibilityLabel(activeReturnRequest.eligibility_status)}</div>
+                                            )}
+                                            {activeReturnRequest.sla_status && (
+                                                <div><span className="font-bold">SLA:</span> {getSlaStatusLabel(activeReturnRequest.sla_status)}
+                                                    {activeReturnRequest.sla_due_at && ` — prazo ${formatDate(activeReturnRequest.sla_due_at)}`}
+                                                </div>
+                                            )}
+                                            {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot) && (
+                                                <div className="text-xs opacity-80 mt-2">
+                                                    Política aplicada: prazo comercial de{' '}
+                                                    {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot)?.commercial?.commercial_deadline_days ?? 30} dias
+                                                    (snapshot da venda)
+                                                </div>
+                                            )}
+                                        </div>
+                                        {canReportReturnToDudit({
+                                            status: activeReturnRequest.status,
+                                            slaStatus: activeReturnRequest.sla_status,
+                                            reportedToDuditAt: activeReturnRequest.reported_to_dudit_at,
+                                        }) && (
+                                            <Button
+                                                variant="outline"
+                                                className="mt-4 w-full sm:w-auto"
+                                                onClick={() => setReportReturnOpen(true)}
+                                            >
+                                                Reportar à Dudit
+                                            </Button>
+                                        )}
+                                        {activeReturnRequest.reported_to_dudit_at && (
+                                            <p className="text-xs mt-2 opacity-80">Reporte enviado em {formatDate(activeReturnRequest.reported_to_dudit_at)}</p>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1671,6 +1707,15 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </div>
                     </div>
                 </DefaultModal>
+
+                {activeReturnRequest && (
+                    <ReportReturnModal
+                        open={reportReturnOpen}
+                        onClose={() => setReportReturnOpen(false)}
+                        returnRequestId={activeReturnRequest.id}
+                        onReported={() => router.refresh()}
+                    />
+                )}
             </div>
         </motion.div>
     );

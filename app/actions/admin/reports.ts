@@ -52,7 +52,7 @@ import {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type ReportTargetType = "product" | "partner" | "review" | "service"
+export type ReportTargetType = "product" | "partner" | "review" | "service" | "return_request"
 export type ReportStatus = "pending" | "validated" | "dismissed" | "spam"
 
 export interface Report {
@@ -196,7 +196,7 @@ export async function createReport(data: {
     if (!targetId) {
         return { success: false, error: "Identificador inválido" }
     }
-    if (!["product", "partner", "review", "service"].includes(data.targetType)) {
+    if (!["product", "partner", "review", "service", "return_request"].includes(data.targetType)) {
         return { success: false, error: "Tipo de alvo inválido" }
     }
 
@@ -213,6 +213,7 @@ export async function createReport(data: {
         service: "services",
         partner: "partners",
         review: "reviews",
+        return_request: "return_requests",
     }
     const tableName = targetTable[data.targetType]
 

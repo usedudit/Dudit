@@ -24,6 +24,7 @@ import { TeamSubPage } from "./TeamSubPage"
 import { SubscriptionSubPage } from "./SubscriptionSubPage"
 import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
 import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
+import { ReturnPolicySubPage } from "./ReturnPolicySubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { ServiceCheckoutSettingsSubPage } from "./ServiceCheckoutSettingsSubPage"
@@ -443,7 +444,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" onBack={() => setActivePage("home")} />}
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
-          {activePage === "recibo" && <SimpleSettingsSubPage key="recibo" title="Recibo/Devolução" onBack={() => setActivePage("home")} />}
+          {activePage === "recibo" && <ReturnPolicySubPage key="recibo" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && <ShowcaseSubPage key="vitrine" partner={partner} onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "service-checkout" && canAccessServiceCheckout && (

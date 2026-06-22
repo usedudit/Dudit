@@ -326,6 +326,21 @@ const SaleReceiptA4Preview = ({
                                         </div>
                                     )}
 
+                                    {data.returnPolicyBlock?.showBlock && (
+                                        <div className="px-8 pb-4">
+                                            <p className="text-[10px] font-bold uppercase text-gray-700 mb-1">Política de trocas</p>
+                                            <p className="text-[10px] text-gray-600">
+                                                Prazo comercial: {data.returnPolicyBlock.commercialDeadlineDays} dias
+                                                {data.returnPolicyBlock.additionalWarrantyDays > 0 && (
+                                                    <> · Garantia adicional: {data.returnPolicyBlock.additionalWarrantyDays} dias</>
+                                                )}
+                                            </p>
+                                            {data.returnPolicyBlock.message && (
+                                                <p className="text-[10px] text-gray-600 mt-1">{data.returnPolicyBlock.message}</p>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="px-8 pb-12">
                                         <p className="text-center font-bold text-sm uppercase tracking-wide text-brand-dark">
                                             {footerMessage}

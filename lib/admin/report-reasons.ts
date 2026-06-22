@@ -15,6 +15,10 @@ export type ReportReasonCode =
     | "harassment_or_hate"
     | "illegal_or_dangerous"
     | "fake_listing"
+    | "return_sla_violation"
+    | "return_denied_unfairly"
+    | "seller_abuse"
+    | "return_abuse"
     | "other"
 
 export const REPORT_REASON_LABELS: Record<ReportReasonCode, string> = {
@@ -26,6 +30,10 @@ export const REPORT_REASON_LABELS: Record<ReportReasonCode, string> = {
     harassment_or_hate: "Assédio / discurso de ódio",
     illegal_or_dangerous: "Item ilegal ou perigoso",
     fake_listing: "Anúncio falso / inexistente",
+    return_sla_violation: "Prazo de resposta expirado (troca/devolução)",
+    return_denied_unfairly: "Recusa indevida de troca/devolução",
+    seller_abuse: "Abuso do vendedor",
+    return_abuse: "Abuso na solicitação de devolução",
     other: "Outro motivo",
 }
 
@@ -55,6 +63,10 @@ export const REPORT_REASON_SEVERITY: Record<ReportReasonCode, "low" | "normal" |
     copyright_violation: "normal",
     inappropriate_content: "normal",
     fake_listing: "normal",
+    return_sla_violation: "high",
+    return_denied_unfairly: "high",
+    seller_abuse: "high",
+    return_abuse: "normal",
     spam_or_misleading: "low",
     other: "low",
 }

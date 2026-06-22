@@ -149,6 +149,20 @@ export default function SaleReceiptThermalPreview({
                     </>
                 )}
 
+                {data.returnPolicyBlock?.showBlock && (
+                    <>
+                        <DashedLine className="my-2" />
+                        <p className="text-[9px] font-bold text-center">Política de trocas</p>
+                        <p className="text-[9px] text-center">
+                            Prazo: {data.returnPolicyBlock.commercialDeadlineDays}d
+                            {data.returnPolicyBlock.additionalWarrantyDays > 0 && ` · Garantia +${data.returnPolicyBlock.additionalWarrantyDays}d`}
+                        </p>
+                        {data.returnPolicyBlock.message && (
+                            <p className="text-[9px] text-center mt-1">{data.returnPolicyBlock.message}</p>
+                        )}
+                    </>
+                )}
+
                 <DashedLine className="my-2" />
                 <p className="text-[10px] font-bold text-center uppercase tracking-wide">{footerMessage}</p>
             </div>

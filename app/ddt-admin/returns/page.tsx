@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { getAdminReturnRequests } from "@/app/actions/admin/marketplace-ops"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -47,7 +48,9 @@ export default async function AdminReturnsPage({ searchParams }: { searchParams?
                                 return (
                                     <tr key={request.id} className="border-t border-brand-border align-top dark:border-dark-border">
                                         <td className="p-3">
-                                            <div className="font-bold text-brand-dark dark:text-dark-heading">#{request.id.slice(0, 8)}</div>
+                                            <Link href={`/ddt-admin/returns/${request.id}`} className="font-bold text-brand-primary hover:underline">
+                                                #{request.id.slice(0, 8)}
+                                            </Link>
                                             <div className="text-xs text-brand-inactive-text">{formatDate(request.created_at)}</div>
                                         </td>
                                         <td className="p-3">{request.order_number_snapshot || request.orders?.order_number || "-"}</td>

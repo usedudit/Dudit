@@ -25,6 +25,13 @@ export type SaleReceiptPartnerHeader = {
     taxIdLine: string
 }
 
+export type SaleReceiptReturnPolicyBlock = {
+    commercialDeadlineDays: number
+    additionalWarrantyDays: number
+    message?: string | null
+    showBlock: boolean
+}
+
 export type SaleReceiptData = {
     customerName: string
     orderNumber: string
@@ -46,6 +53,7 @@ export type SaleReceiptData = {
     primaryColor?: string
     secondaryColor?: string
     partnerAvatar?: string
+    returnPolicyBlock?: SaleReceiptReturnPolicyBlock | null
 }
 
 export const DEFAULT_RECEIPT_FOOTER_MESSAGE = "* OBRIGADO E VOLTE SEMPRE *"
@@ -202,6 +210,16 @@ export function buildSaleReceiptFromOrder(
     const total = Number(order.total_amount || 0)
     const paid = Number(order.paid_amount || 0)
     const change = Math.max(0, paid - total)
+    const policySnap = order.return_policy_snapshot
+    const returnPolicyBlock =
+        policySnap && policySnap.receipt_show_policy_block !== false
+            ? {
+                  commercialDeadlineDays: Number(policySnap?.commercial?.commercial_deadline_days ?? 30),
+                  additionalWarrantyDays: Number(policySnap?.commercial?.additional_warranty_days ?? 0),
+                  message: policySnap?.receipt_message ?? null,
+                  showBlock: true,
+              }
+            : null
 
     return {
         customerName: order.customers?.name || order.customer_name || "Consumidor final",
@@ -224,6 +242,7 @@ export function buildSaleReceiptFromOrder(
         primaryColor: options?.primaryColor,
         secondaryColor: options?.secondaryColor,
         partnerAvatar: options?.partnerAvatar,
+        returnPolicyBlock,
     }
 }
 

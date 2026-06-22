@@ -76,6 +76,14 @@ export type ReturnRequestListItem = {
   evidenceImages: string[]
   observations?: string
   expiresAt?: string | null
+  eligibilityStatus?: string | null
+  eligibilityDetails?: Record<string, unknown> | null
+  policySnapshot?: Record<string, unknown> | null
+  slaDueAt?: string | null
+  slaStatus?: string | null
+  slaExpiredAt?: string | null
+  reportedToDuditAt?: string | null
+  duditReportId?: string | null
   paymentProvider?: string
   mpPaymentId?: string | null
   refundPaymentMethod?: string
