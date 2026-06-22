@@ -44,7 +44,7 @@ function assertManageRole(roleId: string) {
 export async function getPartnerReturnPolicyAction(partnerId: string) {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    const access = await requirePermission(partnerId, "settings_returns", "view")
+    const access = await requirePermission(partnerId, "settings", "settings_returns")
     const supabase = createAdminClient()
 
     const [{ data: policyRow }, { data: partner }] = await Promise.all([
@@ -75,7 +75,7 @@ export async function upsertPartnerReturnPolicyAction(input: z.infer<typeof poli
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     const parsed = policySchema.parse(input)
-    const access = await requirePermission(parsed.partnerId, "returns", "edit")
+    const access = await requirePermission(parsed.partnerId, "settings", "settings_returns")
     assertManageRole(access.roleId)
 
     const supabase = createAdminClient()
@@ -97,7 +97,7 @@ export async function upsertPartnerReturnPolicyAction(input: z.infer<typeof poli
       receipt_message: parsed.receiptMessage || null,
       receipt_show_policy_block: parsed.receiptShowPolicyBlock,
       sla_response_days: parsed.slaResponseDays,
-      updated_at: new Date().toISO(),
+      updated_at: new Date().toISOString(),
     }
 
     const { error } = await supabase
@@ -114,7 +114,7 @@ export async function upsertPartnerReturnPolicyAction(input: z.infer<typeof poli
 export async function getOrderReturnPolicySnapshotAction(partnerId: string, orderId: string) {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requirePermission(partnerId, "returns", "view")
+    await requirePermission(partnerId, "orders", "view")
     const supabase = createAdminClient()
 
     const { data, error } = await supabase

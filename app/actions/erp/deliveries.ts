@@ -1621,6 +1621,7 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   deliveryId: string
   orderId: string
   status: DeliveryStatusValue
+  changeReason?: string
 }) {
   const user = await requireUser()
   const actor = await getDeliveryActorScope(params.partnerId)
@@ -1682,11 +1683,15 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   }
 
   const orderLabel = `#${String(params.orderId).slice(0, 8).toUpperCase()}`
-  const changeMsg = nextStatus === "delivered"
+  let changeMsg = nextStatus === "delivered"
     ? `Pedido ${orderLabel} entregue`
     : nextStatus === "delivery_failed"
       ? `Falha na entrega do pedido ${orderLabel}`
       : `Status de entrega do pedido ${orderLabel} alterado para ${nextStatus}`
+
+  if (params.changeReason?.trim()) {
+    changeMsg += ` (Motivo da alteração: ${params.changeReason.trim()})`
+  }
 
   // Log on delivery audit
   await logDeliveryEvent({

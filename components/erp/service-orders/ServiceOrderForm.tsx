@@ -51,6 +51,19 @@ const REQUIRED_FIELDS = [
     { field: "services", tab: "services" },
 ]
 
+const getLocalDateString = (d: Date) => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+}
+
+const getLocalTimeString = (d: Date) => {
+    const hours = String(d.getHours()).padStart(2, "0")
+    const minutes = String(d.getMinutes()).padStart(2, "0")
+    return `${hours}:${minutes}`
+}
+
 
 
 export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData }: ServiceOrderFormProps) {
@@ -75,8 +88,18 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     const [priority, setPriority] = useState(editData?.priority || "baixa")
     const [estimatedHours, setEstimatedHours] = useState(editData?.estimated_hours != null ? String(editData.estimated_hours) : "")
     const [expectedCompletionTime, setExpectedCompletionTime] = useState(editData?.expected_completion_time || "")
-    const [openingDate, setOpeningDate] = useState(editData?.created_at?.split("T")[0] || new Date().toISOString().split("T")[0])
-    const [openingTime, setOpeningTime] = useState(editData?.created_at ? new Date(editData.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))
+    const [openingDate, setOpeningDate] = useState(() => {
+        if (editData?.created_at) {
+            return getLocalDateString(new Date(editData.created_at))
+        }
+        return getLocalDateString(new Date())
+    })
+    const [openingTime, setOpeningTime] = useState(() => {
+        if (editData?.created_at) {
+            return getLocalTimeString(new Date(editData.created_at))
+        }
+        return getLocalTimeString(new Date())
+    })
     const [teamMembers, setTeamMembers] = useState<any[]>([])
 
     // Financial fields matching CreateOrder / pdv
@@ -325,7 +348,10 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
         setSaving(true)
 
-        const createdAt = `${openingDate}T${openingTime}:00`
+        const [year, month, day] = openingDate.split("-").map(Number)
+        const [hour, minute] = openingTime.split(":").map(Number)
+        const localDate = new Date(year, month - 1, day, hour, minute, 0)
+        const createdAt = localDate.toISOString()
 
         const payload = {
             title: title.trim(),
@@ -658,9 +684,6 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             Dados gerais
                                             {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
-                                        <TabsTrigger value="notes">
-                                            Observações
-                                        </TabsTrigger>
                                         <TabsTrigger value="services">
                                             Serviços
                                             {getTabErrorCount("services") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
@@ -673,6 +696,9 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                         </TabsTrigger>
                                         <TabsTrigger value="attachments">
                                             Anexos
+                                        </TabsTrigger>
+                                        <TabsTrigger value="notes">
+                                            Observações
                                         </TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -797,16 +823,14 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     />
                                                 ) : (
                                                     <div
-                                                        className={`bg-white dark:bg-dark-surface rounded-2xl border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40 transition-colors ${
-                                                            fieldErrors.has("customerId") 
-                                                                ? "border-brand-red dark:border-brand-red-dark" 
-                                                                : "border-brand-border dark:border-dark-border"
-                                                        }`}
+                                                        className={`bg-white dark:bg-dark-surface rounded-2xl border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 cursor-pointer transition-colors ${fieldErrors.has("customerId")
+                                                            ? "border-brand-red dark:border-brand-red-dark"
+                                                            : "border-brand-border dark:border-dark-border"
+                                                            }`}
                                                         onClick={() => setShowCustomerSheet(true)}
                                                     >
-                                                        <div className={`absolute top-0 left-0 w-full h-1 ${
-                                                            fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"
-                                                        }`}></div>
+                                                        <div className={`absolute top-0 left-0 w-full h-1 ${fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"
+                                                            }`}></div>
                                                         <IconPlaceholder
                                                             icon={UserIcon}
                                                             title="Nenhum cliente selecionado"
@@ -1311,6 +1335,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 onClose={() => setShowCustomerSheet(false)}
                 onSelect={handleSelectCustomer}
                 partnerId={partnerId}
+                selectedCustomerId={customerId || undefined}
             />
 
             <SelectServiceSheet

@@ -128,7 +128,42 @@ async function fetchTimelineForEntity(entityType: string, entityId: string, part
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
     .limit(50)
-  return data || []
+
+  const logs = data || []
+  if (logs.length === 0) return []
+
+  const actorIds = Array.from(
+    new Set(
+      logs
+        .map((entry: any) => entry.actor_user_id)
+        .filter((value: any): value is string => Boolean(value)),
+    ),
+  )
+
+  let namesByUserId = new Map<string, string>()
+
+  if (actorIds.length > 0) {
+    const { data: profiles, error: profileError } = await admin
+      .from("user_profiles")
+      .select("user_id, full_name")
+      .in("user_id", actorIds)
+
+    if (profileError) {
+      console.error("[service_order_history] profile fetch error:", profileError)
+    } else {
+      namesByUserId = new Map(
+        (profiles || []).map((profile: { user_id: string; full_name: string | null }) => [
+          profile.user_id,
+          profile.full_name?.trim() || "Usuário",
+        ]),
+      )
+    }
+  }
+
+  return logs.map((entry: any) => ({
+    ...entry,
+    actor_name: entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema",
+  }))
 }
 
 export async function createServiceOrderAction(
@@ -249,12 +284,36 @@ export async function createServiceOrderAction(
 }
 
 async function getCustomerSnapshot(admin: any, customerId: string) {
-  const { data } = await admin
-    .from("customers")
-    .select("id, name, email, phone, cpf_cnpj, city, state, zip_code")
-    .eq("id", customerId)
-    .single()
-  return data || null
+  const [{ data: customer }, { data: address }] = await Promise.all([
+    admin
+      .from("customers")
+      .select("id, name, email, phone")
+      .eq("id", customerId)
+      .single(),
+    admin
+      .from("addresses")
+      .select("zip_code, street, number, complement, neighborhood, city, state")
+      .eq("customer_id", customerId)
+      .eq("address_type", "primary")
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (!customer) return null
+
+  return {
+    id: customer.id,
+    name: customer.name,
+    email: customer.email,
+    phone: customer.phone,
+    city: address?.city || null,
+    state: address?.state || null,
+    zip_code: address?.zip_code || null,
+    street: address?.street || null,
+    number: address?.number || null,
+    complement: address?.complement || null,
+    neighborhood: address?.neighborhood || null,
+  }
 }
 
 export async function addServicesToOrderAction(

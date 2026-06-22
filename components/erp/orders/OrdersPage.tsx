@@ -10,7 +10,7 @@ import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner, MoneyInput, FormDropdown, Badge } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListRow"
@@ -36,7 +36,7 @@ import {
     PartiallyPaidIcon,
 } from "@/lib/icons"
 
-import { formatDate, formatTime } from "@/lib/utils"
+import { formatDate, formatTime, formatCurrency } from "@/lib/utils"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import {
     EMPTY_DATE_PERIOD,
@@ -54,7 +54,8 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
-import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS, getDeliveryStatusLabel } from "@/lib/orders/status"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -91,6 +92,8 @@ interface Order {
     hasOnlyServices?: boolean;
     is_refunded?: boolean;
     refunded_amount?: number;
+    payment_method?: string;
+    payment_breakdown?: any;
 }
 
 interface FilterState {
@@ -117,6 +120,34 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "status", label: "Status", align: "left", width: "80px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
+
+const CHANGE_STATUS_REASONS = [
+    { value: "operational_error", label: "Erro operacional / Clique acidental" },
+    { value: "rescheduling", label: "Cliente solicitou reagendamento" },
+    { value: "logistics_issue", label: "Problema logístico / Rota" },
+    { value: "payment_issue", label: "Problema com pagamento" },
+    { value: "other", label: "Outro" }
+]
+
+function doesTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
+    if (currentStatus === "delivered" && nextStatus !== "delivered") {
+        return true;
+    }
+    if (currentStatus === "delivery_failed" && nextStatus !== "delivery_failed") {
+        return true;
+    }
+    if (currentStatus === "sent" && ["preparing", "pickup_available", "delivery_failed", "not_sent", "pending"].includes(nextStatus)) {
+        return true;
+    }
+    if (currentStatus === "pickup_available" && ["preparing", "sent", "delivery_failed", "not_sent", "pending"].includes(nextStatus)) {
+        return true;
+    }
+    if (currentStatus === "preparing" && ["not_sent", "pending", "delivery_failed"].includes(nextStatus)) {
+        return true;
+    }
+    return false;
+}
+
 
 export default function OrdersPage({
     orders: rawOrders,
@@ -193,6 +224,16 @@ export default function OrdersPage({
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
     const [printOrderId, setPrintOrderId] = useState<string | null>(null)
+    const [paidAmountValue, setPaidAmountValue] = useState<number>(0)
+    const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
+        isOpen: boolean
+        order: Order
+        nextStatus: string
+        currentStatus: string
+        reasonDropdownValue: string
+        customReasonText: string
+    } | null>(null)
+
 
 
     const isLoading = storeLoading || entityPage.isListLoading
@@ -339,6 +380,8 @@ export default function OrdersPage({
                     hasOnlyServices,
                     is_refunded: Boolean(o.is_refunded),
                     refunded_amount: Number(o.refunded_amount || 0),
+                    payment_method: o.payment_method || "",
+                    payment_breakdown: o.payment_breakdown || null,
                 }
             })
             .filter((o: Order) => {
@@ -434,6 +477,7 @@ export default function OrdersPage({
     const handleDetailsOrder = useCallback((order: Order) => {
         openEntity('view', order.originalId)
     }, [openEntity])
+
     const openDeliveryStatusModal = (order: Order) => {
         setDeliveryStatusModal({ open: true, order })
         const status = order.delivery_status
@@ -448,21 +492,20 @@ export default function OrdersPage({
                                     : "not_sent"
         )
     }
-    const submitDeliveryStatusChange = async () => {
-        const targetOrder = deliveryStatusModal.order
-        if (!targetOrder) return
+
+    const saveDeliveryStatusChange = async (targetOrder: Order, nextStatus: string, reason?: string) => {
         setActionModal({ open: true, text: "Atualizando status de entrega..." })
         try {
             const result = await updateOrdersStatusInBatchAction({
                 orderIds: [targetOrder.originalId],
                 partnerId,
                 actionType: "delivery_status",
-                statusValue: deliveryStatusValue,
+                statusValue: nextStatus,
+                changeReason: reason,
             })
             if (result.success) {
                 afterMutation(targetOrder.originalId)
                 toast({ title: "Sucesso", description: "Status de entrega atualizado." })
-                setDeliveryStatusModal({ open: false, order: null })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
             }
@@ -474,6 +517,41 @@ export default function OrdersPage({
         }
     }
 
+    const confirmDeliveryWarningStatusChange = async () => {
+        if (!deliveryWarningModal) return
+        const targetOrder = deliveryWarningModal.order
+        const nextStatus = deliveryWarningModal.nextStatus
+        const reason = deliveryWarningModal.reasonDropdownValue === "other"
+            ? deliveryWarningModal.customReasonText.trim()
+            : CHANGE_STATUS_REASONS.find(r => r.value === deliveryWarningModal.reasonDropdownValue)?.label || ""
+
+        setDeliveryWarningModal(null)
+        await saveDeliveryStatusChange(targetOrder, nextStatus, reason)
+    }
+
+    const submitDeliveryStatusChange = async () => {
+        const targetOrder = deliveryStatusModal.order
+        if (!targetOrder) return
+
+        const currentStatus = targetOrder.delivery_status || "not_sent"
+        const nextStatus = deliveryStatusValue
+
+        if (doesTransitionRequireReason(currentStatus, nextStatus)) {
+            setDeliveryStatusModal({ open: false, order: null })
+            setDeliveryWarningModal({
+                isOpen: true,
+                order: targetOrder,
+                nextStatus,
+                currentStatus,
+                reasonDropdownValue: "",
+                customReasonText: "",
+            })
+        } else {
+            setDeliveryStatusModal({ open: false, order: null })
+            await saveDeliveryStatusChange(targetOrder, nextStatus)
+        }
+    }
+
     const openPaymentStatusModal = (order: Order) => {
         setPaymentStatusModal({ open: true, order })
         const status = order.situation
@@ -482,18 +560,39 @@ export default function OrdersPage({
                 : status === "partially_paid" ? "partially_paid"
                     : "pending"
         )
+        setPaidAmountValue(order.paidAmount ?? 0)
     }
 
     const submitPaymentStatusChange = async () => {
         const targetOrder = paymentStatusModal.order
         if (!targetOrder) return
+
+        let targetStatusValue = paymentStatusValue
+        let targetPaidAmount: number | undefined = undefined
+
+        const breakdown = Array.isArray(targetOrder.payment_breakdown) ? targetOrder.payment_breakdown : []
+        const isSinglePayment = breakdown.length <= 1
+
+        if (isSinglePayment) {
+            const total = targetOrder.total_amount
+            if (paidAmountValue >= total - 0.005) {
+                targetStatusValue = "paid"
+            } else if (paidAmountValue > 0.005) {
+                targetStatusValue = "partially_paid"
+            } else {
+                targetStatusValue = "pending"
+            }
+            targetPaidAmount = paidAmountValue
+        }
+
         setActionModal({ open: true, text: "Atualizando status de pagamento..." })
         try {
             const result = await updateOrdersStatusInBatchAction({
                 orderIds: [targetOrder.originalId],
                 partnerId,
                 actionType: "payment_status",
-                statusValue: paymentStatusValue,
+                statusValue: targetStatusValue,
+                paidAmount: targetPaidAmount,
             })
             if (result.success) {
                 afterMutation(targetOrder.originalId)
@@ -706,6 +805,7 @@ export default function OrdersPage({
                                     items_count: Number(order.order_items?.length || 0),
                                     created_at_time: new Date(order.created_at || Date.now()).getTime(),
                                     situation: order.situation || "pending",
+                                    delivery_status: order.delivery_status || "not_sent",
                                     delivery_type: order.delivery_type || "delivery",
                                     notes: order.notes || "",
                                     previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
@@ -733,11 +833,14 @@ export default function OrdersPage({
                                     items_count: Number(order.order_items?.length || 0),
                                     created_at_time: new Date(order.created_at || Date.now()).getTime(),
                                     situation: order.situation || "pending",
+                                    delivery_status: order.delivery_status || "not_sent",
                                     notes: order.notes || "",
                                     previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
                                     returnCount: Number(order.return_count || order.return_requests?.length || 0),
                                     canEdit: order.situation !== "cancelled",
                                     paidAmount: Number(order.paid_amount || 0),
+                                    payment_method: order.payment_method || "",
+                                    payment_breakdown: order.payment_breakdown || null,
                                 })
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
@@ -887,7 +990,7 @@ export default function OrdersPage({
                                                                 cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                 onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                 onPaymentStatus={o.situation !== "cancelled" ? () => openPaymentStatusModal(o) : undefined}
-                                                                onDeliveryStatus={o.situation !== "cancelled" ? () => openDeliveryStatusModal(o) : undefined}
+                                                                onDeliveryStatus={o.situation !== "cancelled" && !o.hasOnlyServices ? () => openDeliveryStatusModal(o) : undefined}
                                                                 onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                 onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
                                                                 onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
@@ -964,7 +1067,7 @@ export default function OrdersPage({
                                                                             onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                             onDetails={handleDetailsOrder}
                                                                             onPaymentStatus={o.situation !== "cancelled" ? () => openPaymentStatusModal(o) : undefined}
-                                                                            onDeliveryStatus={o.situation !== "cancelled" ? () => openDeliveryStatusModal(o) : undefined}
+                                                                            onDeliveryStatus={o.situation !== "cancelled" && !o.hasOnlyServices ? () => openDeliveryStatusModal(o) : undefined}
                                                                             onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                             onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
                                                                             onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
@@ -1135,15 +1238,12 @@ export default function OrdersPage({
                         message={deliveryStatusModal.order?.displayId || "-"}
                         color="gray"
                     />
-                    <select
+                    <FormDropdown
+                        options={deliveryStatusModal.order?.delivery_type === "pickup" ? PICKUP_STATUS_OPTIONS : DELIVERY_STATUS_OPTIONS}
                         value={deliveryStatusValue}
-                        onChange={(e) => setDeliveryStatusValue(e.target.value)}
-                        className="w-full rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm"
-                    >
-                        {(deliveryStatusModal.order?.delivery_type === "pickup" ? PICKUP_STATUS_OPTIONS : DELIVERY_STATUS_OPTIONS).map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
+                        setValue={setDeliveryStatusValue}
+                        placeholder="Selecione o status"
+                    />
                 </div>
             </DefaultModal>
 
@@ -1168,17 +1268,124 @@ export default function OrdersPage({
                         message={paymentStatusModal.order?.displayId || "-"}
                         color="gray"
                     />
-                    <select
-                        value={paymentStatusValue}
-                        onChange={(e) => setPaymentStatusValue(e.target.value)}
-                        className="w-full rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm"
-                    >
-                        <option value="pending">Pendente</option>
-                        <option value="paid">Pago</option>
-                        <option value="partially_paid">Parcialmente Pago</option>
-                    </select>
+                    {(() => {
+                        const targetOrder = paymentStatusModal.order
+                        if (!targetOrder) return null
+
+                        const breakdown = Array.isArray(targetOrder.payment_breakdown) ? targetOrder.payment_breakdown : []
+                        const isSinglePayment = breakdown.length <= 1
+
+                        if (isSinglePayment) {
+                            const paymentMethodLabelText = formatPaymentMethodLabel(targetOrder.payment_method || breakdown[0]?.method || "", null)
+                            const calculatedStatus = paidAmountValue >= targetOrder.total_amount - 0.005
+                                ? "Pago"
+                                : paidAmountValue > 0.005
+                                    ? "Parcialmente Pago"
+                                    : "Pendente"
+
+                            return (
+                                <div className="flex flex-col gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1">
+                                            Meio de pagamento
+                                        </label>
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                            {paymentMethodLabelText || "Não informado"}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1">
+                                            Valor total do pedido
+                                        </label>
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(targetOrder.total_amount)}
+                                        </span>
+                                    </div>
+                                    <MoneyInput
+                                        label="Valor Pago"
+                                        value={paidAmountValue}
+                                        onChange={(val) => setPaidAmountValue(val)}
+                                        max={targetOrder.total_amount}
+                                    />
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body uppercase">
+                                            Status calculado:
+                                        </span>
+                                        <Badge
+                                            variant={
+                                                calculatedStatus === "Pago" ? "green" :
+                                                calculatedStatus === "Parcialmente Pago" ? "orange" : "gray"
+                                            }
+                                            className="text-xs font-bold"
+                                        >
+                                            {calculatedStatus}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        return (
+                            <FormDropdown
+                                label="Status de pagamento"
+                                options={[
+                                    { value: "pending", label: "Pendente" },
+                                    { value: "paid", label: "Pago" },
+                                    { value: "partially_paid", label: "Parcialmente Pago" }
+                                ]}
+                                value={paymentStatusValue}
+                                setValue={setPaymentStatusValue}
+                            />
+                        )
+                    })()}
                 </div>
             </DefaultModal>
+
+            <AlertModal
+                isOpen={deliveryWarningModal?.isOpen ?? false}
+                onClose={() => setDeliveryWarningModal(null)}
+                onConfirm={confirmDeliveryWarningStatusChange}
+                title="Atenção: Alteração de Status"
+                message={
+                    <div className="flex flex-col gap-4 text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Este pedido já estava como{" "}
+                            <strong className="text-brand-dark dark:text-dark-heading">
+                                {getDeliveryStatusLabel(deliveryWarningModal?.currentStatus)}
+                            </strong>{" "}
+                            e você está alterando para{" "}
+                            <strong className="text-brand-dark dark:text-dark-heading">
+                                {getDeliveryStatusLabel(deliveryWarningModal?.nextStatus)}
+                            </strong>.
+                            Esta ação requer uma justificativa.
+                        </p>
+                        <div className="flex flex-col gap-4 mt-2">
+                            <FormDropdown
+                                label="Motivo da alteração"
+                                options={CHANGE_STATUS_REASONS}
+                                value={deliveryWarningModal?.reasonDropdownValue || ""}
+                                setValue={(val) => setDeliveryWarningModal(prev => prev ? { ...prev, reasonDropdownValue: val } : null)}
+                                placeholder="Selecione o motivo"
+                            />
+                            {deliveryWarningModal?.reasonDropdownValue === "other" && (
+                                <Input
+                                    label="Descreva o motivo"
+                                    placeholder="Digite o motivo aqui..."
+                                    value={deliveryWarningModal?.customReasonText || ""}
+                                    onChange={(e) => setDeliveryWarningModal(prev => prev ? { ...prev, customReasonText: e.target.value } : null)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                }
+                confirmText="Confirmar Alteração"
+                cancelText="Cancelar"
+                variant="warning"
+                disabled={
+                    !deliveryWarningModal?.reasonDropdownValue ||
+                    (deliveryWarningModal.reasonDropdownValue === "other" && !deliveryWarningModal.customReasonText.trim())
+                }
+            />
 
             {printOrderId && (
                 <SaleReceiptPrintModal

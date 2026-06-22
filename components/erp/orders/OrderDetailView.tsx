@@ -579,7 +579,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                                                 onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                                                 onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
-                                                onDeliveryStatus={order.situation !== "cancelled" ? () => onUpdateDeliveryStatus(order) : undefined}
+                                                onDeliveryStatus={(order.situation !== "cancelled" && !hasOnlyServices) ? () => onUpdateDeliveryStatus(order) : undefined}
                                                 cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                                             />
                                         </div>
@@ -1095,7 +1095,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                     onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                     onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
-                    onDeliveryStatus={order.situation !== "cancelled" ? () => onUpdateDeliveryStatus(order) : undefined}
+                    onDeliveryStatus={(order.situation !== "cancelled" && !hasOnlyServices) ? () => onUpdateDeliveryStatus(order) : undefined}
                     cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                     trigger={<Button variant="outline" className="flex-1">
                         <ThreeDotsIcon className="w-4 h-4 mr-2" />

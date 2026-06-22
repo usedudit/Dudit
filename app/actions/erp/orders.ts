@@ -2511,6 +2511,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
     restoreStock?: boolean
     generateAutomaticRefund?: boolean
     userName?: string
+    changeReason?: string
+    paidAmount?: number
 }) {
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
@@ -2846,6 +2848,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             const paymentState = resolvePaymentState({
                 requestedStatus,
                 totalAmount: Number(order.total_amount || 0),
+                paidAmount: payload.paidAmount !== undefined ? payload.paidAmount : undefined,
                 fallbackPaidAmount:
                     requestedStatus === "paid"
                         ? Number(order.total_amount || 0)
@@ -2995,6 +2998,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         const nextPaymentState = resolvePaymentState({
                             requestedStatus,
                             totalAmount: Number(order.total_amount || 0),
+                            paidAmount: payload.paidAmount !== undefined ? payload.paidAmount : undefined,
                             fallbackPaidAmount:
                                 requestedStatus === "paid"
                                     ? Number(order.total_amount || 0)
@@ -3004,14 +3008,22 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         })
 
                         if (order.situation !== nextPaymentState.situation) {
-                            lines.push(`alterou status de pagamento: ${getPaymentStatusLabel(order.situation)} -> ${getPaymentStatusLabel(nextPaymentState.situation)}`)
+                            let line = `alterou status de pagamento: ${getPaymentStatusLabel(order.situation)} -> ${getPaymentStatusLabel(nextPaymentState.situation)}`
+                            if (payload.paidAmount !== undefined) {
+                                line += ` (Valor pago informado: ${formatCurrency(payload.paidAmount)})`
+                            }
+                            lines.push(line)
                         }
                     }
                 }
 
                 if (payload.actionType === "delivery_status" && payload.statusValue && order.delivery_status !== payload.statusValue) {
                     if (order.situation === "cancelled") return Promise.resolve()
-                    lines.push(`alterou status de entrega: ${getDeliveryStatusLabel(order.delivery_status)} -> ${getDeliveryStatusLabel(payload.statusValue)}`)
+                    let line = `alterou status de entrega: ${getDeliveryStatusLabel(order.delivery_status)} -> ${getDeliveryStatusLabel(payload.statusValue)}`
+                    if (payload.changeReason?.trim()) {
+                        line += ` (Motivo da alteração: ${payload.changeReason.trim()})`
+                    }
+                    lines.push(line)
                 }
 
                 if (lines.length === 0) return Promise.resolve()
@@ -3024,6 +3036,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             const nextPaymentState = resolvePaymentState({
                                 requestedStatus,
                                 totalAmount: Number(order.total_amount || 0),
+                                paidAmount: payload.paidAmount !== undefined ? payload.paidAmount : undefined,
                                 fallbackPaidAmount:
                                     requestedStatus === "paid"
                                         ? Number(order.total_amount || 0)
@@ -3145,7 +3158,9 @@ export async function getERPOrdersPageAction(
                 created_at,
                 stores(name),
                 return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount),
-                order_items(quantity, product_id, variant_id, service_id, line_type)
+                order_items(quantity, product_id, variant_id, service_id, line_type),
+                payment_method,
+                payment_breakdown
             `
 
         const selectWithPosSale = `

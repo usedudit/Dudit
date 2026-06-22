@@ -165,7 +165,7 @@ export async function addReturnMessageAction(input: {
 
     if (input.senderRole === "seller") {
       const { requirePermission } = await import("@/lib/permissions/access")
-      await requirePermission(input.partnerId, "returns", "edit")
+      await requirePermission(input.partnerId, "orders", "edit")
     } else {
       const isCustomer =
         request.customer_user_id === user.id || request.customer_id === user.id
@@ -235,7 +235,7 @@ export async function getReturnMessagesAction(
 
     if (!isCustomer) {
       const { requirePermission } = await import("@/lib/permissions/access")
-      await requirePermission(partnerId, "returns", "view")
+      await requirePermission(partnerId, "orders", "view")
     }
 
     let query = admin

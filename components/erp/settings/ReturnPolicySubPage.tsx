@@ -31,7 +31,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
       setLoading(true)
       const res = await getPartnerReturnPolicyAction(partnerId)
       if (cancelled) return
-      if (res.success && res.data) {
+      if (res.success) {
         setPolicy(res.data.policy)
         setStoreName(res.data.storeName || "")
       } else {
