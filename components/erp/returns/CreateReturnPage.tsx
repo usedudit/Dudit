@@ -146,7 +146,7 @@ export default function CreateReturnPage({
             String(order.customer_name || "").toLowerCase().includes(q),
         { pageSize: 10 }
     )
-    const productBucket = useProductBucket(fetchPartnerProductsBucket)
+    const productBucket = useProductBucket<ProductBucketItem>(fetchPartnerProductsBucket)
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -230,7 +230,7 @@ export default function CreateReturnPage({
         if (mode === "edit" && returnRequest) {
             const statusChanged = returnStatus !== returnRequest.status
             const resolutionTypeChanged = resolutionType !== (returnRequest.approvedResolution || returnRequest.desiredResolution || "refund")
-            const observationsChanged = observations !== (returnRequest.observations || "")
+            const observationsChanged = observations !== (returnRequest.sellerNotes || "")
 
             const itemsChanged = returnItems.some(item => {
                 const orig = returnRequest.items.find(i => i.id === item.id)
@@ -304,7 +304,7 @@ export default function CreateReturnPage({
             setReplacementProduct((returnRequest as any).replacementProduct || "")
             setEvidenceImages(returnRequest.evidenceImages || [])
             setEvidenceUploads((returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
-            setObservations(returnRequest.observations || "")
+            setObservations(returnRequest.sellerNotes || "")
         }
     }, [mode, returnRequest])
 
@@ -1644,12 +1644,20 @@ export default function CreateReturnPage({
 
                                     <TabsContent value="observations" className="mt-0">
                                         <FadeIn key="observations" className="space-y-6">
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Observações Gerais</h3>
+                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Observações da Devolução</h3>
+                                            {returnRequest?.customerMessage && (
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Observações do Cliente</label>
+                                                    <div className="p-3.5 bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap border border-brand-border/40 dark:border-dark-border/40">
+                                                        {returnRequest.customerMessage}
+                                                    </div>
+                                                </div>
+                                            )}
                                             <FormTextarea
                                                 name="observations"
-                                                label="Observações da Devolução"
-                                                placeholder="Adicione observações sobre a troca, feedback do cliente ou detalhes internos..."
-                                                disabled={isViewOnly || isMarketplaceRequest}
+                                                label="Observações Internas (Vendedor)"
+                                                placeholder="Adicione observações internas sobre a troca/devolução. O cliente também poderá visualizar essas observações."
+                                                disabled={isViewOnly}
                                                 value={observations}
                                                 onChange={(e) => setObservations(e.target.value)}
                                                 maxLength={1000}

@@ -106,4 +106,4 @@ Sim. A promoção automática é aplicada primeiro. Depois, se o cliente tem um 
 ---
 
 **Artigo relacionado:** [Vendendo no PDV](./07-pdv-vendas.md)
-**Próximo artigo:** [Solicitando devolução ou troca](./09-devolucoes-solicitacao.md)
+**Próximo artigo:** [Solicitando devolução ou troca](./09-devolucoes-solicitação.md)

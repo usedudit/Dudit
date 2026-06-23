@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input, Button, Accordion, IconPlaceholder, DefaultModal, ListItem, Badge } from "@/components/reusable"
-import { TrashIcon, PlusIcon, ArrowUpDownIcon, PhoneIcon, MonitorIcon, TruckIcon, HomeIcon, SettingsIcon } from "@/lib/icons"
+import { TrashIcon, PlusIcon, ArrowUpDownIcon, PhoneIcon, MonitorIcon, TruckIcon, HomeIcon, SettingsIcon, ChevronLeftIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { saveServiceOrderSpecificationsAction } from "@/app/actions/erp/service-orders"
 
@@ -104,7 +104,7 @@ export default function SpecificationsTab({
     setSelectedTemplate(null)
   }
 
-  const isSpecsEmpty = localSpecs.length === 0 || localSpecs.every((s) => !s.name && !s.value)
+  const isSpecsEmpty = localSpecs.length === 0
 
   return (
     <div className="space-y-4">
@@ -212,112 +212,146 @@ export default function SpecificationsTab({
         </>
       )}
 
-      {/* Template Preview Modal */}
-      {showTemplateModal && selectedTemplate && (
+      {/* Template Modal */}
+      {showTemplateModal && (
         <DefaultModal
           isOpen={showTemplateModal}
-          onClose={() => { setShowTemplateModal(false); setSelectedTemplate(null) }}
-          title={`Modelo: ${selectedTemplate}`}
-          maxWidth="lg"
-        >
-          <button
-            onClick={() => setSelectedTemplate(null)}
-            className="text-xs font-semibold text-brand-inactive-text hover:text-brand-dark mb-3 flex items-center gap-1"
-          >
-            ← Voltar para modelos
-          </button>
-          <div className="space-y-3 py-2">
-            {templateSpecs.map((spec, idx) => (
-              <div key={idx} className="flex gap-2 items-start">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={spec.name}
-                    onChange={(e) => {
-                      const next = [...templateSpecs]
-                      next[idx] = { ...next[idx], name: e.target.value }
-                      setTemplateSpecs(next)
-                    }}
-                    placeholder="Nome"
-                    className="w-full px-3 py-2 text-[13px] rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green/30"
-                  />
-                </div>
-                <div className="flex-[2]">
-                  <input
-                    type="text"
-                    value={spec.value}
-                    onChange={(e) => {
-                      const next = [...templateSpecs]
-                      next[idx] = { ...next[idx], value: e.target.value }
-                      setTemplateSpecs(next)
-                    }}
-                    placeholder="Valor"
-                    className="w-full px-3 py-2 text-[13px] rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green/30"
-                  />
-                </div>
-                <button
+          onClose={() => {
+            setShowTemplateModal(false)
+            setSelectedTemplate(null)
+          }}
+          title={selectedTemplate ? `Modelo: ${selectedTemplate}` : "Escolher modelo"}
+          maxWidth={selectedTemplate ? "lg" : "sm"}
+          leftAction={
+            selectedTemplate ? (
+              <Button
+                variant="filled"
+                onClick={() => setSelectedTemplate(null)}
+                className="w-[40px] h-[40px] p-0 flex items-center justify-center shrink-0"
+              >
+                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+              </Button>
+            ) : undefined
+          }
+          footer={
+            selectedTemplate ? (
+              <>
+                <Button
+                  variant="outline"
                   onClick={() => {
-                    setTemplateSpecs(templateSpecs.filter((_, i) => i !== idx))
+                    setShowTemplateModal(false)
+                    setSelectedTemplate(null)
                   }}
-                  className="p-2 hover:bg-brand-gray/50 dark:hover:bg-dark-border rounded-lg mt-0.5"
                 >
-                  <TrashIcon className="w-4 h-4 text-brand-red" />
-                </button>
-              </div>
-            ))}
-            <Button variant="outline" size="sm" onClick={() => setTemplateSpecs([...templateSpecs, { name: "", value: "" }])}>
-              <PlusIcon className="w-4 h-4 mr-1" />
-              Adicionar linha
-            </Button>
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border mt-6">
-            <Button variant="outline" onClick={() => { setShowTemplateModal(false); setSelectedTemplate(null) }}>
-              Cancelar
-            </Button>
-            <Button onClick={applyTemplate}>
-              Aplicar modelo
-            </Button>
-          </div>
-        </DefaultModal>
-      )}
-
-      {/* Template Selection Modal */}
-      {showTemplateModal && !selectedTemplate && (
-        <DefaultModal
-          isOpen={showTemplateModal}
-          onClose={() => setShowTemplateModal(false)}
-          title="Escolher modelo"
-          maxWidth="sm"
+                  Cancelar
+                </Button>
+                <Button onClick={applyTemplate}>
+                  Aplicar modelo
+                </Button>
+              </>
+            ) : undefined
+          }
         >
-          <div className="space-y-2 py-2">
-            {Object.keys(SPEC_TEMPLATES).map((name) => {
-              const iconMap: Record<string, React.ComponentType<any>> = {
-                Celular: PhoneIcon,
-                Veículo: TruckIcon,
-                Eletrônico: MonitorIcon,
-                Eletrodoméstico: HomeIcon,
-              }
-              const descMap: Record<string, string> = {
-                Celular: "IMEI, modelo, marca, cor, armazenamento, ano",
-                Veículo: "Chassi, placa, modelo, marca, ano, cor",
-                Eletrônico: "Modelo, marca, nº série, voltagem",
-                Eletrodoméstico: "Modelo, marca, nº série, voltagem, cor",
-              }
-              return (
-                <ListItem
-                  key={name}
-                  icon={iconMap[name] || SettingsIcon}
-                  title={name}
-                  description={descMap[name] || ""}
-                  className="px-4 py-3 gap-4"
-                  showChevron={true}
-                  onClick={() => {
-                    setSelectedTemplate(name)
-                    setTemplateSpecs(SPEC_TEMPLATES[name].map((s) => ({ ...s })))
-                  }}
-                />
-              )
-            })}
+          <div className="relative overflow-hidden min-h-[300px]">
+            <AnimatePresence mode="wait">
+              {!selectedTemplate ? (
+                <motion.div
+                  key="selection"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                  className="space-y-2 py-2"
+                >
+                  {Object.keys(SPEC_TEMPLATES).map((name) => {
+                    const iconMap: Record<string, React.ComponentType<any>> = {
+                      Celular: PhoneIcon,
+                      Veículo: TruckIcon,
+                      Eletrônico: MonitorIcon,
+                      Eletrodoméstico: HomeIcon,
+                    }
+                    const descMap: Record<string, string> = {
+                      Celular: "IMEI, modelo, marca, cor, armazenamento, ano",
+                      Veículo: "Chassi, placa, modelo, marca, ano, cor",
+                      Eletrônico: "Modelo, marca, nº série, voltagem",
+                      Eletrodoméstico: "Modelo, marca, nº série, voltagem, cor",
+                    }
+                    return (
+                      <ListItem
+                        key={name}
+                        icon={iconMap[name] || SettingsIcon}
+                        title={name}
+                        description={descMap[name] || ""}
+                        className="px-4 py-3 gap-4"
+                        showChevron={true}
+                        onClick={() => {
+                          setSelectedTemplate(name)
+                          setTemplateSpecs(SPEC_TEMPLATES[name].map((s) => ({ ...s })))
+                        }}
+                      />
+                    )
+                  })}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="preview"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                  className="space-y-3 py-2"
+                >
+                  {templateSpecs.map((spec, idx) => (
+                    <div key={idx} className="flex gap-4 mb-3 last:mb-0 items-start">
+                      <div className="flex-1">
+                        <Input
+                          label=""
+                          name={`template-name-${idx}`}
+                          placeholder="Nome"
+                          value={spec.name}
+                          onChange={(e) => {
+                            const next = [...templateSpecs]
+                            next[idx] = { ...next[idx], name: e.target.value }
+                            setTemplateSpecs(next)
+                          }}
+                          className="mb-0"
+                        />
+                      </div>
+                      <div className="flex-[2]">
+                        <Input
+                          label=""
+                          name={`template-val-${idx}`}
+                          placeholder="Valor"
+                          value={spec.value}
+                          onChange={(e) => {
+                            const next = [...templateSpecs]
+                            next[idx] = { ...next[idx], value: e.target.value }
+                            setTemplateSpecs(next)
+                          }}
+                          className="mb-0"
+                        />
+                      </div>
+                      <div className="h-[40px] mt-1.5 flex items-center justify-center">
+                        <Button
+                          type="button"
+                          variant="outlinered"
+                          className="w-[40px] h-[40px] p-0 flex items-center justify-center"
+                          onClick={() => {
+                            setTemplateSpecs(templateSpecs.filter((_, i) => i !== idx))
+                          }}
+                        >
+                          <TrashIcon className="w-4 h-4 pointer-events-none" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={() => setTemplateSpecs([...templateSpecs, { name: "", value: "" }])}>
+                    <PlusIcon className="w-4 h-4 mr-1" />
+                    Adicionar linha
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </DefaultModal>
       )}

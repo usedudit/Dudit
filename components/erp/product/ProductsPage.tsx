@@ -826,7 +826,13 @@ export default function ProductsPage({
                                         <DropdownItem onClick={handleExport} disabled={isExporting}>
                                             <ExportFileIcon size={18} /> {isExporting ? "Exportando..." : "Exportar"}
                                         </DropdownItem>
-                                        <DropdownItem onClick={() => setShowLabelModal(true)}>
+                                        <DropdownItem onClick={() => {
+                                            if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                openPlanUpgrade("crescer")
+                                            } else {
+                                                setShowLabelModal(true)
+                                            }
+                                        }}>
                                             <TagIcon size={18} /> Gerar Etiquetas
                                         </DropdownItem>
                                     </Dropdown>

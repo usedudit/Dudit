@@ -75,6 +75,8 @@ export type ReturnRequestListItem = {
   storeCreditValue: number
   evidenceImages: string[]
   observations?: string
+  customerMessage?: string
+  sellerNotes?: string
   expiresAt?: string | null
   eligibilityStatus?: string | null
   eligibilityDetails?: Record<string, unknown> | null

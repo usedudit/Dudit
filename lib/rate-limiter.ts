@@ -46,6 +46,7 @@ export enum RateLimitCategory {
   SUBSCRIPTION_CREATE = "SUBSCRIPTION_CREATE",
   SUBSCRIPTION_CANCEL = "SUBSCRIPTION_CANCEL",
   SUBSCRIPTION_WEBHOOK = "SUBSCRIPTION_WEBHOOK",
+  REFUND_EXECUTE = "REFUND_EXECUTE",
   DEFAULT = "DEFAULT",
 }
 
@@ -269,6 +270,12 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     window: "1 m",
     identifierType: IdentifierType.ENDPOINT,
     failClosed: false,
+  },
+  [RateLimitCategory.REFUND_EXECUTE]: {
+    maxRequests: 3,
+    window: "10 m",
+    identifierType: IdentifierType.USER_PLUS_IP,
+    failClosed: true,
   },
   [RateLimitCategory.DEFAULT]: {
     maxRequests: 100,

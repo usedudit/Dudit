@@ -136,7 +136,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     );
 
     // Instant product search (client-side bucket)
-    const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 });
+    const productBucket = useProductBucket<ProductBucketItem>(fetchPartnerProductsBucket, { pageSize: 10 });
     const [isSaving, setIsSaving] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
     const getTabErrorCount = useCallback((tab: string) => {

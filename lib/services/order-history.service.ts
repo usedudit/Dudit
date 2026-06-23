@@ -117,10 +117,51 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
     }
   }
 
-  return merged.map((entry) => ({
-    ...entry,
-    actor_name: entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema",
-  }))
+  // Fetch return requests seller notes to detect if seller notes exist for this order
+  let hasSellerNotes = false
+  try {
+    const { data: returnRequests } = await supabase
+      .from("return_requests")
+      .select("seller_notes")
+      .eq("order_id", orderId)
+      .is("deleted_at", null)
+    hasSellerNotes = (returnRequests || []).some((rr: any) => rr.seller_notes && rr.seller_notes.trim().length > 0)
+  } catch (err) {
+    console.error("[orders_history] return requests notes fetch error:", err)
+  }
+
+  return merged.map((entry) => {
+    let actorName = entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema"
+    let changeLines = [...entry.change_lines]
+
+    // Rewrite return created events for ERP view
+    if (entry.entry_type === "return_created") {
+      actorName = "Solicitação de devolução"
+      changeLines = changeLines.map(line => 
+        line === "Solicitação criada" ? "Solicitação de devolução criada pelo cliente" : line
+      )
+    }
+
+    // Rewrite return status changes for ERP view
+    if (entry.entry_type && entry.entry_type.startsWith("return_") && entry.entry_type !== "return_created") {
+      changeLines = changeLines.map(line => {
+        if (line.startsWith("Solicitação atualizada:")) {
+          let newLine = line.replace("Solicitação atualizada:", "Solicitação de devolução atualizada:")
+          if (hasSellerNotes) {
+            newLine = newLine.trim().replace(/\.$/, "") + ". Observações adicionadas."
+          }
+          return newLine
+        }
+        return line
+      })
+    }
+
+    return {
+      ...entry,
+      actor_name: actorName,
+      change_lines: changeLines,
+    }
+  })
 }
 
 export const getOrderHistoryEntries = cache(async (orderId: string, partnerId: string, limit = MAX_MERGED_ENTRIES): Promise<OrderHistoryEntryWithActor[]> => {

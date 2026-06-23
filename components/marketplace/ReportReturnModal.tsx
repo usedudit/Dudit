@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { DefaultModal, Button, FormDropdown, FormTextarea, Checkbox } from "@/components/reusable"
+import { DefaultModal, Button, FormDropdown, FormTextarea, Checkbox, InfoCard } from "@/components/reusable"
 import { reportReturnToDuditAction } from "@/app/actions/returns/reports"
 import { DUDIT_REPORT_LEGAL_NOTICE } from "@/lib/returns/policy"
 import { useToast } from "@/components/ui/use-toast"
+import { useCSRFToken } from "@/hooks/use-csrf-token"
 
 type Props = {
   open: boolean
@@ -28,6 +29,7 @@ export function ReportReturnModal({ open, onClose, returnRequestId, onReported }
   const [description, setDescription] = useState("")
   const [legalAck, setLegalAck] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const csrfToken = useCSRFToken()
 
   async function handleSubmit() {
     if (!legalAck) {
@@ -41,6 +43,7 @@ export function ReportReturnModal({ open, onClose, returnRequestId, onReported }
       description: description || null,
       legalAcknowledged: true,
       idempotencyKey: `report:${returnRequestId}`,
+      csrf_token: csrfToken || undefined,
     })
     setSubmitting(false)
 
@@ -56,9 +59,7 @@ export function ReportReturnModal({ open, onClose, returnRequestId, onReported }
   return (
     <DefaultModal isOpen={open} onClose={onClose} title="Reportar à Dudit">
       <div className="space-y-4">
-        <p className="text-sm text-brand-inactive-text dark:text-dark-body rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3">
-          {DUDIT_REPORT_LEGAL_NOTICE}
-        </p>
+        <InfoCard message={DUDIT_REPORT_LEGAL_NOTICE} color="orange" />
 
         <FormDropdown
           label="Motivo"

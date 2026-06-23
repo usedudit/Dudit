@@ -127,5 +127,5 @@ Não necessariamente. Você pode definir o fluxo: aprovar primeiro, aguardar o i
 
 ---
 
-**Artigo relacionado:** [Solicitando devolução ou troca](./09-devolucoes-solicitacao.md)
+**Artigo relacionado:** [Solicitando devolução ou troca](./09-devolucoes-solicitação.md)
 **Próximo artigo:** [Gerenciando entregadores e criando rotas](./11-entregas-gerenciamento.md)

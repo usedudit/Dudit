@@ -17,6 +17,12 @@ export default async function GenerateLabelsPage() {
     redirect("/dashboard")
   }
 
+  const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+  const plan = await getPartnerPlan(partner.id)
+  if (plan.slug.toLowerCase() === "free") {
+    redirect("/erp/labels")
+  }
+
   const { allowed } = await checkPermission(partner.id, "products", "view")
   if (!allowed) return <AccessDenied />
 

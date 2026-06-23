@@ -9,6 +9,7 @@ export type PermissionTemplate = {
     cancel: boolean
     can_apply_discount: boolean
     can_add_delivery: boolean
+    can_refund: boolean
   }
   appointments: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   customers: { view: boolean; create: boolean; edit: boolean; delete: boolean }

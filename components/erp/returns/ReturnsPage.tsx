@@ -2,10 +2,10 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Badge, Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { Badge, Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, DefaultModal, Checkbox } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
-import { PlusIcon, ExportFileIcon, ReturnIcon } from "@/lib/icons"
+import { PlusIcon, ExportFileIcon, ReturnIcon, XIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useToast } from "@/hooks/use-toast"
@@ -103,6 +103,10 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
         direction: "desc",
     })
 
+    const [showMpPaymentNotFoundModal, setShowMpPaymentNotFoundModal] = useState(false)
+    const [mpPaymentNotFoundChecked, setMpPaymentNotFoundChecked] = useState(false)
+    const [pendingProcessData, setPendingProcessData] = useState<Record<string, any> | null>(null)
+
     const loadReturns = useCallback(async () => {
         setIsLoading(true)
         const res = await getReturnRequestsPageAction(partnerId, { limit: 100 })
@@ -161,9 +165,9 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                     returnToInventory: Boolean(data.returnToInventory),
                 })
                 if (!response.success) throw new Error(response.error)
-                toast({ title: "Sucesso", description: "Solicitacao criada com sucesso." })
+                toast({ title: "Sucesso", description: "Solicitação criada com sucesso." })
             } else if (entityState.action === "edit" && entityState.entityId) {
-                const response = await processReturnRequestAction({
+                const processPayload: Record<string, any> = {
                     partnerId,
                     requestId: entityState.entityId,
                     action: "updated",
@@ -179,8 +183,15 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                     exchangeBalanceResolution: data.exchangeBalanceResolution || null,
                     notes: data.observations || "",
                     idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
-                })
+                }
+                const response = await processReturnRequestAction(processPayload)
                 if (!response.success) throw new Error(response.error)
+                if (response.success && (response as any).data?.mpPaymentNotFound) {
+                    setPendingProcessData(processPayload)
+                    setMpPaymentNotFoundChecked(false)
+                    setShowMpPaymentNotFoundModal(true)
+                    return
+                }
                 toast({ title: "Sucesso", description: "Solicitação atualizada com sucesso." })
             }
             await loadReturns()
@@ -273,153 +284,250 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
         )
     }
 
+    const handleMpPaymentNotFoundConfirm = useCallback(async () => {
+        if (!pendingProcessData) return
+        setIsSaving(true)
+        setShowMpPaymentNotFoundModal(false)
+        try {
+            const retryResponse = await processReturnRequestAction({
+                ...pendingProcessData,
+                skipMpPaymentCheck: true,
+            })
+            if (!retryResponse.success) throw new Error(retryResponse.error)
+            await loadReturns()
+            closeEntity()
+            toast({ title: "Sucesso", description: "Solicitação atualizada com sucesso." })
+        } catch (err: any) {
+            toast({ title: "Erro", description: err?.message || "Erro ao salvar devolução.", variant: "destructive" })
+        } finally {
+            setIsSaving(false)
+            setPendingProcessData(null)
+        }
+    }, [pendingProcessData, loadReturns, closeEntity, toast])
+
     return (
-        <AnimatePresence mode="wait">
-            {entityState.isOpen ? (
-                isLoading ? (
-                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                        <ThreeDotsLoader />
-                    </div>
-                ) : (
-                    <CreateReturnPage
-                        key="form"
-                        partnerId={partnerId}
-                        mode={entityState.action as any}
-                        returnRequest={activeReturnRequest}
-                        onBack={closeEntity}
-                        onSave={handleSaveReturn}
-                        isSaving={isSaving}
-                    />
-                )
-            ) : (
-                <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-                    <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                            <div className="flex flex-col gap-2 pt-1">
-                                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                    Trocas e devoluções
-                                </h1>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                    Gerencie trocas, devoluções, créditos e reembolsos.
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Button variant="outline" leftIcon={<ExportFileIcon size={18} />} onClick={() => toast({ title: "Exportacao", description: "Use os filtros atuais para revisar a lista antes de exportar." })}>
-                                    Exportar
-                                </Button>
-                                {canManage && (
-                                    <Button onClick={() => openEntity("create")} leftIcon={<PlusIcon size={18} />}>
-                                        Nova devolução
-                                    </Button>
-                                )}
-                            </div>
+        <>
+            <AnimatePresence mode="wait">
+                {entityState.isOpen ? (
+                    isLoading ? (
+                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                            <ThreeDotsLoader />
                         </div>
-
-                        <div className="mb-6 px-4 md:px-8">
-                            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as ActiveTab)}>
-                                <TabsList className="px-0">
-                                    <TabsTrigger value="Todos">Todos</TabsTrigger>
-                                    <TabsTrigger value="Pendentes">Pendentes</TabsTrigger>
-                                    <TabsTrigger value="Analise">Análise</TabsTrigger>
-                                    <TabsTrigger value="AguardandoCliente">Aguardando cliente</TabsTrigger>
-                                    <TabsTrigger value="Aprovados">Aprovados</TabsTrigger>
-                                    <TabsTrigger value="Finalizados">Finalizados</TabsTrigger>
-                                </TabsList>
-                            </Tabs>
-                        </div>
-
-                        <ReturnPageControls
-                            search={search}
-                            onSearchChange={setSearch}
-                            onOpenFilter={() => undefined}
-                            onAdd={canManage ? () => openEntity("create") : undefined}
-                            viewMode={effectiveViewMode}
-                            onViewModeChange={setViewModeState}
+                    ) : (
+                        <CreateReturnPage
+                            key="form"
+                            partnerId={partnerId}
+                            mode={entityState.action as any}
+                            returnRequest={activeReturnRequest}
+                            onBack={closeEntity}
+                            onSave={handleSaveReturn}
+                            isSaving={isSaving}
                         />
+                    )
+                ) : (
+                    <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                        Trocas e devoluções
+                                    </h1>
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                        Gerencie trocas, devoluções, créditos e reembolsos.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Button variant="outline" leftIcon={<ExportFileIcon size={18} />} onClick={() => toast({ title: "Exportacao", description: "Use os filtros atuais para revisar a lista antes de exportar." })}>
+                                        Exportar
+                                    </Button>
+                                    {canManage && (
+                                        <Button onClick={() => openEntity("create")} leftIcon={<PlusIcon size={18} />}>
+                                            Nova devolução
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                            <AnimatePresence mode="wait">
-                                {isLoading ? (
-                                    <div className="h-[400px] flex items-center justify-center">
-                                        <ThreeDotsLoader />
-                                    </div>
-                                ) : paginatedReturns.length === 0 ? (
-                                    <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
-                                        <IconPlaceholder
-                                            placeholderType="image"
-                                            imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Devolucoes.png"}
-                                            imageAlt="Sem devolucoes"
-                                            title={hasActiveFilters ? "Nenhuma solicitação encontrada" : "Nenhuma solicitação cadastrada"}
-                                            subtitle={hasActiveFilters ? "Ajuste a busca para encontrar o que procura." : "Comece criando a primeira solicitação de troca ou devolução."}
-                                            itemButton={!hasActiveFilters && canManage ? { text: "Criar devolução", action: () => openEntity("create") } : undefined}
-                                        />
-                                    </FadeIn>
-                                ) : effectiveViewMode === "grid" ? (
-                                    <FadeIn key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginatedReturns.map((item) => (
-                                            <ReturnGridCard
-                                                key={item.id}
-                                                returnRequest={item}
-                                                onDetails={() => openEntity("view", item.id)}
-                                                onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status) ? () => openEntity("edit", item.id) : undefined}
-                                                canManage={canManage}
-                                            />
-                                        ))}
-                                    </FadeIn>
-                                ) : (
-                                    <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        {COLUMNS.map((col, idx) => {
-                                                            const sortable = col.id !== "actions"
-                                                            const sorted = sortConfig?.key === col.id
-                                                            return (
-                                                                <th
-                                                                    key={col.id}
-                                                                    style={{ width: col.width }}
-                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === 0 ? "rounded-l-lg pl-4" : ""} ${idx === COLUMNS.length - 1 ? "rounded-r-lg pr-4" : ""} ${sortable ? "cursor-pointer group" : ""}`}
-                                                                    onClick={() => {
-                                                                        if (!sortable) return
-                                                                        setSortConfig((prev) => ({
-                                                                            key: col.id as SortKey,
-                                                                            direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
-                                                                        }))
-                                                                    }}
-                                                                >
-                                                                    <span>{col.label}</span>
-                                                                    {sorted ? null : null}
-                                                                </th>
-                                                            )
-                                                        })}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginatedReturns.map((item) => (
-                                                        <ReturnListRow
-                                                            key={item.id}
-                                                            returnRequest={item}
-                                                            columns={COLUMNS}
-                                                            onDetails={(r) => openEntity("view", r.id)}
-                                                            onEdit={(r) => openEntity("edit", r.id)}
-                                                            canManage={canManage}
-                                                        />
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                            <div className="mb-6 px-4 md:px-8">
+                                <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as ActiveTab)}>
+                                    <TabsList className="px-0">
+                                        <TabsTrigger value="Todos">Todos</TabsTrigger>
+                                        <TabsTrigger value="Pendentes">Pendentes</TabsTrigger>
+                                        <TabsTrigger value="Analise">Análise</TabsTrigger>
+                                        <TabsTrigger value="AguardandoCliente">Aguardando cliente</TabsTrigger>
+                                        <TabsTrigger value="Aprovados">Aprovados</TabsTrigger>
+                                        <TabsTrigger value="Finalizados">Finalizados</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                            </div>
+
+                            <ReturnPageControls
+                                search={search}
+                                onSearchChange={setSearch}
+                                onOpenFilter={() => undefined}
+                                onAdd={canManage ? () => openEntity("create") : undefined}
+                                viewMode={effectiveViewMode}
+                                onViewModeChange={setViewModeState}
+                            />
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                                <AnimatePresence mode="wait">
+                                    {isLoading ? (
+                                        <div className="h-[400px] flex items-center justify-center">
+                                            <ThreeDotsLoader />
                                         </div>
-                                    </FadeIn>
-                                )}
-                            </AnimatePresence>
-                        </div>
+                                    ) : paginatedReturns.length === 0 ? (
+                                        <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Devolucoes.png"}
+                                                imageAlt="Sem devolucoes"
+                                                title={hasActiveFilters ? "Nenhuma solicitação encontrada" : "Nenhuma solicitação cadastrada"}
+                                                subtitle={hasActiveFilters ? "Ajuste a busca para encontrar o que procura." : "Comece criando a primeira solicitação de troca ou devolução."}
+                                                itemButton={!hasActiveFilters && canManage ? { text: "Criar devolução", action: () => openEntity("create") } : undefined}
+                                            />
+                                        </FadeIn>
+                                    ) : effectiveViewMode === "grid" ? (
+                                        <FadeIn key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                            {paginatedReturns.map((item) => (
+                                                <ReturnGridCard
+                                                    key={item.id}
+                                                    returnRequest={item}
+                                                    onDetails={() => openEntity("view", item.id)}
+                                                    onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status) ? () => openEntity("edit", item.id) : undefined}
+                                                    canManage={canManage}
+                                                />
+                                            ))}
+                                        </FadeIn>
+                                    ) : (
+                                        <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
+                                            <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                                    <thead>
+                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                            {COLUMNS.map((col, idx) => {
+                                                                const sortable = col.id !== "actions"
+                                                                const sorted = sortConfig?.key === col.id
+                                                                return (
+                                                                    <th
+                                                                        key={col.id}
+                                                                        style={{ width: col.width }}
+                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === 0 ? "rounded-l-lg pl-4" : ""} ${idx === COLUMNS.length - 1 ? "rounded-r-lg pr-4" : ""} ${sortable ? "cursor-pointer group" : ""}`}
+                                                                        onClick={() => {
+                                                                            if (!sortable) return
+                                                                            setSortConfig((prev) => ({
+                                                                                key: col.id as SortKey,
+                                                                                direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                            }))
+                                                                        }}
+                                                                    >
+                                                                        <span>{col.label}</span>
+                                                                        {sorted ? null : null}
+                                                                    </th>
+                                                                )
+                                                            })}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {paginatedReturns.map((item) => (
+                                                            <ReturnListRow
+                                                                key={item.id}
+                                                                returnRequest={item}
+                                                                columns={COLUMNS}
+                                                                onDetails={(r) => openEntity("view", r.id)}
+                                                                onEdit={(r) => openEntity("edit", r.id)}
+                                                                canManage={canManage}
+                                                            />
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </FadeIn>
+                                    )}
+                                </AnimatePresence>
+                            </div>
 
-                        {filteredReturns.length > 0 && (
-                            <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
-                        )}
+                            {filteredReturns.length > 0 && (
+                                <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
+                            )}
+                        </div>
+                    </FadeIn>
+                )}
+            </AnimatePresence>
+
+            <DefaultModal
+                isOpen={showMpPaymentNotFoundModal}
+                onClose={() => {
+                    setShowMpPaymentNotFoundModal(false)
+                    setPendingProcessData(null)
+                }}
+                maxWidth="md"
+            >
+                <div className="flex flex-col relative">
+                    <button
+                        onClick={() => {
+                            setShowMpPaymentNotFoundModal(false)
+                            setPendingProcessData(null)
+                        }}
+                        className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
+                        title="Fechar"
+                    >
+                        <XIcon size={18} />
+                    </button>
+
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden bg-[#fff3e0]">
+                        <img
+                            src="https://img.dudit.com.br/static/illustrations/Pagamento.png"
+                            alt="Pagamento não encontrado"
+                            className="w-64 h-auto object-contain transform translate-y-4"
+                        />
                     </div>
-                </FadeIn>
-            )}
-        </AnimatePresence>
+
+                    <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
+                        Pagamento não detectado
+                    </h4>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-6 text-center leading-relaxed">
+                        Não foi detectado pagamento via <strong>Mercado Pago</strong> para este pedido nos servidores do Mercado Pago. O reembolso automático pode não ser processado.
+                    </p>
+
+                    <div className="mb-6 flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4">
+                        <Checkbox
+                            checked={mpPaymentNotFoundChecked}
+                            onChange={(checked: boolean) => setMpPaymentNotFoundChecked(!!checked)}
+                        />
+                        <div
+                            className="text-xs font-medium text-amber-800 dark:text-amber-300 leading-normal select-none cursor-pointer"
+                            onClick={() => setMpPaymentNotFoundChecked(!mpPaymentNotFoundChecked)}
+                        >
+                            Estou ciente de que o pagamento não foi localizado no Mercado Pago e o reembolso pode não ser processado automaticamente.
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowMpPaymentNotFoundModal(false)
+                                setPendingProcessData(null)
+                            }}
+                            className="flex-1 h-[46px]"
+                            disabled={isSaving}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleMpPaymentNotFoundConfirm}
+                            className={`flex-1 h-[46px] text-white border-none transition-colors ${mpPaymentNotFoundChecked
+                                ? "bg-amber-600 hover:bg-amber-700"
+                                : "bg-amber-600/50 cursor-not-allowed opacity-50"
+                            }`}
+                            disabled={!mpPaymentNotFoundChecked || isSaving}
+                        >
+                            {isSaving ? "Salvando..." : "Continuar mesmo assim"}
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
+        </>
     )
 }

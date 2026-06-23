@@ -21,6 +21,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency, formatDate, formatFullDate, formatTime } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit, getEligibilityLabel, getSlaStatusLabel } from '@/lib/returns/policy';
+import { getReturnStatusLabel } from '@/lib/returns/types';
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -57,7 +58,7 @@ const getReturnRequestStatusConfig = (request: any) => {
     const status = request.status;
     const isCancellation = request.request_type === "cancellation";
     const typeLabel = isCancellation ? "Cancelamento" : request.request_type === "return" ? "Devolução" : "Troca/Devolução";
-    
+
     switch (status) {
         case "PENDING_REVIEW":
             return {
@@ -532,16 +533,18 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const mappedReturnHistoryEntries = returnEvents.map((evt: any) => {
         let title = "Solicitação de devolução";
         let lines = [evt.message || "Evento de devolução registrado."];
-        
-        if (evt.event_type === "status_changed") {
-            title = "Status da Devolução";
-            lines = [`Status alterado de ${evt.from_status || "início"} para ${evt.to_status}.`];
-            if (evt.message) lines.push(evt.message);
+
+        if (evt.event_type === "created" || evt.message === "Solicitação criada" || evt.message === "Solicitação de cancelamento criada") {
+            title = "Solicitação de devolução";
+            lines = [evt.message === "Solicitação de cancelamento criada" ? "Solicitação de cancelamento criada" : "Solicitação de devolução criada pelo cliente"];
+        } else if (evt.event_type === "status_changed" || evt.event_type === "status_updated" || evt.event_type === "updated") {
+            title = "Atualização da solicitação de devolução";
+            lines = [`Solicitação atualizada: ${getReturnStatusLabel(evt.from_status || "PENDING_REVIEW")} para ${getReturnStatusLabel(evt.to_status)}`];
         } else if (evt.event_type === "message_added") {
             title = "Mensagem na Devolução";
             lines = [evt.message];
         }
-        
+
         return {
             id: `return-evt-${evt.id}`,
             actor_name: title,
@@ -669,7 +672,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
             );
         }
-        
+
         // Extract submethod name
         const nameLower = paymentMethodName.toLowerCase();
         if (nameLower.includes("pix")) {
@@ -811,7 +814,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 if (!res.success) throw new Error(res.error);
 
                 toast({
-                    title: "Solicitacao enviada",
+                    title: "Solicitação enviada",
                     description: "O vendedor recebeu seu pedido de cancelamento."
                 });
 
@@ -892,7 +895,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 idempotencyKey: `marketplace:${order.id}:${Date.now()}`,
             });
             if (!result.success) throw new Error(result.error);
-            toast({ title: "Solicitacao enviada", description: "A loja recebeu seu pedido de troca ou devolução." });
+            toast({ title: "Solicitação enviada", description: "A loja recebeu seu pedido de troca ou devolução." });
             setIsReturnModalOpen(false);
         } catch (err: any) {
             toast({ title: "Erro ao enviar", description: err.message || "Tente novamente.", variant: "destructive" });
@@ -1020,6 +1023,59 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         </>
     );
 
+    const renderReturnRequestCard = () => {
+        if (!activeReturnRequest || !returnStatusCfg) return null;
+        return (
+            <div className={`p-6 rounded-2xl border ${returnStatusCfg.color} flex items-start gap-4 shadow-none`}>
+                <div className="w-10 h-10 rounded-full bg-current/10 flex items-center justify-center shrink-0 font-bold">
+                    <returnStatusCfg.icon className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                    <h4 className="font-bold text-base lg:text-lg leading-snug">{returnStatusCfg.title}</h4>
+                    <p className="text-sm mt-1.5 opacity-90 leading-relaxed">{returnStatusCfg.description}</p>
+                    {activeReturnRequest.seller_notes && (
+                        <div className="mt-4 pt-3 border-t border-current/20 text-sm">
+                            <span className="font-bold">Observações do vendedor:</span> {activeReturnRequest.seller_notes}
+                        </div>
+                    )}
+                    <div className="mt-4 pt-3 border-t border-current/20 text-sm space-y-1">
+                        {activeReturnRequest.eligibility_status && (
+                            <div><span className="font-bold">Elegibilidade:</span> {getEligibilityLabel(activeReturnRequest.eligibility_status)}</div>
+                        )}
+                        {activeReturnRequest.sla_status && (
+                            <div><span className="font-bold">SLA:</span> {getSlaStatusLabel(activeReturnRequest.sla_status)}
+                                {activeReturnRequest.sla_due_at && ` — prazo ${formatDate(activeReturnRequest.sla_due_at)}`}
+                            </div>
+                        )}
+                        {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot) && (
+                            <div className="text-xs opacity-80 mt-2">
+                                Política aplicada: prazo comercial de{' '}
+                                {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot)?.commercial?.commercial_deadline_days ?? 30} dias
+                                (snapshot da venda)
+                            </div>
+                        )}
+                    </div>
+                    {canReportReturnToDudit({
+                        status: activeReturnRequest.status,
+                        slaStatus: activeReturnRequest.sla_status,
+                        reportedToDuditAt: activeReturnRequest.reported_to_dudit_at,
+                    }) && (
+                            <Button
+                                variant="outline"
+                                className="mt-4 w-full sm:w-auto"
+                                onClick={() => setReportReturnOpen(true)}
+                            >
+                                Reportar à Dudit
+                            </Button>
+                        )}
+                    {activeReturnRequest.reported_to_dudit_at && (
+                        <p className="text-xs mt-2 opacity-80">Reporte enviado em {formatDate(activeReturnRequest.reported_to_dudit_at)}</p>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -1052,56 +1108,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </TabsList>
 
                         <TabsContent value="details" className="mt-0 focus-visible:ring-0">
-                            {activeReturnRequest && returnStatusCfg && (
-                                <div className={`mb-8 p-6 rounded-2xl border ${returnStatusCfg.color} flex items-start gap-4 shadow-sm`}>
-                                    <div className="w-10 h-10 rounded-full bg-current/10 flex items-center justify-center shrink-0 font-bold">
-                                        <returnStatusCfg.icon className="w-5 h-5" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h4 className="font-bold text-base lg:text-lg leading-snug">{returnStatusCfg.title}</h4>
-                                        <p className="text-sm mt-1.5 opacity-90 leading-relaxed">{returnStatusCfg.description}</p>
-                                        {activeReturnRequest.seller_notes && (
-                                            <div className="mt-4 pt-3 border-t border-current/20 text-sm">
-                                                <span className="font-bold">Observações do vendedor:</span> {activeReturnRequest.seller_notes}
-                                            </div>
-                                        )}
-                                        <div className="mt-4 pt-3 border-t border-current/20 text-sm space-y-1">
-                                            {activeReturnRequest.eligibility_status && (
-                                                <div><span className="font-bold">Elegibilidade:</span> {getEligibilityLabel(activeReturnRequest.eligibility_status)}</div>
-                                            )}
-                                            {activeReturnRequest.sla_status && (
-                                                <div><span className="font-bold">SLA:</span> {getSlaStatusLabel(activeReturnRequest.sla_status)}
-                                                    {activeReturnRequest.sla_due_at && ` — prazo ${formatDate(activeReturnRequest.sla_due_at)}`}
-                                                </div>
-                                            )}
-                                            {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot) && (
-                                                <div className="text-xs opacity-80 mt-2">
-                                                    Política aplicada: prazo comercial de{' '}
-                                                    {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot)?.commercial?.commercial_deadline_days ?? 30} dias
-                                                    (snapshot da venda)
-                                                </div>
-                                            )}
-                                        </div>
-                                        {canReportReturnToDudit({
-                                            status: activeReturnRequest.status,
-                                            slaStatus: activeReturnRequest.sla_status,
-                                            reportedToDuditAt: activeReturnRequest.reported_to_dudit_at,
-                                        }) && (
-                                            <Button
-                                                variant="outline"
-                                                className="mt-4 w-full sm:w-auto"
-                                                onClick={() => setReportReturnOpen(true)}
-                                            >
-                                                Reportar à Dudit
-                                            </Button>
-                                        )}
-                                        {activeReturnRequest.reported_to_dudit_at && (
-                                            <p className="text-xs mt-2 opacity-80">Reporte enviado em {formatDate(activeReturnRequest.reported_to_dudit_at)}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                                 {/* Left Column (Sections 1, 2, 3, 4, 5) */}
                                 <div className="lg:col-span-8 space-y-8">
@@ -1401,6 +1407,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 )}
                                             </div>
                                         </FormSection>
+                                        {activeReturnRequest && (
+                                            <div className="mt-6">
+                                                {renderReturnRequestCard()}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1414,6 +1425,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             {renderPriceSummary()}
                                         </div>
                                     </div>
+
+                                    {renderReturnRequestCard()}
 
                                     {/* Desktop Actions / Buttons */}
                                     <div className="space-y-4 pt-4">
@@ -1551,7 +1564,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <div className="flex justify-end gap-3 w-full">
                             <Button variant="outline" onClick={() => setIsReturnModalOpen(false)} disabled={isSubmittingReturn}>Cancelar</Button>
                             <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
-                                {isSubmittingReturn ? "Enviando..." : "Enviar solicitacao"}
+                                {isSubmittingReturn ? "Enviando..." : "Enviar solicitação"}
                             </Button>
                         </div>
                     }

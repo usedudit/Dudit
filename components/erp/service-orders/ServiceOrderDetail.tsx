@@ -21,6 +21,9 @@ import {
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { useToast } from "@/hooks/use-toast"
+import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
@@ -59,6 +62,8 @@ interface ServiceOrderDetailProps {
 
 export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation, onEdit }: ServiceOrderDetailProps) {
     const { toast } = useToast()
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
     const [activeTab, setActiveTab] = useState("summary")
     const [order, setOrder] = useState(data)
     const [loading, setLoading] = useState(false)
@@ -352,14 +357,26 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 )
                                             })}
                                             {!order.signature_image_key && (
-                                                <DropdownItem onClick={() => setShowSignature(true)}>
+                                                <DropdownItem onClick={() => {
+                                                    if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                        openPlanUpgrade("crescer");
+                                                    } else {
+                                                        setShowSignature(true);
+                                                    }
+                                                }}>
                                                     Assinar OS
                                                 </DropdownItem>
                                             )}
                                             <DropdownItem onClick={() => window.print()}>
                                                 Imprimir OS
                                             </DropdownItem>
-                                            <DropdownItem onClick={() => setShowShareModal(true)}>
+                                            <DropdownItem onClick={() => {
+                                                if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                    openPlanUpgrade("crescer");
+                                                } else {
+                                                    setShowShareModal(true);
+                                                }
+                                            }}>
                                                 Compartilhar
                                             </DropdownItem>
                                         </ActionsDropdown>
@@ -726,7 +743,13 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Assinatura do Cliente</h3>
                                                             <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
                                                                 <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço foi concluída mas ainda não foi assinada.</p>
-                                                                <Button variant="outline" size="sm" onClick={() => setShowSignature(true)} className="w-full">
+                                                                <Button variant="outline" size="sm" onClick={() => {
+                                                                    if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                                        openPlanUpgrade("crescer");
+                                                                    } else {
+                                                                        setShowSignature(true);
+                                                                    }
+                                                                }} className="w-full">
                                                                     <CheckCircleIcon className="w-4 h-4 mr-2" />
                                                                     Assinar OS
                                                                 </Button>

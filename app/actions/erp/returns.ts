@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { headers } from "next/headers"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireUser, requireMinimumPlan, requireOrderAccess } from "@/lib/auth/authorization"
@@ -22,6 +23,13 @@ import {
     getOrderAmountPaid,
     getOrderSubtotalOriginal,
 } from "@/lib/returns/calculations"
+
+// ─── Segurança: Constantes de Reembolso ────────────────────────────────────
+
+const REFUND_PASSWORD_THRESHOLD = 300
+const REFUND_COOLDOWN_THRESHOLD = 1000
+const REFUND_COOLDOWN_SECONDS = 5
+const REFUND_CRITICAL_THRESHOLD = 2000
 
 const RETURN_STATUS_SET = new Set([
     "PENDING_REVIEW",
@@ -120,6 +128,19 @@ const processReturnSchema = z.object({
     exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
     notes: z.string().max(2000).optional().nullable(),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
+    skipMpPaymentCheck: z.boolean().optional().default(false),
+})
+
+const executeMpRefundSchema = z.object({
+    partnerId: z.string().uuid(),
+    requestId: z.string().uuid(),
+    refundId: z.string().uuid(),
+    refundConfirmation: z.string().refine((v) => v === "REEMBOLSAR", {
+        message: "Digite exatamente REEMBOLSAR para confirmar",
+    }),
+    refundPassword: z.string().optional().nullable(),
+    refundCooldownTimestamp: z.number().optional().nullable(),
+    idempotencyKey: z.string().trim().max(160).optional().nullable(),
 })
 
 function assertRole(roleId: string, allowed: Set<string>) {
@@ -132,6 +153,24 @@ function assertRole(roleId: string, allowed: Set<string>) {
 function toNumber(value: unknown) {
     const n = Number(value || 0)
     return Number.isFinite(n) ? n : 0
+}
+
+async function getClientIP(): Promise<string> {
+    try {
+        const h = await headers()
+        return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown"
+    } catch {
+        return "unknown"
+    }
+}
+
+async function getClientUserAgent(): Promise<string> {
+    try {
+        const h = await headers()
+        return h.get("user-agent") || "unknown"
+    } catch {
+        return "unknown"
+    }
 }
 
 function normalizeReturnRow(row: any): ReturnRequestListItem {
@@ -179,6 +218,8 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
         storeCreditValue: toNumber(row.store_credit_amount),
         evidenceImages: (row.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
         observations: row.customer_details || row.customer_message || row.seller_notes || row.internal_notes || "",
+        customerMessage: row.customer_message || row.customer_details || "",
+        sellerNotes: row.seller_notes || "",
         expiresAt: row.expires_at,
         eligibilityStatus: row.eligibility_status || null,
         eligibilityDetails: row.eligibility_details || null,
@@ -392,7 +433,7 @@ export async function createReturnRequestAction(input: unknown) {
             entityType: "return_request",
             entityId: requestId,
             actionType: "created",
-            changeLines: ["criou solicitacao de troca/devolução."],
+            changeLines: ["criou solicitação de troca/devolução."],
             metadata: { orderId: data.orderId, resolution: data.resolution },
             source: "manual",
         })
@@ -610,11 +651,14 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
 async function maybeRefundMercadoPago(params: {
     partnerId: string
     requestId: string
-    refundId?: string | null
+    refundId: string
     amount: number
     order: any
-}) {
-    if (!params.refundId || !params.order?.mp_payment_id || params.amount <= 0) return
+    idempotencyKey?: string
+}): Promise<{ success: boolean; mpRefundId?: string; error?: string }> {
+    if (!params.refundId || !params.order?.mp_payment_id || params.amount <= 0) {
+        return { success: false, error: "Parâmetros inválidos para reembolso" }
+    }
     const supabase = createAdminClient()
 
     try {
@@ -629,35 +673,41 @@ async function maybeRefundMercadoPago(params: {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
-                "X-Idempotency-Key": `return-${params.requestId}-${params.refundId}`,
+                "X-Idempotency-Key": params.idempotencyKey || `return-${params.requestId}-${params.refundId}`,
             },
             body: JSON.stringify(body),
         })
 
         const result = await response.json().catch(() => ({}))
         if (!response.ok) {
+            const errorMsg = result?.message || "Mercado Pago refund failed"
             await supabase
                 .from("return_refunds")
-                .update({ status: "FAILED", error_message: result?.message || "Mercado Pago refund failed", updated_at: new Date().toISOString() })
+                .update({ status: "FAILED", error_message: errorMsg, updated_at: new Date().toISOString() })
                 .eq("id", params.refundId)
-            return
+            return { success: false, error: errorMsg }
         }
 
+        const mpRefundId = result?.id ? String(result.id) : null
         await supabase
             .from("return_refunds")
             .update({
                 status: "APPROVED",
                 payment_provider: "Mercado Pago",
                 mp_payment_id: params.order.mp_payment_id,
-                mp_refund_id: result?.id ? String(result.id) : null,
+                mp_refund_id: mpRefundId,
                 updated_at: new Date().toISOString(),
             })
             .eq("id", params.refundId)
+
+        return { success: true, mpRefundId: mpRefundId || undefined }
     } catch (error: any) {
+        const errorMsg = error?.message || "Mercado Pago refund failed"
         await supabase
             .from("return_refunds")
-            .update({ status: "FAILED", error_message: error?.message || "Mercado Pago refund failed", updated_at: new Date().toISOString() })
+            .update({ status: "FAILED", error_message: errorMsg, updated_at: new Date().toISOString() })
             .eq("id", params.refundId)
+        return { success: false, error: errorMsg }
     }
 }
 
@@ -685,8 +735,8 @@ export async function processReturnRequestAction(input: unknown) {
             .is("deleted_at", null)
             .single()
 
-        if (requestError || !request) throw new Error("Solicitacao nao encontrada")
-        if (["RESOLVED", "REJECTED", "EXPIRED"].includes(request.status)) throw new Error("Solicitacao bloqueada")
+        if (requestError || !request) throw new Error("Solicitação nao encontrada")
+        if (["RESOLVED", "REJECTED", "EXPIRED"].includes(request.status)) throw new Error("Solicitação bloqueada")
 
         // Map buyer user UUID to ERP customers table ID to avoid foreign key violations on transactions
         const buyerId = (request as any).orders?.buyer_id || (request as any).customer_id
@@ -747,12 +797,30 @@ export async function processReturnRequestAction(input: unknown) {
 
         const paymentProvider = String((request as any).orders?.payment_provider || "").toLowerCase()
         const hasMercadoPago = Boolean((request as any).orders?.mp_payment_id) || paymentProvider.includes("mercado")
-        
+
         // Expose Mercado Pago refund trigger based on explicit selection
         const isMpRefund = hasMercadoPago && (data.refundPaymentMethod === "Mercado Pago" || data.refundPaymentMethod === "mercado_pago")
 
+        // Antes de prosseguir, verifica se o pagamento realmente existe no Mercado Pago
+        if (isMpRefund && !data.skipMpPaymentCheck) {
+            try {
+                const mpPaymentId = (request as any).orders?.mp_payment_id
+                if (mpPaymentId) {
+                    const mpAccessToken = await getValidMercadoPagoAccessToken(data.partnerId)
+                    const mpCheck = await fetch(`https://api.mercadopago.com/v1/payments/${mpPaymentId}`, {
+                        headers: { Authorization: `Bearer ${mpAccessToken}` },
+                    })
+                    if (!mpCheck.ok) {
+                        return successResponse({ mpPaymentNotFound: true })
+                    }
+                }
+            } catch {
+                return successResponse({ mpPaymentNotFound: true })
+            }
+        }
+
         const refundStatus = data.refundAmount > 0
-            ? (isMpRefund ? "PROCESSING" : data.refundStatus)
+            ? (isMpRefund ? "PENDING" : data.refundStatus)
             : data.refundStatus
 
         const useSelectiveReturn = data.returnToInventoryItems !== undefined && data.returnToInventoryItems !== null
@@ -884,46 +952,10 @@ export async function processReturnRequestAction(input: unknown) {
             : data.exchangeBalanceResolution === "refund"
                 ? toNumber(result?.exchange_surplus_amount)
                 : 0
-        if (isMpRefund && requestedRefundAmount > 0) {
-            // Cap the MP refund to only the portion actually paid via Mercado Pago.
-            // Any excess (paid via external methods) flows through the existing manual refund path.
-            const mpPaidAmount = extractMercadoPagoPaidAmount((request as any).orders)
-            const cappedMpRefundAmount = Math.min(requestedRefundAmount, mpPaidAmount)
-            if (cappedMpRefundAmount > 0) {
-                await maybeRefundMercadoPago({
-                    partnerId: data.partnerId,
-                    requestId: data.requestId,
-                    refundId: result?.refund_id,
-                    amount: cappedMpRefundAmount,
-                    order: (request as any).orders,
-                })
-
-                // Find the Mercado Pago finance account, associate it to the transaction, and subtract balance
-                const { data: mpAcc } = await supabase
-                    .from("finance_accounts")
-                    .select("id")
-                    .eq("partner_id", data.partnerId)
-                    .eq("integration_source", "mercadopago")
-                    .eq("is_active", true)
-                    .maybeSingle()
-
-                if (mpAcc?.id && result?.transaction_id) {
-                    await supabase
-                        .from("transactions")
-                        .update({ account_id: mpAcc.id })
-                        .eq("id", result.transaction_id)
-
-                    const { error: deltaErr } = await supabase.rpc("apply_account_balance_delta", {
-                        p_account_id: mpAcc.id,
-                        p_partner_id: data.partnerId,
-                        p_delta: -cappedMpRefundAmount,
-                    })
-                    if (deltaErr) {
-                        console.error("[processReturnRequest] Error applying MP refund balance delta:", deltaErr.message)
-                    }
-                }
-            }
-        }
+        // Refund MP não é mais executado aqui.
+        // A aprovação da devolução cria o registro return_refund com status PENDING.
+        // A execução real do reembolso MP ocorre em executeMercadoPagoRefundAction,
+        // que possui todas as validações de segurança (confirmação, senha, cooldown, rate limit, etc.).
 
         await logAuditEvent({
             partnerId: data.partnerId,
@@ -949,10 +981,10 @@ export async function processReturnRequestAction(input: unknown) {
         if (buyerId && data.nextStatus) {
             try {
                 const { createNotification } = await import("@/lib/services/notification.service")
-                
+
                 let title = "Atualização na sua solicitação de devolução"
                 let message = `Sua solicitação de devolução para o pedido #${(request as any).orders?.order_number || request.order_id.slice(0, 8).toUpperCase()} foi atualizada.`
-                
+
                 if (data.nextStatus === "APPROVED") {
                     title = "Solicitação de devolução aprovada!"
                     message = `A solicitação de devolução/troca para o pedido #${(request as any).orders?.order_number || request.order_id.slice(0, 8).toUpperCase()} foi aprovada pelo vendedor.`
@@ -969,7 +1001,7 @@ export async function processReturnRequestAction(input: unknown) {
                         message += ` Vale-compra de ${data.storeCreditAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} liberado.`
                     }
                 }
-                
+
                 await createNotification({
                     userId: buyerId,
                     type: "order_delivered",
@@ -991,6 +1023,260 @@ export async function processReturnRequestAction(input: unknown) {
         return successResponse(result)
     } catch (e: any) {
         return errorResponse(e?.message || "Erro ao processar devolução")
+    }
+}
+
+export async function executeMercadoPagoRefundAction(input: unknown) {
+    await requireRateLimit(RateLimitCategory.REFUND_EXECUTE)
+    const user = await requireUser()
+    const data = executeMpRefundSchema.parse(input)
+    const supabase = createAdminClient()
+    const [ip, userAgent] = await Promise.all([getClientIP(), getClientUserAgent()])
+
+    let processingStarted = false
+    let refundOrder: any = null
+
+    try {
+        // 1. Permissão exclusiva: orders.can_refund
+        const access = await requirePermission(data.partnerId, "orders", "can_refund")
+
+        // 2. Busca refund + request + order no banco
+        const { data: refundRec, error: refundErr } = await supabase
+            .from("return_refunds")
+            .select(`
+                id, status, amount, return_request_id, order_id, partner_id,
+                return_requests!inner(
+                    id, partner_id, order_id, status,
+                    orders!order_id(
+                        id, partner_id, mp_payment_id, payment_provider,
+                        amount_paid, paid_amount, total_amount, payment_breakdown,
+                        order_number, customer_name
+                    )
+                )
+            `)
+            .eq("id", data.refundId)
+            .eq("partner_id", data.partnerId)
+            .single()
+
+        if (refundErr || !refundRec) throw new Error("Registro de reembolso não encontrado")
+        if (refundRec.status !== "PENDING") throw new Error("Reembolso já foi processado ou está bloqueado")
+
+        const request = refundRec.return_requests as any
+        const order = request.orders || {}
+        const amount = Number(refundRec.amount || 0)
+        if (amount <= 0) throw new Error("Valor de reembolso inválido")
+
+        // 3. Valida pagamento MP
+        const mpPaymentId = order.mp_payment_id
+        if (!mpPaymentId) throw new Error("Pedido não possui pagamento Mercado Pago")
+
+        // 4. Confirmação REEMBOLSAR (já validada pelo schema)
+
+        // 5. Reautenticação para valores altos
+        if (amount > REFUND_PASSWORD_THRESHOLD) {
+            if (!data.refundPassword) throw new Error("Confirmação de senha necessária para este valor")
+
+            const { data: userData } = await supabase.auth.admin.getUserById(user.id)
+            const userEmail = userData?.user?.email
+            if (!userEmail) throw new Error("Não foi possível obter email do usuário")
+
+            const { error: signInErr } = await supabase.auth.signInWithPassword({
+                email: userEmail,
+                password: data.refundPassword,
+            })
+            if (signInErr) throw new Error("Senha incorreta")
+        }
+
+        // 6. Cooldown para valores muito altos
+        if (amount > REFUND_COOLDOWN_THRESHOLD) {
+            if (!data.refundCooldownTimestamp) throw new Error("Confirmação de cooldown necessária para este valor")
+            const elapsed = (Date.now() - data.refundCooldownTimestamp) / 1000
+            if (elapsed < REFUND_COOLDOWN_SECONDS) {
+                throw new Error(`Aguarde ${Math.ceil(REFUND_COOLDOWN_SECONDS - elapsed)}s antes de confirmar`)
+            }
+        }
+
+        // 7. Status guard: race condition prevention
+        const { data: updatedRefund, error: updateErr } = await supabase
+            .from("return_refunds")
+            .update({ status: "PROCESSING", updated_at: new Date().toISOString() })
+            .eq("id", data.refundId)
+            .eq("status", "PENDING")
+            .select("id, status")
+            .maybeSingle()
+
+        if (updateErr || !updatedRefund) {
+            throw new Error("Reembolso já está sendo processado por outra solicitação")
+        }
+        processingStarted = true
+        refundOrder = order
+
+        // 8. Cap o reembolso ao valor pago via MP
+        const mpPaidAmount = extractMercadoPagoPaidAmount(order)
+        const cappedAmount = Math.min(amount, mpPaidAmount)
+        if (cappedAmount <= 0) throw new Error("Nenhum valor pago via Mercado Pago para reembolsar")
+
+        // 9. Executa reembolso na API do Mercado Pago
+        const mpResult = await maybeRefundMercadoPago({
+            partnerId: data.partnerId,
+            requestId: data.requestId,
+            refundId: data.refundId,
+            amount: cappedAmount,
+            order,
+            idempotencyKey: data.idempotencyKey || `execute-mp-refund:${data.refundId}:${data.requestId}`,
+        })
+
+        if (!mpResult.success) {
+            throw new Error(mpResult.error || "Falha ao reembolsar no Mercado Pago")
+        }
+
+        // 10. Atualiza saldo da conta financeira Mercado Pago
+        const { data: mpAcc } = await supabase
+            .from("finance_accounts")
+            .select("id")
+            .eq("partner_id", data.partnerId)
+            .eq("integration_source", "mercadopago")
+            .eq("is_active", true)
+            .maybeSingle()
+
+        let appliedBalanceDelta = false
+        if (mpAcc?.id) {
+            const { data: txRes } = await supabase
+                .from("return_refunds")
+                .select("financial_transaction_id")
+                .eq("id", data.refundId)
+                .single()
+
+            if (txRes?.financial_transaction_id) {
+                await supabase
+                    .from("transactions")
+                    .update({ account_id: mpAcc.id })
+                    .eq("id", txRes.financial_transaction_id)
+
+                const { error: deltaErr } = await supabase.rpc("apply_account_balance_delta", {
+                    p_account_id: mpAcc.id,
+                    p_partner_id: data.partnerId,
+                    p_delta: -cappedAmount,
+                })
+                if (!deltaErr) appliedBalanceDelta = true
+            }
+        }
+
+        // 11. Auditoria completa
+        const auditLines = [
+            `Reembolso Mercado Pago executado por ${user.email || user.id}.`,
+            `Valor: R$ ${cappedAmount.toFixed(2)}.`,
+            `Refund ID: ${mpResult.mpRefundId || "N/A"}.`,
+            `Pagamento MP: ${mpPaymentId}.`,
+        ]
+        if (amount > REFUND_CRITICAL_THRESHOLD) {
+            auditLines.push("--- AUDITORIA CRÍTICA: Valor acima do limite de segurança ---")
+            auditLines.push(`IP: ${ip}`)
+            auditLines.push(`User-Agent: ${userAgent}`)
+        }
+
+        await logAuditEvent({
+            partnerId: data.partnerId,
+            actorUserId: user.id,
+            entityType: "return_request",
+            entityId: data.requestId,
+            actionType: "mercadopago_refund_executed",
+            changeLines: auditLines,
+            metadata: {
+                refundId: data.refundId,
+                mpRefundId: mpResult.mpRefundId || null,
+                mpPaymentId,
+                orderId: order.id,
+                returnRequestId: data.requestId,
+                amount: cappedAmount,
+                userId: user.id,
+                roleId: access.roleId,
+                ip,
+                userAgent,
+                appliedBalanceDelta,
+            },
+            source: "manual",
+        })
+
+        // 12. Registra também na timeline do pedido
+        await logAuditEvent({
+            partnerId: data.partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: order.id,
+            actionType: "refunded",
+            changeLines: [
+                `Reembolso Mercado Pago de R$ ${cappedAmount.toFixed(2)} executado.`,
+                `Refund ID: ${mpResult.mpRefundId || "N/A"}.`,
+            ],
+            metadata: {
+                refundId: data.refundId,
+                mpRefundId: mpResult.mpRefundId || null,
+                paymentId: mpPaymentId,
+            },
+            source: "manual",
+        })
+
+        await Promise.all([
+            revalidateReturns(data.partnerId, order.id, data.requestId),
+            revalidateTransactions(data.partnerId),
+            revalidateEntityTimeline("return_request", data.requestId),
+            revalidateEntityTimeline("order", order.id),
+        ])
+
+        return successResponse({
+            refundId: data.refundId,
+            mpRefundId: mpResult.mpRefundId,
+            amount: cappedAmount,
+        })
+    } catch (e: any) {
+        // Fallback defensivo: se o status guard já foi executado (status = PROCESSING),
+        // tenta marcar como FAILED para não ficar stuck eternamente.
+        if (processingStarted && data?.refundId) {
+            try {
+                await supabase
+                    .from("return_refunds")
+                    .update({
+                        status: "FAILED",
+                        error_message: `[FALLBACK] ${e?.message || "Erro inesperado"}`,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", data.refundId)
+
+                console.error("[executeMercadoPagoRefundAction] Fallback FAILED applied:", {
+                    refundId: data.refundId,
+                    requestId: data.requestId,
+                    error: e?.message,
+                })
+
+                await logAuditEvent({
+                    partnerId: data.partnerId,
+                    actorUserId: user.id,
+                    entityType: "return_request",
+                    entityId: data.requestId,
+                    actionType: "mercadopago_refund_failed",
+                    changeLines: [
+                        `Reembolso MP falhou após status PROCESSING.`,
+                        `Erro: ${e?.message || "Desconhecido"}.`,
+                        `Fallback automático: status alterado para FAILED.`,
+                    ],
+                    metadata: {
+                        refundId: data.refundId,
+                        orderMpPaymentId: refundOrder?.mp_payment_id || null,
+                        amount: refundOrder?.amount_paid || null,
+                        userId: user.id,
+                        errorMessage: e?.message || null,
+                        ip,
+                        userAgent,
+                    },
+                    source: "manual",
+                })
+            } catch (fallbackErr) {
+                console.error("[executeMercadoPagoRefundAction] Fallback FAILED update also failed:", fallbackErr)
+            }
+        }
+
+        return errorResponse(e?.message || "Erro ao executar reembolso Mercado Pago")
     }
 }
 

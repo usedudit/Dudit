@@ -776,7 +776,7 @@ BEGIN
     p_created_by,
     'created',
     'PENDING_REVIEW',
-    CASE WHEN v_request_type = 'cancellation' THEN 'Solicitacao de cancelamento criada' ELSE 'Solicitacao criada' END,
+    CASE WHEN v_request_type = 'cancellation' THEN 'Solicitação de cancelamento criada' ELSE 'Solicitação criada' END,
     jsonb_build_object('resolution', p_resolution, 'request_type', v_request_type, 'source', p_source, 'amount_basis', v_total_amount),
     'user',
     CASE WHEN p_idempotency_key IS NULL THEN NULL ELSE p_idempotency_key || ':event' END
@@ -788,7 +788,7 @@ BEGIN
     p_partner_id,
     p_created_by,
     CASE WHEN v_request_type = 'cancellation' THEN 'cancellation_requested' ELSE 'return_created' END,
-    ARRAY[CASE WHEN v_request_type = 'cancellation' THEN 'Solicitacao de cancelamento criada' ELSE 'Solicitacao criada' END]
+    ARRAY[CASE WHEN v_request_type = 'cancellation' THEN 'Solicitação de cancelamento criada' ELSE 'Solicitação criada' END]
   );
 
   INSERT INTO public.return_notifications (
@@ -803,8 +803,8 @@ BEGIN
     p_partner_id,
     'seller',
     CASE WHEN v_request_type = 'cancellation' THEN 'cancellation_created' ELSE 'return_created' END,
-    CASE WHEN v_request_type = 'cancellation' THEN 'Nova solicitacao de cancelamento' ELSE 'Nova solicitacao' END,
-    COALESCE(v_order.order_number, 'Pedido') || CASE WHEN v_request_type = 'cancellation' THEN ' recebeu uma solicitacao de cancelamento.' ELSE ' recebeu uma solicitacao de devolução ou troca.' END
+    CASE WHEN v_request_type = 'cancellation' THEN 'Nova solicitação de cancelamento' ELSE 'Nova solicitação' END,
+    COALESCE(v_order.order_number, 'Pedido') || CASE WHEN v_request_type = 'cancellation' THEN ' recebeu uma solicitação de cancelamento.' ELSE ' recebeu uma solicitação de devolução ou troca.' END
   );
 
   RETURN jsonb_build_object('id', v_request_id, 'idempotent', false, 'amount_basis', v_total_amount);
@@ -1463,8 +1463,8 @@ BEGIN
     'return_' || LOWER(COALESCE(NULLIF(p_action, ''), 'updated')),
     ARRAY[
       CASE
-        WHEN v_new_status <> v_old_status THEN 'Solicitacao atualizada: ' || v_old_status || ' para ' || v_new_status
-        ELSE 'Solicitacao atualizada'
+        WHEN v_new_status <> v_old_status THEN 'Solicitação atualizada: ' || v_old_status || ' para ' || v_new_status
+        ELSE 'Solicitação atualizada'
       END
     ]
   );
@@ -1505,8 +1505,8 @@ BEGIN
     v_request.customer_id,
     'customer',
     'return_status',
-    'Solicitacao atualizada',
-    'Sua solicitacao agora esta ' || v_new_status || '.'
+    'Solicitação atualizada',
+    'Sua solicitação agora esta ' || v_new_status || '.'
   );
 
   RETURN jsonb_build_object(

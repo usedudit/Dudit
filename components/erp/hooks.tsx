@@ -115,9 +115,12 @@ export interface ProductBucketItem {
  * 
  * Pattern: loads bucket on first focus → filters with useMemo → instant results
  */
-export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>, options?: { pageSize?: number }) {
+export function useProductBucket<T extends { name: string; sku?: string; gtin?: string | null }>(
+  loadFn: () => Promise<T[]>,
+  options?: { pageSize?: number }
+) {
   const pageSize = options?.pageSize ?? 10
-  const [bucket, setBucket] = useState<ProductBucketItem[]>([])
+  const [bucket, setBucket] = useState<T[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -143,7 +146,7 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>, opt
     return bucket.filter(
       (item) =>
         item.name.toLowerCase().includes(search) ||
-        item.sku.toLowerCase().includes(search) ||
+        (item.sku && item.sku.toLowerCase().includes(search)) ||
         (item.gtin && item.gtin.toLowerCase().includes(search))
     )
   }, [bucket, searchQuery])

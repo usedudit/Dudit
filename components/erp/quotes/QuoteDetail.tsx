@@ -500,7 +500,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                             <ActionsDropdown
                                                 onPrint={() => setShowPrintModal(true)}
-                                                onShare={() => setShowShareModal(true)}
+                                                onShare={() => {
+                                                    if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                        openPlanUpgrade("crescer");
+                                                    } else {
+                                                        setShowShareModal(true);
+                                                    }
+                                                }}
                                                 onDelete={() => setShowDeleteModal(true)}
                                                 onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
                                             />
@@ -945,7 +951,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-lg">
                         <ActionsDropdown
                             onPrint={() => setShowPrintModal(true)}
-                            onShare={() => setShowShareModal(true)}
+                            onShare={() => {
+                                if (!hasMinimumPlan(planSlug, "crescer")) {
+                                    openPlanUpgrade("crescer");
+                                } else {
+                                    setShowShareModal(true);
+                                }
+                            }}
                             onDelete={() => setShowDeleteModal(true)}
                             onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
                             trigger={
