@@ -2,7 +2,7 @@
 
 import React from "react"
 import { XIcon } from "@/lib/icons"
-import { Button } from "@/components/reusable"
+import { Button, FormTextarea } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -68,11 +68,13 @@ export default function NotesSheet({
 
     const content = (
         <div className="space-y-4 pt-2 md:flex md:h-full md:flex-col md:p-6">
-            <textarea
-                className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text md:h-40"
+            <FormTextarea
+                label=""
                 placeholder={placeholder}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
+                name="notes"
+                rows={5}
             />
             <div className="flex items-center gap-3 md:mt-4 md:border-t md:border-brand-border md:pt-4 dark:md:border-dark-border">
                 <Button variant="outline" className="flex-1" onClick={onClose}>

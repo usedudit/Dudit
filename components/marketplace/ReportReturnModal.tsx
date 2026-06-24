@@ -37,22 +37,28 @@ export function ReportReturnModal({ open, onClose, returnRequestId, onReported }
       return
     }
     setSubmitting(true)
-    const res = await reportReturnToDuditAction({
-      returnRequestId,
-      reasonCode: reasonCode as "return_sla_violation",
-      description: description || null,
-      legalAcknowledged: true,
-      idempotencyKey: `report:${returnRequestId}`,
-      csrf_token: csrfToken || undefined,
-    })
-    setSubmitting(false)
+    try {
+      const res = await reportReturnToDuditAction({
+        returnRequestId,
+        reasonCode: reasonCode as "return_sla_violation",
+        description: description || null,
+        legalAcknowledged: true,
+        idempotencyKey: `report:${returnRequestId}`,
+        csrf_token: csrfToken || undefined,
+      })
 
-    if (res.success) {
-      toast({ title: "Reporte enviado à Dudit" })
-      onReported?.()
-      onClose()
-    } else {
-      toast({ title: res.error || "Erro ao reportar", variant: "destructive" })
+      if (res.success) {
+        toast({ title: "Reporte enviado à Dudit" })
+        onReported?.()
+        onClose()
+      } else {
+        toast({ title: res.error || "Erro ao reportar", variant: "destructive" })
+      }
+    } catch (err) {
+      console.error("[ReportReturnModal] Unexpected error:", err)
+      toast({ title: "Erro ao enviar reporte", variant: "destructive" })
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -84,7 +90,7 @@ export function ReportReturnModal({ open, onClose, returnRequestId, onReported }
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancelar</Button>
-          <Button variant="filled" onClick={handleSubmit} disabled={submitting || !legalAck}>
+          <Button onClick={handleSubmit} disabled={submitting || !legalAck}>
             {submitting ? "Enviando..." : "Enviar reporte"}
           </Button>
         </div>

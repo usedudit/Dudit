@@ -10,7 +10,7 @@ interface OrderDataForTransaction {
     payment_breakdown?: Partial<PaymentBreakdownEntry>[] | null
     payment_date?: string | null
     customer_name?: string | null
-    customer_contact_id?: string | null
+    customer_id?: string | null
     finance_account_id?: string | null
 }
 
@@ -31,15 +31,6 @@ function normalizePaymentLabel(value?: string | null) {
     if (normalized === "cartao") return "Cartão"
     if (normalized === "dinheiro") return "Dinheiro"
     return String(value || "Desconhecido")
-}
-
-async function resolveTransactionContactId(
-    supabase: SupabaseClient,
-    data: OrderDataForTransaction,
-): Promise<string | null> {
-    // Para vendas, não usamos transaction_contacts.
-    // O cliente deve ser resolvido diretamente de orders/customers na camada de leitura.
-    return null
 }
 
 async function resolveMercadoPagoAccountId(
@@ -130,7 +121,6 @@ export async function createTransactionFromOrder(
         const now = new Date().toISOString()
         const paymentDate = orderData.payment_date || now
         const entries = buildEntries(orderData)
-        const contactId = await resolveTransactionContactId(supabase, orderData)
         const explicitAccountId = orderData.finance_account_id || null
         const mercadoPagoAccountId = await resolveMercadoPagoAccountId(supabase, orderData.partner_id, orderData.payment_provider)
         const defaultSalesAccountId = explicitAccountId || mercadoPagoAccountId
@@ -171,8 +161,9 @@ export async function createTransactionFromOrder(
                 partner_id: orderData.partner_id,
                 description: orderData.order_number,
                 category: "Vendas",
-                contact_id: contactId,
+                contact_id: null,
                 contact_type: "customer",
+                customer_id: orderData.customer_id || null,
                 amount: calculated.finalAmount,
                 due_date: null,
                 payment_date: paymentDate,

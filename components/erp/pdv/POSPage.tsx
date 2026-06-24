@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge } from "@/components/reusable"
+import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge, FormTextarea } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -1924,11 +1924,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                     {isMobile && (
                         <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
                             <div className="space-y-4 pt-2">
-                                <textarea
-                                    className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+                                <FormTextarea
+                                    label=""
                                     placeholder="Digite alguma observação que sairá no pedido..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
+                                    name="notes"
+                                    rows={5}
                                 />
                                 <div className="flex items-center gap-3">
                                     <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
@@ -1949,11 +1951,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                             title="Adicionar Observação"
                         >
                             <div className="flex h-full flex-col p-6">
-                                <textarea
-                                    className="h-40 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+                                <FormTextarea
+                                    label=""
                                     placeholder="Digite alguma observação que sairá no pedido..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
+                                    name="notes"
+                                    rows={6}
                                 />
                                 <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
                                     <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>

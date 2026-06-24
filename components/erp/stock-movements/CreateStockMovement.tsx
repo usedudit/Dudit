@@ -24,7 +24,8 @@ import {
     FormDropdown,
     AlertModal,
     IconPlaceholder,
-    ThreeDotsLoader
+    ThreeDotsLoader,
+    FormTextarea
 } from '@/components/reusable';
 import { searchProductByBarcodeAction } from '@/app/actions/erp/products';
 import { playBeepSound, vibrateMobile } from '@/lib/utils/barcode';
@@ -796,15 +797,13 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                         <TabsContent value="Observações" className="mt-0">
                                             <motion.div key="Observações" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Observações Internas</h3>
-                                                <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[350px]">
-                                                    <textarea
-                                                        className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading leading-relaxed focus:outline-none resize-none placeholder:text-brand-inactive-text"
-                                                        placeholder="Adicione informações como número da nota fiscal, motivo detalhado, ou observações para controle interno..."
-                                                        value={notes}
-                                                        onChange={(e) => setNotes(e.target.value)}
-                                                    ></textarea>
-                                                </div>
+                                                <FormTextarea
+                                                    label="Observações Internas"
+                                                    placeholder="Adicione informações como número da nota fiscal, motivo detalhado, ou observações para controle interno..."
+                                                    value={notes}
+                                                    onChange={(e) => setNotes(e.target.value)}
+                                                    name="notes"
+                                                />
                                             </motion.div>
                                         </TabsContent>
 

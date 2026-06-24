@@ -131,7 +131,8 @@ export async function reportReturnToDuditAction(input: z.infer<typeof reportSche
       idempotent: result?.idempotent === true,
     })
   } catch (e: unknown) {
-    return errorResponse(e instanceof Error ? e.message : "Erro ao enviar reporte")
+    console.error("[REPORT_RETURN] Unexpected error:", e)
+    return errorResponse("Erro ao enviar reporte")
   }
 }
 

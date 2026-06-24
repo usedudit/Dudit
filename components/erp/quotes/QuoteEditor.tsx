@@ -15,7 +15,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection, Badge } from '@/components/reusable';
+import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection, Badge, FormTextarea } from '@/components/reusable';
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
@@ -814,30 +814,26 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                 <FadeIn key="Observações">
                     <div className="bg-white dark:bg-dark-surface p-0 space-y-8">
                         <div>
-                            <label className="block text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Observações da Proposta</label>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">Texto visível ao cliente na proposta / PDF.</p>
-                            <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[280px]">
-                                <textarea
-                                    className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading leading-relaxed focus:outline-none resize-none placeholder:text-brand-inactive-text disabled:opacity-70 font-medium"
-                                    placeholder="Adicione termos, condições ou notas para o cliente..."
-                                    value={props.internalNote}
-                                    onChange={(e) => props.setInternalNote(e.target.value)}
-                                    disabled={proposalNotesLocked}
-                                />
-                            </div>
+                            <FormTextarea
+                                label="Observações da Proposta"
+                                placeholder="Adicione termos, condições ou notas para o cliente..."
+                                value={props.internalNote}
+                                onChange={(e) => props.setInternalNote(e.target.value)}
+                                disabled={proposalNotesLocked}
+                                name="internalNote"
+                            />
                         </div>
                         <div>
-                            <label className="block text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Observações internas</label>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">Uso interno da equipe; não aparecem na proposta ao cliente.</p>
-                            <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[200px]">
-                                <textarea
-                                    className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading leading-relaxed focus:outline-none resize-none placeholder:text-brand-inactive-text disabled:opacity-70 font-medium"
-                                    placeholder="Notas internas, lembretes, histórico comercial..."
-                                    value={props.staffInternalNotes}
-                                    onChange={(e) => props.setStaffInternalNotes(e.target.value)}
-                                    disabled={internalNotesLocked}
-                                />
-                            </div>
+                            <FormTextarea
+                                label="Observações internas"
+                                placeholder="Notas internas, lembretes, histórico comercial..."
+                                value={props.staffInternalNotes}
+                                onChange={(e) => props.setStaffInternalNotes(e.target.value)}
+                                disabled={internalNotesLocked}
+                                name="staffInternalNotes"
+                            />
                         </div>
                     </div>
                 </FadeIn>

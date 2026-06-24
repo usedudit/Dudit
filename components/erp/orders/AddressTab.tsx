@@ -165,7 +165,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Informações da Entrega</h3>
                         {isPaidOrder ? (
                             <div className="space-y-4 rounded-2xl border border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
-                                <InfoRow label="Carrier / Entregador" value={deliveryPeopleOptions.find(opt => opt.value === selectedDeliveryPersonId)?.label || "Sem entregador (não atribuído)"} />
+                                <InfoRow label="Entregador" value={deliveryPeopleOptions.find(opt => opt.value === selectedDeliveryPersonId)?.label || "Sem entregador (não atribuído)"} />
                                 <InfoRow label="Status" value={selectedStatusMeta.label} />
                                 <InfoRow label="Data de saída" value={formatDateString(deliveryDate)} />
                                 <InfoRow label="Horário de saída" value={deliveryTime || "-"} />
@@ -173,7 +173,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                         ) : (
                             <div className="grid grid-cols-1 gap-4">
                                 <FormDropdown
-                                    label="Carrier / Entregador"
+                                    label="Entregador"
                                     value={selectedDeliveryPersonId || "none"}
                                     setValue={(val: any) => setSelectedDeliveryPersonId(val === "none" ? "" : val)}
                                     options={[{ value: "none", label: "Sem entregador (não atribuído)" }, ...deliveryPeopleOptions]}
@@ -200,13 +200,6 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     placeholder="Selecione o horário"
                                     disabled={isDeliveryLocked}
                                 />
-                            </div>
-                        )}
-
-                        {!isPaidOrder && (
-                            <div className="mt-4 rounded-2xl border border-brand-border p-4 dark:border-dark-border">
-                                <span className="mr-2 text-sm font-medium text-brand-inactive-text">Status selecionado:</span>
-                                <Badge variant={selectedStatusMeta.variant}>{selectedStatusMeta.label}</Badge>
                             </div>
                         )}
                     </section>

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown } from "@/components/reusable"
+import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, FormTextarea } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -440,8 +440,8 @@ function ListContent({
                                         <ArrowUpDownIcon
                                           size={14}
                                           className={`transition-all duration-200 ${isSorted
-                                              ? "text-brand-dark dark:text-dark-heading opacity-100 block"
-                                              : "text-brand-inactive-text hidden group-hover:block opacity-40"
+                                            ? "text-brand-dark dark:text-dark-heading opacity-100 block"
+                                            : "text-brand-inactive-text hidden group-hover:block opacity-40"
                                             } ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""
                                             }`}
                                         />
@@ -936,13 +936,12 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                               <div className="flex items-center gap-2 mt-1">
                                 {item.match_method && <p className="text-xs text-brand-green">Match por {item.match_method}</p>}
                                 {item.match_confidence != null && (
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                    item.match_confidence >= 0.9
-                                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                      : item.match_confidence >= 0.7
-                                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                        : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                                  }`}>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.match_confidence >= 0.9
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : item.match_confidence >= 0.7
+                                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                      : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                    }`}>
                                     {Math.round(item.match_confidence * 100)}%
                                   </span>
                                 )}
@@ -1236,13 +1235,12 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
           <div className="space-y-4">
             <InfoCard color="red" title="Atenção" message="Esta ação irá desfazer toda a importação, incluindo movimentações de estoque e contas a pagar geradas. Esta operação é irreversível." />
             <div>
-              <label className="block text-sm font-medium text-brand-dark mb-1">Motivo da reversão (opcional)</label>
-              <textarea
+              <FormTextarea
+                name="revert-reason"
                 value={revertReason}
                 onChange={(e) => setRevertReason(e.target.value)}
-                className="w-full border border-brand-border rounded-lg px-3 py-2 text-sm bg-transparent text-brand-dark resize-none"
+                label="Motivo da reversão"
                 rows={3}
-                placeholder="Ex: Nota duplicada, erro nos valores..."
               />
             </div>
             <div className="flex items-center justify-end gap-3 pt-2">

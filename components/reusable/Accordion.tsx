@@ -169,12 +169,12 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
       </DropdownItem>
     )}
     {onArchive && (
-      <DropdownItem onClick={onArchive} className="text-brand-orange">
+      <DropdownItem onClick={onArchive} className="text-brand-orange dark:text-brand-orange">
         <ArchiveIcon size={18} /> Arquivar
       </DropdownItem>
     )}
     {onDelete && (
-      <DropdownItem onClick={onDelete} className="text-brand-red">
+      <DropdownItem onClick={onDelete} className="text-brand-red dark:text-brand-red">
         <TrashIcon size={18} /> Excluir
       </DropdownItem>
     )}
@@ -182,9 +182,9 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
       <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red" : ""}>
         {cancelIcon ? cancelIcon : (
           (cancelLabel.toLowerCase().includes("pago") ||
-           cancelLabel.toLowerCase().includes("recebido") ||
-           cancelLabel.toLowerCase().includes("quitar") ||
-           cancelLabel.toLowerCase().includes("estornar"))
+            cancelLabel.toLowerCase().includes("recebido") ||
+            cancelLabel.toLowerCase().includes("quitar") ||
+            cancelLabel.toLowerCase().includes("estornar"))
             ? <MoneyIcon size={18} />
             : <BlockedIcon size={18} />
         )} {cancelLabel}

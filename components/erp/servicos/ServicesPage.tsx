@@ -20,14 +20,17 @@ import {
     deleteServiceAction,
     deleteServicesInBatchAction,
     toggleServicesStatusAction,
+    batchUpdateServicesAction,
     getServiceWithDetailsAction,
 } from "@/app/actions/erp/servicos"
 
 // Components
 import { Button, IconPlaceholder, Checkbox, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
+import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getServiceUrl } from "@/lib/utils/url-generator"
+import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 
 // New Component Imports
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -44,7 +47,8 @@ import {
     TrashIcon,
     CheckCircleIcon,
     BlockedIcon,
-    UploadIcon
+    UploadIcon,
+    EditIcon,
 } from "@/lib/icons"
 
 // --- TYPES & INTERFACES ---
@@ -253,6 +257,7 @@ export default function ServicesPage({
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive">("all")
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
+    const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [confirmations, setConfirmations] = useState({
         delete: false,
         inactivate: false,
@@ -458,6 +463,88 @@ export default function ServicesPage({
             toast({ title: "Atualizado" })
         }
         setSelection((p) => ({ ...p, ids: new Set() }))
+    }
+
+    const handleBulkEditApply = async (payload: BulkActionPayload) => {
+        const ids = Array.from(selection.ids)
+        if (ids.length === 0) return
+
+        setActionModal({ open: true, text: "Aplicando alterações..." })
+
+        try {
+            if (payload.type === 'delete') {
+                const result = await deleteServicesInBatchAction(ids)
+                if (result.success) {
+                    afterMutation()
+                    setServices(p => p.filter(service => !selection.ids.has(service.id)))
+                    setSelection(p => ({ ...p, ids: new Set() }))
+                    toast({ title: "Sucesso", description: `${ids.length} serviços excluídos` })
+                    setBulkEditModal({ isOpen: false })
+                } else {
+                    toast({ title: "Erro", description: (result as any).error || "Erro ao excluir", variant: "destructive" })
+                }
+                return
+            }
+
+            let uploadedImageUrl: string | undefined = undefined
+            if (payload.type === 'image' && payload.imageFile) {
+                const formData = new FormData()
+                formData.append("file", payload.imageFile)
+                const uploadRes = await fetchWithCSRF("/api/upload-image", { method: "POST", body: formData })
+                const uploadData = await uploadRes.json()
+                if (uploadData.success && uploadData.key) {
+                    uploadedImageUrl = uploadData.key
+                } else {
+                    toast({ title: "Erro", description: "Falha no upload da imagem", variant: "destructive" })
+                    return
+                }
+            }
+
+            const servicesMap = new Map(services.map(s => [s.id, s]))
+            const updates = ids.map(id => {
+                const service = servicesMap.get(id)
+                if (!service) return null
+
+                const update: any = { id }
+
+                if (payload.type === 'price') {
+                    if (payload.priceOnlyPublished && !service.is_active) return null
+                    let newPrice = service.price
+                    if (payload.priceMode === 'percent_inc') newPrice *= (1 + (payload.priceValue || 0) / 100)
+                    else if (payload.priceMode === 'percent_dec') newPrice *= (1 - (payload.priceValue || 0) / 100)
+                    else if (payload.priceMode === 'fixed') newPrice = payload.priceValue || 0
+                    update.price = newPrice
+                } else if (payload.type === 'visibility') {
+                    update.is_active = payload.visibilityMode === 'publish'
+                } else if (payload.type === 'image' && uploadedImageUrl) {
+                    update.images = [uploadedImageUrl, ...(service.images || [])]
+                } else if (payload.type === 'remove_image') {
+                    update.images = []
+                }
+
+                return update
+            }).filter(Boolean) as any[]
+
+            if (updates.length > 0) {
+                const result = await batchUpdateServicesAction(updates)
+                if (result.success) {
+                    afterMutation()
+                    const updatesMap = new Map(updates.map(u => [u.id, u]))
+                    setServices(p => p.map(service => updatesMap.has(service.id) ? { ...service, ...updatesMap.get(service.id) } : service))
+                    toast({ title: "Sucesso", description: "Alterações aplicadas com sucesso" })
+                    setBulkEditModal({ isOpen: false })
+                    setSelection(p => ({ ...p, ids: new Set() }))
+                } else {
+                    toast({ title: "Erro", description: (result as any).error || "Falha ao aplicar alterações", variant: "destructive" })
+                }
+            }
+
+        } catch (error) {
+            console.error(error)
+            toast({ title: "Erro", description: "Ocorreu um erro ao processar a solicitação", variant: "destructive" })
+        } finally {
+            setActionModal({ open: false, text: "" })
+        }
     }
 
     const handleAddFirstService = useCallback(() => {
@@ -723,6 +810,14 @@ export default function ServicesPage({
                     selectedCount={selection.ids.size}
                     onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}
                 >
+                    <Button
+                        variant="ghost"
+                        onClick={() => setBulkEditModal({ isOpen: true })}
+                        leftIcon={<EditIcon size={18} />}
+                        className="h-10 px-3"
+                    >
+                        Ações em massa
+                    </Button>
                     <Button variant="ghost" onClick={() => setConfirmations(p => ({ ...p, bulkInactive: true }))}>
                         {selectedProds.every(p => !p.is_active) ? <CheckCircleIcon size={18} /> : <BlockedIcon size={18} />}
                         {selectedProds.every(p => !p.is_active) ? "Ativar Todos" : "Inativar Todos"}
@@ -768,6 +863,14 @@ export default function ServicesPage({
                 description={`Tem certeza que deseja alterar o status de ${selection.ids.size} serviços?`}
                 confirmText="Confirmar"
                 cancelText="Cancelar"
+            />
+
+            <BulkEditActionsModal
+                isOpen={bulkEditModal.isOpen}
+                onClose={() => setBulkEditModal({ isOpen: false })}
+                selectedCount={selection.ids.size}
+                targetType="service"
+                onApply={handleBulkEditApply}
             />
 
             {sharingService && (

@@ -465,6 +465,9 @@ export default function PromotionFormPage({
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 label=""
                             />
+                            <Button variant="link" onClick={() => setIsProductsSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                                Selecionar Produtos
+                            </Button>
                         </div>
                     </div>
 
@@ -581,7 +584,7 @@ export default function PromotionFormPage({
 
     const renderSelectedCategoriesList = () => {
         return (
-            <FormSection title="Categorias Específicas Elegíveis">
+            <FormSection hasSeparator title="Categorias Específicas Elegíveis">
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
                         <div className="w-full sm:w-72">
@@ -598,6 +601,9 @@ export default function PromotionFormPage({
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 label=""
                             />
+                            <Button variant="link" onClick={() => setIsCategoriesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                                Selecionar Categorias
+                            </Button>
                         </div>
                     </div>
 
@@ -683,7 +689,7 @@ export default function PromotionFormPage({
 
     const renderSelectedServicesList = () => {
         return (
-            <FormSection title="Serviços Específicos Elegíveis">
+            <FormSection hasSeparator title="Serviços Específicos Elegíveis">
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
                         <div className="w-full sm:w-72">
@@ -700,6 +706,9 @@ export default function PromotionFormPage({
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 label=""
                             />
+                            <Button variant="link" onClick={() => setIsServicesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                                Selecionar Serviços
+                            </Button>
                         </div>
                     </div>
 
@@ -839,7 +848,7 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="outline" type="button" onClick={() => setIsCustomersSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                        <Button variant="link" onClick={() => setIsCustomersSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
                             Selecionar Clientes
                         </Button>
                     </div>
@@ -869,13 +878,22 @@ export default function PromotionFormPage({
                             ))}
                         </div>
                     ) : campCustIds.length === 0 ? (
-                        <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum cliente selecionado.</p>
-                        </div>
+                        <IconPlaceholder
+                            icon={UserIcon}
+                            title="Nenhum cliente selecionado"
+                            subtitle="Selecione clientes para a promoção."
+                            itemButton={{
+                                text: "Selecionar Clientes",
+                                action: () => setIsCustomersSheetOpen(true),
+                                variant: "outline",
+                            }}
+                        />
                     ) : (
-                        <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum cliente corresponde à busca.</p>
-                        </div>
+                        <IconPlaceholder
+                            icon={UserIcon}
+                            title="Nenhum cliente encontrado"
+                            subtitle="Tente outro termo de busca ou selecione os cliente."
+                        />
                     )}
                 </div>
             </FormSection>

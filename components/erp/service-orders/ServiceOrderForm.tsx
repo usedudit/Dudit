@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import {
     Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge, IconPlaceholder,
-    FormDropdown, TimePicker, MoneyInput, PercentageInput, ListItem, RadioButton, InfoCard, DefaultModal
+    FormDropdown, TimePicker, MoneyInput, PercentageInput, ListItem, RadioButton, InfoCard, DefaultModal, HourInput, FormTextarea
 } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import Pagination from "@/components/reusable/Pagination"
@@ -99,15 +99,15 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
             if (fieldErrors.has("assignedUserId")) count++
             if (fieldErrors.has("services")) count++
         } else if (tab === "services") {
-            if (services.length === 0 || fieldErrors.has("services")) count++
-            const hasEmptyManualName = services.some(s => s.isManual && (!s.service_name || s.service_name.trim() === ""))
-            if (hasEmptyManualName || fieldErrors.has("servicesName")) count++
+            if (fieldErrors.has("services")) count++
+            if (fieldErrors.has("servicesName")) count++
+            if (fieldErrors.has("servicesPrice")) count++
         } else if (tab === "products") {
-            const hasEmptyManualName = products.some(p => p.isManual && (!p.product_name || p.product_name.trim() === ""))
-            if (hasEmptyManualName || fieldErrors.has("productsName")) count++
+            if (fieldErrors.has("productsName")) count++
+            if (fieldErrors.has("productsPrice")) count++
         }
         return count
-    }, [fieldErrors, services, products])
+    }, [fieldErrors])
     const [title, setTitle] = useState(editData?.title || "")
     const [description, setDescription] = useState(editData?.description || "")
     const [internalNotes, setInternalNotes] = useState(editData?.internal_notes || "")
@@ -396,21 +396,31 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         if (hasEmptyService) {
             newErrors.add("servicesName")
         }
+        const hasEmptyServicePrice = services.some(s => s.isManual && (!s.service_price || Number(s.service_price) <= 0))
+        if (hasEmptyServicePrice) {
+            newErrors.add("servicesPrice")
+        }
         const hasEmptyProduct = products.some(p => p.isManual && (!p.product_name || p.product_name.trim() === ""))
         if (hasEmptyProduct) {
             newErrors.add("productsName")
+        }
+        const hasEmptyProductPrice = products.some(p => p.isManual && (!p.product_price || Number(p.product_price) <= 0))
+        if (hasEmptyProductPrice) {
+            newErrors.add("productsPrice")
         }
 
         if (newErrors.size > 0) {
             setFieldErrors(newErrors)
             if (hasEmptyService || hasEmptyProduct) {
                 toast({ description: "Por favor, preencha o nome de todos os itens manuais." })
+            } else if (hasEmptyServicePrice || hasEmptyProductPrice) {
+                toast({ description: "Por favor, preencha o preço de todos os itens manuais." })
             } else {
                 toast({ description: "Por favor, preencha os campos obrigatórios." })
             }
-            if (hasEmptyService) {
+            if (hasEmptyService || hasEmptyServicePrice) {
                 setActiveTab("services")
-            } else if (hasEmptyProduct) {
+            } else if (hasEmptyProduct || hasEmptyProductPrice) {
                 setActiveTab("products")
             } else {
                 setActiveTab("general")
@@ -869,14 +879,11 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         errorMessage={fieldErrors.has("assignedUserId") ? "Selecione um responsável" : undefined}
                                                     />
 
-                                                    <Input
+                                                    <HourInput
                                                         label="Tempo Estimado (horas)"
-                                                        placeholder="Ex: 2.5"
-                                                        type="number"
-                                                        step="0.1"
-                                                        min="0"
+                                                        placeholder="0h 0m"
                                                         value={estimatedHours}
-                                                        onChange={(e) => setEstimatedHours(e.target.value)}
+                                                        onChange={(val) => setEstimatedHours(val)}
                                                     />
                                                 </div>
                                             </FormSection>
@@ -992,14 +999,13 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                                 {activeTab === "notes" && (
                                     <FadeIn key="notes" className="space-y-6 w-full max-w-[800px]">
-                                        <FormSection title="Observações internas">
-                                            <textarea
-                                                className="w-full min-h-[150px] px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green resize-y"
-                                                placeholder="Anotações internas (não visíveis ao cliente)..."
-                                                value={internalNotes}
-                                                onChange={(e) => setInternalNotes(e.target.value)}
-                                            />
-                                        </FormSection>
+                                        <FormTextarea
+                                            label="Observações internas"
+                                            placeholder="Anotações internas (não visíveis ao cliente)..."
+                                            value={internalNotes}
+                                            onChange={(e) => setInternalNotes(e.target.value)}
+                                            name="internalNotes"
+                                        />
                                     </FadeIn>
                                 )}
 

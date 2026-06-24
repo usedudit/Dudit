@@ -4,10 +4,9 @@ import type React from "react"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon } from "@/lib/icons"
-import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
+import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
-import { Textarea } from "@/components/ui/textarea"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
@@ -2714,11 +2713,12 @@ export function CheckoutPageClient() {
                     <p className="text-xs text-brand-inactive-text">
                         Adicione instruções especiais para a preparação ou entrega do seu pedido.
                     </p>
-                    <Textarea
+                    <FormTextarea
+                        label=""
                         placeholder="Ex: Tocar interfone, embalar para presente, detalhes da entrega..."
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        className="resize-none"
+                        name="notes"
                         rows={4}
                     />
                 </div>

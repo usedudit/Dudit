@@ -23,6 +23,7 @@ import {
     TimePicker,
     InfoCard,
     AlertModal,
+    FormTextarea,
 } from "@/components/reusable"
 import {
     createERPDeliveryAction,
@@ -523,7 +524,7 @@ export default function CreateDeliveryPage({
                                                             </h3>
                                                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                                                 <FormDropdown
-                                                                    label="Carrier / Entregador"
+                                                                    label="Entregador"
                                                                     value={selectedDeliveryPersonId || "none"}
                                                                     setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
                                                                     options={[
@@ -630,7 +631,7 @@ export default function CreateDeliveryPage({
                                                     </h3>
                                                     <div className="grid grid-cols-1 gap-4">
                                                         <FormDropdown
-                                                            label="Carrier / Entregador"
+                                                            label="Entregador"
                                                             value={selectedDeliveryPersonId || "none"}
                                                             setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
                                                             options={[
@@ -720,20 +721,15 @@ export default function CreateDeliveryPage({
 
                                 <TabsContent value="Observacoes" className="mt-0">
                                     <FadeIn key={activeTab}>
-                                        <h3 className="mb-4 text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                            Observações
-                                        </h3>
-                                        <div className="space-y-4 max-w-2xl">
-                                            <div className="h-[280px] rounded-2xl border border-brand-border bg-brand-gray p-5 dark:border-dark-border dark:bg-dark-border/30">
-                                                <textarea
-                                                    className="h-full w-full resize-none border-none bg-transparent text-[15px] text-brand-dark placeholder:text-brand-inactive-text focus:outline-none dark:text-dark-heading"
-                                                    placeholder="Observações internas da entrega..."
-                                                    value={notes}
-                                                    onChange={(event) => setNotes(event.target.value)}
-                                                />
-                                            </div>
+                                        <FormTextarea
+                                            label="Observações"
+                                            placeholder="Observações internas da entrega..."
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                            name="notes"
+                                        />
 
-                                            <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-3">
                                                 <Button
                                                     onClick={() => {
                                                         if (isBlocked) {
@@ -753,7 +749,6 @@ export default function CreateDeliveryPage({
                                                     </Button>
                                                 ) : null}
                                             </div>
-                                        </div>
                                     </FadeIn>
                                 </TabsContent>
                             </AnimatePresence>

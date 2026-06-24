@@ -3,7 +3,7 @@ import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { formatCurrency } from "@/lib/utils"
 import { Badge } from "@/components/reusable"
-import { WrenchIcon, CheckCircleIcon, CalendarIcon } from "@/lib/icons"
+import { CheckCircleIcon, CalendarIcon } from "@/lib/icons"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
@@ -20,13 +20,22 @@ export default async function ClientPortalPage({
   const result = await getServiceOrderByTokenAction(token)
 
   if (!result.success) {
+    const isExpired = result.error?.toLowerCase().includes("expirado") || result.error?.toLowerCase().includes("revogado")
     return (
       <div className="min-h-screen flex items-center justify-center bg-brand-gray p-4">
         <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-sm border border-brand-border">
-          <WrenchIcon className="w-12 h-12 mx-auto text-brand-inactive-text mb-4" />
-          <h1 className="text-lg font-bold text-brand-dark mb-2">Ordem de Serviço não encontrada</h1>
+          <img
+            src="https://img.dudit.com.br/static/mascots/Ops.png"
+            alt="Não encontrado"
+            className="w-24 h-24 mx-auto mb-4 object-contain"
+          />
+          <h1 className="text-lg font-bold text-brand-dark mb-2">
+            {isExpired ? "Link Expirado" : "Ordem de Serviço não encontrada"}
+          </h1>
           <p className="text-sm text-brand-inactive-text">
-            Verifique se o link está correto ou entre em contato conosco.
+            {isExpired
+              ? "Este link não está mais disponível. Entre em contato para obter um novo."
+              : "Verifique se o link está correto ou entre em contato conosco."}
           </p>
         </div>
       </div>

@@ -40,7 +40,7 @@ interface BulkEditActionsModalProps {
     isOpen: boolean
     onClose: () => void
     selectedCount: number
-    targetType: 'product' | 'variation' | 'quote' | 'order'
+    targetType: 'product' | 'variation' | 'service' | 'quote' | 'order'
     orderSelectionGuards?: {
         paidCount: number
         deliveredCount: number
@@ -203,8 +203,8 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         } catch (error) { console.error("Erro ao processar imagem", error) }
     }
 
-    const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : targetType === 'order' ? 'pedidos' : 'orçamentos'
-    const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : targetType === 'order' ? 'pedido' : 'orçamento'
+    const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : targetType === 'service' ? 'serviços' : targetType === 'order' ? 'pedidos' : 'orçamentos'
+    const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : targetType === 'service' ? 'serviço' : targetType === 'order' ? 'pedido' : 'orçamento'
 
     const viewTitles: Record<string, string> = {
         menu: '', price: 'Alterar Preço', stock: 'Ajustar Estoque',
@@ -218,10 +218,12 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
             case 'menu':
                 return (
                     <div className="grid grid-cols-2 gap-4 pt-2">
-                        {targetType !== 'quote' && targetType !== 'order' && (
+                        {(targetType === 'product' || targetType === 'variation' || targetType === 'service') && (
                             <>
                                 <BulkActionCard icon={MoneyIcon} label="Alterar Preço" onClick={() => setView('price')} />
-                                <BulkActionCard icon={Package} label="Ajustar Estoque" onClick={() => setView('stock')} />
+                                {targetType !== 'service' && (
+                                    <BulkActionCard icon={Package} label="Ajustar Estoque" onClick={() => setView('stock')} />
+                                )}
                                 <BulkActionCard icon={EyeIcon} label="Publicar / Ocultar" onClick={() => setView('visibility')} />
                                 <BulkActionCard icon={UploadIcon} label="Aplicar Imagem" onClick={() => setView('image')} />
                                 <BulkActionCard icon={RemoveImageIcon} label="Remover Imagem" onClick={() => setView('remove_image')} />
@@ -291,7 +293,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         <label className="flex items-center gap-3 p-2 cursor-pointer mt-2">
                             <Checkbox checked={priceConfig.onlyPublished} onChange={c => setPriceConfig(p => ({ ...p, onlyPublished: c }))} />
                             <span className="text-sm text-brand-dark dark:text-dark-heading font-medium">
-                                Aplicar apenas {targetType === 'product' ? 'aos produtos publicados' : 'às variações publicadas'}
+                                Aplicar apenas {targetType === 'service' ? 'aos serviços ativos' : targetType === 'product' ? 'aos produtos publicados' : 'às variações publicadas'}
                             </span>
                         </label>
                     </div>
@@ -493,7 +495,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
             case 'remove_image':
                 return <ConfirmationView icon={AlertTriangleIcon} title={`Remover imagem de ${selectedCount} ${selectedCount === 1 ? singularTargetLabel : targetLabel}?`} desc={`A imagem principal será removida.`} colorClass="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" />
             case 'delete':
-                return <ConfirmationView icon={TrashIcon} title={`Excluir ${selectedCount} ${selectedCount === 1 ? singularTargetLabel : targetLabel}?`} desc="Esta ação é irreversível e pode afetar o histórico de vendas." colorClass="bg-red-100 text-brand-red" />
+                return <ConfirmationView icon={TrashIcon} title={`Excluir ${selectedCount} ${selectedCount === 1 ? singularTargetLabel : targetLabel}?`} desc="Esta ação é irreversível e pode afetar o histórico de vendas." colorClass="bg-brand-red-light dark:bg-brand-red/20 text-brand-red-dark dark:text-brand-red" />
             default: return null
         }
     }

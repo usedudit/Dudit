@@ -29,7 +29,7 @@ export async function confirmPickupPaymentAction(params: {
 
   const { data: order } = await adminClient
     .from("orders")
-    .select("id, order_number, situation, total_amount, partner_id")
+    .select("id, order_number, situation, total_amount, partner_id, customer_id, buyer_id")
     .eq("id", params.orderId)
     .eq("partner_id", ctx.partnerId)
     .single()
@@ -92,7 +92,7 @@ export async function confirmPickupPaymentAction(params: {
       payment_provider: "pickup",
       payment_date: now,
       payment_breakdown: [{ method: paymentMethodLabels[params.paymentMethod], amount: order.total_amount }],
-      customer_contact_id: null,
+      customer_id: order.customer_id || order.buyer_id || null,
       customer_name: null,
     })
   } catch (txErr: any) {

@@ -45,11 +45,11 @@ const formatRuleDetails = (rule: any) => {
             if (val === undefined || val === null) return ""
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
         }
-        const valStr = isPercent 
-            ? `${rule.discount_value}% Desc.` 
+        const valStr = isPercent
+            ? `${rule.discount_value}% Desc.`
             : `${formatCurrency(rule.discount_value)} Desc.`
-        const maxStr = rule.max_discount_amount 
-            ? ` - Max ${formatCurrency(rule.max_discount_amount)}` 
+        const maxStr = rule.max_discount_amount
+            ? ` - Max ${formatCurrency(rule.max_discount_amount)}`
             : ""
         below = `${valStr}${maxStr}`
     } else if (rule.promotion_type === "buy_x_pay_y") {
@@ -101,7 +101,7 @@ const PromotionGridCard = React.memo(({
                                 {campaign.name}
                             </h3>
                             <div className="flex items-center gap-1 shrink-0">
-                                <Tooltip text={campaign.is_active ? "Status: Ativa" : "Status: Rascunho/Inativa"}>
+                                <Tooltip text={campaign.is_active ? "Status: Ativa" : "Status: Inativa"}>
                                     <Badge
                                         variant={campaign.is_active ? "green" : "gray"}
                                         className="whitespace-nowrap scale-90 shrink-0"

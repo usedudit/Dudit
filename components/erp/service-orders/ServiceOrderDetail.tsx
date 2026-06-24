@@ -358,8 +358,8 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                             })}
                                             {!order.signature_image_key && (
                                                 <DropdownItem onClick={() => {
-                                                    if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                        openPlanUpgrade("crescer");
+                                                    if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                        openPlanUpgrade("escalar");
                                                     } else {
                                                         setShowSignature(true);
                                                     }

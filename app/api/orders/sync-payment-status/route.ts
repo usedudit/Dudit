@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
 
           const { data: fullOrder } = await supabaseAdmin
             .from("orders")
-            .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name")
+            .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id")
             .eq("id", orderId)
             .single()
 
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
               payment_provider: fullOrder.payment_provider,
               payment_breakdown: fullOrder.payment_breakdown,
               payment_date: paymentData.date_approved || new Date().toISOString(),
-              customer_contact_id: fullOrder.buyer_id,
+              customer_id: fullOrder.customer_id,
               customer_name: fullOrder.customer_name,
             })
 

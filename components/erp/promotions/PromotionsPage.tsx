@@ -284,7 +284,7 @@ export default function PromotionsPage({
         id: "status",
         title: "Status da Campanha",
         type: "checkbox-list",
-        options: ["Ativa", "Rascunho/Inativa"],
+        options: ["Ativa", "Inativa"],
       },
       {
         id: "datePeriod",
@@ -310,7 +310,7 @@ export default function PromotionsPage({
     // 2. Status filter
     if (filters.status.length > 0) {
       result = result.filter(c => {
-        const statusStr = c.is_active ? "Ativa" : "Rascunho/Inativa"
+        const statusStr = c.is_active ? "Ativa" : "Inativa"
         return filters.status.includes(statusStr)
       })
     }
@@ -818,7 +818,7 @@ export default function PromotionsPage({
                                             </td>
                                             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                                               <Badge variant={camp.is_active ? "green" : "gray"}>
-                                                {camp.is_active ? "Ativa" : "Rascunho/Inativa"}
+                                                {camp.is_active ? "Ativa" : "Inativa"}
                                               </Badge>
                                             </td>
                                             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center" onClick={(e) => e.stopPropagation()}>

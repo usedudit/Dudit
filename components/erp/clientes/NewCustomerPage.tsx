@@ -19,6 +19,7 @@ import {
     DatePicker,
     ListItem,
     RadioButton,
+    FormTextarea,
     UnsavedChangesDialog
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
@@ -765,15 +766,13 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                         <TabsContent value="notes" className="mt-0">
                                             <FadeIn key="notes">
                                                 <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Observações</h3>
-                                                    <div className="bg-gray-50 dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[400px]">
-                                                        <textarea
-                                                            value={observacoes}
-                                                            onChange={(e) => setObservacoes(e.target.value)}
-                                                            className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading leading-relaxed focus:outline-none resize-none placeholder:text-brand-inactive-text"
-                                                            placeholder="Adicione observações internas sobre este cliente..."
-                                                        />
-                                                    </div>
+                                                    <FormTextarea
+                                                        label="Observações"
+                                                        value={observacoes}
+                                                        onChange={(e) => setObservacoes(e.target.value)}
+                                                        placeholder="Adicione observações internas sobre este cliente..."
+                                                        name="observacoes"
+                                                    />
                                                 </section>
                                             </FadeIn>
                                         </TabsContent>

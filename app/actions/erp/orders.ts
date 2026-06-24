@@ -723,7 +723,7 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
             payment_provider: params.paymentProvider || null,
             payment_breakdown: params.paymentBreakdown || null,
             payment_date: params.paymentDate || new Date().toISOString(),
-            customer_contact_id: params.customerId || null,
+            customer_id: params.customerId || null,
             customer_name: params.customerName || null,
             finance_account_id: params.financeAccountId || null,
         })
@@ -1601,7 +1601,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             paymentMethod: paymentMethodSummary,
             paymentProvider: order.payment_provider,
             paymentBreakdown: adjustedPaymentBreakdown,
-            customerId: order.buyer_id,
+            customerId: order.customer_id || order.buyer_id || null,
             customerName: order.customer_name,
             paymentDate: new Date().toISOString(),
             financeAccountId: order.finance_account_id || data.financeAccountId,
@@ -2531,7 +2531,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     const { data: currentOrders } = await supabase
         .from("orders")
-        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, order_items(product_id, variant_id, quantity)")
+        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, order_items(product_id, variant_id, quantity)")
         .in("id", payload.orderIds)
         .eq("partner_id", payload.partnerId)
     const overallWarnings: string[] = []
@@ -2647,7 +2647,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             partnerId: payload.partnerId,
                             orderNumber: order.order_number || order.id,
                             orderId: order.id,
-                            customerId: order.buyer_id || null,
+                            customerId: order.customer_id || order.buyer_id || null,
                             customerName: order.customer_name || null,
                             paidAmount: refundAmount,
                             financeAccountId: order.finance_account_id || null,
@@ -2877,7 +2877,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     paymentMethod: order.payment_method || null,
                     paymentProvider: order.payment_provider || null,
                     paymentBreakdown: order.payment_breakdown || null,
-                    customerId: order.buyer_id || null,
+                    customerId: order.customer_id || order.buyer_id || null,
                     customerName: order.customer_name || null,
                     paymentDate: new Date().toISOString(),
                     financeAccountId: order.finance_account_id || null,
@@ -3360,7 +3360,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 paymentMethod: payload.paymentMethod,
                 paymentProvider: payload.paymentProvider,
                 paymentBreakdown: payload.paymentBreakdown,
-                customerId: order.buyer_id,
+                customerId: order.customer_id || order.buyer_id || null,
                 customerName: order.customer_name,
                 paymentDate: new Date().toISOString(),
                 financeAccountId: payload.financeAccountId,

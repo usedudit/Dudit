@@ -212,11 +212,14 @@ export async function createServiceOrderAction(
       return { success: false, error: limitCheck.message || "Limite mensal de ordens de serviço atingido." }
     }
 
+    const publicToken = crypto.randomUUID()
+
     const { data, error } = await admin
       .from("service_orders")
       .insert({
         partner_id: partnerId,
         order_number: orderNumber,
+        public_token: publicToken,
         title: input.title,
         description: input.description || null,
         internal_notes: input.internal_notes || null,
@@ -1086,6 +1089,10 @@ export async function confirmServiceOrderPaymentAction(payload: {
 
     const totalAmount = Number(order.total_amount || 0)
 
+    // Map payment status to valid sales table values
+    const salePaymentStatus = payload.paymentStatus === "unpaid" ? "pending" : payload.paymentStatus
+    const saleStatus = payload.paymentStatus === "unpaid" ? "pending" : payload.paymentStatus
+
     // 3. Update the service order's payment info
     const { error: updateErr } = await supabase
       .from("service_orders")
@@ -1125,8 +1132,8 @@ export async function confirmServiceOrderPaymentAction(payload: {
           discount_amount: Number(order.discount_value || 0) + Number(order.coupon_discount_amount || 0),
           final_amount: totalAmount,
           paid_amount: payload.paidAmount,
-          payment_status: payload.paymentStatus,
-          status: payload.paymentStatus,
+          payment_status: salePaymentStatus,
+          status: saleStatus,
           finance_account_id: payload.financeAccountId || null,
           notes: saleRefNote,
           finalized_by_user_id: user.id,
@@ -1193,8 +1200,8 @@ export async function confirmServiceOrderPaymentAction(payload: {
           discount_amount: Number(order.discount_value || 0) + Number(order.coupon_discount_amount || 0),
           final_amount: totalAmount,
           paid_amount: payload.paidAmount,
-          payment_status: payload.paymentStatus,
-          status: payload.paymentStatus,
+          payment_status: salePaymentStatus,
+          status: saleStatus,
           finance_account_id: payload.financeAccountId || null,
         })
         .eq("id", saleId)

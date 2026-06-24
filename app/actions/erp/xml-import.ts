@@ -915,7 +915,7 @@ export async function confirmImportAction(
           .select("id")
           .eq("partner_id", partnerId)
           .eq("type", "fornecedor")
-          .eq("contact_id", xmlImport.supplier_id)
+          .eq("name", supplier.name)
           .maybeSingle()
 
         if (!contact) {
@@ -925,7 +925,6 @@ export async function confirmImportAction(
               partner_id: partnerId,
               name: supplier.name,
               type: "fornecedor",
-              contact_id: xmlImport.supplier_id,
               description: "Fornecedor (importado de XML NF-e)",
             })
             .select("id")
@@ -1236,7 +1235,6 @@ export async function getImportFinanceAction(
       .from("transactions")
       .select("*")
       .eq("partner_id", partnerId)
-      .eq("supplier_id", xmlImport.supplier_id)
       .ilike("description", `%${xmlImport.invoice_number || ""}%`)
       .order("due_date")
 
