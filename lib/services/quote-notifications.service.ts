@@ -47,22 +47,18 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
 
         case "viewed":
             changeLines = [`Orçamento ${quoteNum} visualizado pelo cliente.`]
-            if (ipAddress) changeLines.push(`IP: ${ipAddress}`)
-            if (userAgent) changeLines.push(`Dispositivo: ${userAgent}`)
             break
 
         case "approved":
             changeLines = [`Orçamento ${quoteNum} APROVADO pelo cliente.`]
             if (actorName) changeLines.push(`Aprovador: ${actorName}`)
             if (approvalMethod) changeLines.push(`Método: ${approvalMethod === "code" ? "Código de aprovação" : "Autenticado"}`)
-            if (ipAddress) changeLines.push(`IP: ${ipAddress}`)
             break
 
         case "rejected":
             changeLines = [`Orçamento ${quoteNum} REJEITADO pelo cliente.`]
             if (actorName) changeLines.push(`Rejeitado por: ${actorName}`)
             if (rejectionReason) changeLines.push(`Motivo da recusa: ${rejectionReason}`)
-            if (ipAddress) changeLines.push(`IP: ${ipAddress}`)
             metadata.rejectionReason = rejectionReason
             break
 
@@ -93,7 +89,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
     // 2. Email Notifications via Unosend (Fire-and-forget, fails silently to prevent breaking primary actions)
     try {
         const supabase = getAdminClient()
-        
+
         // Fetch seller email
         let sellerEmail: string | null = null
         if (quote.user_id) {

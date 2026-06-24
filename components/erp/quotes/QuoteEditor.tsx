@@ -721,7 +721,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading mb-3">Temas de Cor</label>
                                 <div className="flex flex-wrap gap-2">
                                     {[
-                                        { p: "#113833", s: "#d4f995", label: "Padrão" },
+                                        { p: "#003229", s: "#d4f995", label: "Padrão" },
                                         { p: "#1e40af", s: "#bfdbfe", label: "Azul" },
                                         { p: "#065f46", s: "#a7f3d0", label: "Verde" },
                                         { p: "#6b21a8", s: "#e9d5ff", label: "Roxo" },
@@ -783,8 +783,9 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 label="Título do Documento"
                                 name="quoteTitle"
                                 value={props.quoteTitle}
-                                onChange={(e) => props.setQuoteTitle(e.target.value)}
+                                onChange={(e) => { const v = e.target.value; if (v.length <= 30) props.setQuoteTitle(v); }}
                                 placeholder="EX: ORÇAMENTO"
+                                maxLength={30}
                                 disabled={layoutLocked}
                             />
 
@@ -792,8 +793,9 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 label="Subtítulo"
                                 name="quoteSubtitle"
                                 value={props.quoteSubtitle}
-                                onChange={(e) => props.setQuoteSubtitle(e.target.value)}
+                                onChange={(e) => { const v = e.target.value; if (v.length <= 30) props.setQuoteSubtitle(v); }}
                                 placeholder="Ex: Proposta Comercial"
+                                maxLength={30}
                                 disabled={layoutLocked}
                             />
 

@@ -15,6 +15,7 @@ interface ServiceOrderGridCardProps {
   onDelete?: () => void
   statusColor: string
   statusLabel: string
+  children?: React.ReactNode
 }
 
 const ServiceOrderGridCard = React.memo(
@@ -27,6 +28,7 @@ const ServiceOrderGridCard = React.memo(
     onDelete,
     statusColor,
     statusLabel,
+    children,
   }: ServiceOrderGridCardProps) => {
     const formatDate = (d: string) => {
       if (!d) return "-"
@@ -119,7 +121,9 @@ const ServiceOrderGridCard = React.memo(
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onView={onDetails}
-              />
+              >
+                {children}
+              </ActionsDropdown>
             </div>
           </div>
         </div>

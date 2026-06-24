@@ -56,8 +56,8 @@ export default async function SelectErpPage() {
     return (
         <div className="flex flex-col min-h-screen bg-gray-50">
             <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
-                <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-6 mx-auto gap-4">
-                    <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
+                <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-2 mx-auto gap-4">
+                    <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
                             src="https://img.dudit.com.br/static/Logo.png"
                             alt="Dudit"
@@ -65,7 +65,7 @@ export default async function SelectErpPage() {
                             height={40}
                             className="h-10 w-auto object-contain"
                         />
-                    </Link>
+                    </a>
                 </div>
             </header>
 
@@ -147,18 +147,9 @@ export default async function SelectErpPage() {
                 </div>
             </main>
 
-            <footer className="w-full py-8 border-t border-white/10 bg-brand-dark mt-auto">
-                <div className="max-w-[1300px] mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <a href="/" className="opacity-80 hover:opacity-100 transition-opacity">
-                        <img
-                            src="https://img.dudit.com.br/static/Logo.png"
-                            alt="Dudit"
-                            width={110}
-                            height={32}
-                            className="h-8 w-auto object-contain"
-                        />
-                    </a>
-                    <p className="text-white text-xs sm:text-sm font-medium">
+            <footer className="w-full h-[68px] py-6 border-t border-white/10 bg-brand-dark">
+                <div className="max-w-[1400px] mx-auto px-6 flex flex-col md:flex-row justify-center items-center">
+                    <p className="text-white text-xs sm:text-sm font-medium tracking-tight">
                         © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
                     </p>
                 </div>

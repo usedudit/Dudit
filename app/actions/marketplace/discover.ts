@@ -87,7 +87,7 @@ function seededShuffle<T>(array: T[], seed: string): T[] {
     for (let i = r.length - 1; i > 0; i--) {
         h = (h * 16807) % 2147483647
         const j = Math.abs(h) % (i + 1)
-        ;[r[i], r[j]] = [r[j], r[i]]
+            ;[r[i], r[j]] = [r[j], r[i]]
     }
     return r
 }
@@ -127,69 +127,69 @@ function sectionDisplay(
 
     const MAP: Record<string, Record<string, [string, string]>> = {
         trending: {
-            country: ["🔥 Bombando na Dudit", "Os produtos mais quentes do momento"],
-            state: [`🔥 Bombando no ${stateName}`, `Os produtos mais quentes no ${stateName}`],
-            city: [`🔥 Bombando em ${cityName}`, `Os produtos mais quentes em ${cityName}`],
+            country: ["Bombando na Dudit", "Os produtos mais quentes do momento"],
+            state: [`Bombando no ${stateName}`, `Os produtos mais quentes no ${stateName}`],
+            city: [`Bombando em ${cityName}`, `Os produtos mais quentes em ${cityName}`],
         },
         endingSoon: {
-            country: ["⏰ Acabando hoje", "Ofertas que terminam em breve"],
-            state: ["⏰ Acabando hoje", "Ofertas que terminam em breve"],
-            city: ["⏰ Acabando hoje", "Ofertas que terminam em breve"],
+            country: ["Acabando hoje", "Ofertas que terminam em breve"],
+            state: ["Acabando hoje", "Ofertas que terminam em breve"],
+            city: ["Acabando hoje", "Ofertas que terminam em breve"],
         },
         nearby: {
-            country: ["📍 Perto de você", "SKIP"],
-            state: ["📍 Perto de você", "SKIP"],
-            city: ["📍 Até 2km de você", "Produtos pertinho da sua localização"],
+            country: ["Perto de você", "SKIP"],
+            state: ["Perto de você", "SKIP"],
+            city: ["Até 2km de você", "Produtos pertinho da sua localização"],
         },
         recent: {
-            country: ["🆕 Recém anunciados", "Acabaram de chegar na Dudit"],
-            state: [`🆕 Recém anunciados no ${stateName}`, `Acabaram de chegar no ${stateName}`],
-            city: [`🆕 Recém anunciados em ${cityName}`, `Acabaram de chegar em ${cityName}`],
+            country: ["Recém anunciados", "Acabaram de chegar na Dudit"],
+            state: [`Recém anunciados no ${stateName}`, `Acabaram de chegar no ${stateName}`],
+            city: [`Recém anunciados em ${cityName}`, `Acabaram de chegar em ${cityName}`],
         },
         gems: {
-            country: ["💎 Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
-            state: ["💎 Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
-            city: ["💎 Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
+            country: ["Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
+            state: ["Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
+            city: ["Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
         },
         personalized: {
-            country: ["👀 Você pode gostar", "Baseado nos seus favoritos e compras"],
-            state: ["👀 Você pode gostar", "Baseado nos seus favoritos e compras"],
-            city: ["👀 Você pode gostar", "Baseado nos seus favoritos e compras"],
+            country: ["Você pode gostar", "Baseado nos seus favoritos e compras"],
+            state: ["Você pode gostar", "Baseado nos seus favoritos e compras"],
+            city: ["Você pode gostar", "Baseado nos seus favoritos e compras"],
         },
         bestSellers: {
-            country: ["⭐ Mais vendidos", "Os produtos mais vendidos da Dudit"],
-            state: [`⭐ Mais vendidos no ${stateName}`, `Os mais vendidos no ${stateName}`],
-            city: [`⭐ Mais vendidos em ${cityName}`, `Os mais vendidos em ${cityName}`],
+            country: ["Mais vendidos", "Os produtos mais vendidos da Dudit"],
+            state: [`Mais vendidos no ${stateName}`, `Os mais vendidos no ${stateName}`],
+            city: [`Mais vendidos em ${cityName}`, `Os mais vendidos em ${cityName}`],
         },
         topRated: {
-            country: ["🏆 Melhor avaliados", "Os produtos com as melhores avaliações"],
+            country: ["Melhor avaliados", "Os produtos com as melhores avaliações"],
             state: ["🏆 Melhor avaliados", "Os produtos com as melhores avaliações"],
             city: ["🏆 Melhor avaliados", "Os produtos com as melhores avaliações"],
         },
         promos: {
-            country: ["🎯 Promoções especiais", "Os melhores descontos da Dudit"],
-            state: ["🎯 Promoções especiais", "Os melhores descontos da região"],
-            city: ["🎯 Promoções especiais", "Os melhores descontos perto de você"],
+            country: ["Promoções especiais", "Os melhores descontos da Dudit"],
+            state: ["Promoções especiais", "Os melhores descontos da região"],
+            city: ["Promoções especiais", "Os melhores descontos perto de você"],
         },
         mostViewed: {
-            country: ["💬 Mais visualizados", "O que todo mundo está de olho"],
-            state: ["💬 Mais visualizados", "O que todo mundo está de olho"],
-            city: ["💬 Mais visualizados", "O que todo mundo está de olho"],
+            country: ["Mais visualizados", "O que todo mundo está de olho"],
+            state: ["Mais visualizados", "O que todo mundo está de olho"],
+            city: ["Mais visualizados", "O que todo mundo está de olho"],
         },
         services: {
-            country: ["🧰 Serviços em destaque", "Profissionais e serviços para você"],
-            state: ["🧰 Serviços em destaque", "Profissionais e serviços para você"],
-            city: ["🧰 Serviços próximos", "Profissionais e serviços perto de você"],
+            country: ["Serviços em destaque", "Profissionais e serviços para você"],
+            state: ["Serviços em destaque", "Profissionais e serviços para você"],
+            city: ["Serviços próximos", "Profissionais e serviços perto de você"],
         },
         topVitrines: {
-            country: ["🛍️ Vitrines em destaque", "Lojas para você conhecer"],
-            state: [`🛍️ Vitrines do ${stateName}`, `Lojas do ${stateName} para você conhecer`],
-            city: ["🛍️ Lojas próximas", "Lojas perto de você"],
+            country: ["Vitrines em destaque", "Lojas para você conhecer"],
+            state: [`Vitrines do ${stateName}`, `Lojas do ${stateName} para você conhecer`],
+            city: ["Negócios e profissionais por perto", "Descubra o que está por perto"],
         },
         popular: {
-            country: ["🔥 Populares na Dudit", "O que está bombando por aqui"],
-            state: [`🔥 Populares no ${stateName}`, `O que está bombando no ${stateName}`],
-            city: [`🔥 Populares em ${cityName}`, `O que está bombando em ${cityName}`],
+            country: ["Populares na Dudit", "O que está bombando por aqui"],
+            state: [`Populares no ${stateName}`, `O que está bombando no ${stateName}`],
+            city: [`Populares em ${cityName}`, `O que está bombando em ${cityName}`],
         },
     }
 
@@ -298,8 +298,8 @@ function applyTierSort<T>(
         .map(item => {
             const pid = getPartnerId(item as any)
             const tier = pid && tiers.cityIds.has(pid) ? 0
-                       : pid && tiers.stateIds.has(pid) ? 1
-                       : 2
+                : pid && tiers.stateIds.has(pid) ? 1
+                    : 2
             return { ...item, _tier: tier } as T & WithTier
         })
         .sort((a, b) => a._tier - b._tier || scorer(b as T) - scorer(a as T))
@@ -606,8 +606,8 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const pid = rawPartner?.id
         const tier = pid && tiers.cityIds.has(pid) ? 0
-                   : pid && tiers.stateIds.has(pid) ? 1
-                   : 2
+            : pid && tiers.stateIds.has(pid) ? 1
+                : 2
         return { ...item, _distKm: distKm, _tier: tier }
     })
 
@@ -652,7 +652,7 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         const p = processProduct(item, { _distanceText: distText })
         if (p.partners) {
             (p.partners as Record<string, any>).distance_km = dist
-            ;(p.partners as Record<string, any>).distance_km_formatted = distText
+                ; (p.partners as Record<string, any>).distance_km_formatted = distText
         }
         return p
     })
@@ -1295,8 +1295,8 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const pid = rawPartner?.id
         const tier = pid && tiers.cityIds.has(pid) ? 0
-                   : pid && tiers.stateIds.has(pid) ? 1
-                   : 2
+            : pid && tiers.stateIds.has(pid) ? 1
+                : 2
         return { ...item, _tier: tier }
     }).sort((a: any, b: any) => a._tier - b._tier || (b.rating ?? 0) - (a.rating ?? 0))
 
@@ -1382,8 +1382,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const tagged = data.map((p: Record<string, any>) => {
         const pid = p.id
         const tier = pid && tiers.cityIds.has(pid) ? 0
-                   : pid && tiers.stateIds.has(pid) ? 1
-                   : 2
+            : pid && tiers.stateIds.has(pid) ? 1
+                : 2
         return { ...p, _tier: tier }
     }).sort((a: any, b: any) => a._tier - b._tier || (b.rating ?? 0) - (a.rating ?? 0))
 
@@ -1641,7 +1641,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 2 (MEDIUM): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
+    console.log(`[Discover] Phase 2 (MEDIUM): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 3. FALLBACK if still < 5
     if (pool.length < 5) {
@@ -1655,7 +1655,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 3 (FALLBACK): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
+    console.log(`[Discover] Phase 3 (FALLBACK): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 4. ULTIMATE FALLBACK — any products at all (no ranking required)
     if (pool.length < 5) {
@@ -1668,7 +1668,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 4 (ULTIMATE): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
+    console.log(`[Discover] Phase 4 (ULTIMATE): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 5. Proximity (nearby) — only with coords, only if room
     //    Vitrines are NOT reserved — they participate in the seeded MEDIUM rotation
@@ -1683,7 +1683,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 5 (PROXIMITY): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
+    console.log(`[Discover] Phase 5 (PROXIMITY): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 6. Sixth dynamic section (only if room)
     if (pool.length < 6) {
@@ -1733,7 +1733,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 6 (SIXTH): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
+    console.log(`[Discover] Phase 6 (SIXTH): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 7. Global dedup with auto-refill — sections never drop below 1 item
     const globalSeen = new Set<string>()

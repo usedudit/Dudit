@@ -2,16 +2,13 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { HeartIcon, SearchIcon, XIcon, ChevronDownIcon, TrashIcon } from "@/lib/icons"
+import { SearchIcon, ChevronDownIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useFavorites } from "@/providers/favorites-provider"
-import { getUserFavoritesAction, getFavoritesCountAction } from "@/app/actions/marketplace/favorites"
+import { getUserFavoritesAction } from "@/app/actions/marketplace/favorites"
 import { ItemCard } from "./shared-components"
-import { MarketplaceHeader } from "./MarketplaceHeader"
-import { MarketplaceFooter } from "./MarketplaceFooter"
-import { Button, IconPlaceholder, DefaultModal, SkeletonLoader, Input } from "@/components/reusable"
+import { Button, IconPlaceholder, DefaultModal, SkeletonLoader, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import { RadioButton } from "@/components/reusable/RadioButton"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 interface FavoritesPageClientProps {
@@ -42,6 +39,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
 
     const [activeTab, setActiveTab] = useState<TabType>("todos")
     const [sortBy, setSortBy] = useState<SortType>("recentes")
+    const [searchInput, setSearchInput] = useState("")
     const [searchQuery, setSearchQuery] = useState("")
     const [items, setItems] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -57,35 +55,36 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
     }, [user, router])
 
     // Fetch favorites
-    const fetchFavorites = useCallback(async (force = false) => {
+    const fetchFavorites = useCallback(async () => {
         if (!user) return
-        if (items.length === 0 || force) {
-            setIsLoading(true)
-        }
+        setIsLoading(true)
         try {
-            const [favResult, countResult] = await Promise.all([
-                getUserFavoritesAction({ type: "todos" }),
-                getFavoritesCountAction(),
-            ])
+            const favResult = await getUserFavoritesAction({ type: "todos" })
 
             if (favResult.success) {
                 setItems(favResult.items)
+                if (favResult.counts) {
+                    setCounts(favResult.counts)
+                }
             }
-            setCounts(countResult)
         } catch (error) {
             console.error("[Favorites] Fetch error:", error)
         } finally {
             setIsLoading(false)
         }
-    }, [user, items.length])
+    }, [user])
 
     useEffect(() => {
         fetchFavorites()
     }, [fetchFavorites])
 
+    const prevContextCount = useRef(contextCount)
     useEffect(() => {
-        fetchFavorites(true)
-    }, [contextCount])
+        if (prevContextCount.current !== contextCount) {
+            prevContextCount.current = contextCount
+            fetchFavorites()
+        }
+    }, [contextCount, fetchFavorites])
 
     // Filter and sort items
     const filteredItems = useMemo(() => {
@@ -130,6 +129,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
 
     // Debounced search
     const handleSearchChange = useCallback((value: string) => {
+        setSearchInput(value)
         if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
         searchTimeoutRef.current = setTimeout(() => {
             setSearchQuery(value)
@@ -159,24 +159,19 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-1">
-                        {TAB_OPTIONS.map((tab) => (
-                            <button
-                                key={tab.value}
-                                onClick={() => setActiveTab(tab.value)}
-                                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 cursor-pointer select-none ${activeTab === tab.value
-                                    ? "bg-brand-dark text-white shadow-sm"
-                                    : "bg-gray-100 text-brand-dark hover:bg-gray-200"
-                                    }`}
-                            >
-                                {tab.label}
-                                <span className={`ml-1.5 text-xs ${activeTab === tab.value ? "text-white/70" : "text-brand-inactive-text"
-                                    }`}>
-                                    {tabCount(tab.value)}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
+                    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+                        <TabsList className="bg-transparent px-0 md:px-0 mb-6">
+                            {TAB_OPTIONS.map((tab) => (
+                                <TabsTrigger
+                                    key={tab.value}
+                                    value={tab.value}
+                                    badge={<span className="ml-1 text-xs text-brand-inactive-text">({tabCount(tab.value)})</span>}
+                                >
+                                    {tab.label}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
 
                     {/* Search & Sort Bar */}
                     {counts.total > 0 && (
@@ -187,7 +182,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                                     label=""
                                     name="searchQuery"
                                     placeholder="Buscar nos favoritos..."
-                                    value={searchQuery}
+                                    value={searchInput}
                                     onChange={(e) => handleSearchChange(e.target.value)}
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     className="mb-0"

@@ -70,6 +70,7 @@ export async function getERPQuotesPageAction(
                     expiration_date,
                     total,
                     customer_id,
+                    user_id,
                     created_by_user_id,
                     created_at,
                     updated_at,
@@ -85,6 +86,7 @@ export async function getERPQuotesPageAction(
                     expiration_date,
                     total,
                     customer_id,
+                    user_id,
                     created_at,
                     updated_at,
                     public_token,
@@ -110,10 +112,11 @@ export async function getERPQuotesPageAction(
 
             const rowsWithCreator = (queryResult.data || []).map((row: any) => ({
                 ...row,
+                user_id: row?.user_id || null,
                 created_by_user_id: row?.created_by_user_id || null,
             }))
             const creatorIds = Array.from(
-                new Set(rowsWithCreator.map((row: any) => row.created_by_user_id).filter(Boolean))
+                new Set(rowsWithCreator.map((row: any) => row.user_id || row.created_by_user_id).filter(Boolean))
             ) as string[]
             const creatorNameById = new Map<string, string>()
             if (creatorIds.length > 0) {
@@ -127,20 +130,21 @@ export async function getERPQuotesPageAction(
                 }
             }
 
-            // Mark expired quotes on read (virtual status)
+            // Mark expired quotes on read (virtual status, never for finalized)
             const now = new Date()
             now.setHours(0, 0, 0, 0)
+            const finalizedStatuses = ["approved", "rejected", "expired", "cancelled", "converted_to_order"]
 
             const mappedData = rowsWithCreator.map((row: any) => {
                 const mappedRow = {
                     ...row,
-                    user_profiles: row.created_by_user_id
-                        ? { full_name: creatorNameById.get(String(row.created_by_user_id)) || "Sistema" }
-                        : null,
+                user_profiles: (row.user_id || row.created_by_user_id)
+                    ? { full_name: creatorNameById.get(String(row.user_id || row.created_by_user_id)) || "Sistema" }
+                    : null,
                 }
                 if (
                     row.expiration_date &&
-                    (row.status === "draft" || row.status === "sent") &&
+                    !finalizedStatuses.includes(row.status) &&
                     new Date(row.expiration_date) < now
                 ) {
                     return { ...mappedRow, status: "expired", _originalStatus: row.status }
@@ -364,6 +368,13 @@ export async function createQuoteAction(data: {
     additionalCosts?: number
     items?: QuoteItemPayload[]
     userId?: string | null
+    preview?: {
+        primaryColor?: string
+        secondaryColor?: string
+        quoteTitle?: string
+        quoteSubtitle?: string
+        showDecoration?: boolean
+    }
 }) {
     return withTelemetry("createQuoteAction", async () => {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -429,6 +440,23 @@ export async function createQuoteAction(data: {
                 return errorResponse(rpcError?.message || "Erro fatal ao criar orçamento. Operação revertida.")
             }
 
+            // Save preview customization to metadata
+            if (data.preview) {
+                const previewMeta = {
+                    preview: {
+                        primaryColor: data.preview.primaryColor || null,
+                        secondaryColor: data.preview.secondaryColor || null,
+                        quoteTitle: data.preview.quoteTitle || null,
+                        quoteSubtitle: data.preview.quoteSubtitle || null,
+                        showDecoration: data.preview.showDecoration ?? true,
+                    }
+                }
+                await supabase
+                    .from("quotes")
+                    .update({ metadata: previewMeta as any })
+                    .eq("id", quoteResult.id)
+            }
+
             // Sync full state to compute native triggers (subtotals)
             const { data: updatedQuote } = await supabase
                 .from("quotes")
@@ -478,6 +506,13 @@ export async function updateQuoteAction(data: {
     discountValue?: number
     shippingCost?: number
     additionalCosts?: number
+    preview?: {
+        primaryColor?: string
+        secondaryColor?: string
+        quoteTitle?: string
+        quoteSubtitle?: string
+        showDecoration?: boolean
+    }
 }) {
     return withTelemetry("updateQuoteAction", async () => {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -500,7 +535,7 @@ export async function updateQuoteAction(data: {
             const { data: currentQuote, error: currentQuoteError } = await supabase
                 .from("quotes")
                 .select(
-                    "status, customer_id, issue_date, expiration_date, notes, internal_notes, discount_type, discount_value, shipping_cost, additional_costs, converted",
+                    "status, customer_id, issue_date, expiration_date, notes, internal_notes, discount_type, discount_value, shipping_cost, additional_costs, converted, metadata",
                 )
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)
@@ -537,6 +572,19 @@ export async function updateQuoteAction(data: {
             if (data.discountValue !== undefined) updatePayload.discount_value = data.discountValue
             if (data.shippingCost !== undefined) updatePayload.shipping_cost = data.shippingCost
             if (data.additionalCosts !== undefined) updatePayload.additional_costs = data.additionalCosts
+            if (data.preview) {
+                const existingMeta = (currentQuote as any)?.metadata || {}
+                updatePayload.metadata = {
+                    ...existingMeta,
+                    preview: {
+                        primaryColor: data.preview.primaryColor || null,
+                        secondaryColor: data.preview.secondaryColor || null,
+                        quoteTitle: data.preview.quoteTitle || null,
+                        quoteSubtitle: data.preview.quoteSubtitle || null,
+                        showDecoration: data.preview.showDecoration ?? true,
+                    }
+                }
+            }
 
             const fieldCap: Record<string, keyof typeof caps> = {
                 customer_id: "canEditCustomer",
@@ -770,7 +818,7 @@ export async function updateQuoteStatusAction(data: {
                 sent: ["pending_client", "viewed", "approved", "rejected", "draft", "cancelled", "expired"],
                 pending_client: ["viewed", "approved", "rejected", "draft", "cancelled", "expired"],
                 viewed: ["approved", "rejected", "draft", "cancelled", "expired"],
-                approved: ["expired", "cancelled", "converted_to_order"],
+                approved: ["cancelled", "converted_to_order"],
                 rejected: ["draft"],
                 expired: ["draft"],
                 cancelled: ["draft"],
@@ -1304,11 +1352,13 @@ import { getQuoteWithItemsCached } from "@/lib/data/quotes"
 function quoteIsEffectivelyExpired(quote: { status: string; expiration_date: string | null }) {
     if (quote.status === "expired") return true
     if (!quote.expiration_date) return false
+    const finalizedStatuses = ["approved", "rejected", "cancelled", "converted_to_order"]
+    if (finalizedStatuses.includes(quote.status)) return false
     const exp = new Date(`${quote.expiration_date}T12:00:00`)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     exp.setHours(0, 0, 0, 0)
-    return exp < today && (quote.status === "draft" || quote.status === "sent")
+    return exp < today
 }
 
 function pickPrimaryCustomerAddress(addresses: any[] | undefined | null) {
@@ -1992,11 +2042,12 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
 
             const now = new Date()
 
-            // 2. Check lazy expiration
+            // 2. Check lazy expiration (never expire finalized quotes)
+            const finalizedStatuses = ["approved", "rejected", "expired", "cancelled", "converted_to_order"]
             if (
                 quote.expiration_date &&
                 new Date(`${quote.expiration_date}T23:59:59`) < now &&
-                (quote.status === "draft" || quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed")
+                !finalizedStatuses.includes(quote.status)
             ) {
                 // Transition to expired
                 const { error: expireErr } = await admin
@@ -2094,6 +2145,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             let sellerInfo = null
             let items: any[] = []
             let fallbackSnapshot = null
+            let sellerName = null
 
             if (!quote.snapshot) {
                 if (quote.user_id) {
@@ -2112,6 +2164,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                             name: profile.full_name,
                             email: authUser?.email || null
                         }
+                        sellerName = profile.full_name
                     }
                 }
 
@@ -2179,6 +2232,9 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             }
 
             let resolvedSnapshot = quote.snapshot || fallbackSnapshot
+            if (!sellerName && resolvedSnapshot?.seller?.name) {
+                sellerName = resolvedSnapshot.seller.name
+            }
             if (resolvedSnapshot && resolvedSnapshot.partner) {
                 if (!resolvedSnapshot.partner.name || resolvedSnapshot.partner.name === "Parceiro") {
                     const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
@@ -2189,6 +2245,8 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     resolvedSnapshot.partner.image_url = store?.image_url || partnerObj?.store_image_url || null
                 }
             }
+
+            const previewMeta = quote.metadata?.preview || {}
 
             return successResponse({
                 quote: {
@@ -2215,7 +2273,12 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     partner_id: quote.partner_id,
                     customers: quote.customers || null,
                     partners: Array.isArray(quote.partners) ? quote.partners[0] : (quote.partners || null),
-                    items: items
+                    items: items,
+                    primary_color: previewMeta.primaryColor || null,
+                    secondary_color: previewMeta.secondaryColor || null,
+                    quote_title: previewMeta.quoteTitle || null,
+                    quote_subtitle: previewMeta.quoteSubtitle || null,
+                    seller_name: sellerName,
                 },
                 snapshot: resolvedSnapshot,
                 interactions: interactions || []

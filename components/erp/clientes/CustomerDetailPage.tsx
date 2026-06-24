@@ -5,6 +5,7 @@ import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon } 
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
+import { ReviewsSection } from '@/components/marketplace/ReviewsSection';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getCustomerOrdersAction, deleteCustomerAction } from '@/app/actions/erp/customers';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
@@ -988,9 +989,6 @@ const OrdersContent = ({
 /* ── Reviews Content ──────────────────────────────────────────── */
 
 function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boolean }) {
-    const [page, setPage] = useState(1);
-    const itemsPerPage = 5;
-
     if (isLoading) {
         return (
             <div className="flex items-center justify-center p-8 py-20">
@@ -999,65 +997,7 @@ function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boo
         )
     }
 
-    if (reviews.length === 0) {
-        return (
-            <IconPlaceholder
-                title="Nenhuma avaliação"
-                subtitle="Este cliente ainda não avaliou nenhum produto ou serviço."
-                imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
-                imageAlt="Nenhuma avaliação"
-                placeholderType="image"
-            />
-        )
-    }
-
-    const totalPages = Math.ceil(reviews.length / itemsPerPage);
-    const paginatedReviews = reviews.slice((page - 1) * itemsPerPage, page * itemsPerPage);
-
-    return (
-        <div className="space-y-4">
-            {paginatedReviews.map((review: any) => (
-                <div
-                    key={review.id}
-                    className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-5"
-                >
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                {review.product_name || review.service_name || "Item"}
-                            </span>
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">
-                                {review.product_name ? "Produto" : "Serviço"}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-0.5">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                                <StarIcon
-                                    key={i}
-                                    size={14}
-                                    className={i < review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300 dark:text-gray-600"}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                    {review.comment && (
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            {review.comment}
-                        </p>
-                    )}
-                    <div className="mt-2 text-xs text-brand-inactive-text dark:text-dark-body/60">
-                        {review.created_at ? formatDate(review.created_at) : ''}
-                    </div>
-                </div>
-            ))}
-
-            {totalPages > 1 && (
-                <div className="flex justify-center mt-6 w-full">
-                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-                </div>
-            )}
-        </div>
-    )
+    return <ReviewsSection reviews={reviews} showItemInfo />;
 }
 
 export default CustomerDetailPage;

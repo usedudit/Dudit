@@ -43,7 +43,7 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
             </label>
             {labelAddon}
         </div>
-        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 min-h-[100px]">
+        <div className="min-h-[100px]">
             <textarea
                 name={name}
                 id={id || name}
@@ -55,7 +55,7 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
                 required={required}
                 maxLength={maxLength}
                 rows={rows}
-                className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm focus:ring-brand-green focus:border-brand-green dark:focus:ring-brand-green dark:focus:border-brand-green focus:outline-none text-brand-dark dark:text-dark-heading placeholder:text-brand-dark/70 dark:placeholder:text-dark-heading/70 transition-colors disabled:bg-brand-gray dark:disabled:bg-dark-border/30 resize-y min-h-[100px]"
+                className="w-full bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm focus:bg-white dark:focus:bg-dark-surface focus:ring-brand-green focus:border-brand-green dark:focus:ring-brand-green dark:focus:border-brand-green focus:outline-none text-brand-dark dark:text-dark-heading placeholder:text-brand-dark/70 dark:placeholder:text-dark-heading/70 transition-colors disabled:bg-brand-gray dark:disabled:bg-dark-border/30 resize-y min-h-[100px]"
             />
         </div>
         {maxLength && showCharacterCount && (

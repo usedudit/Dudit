@@ -10,7 +10,7 @@ import {
     ReturnIcon, ShieldIcon, PackageIcon, StoreIcon, ClockIcon, XIcon
 } from "@/lib/icons"
 
-import { Button, Badge, Input, Pagination, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Badge, Input, Pagination, IconPlaceholder, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import BottomSheet from "@/components/BottomSheet"
@@ -549,7 +549,9 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
     const [summary, setSummary] = useState<TargetReportSummary | null>(null)
     const [targetDetails, setTargetDetails] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(false)
-    const [historyOpen, setHistoryOpen] = useState(false)
+    const [activeTab, setActiveTab] = useState("general")
+    const [history, setHistory] = useState<AuditLogRow[]>([])
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false)
 
     useEffect(() => {
         if (report && isOpen) {
@@ -561,10 +563,14 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                 if (sum) setSummary(sum)
                 if (details) setTargetDetails(details)
             }).finally(() => setIsLoading(false))
+
+            setIsHistoryLoading(true)
+            getTargetAuditHistory(report.target_id).then(setHistory).finally(() => setIsHistoryLoading(false))
         } else if (!isOpen) {
             setSummary(null)
             setTargetDetails(null)
-            setHistoryOpen(false)
+            setActiveTab("general")
+            setHistory([])
         }
     }, [report, isOpen])
 
@@ -572,253 +578,195 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
             <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da Denúncia</h2>
+                <div className="flex flex-col gap-0.5">
+                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da Denúncia</h2>
+                    <p className="text-[10px] font-bold text-brand-inactive-text opacity-70 tracking-widest uppercase font-mono truncate max-w-[300px]">ID: {report.target_id}</p>
+                </div>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-32 md:pb-6">
-                {/* Item Info */}
-                <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1 pr-4">
-                        <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"} className="mb-2">
-                            {report.target_type === "product" ? "Produto" : report.target_type === "service" ? "Serviço" : report.target_type === "partner" ? "Parceiro" : report.target_type === "review" ? "Avaliação" : report.target_type}
-                        </Badge>
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">{report.target_name}</h3>
-                        <p className="text-xs font-bold text-brand-inactive-text mt-1 opacity-70 tracking-wider font-mono uppercase">ID: {report.target_id}</p>
-                    </div>
-                    <Button
-                        variant="outline"
-                        className="h-10 px-4 rounded-full font-bold text-[13px] shrink-0"
-                        leftIcon={<ClockIcon size={16} />}
-                        onClick={() => setHistoryOpen(true)}
-                    >
-                        Histórico
-                    </Button>
+            {/* Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
+                <div className="shrink-0 px-6 border-b border-brand-border dark:border-dark-border">
+                    <TabsList className="px-0">
+                        <TabsTrigger value="general">Dados Gerais</TabsTrigger>
+                        <TabsTrigger value="history" icon={ClockIcon}>Histórico</TabsTrigger>
+                    </TabsList>
                 </div>
 
-                {/* Rich Details Section */}
-                {isLoading ? (
-                    <div className="flex justify-center py-4"><ThreeDotsLoader /></div>
-                ) : targetDetails ? (
-                    <div className="p-4 bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-2xl space-y-4">
-                        <h4 className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest flex items-center gap-2">
-                            {report.target_type === 'product' ? <PackageIcon size={14} /> : <StoreIcon size={14} />}
-                            Detalhes do Alvo
-                        </h4>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <TabsContent value="general" className="p-6 space-y-6 mt-0">
+                        {/* Item Info */}
+                        <div className="flex items-start justify-between">
+                            <div className="min-w-0 flex-1 pr-4">
+                                <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"} className="mb-2">
+                                    {report.target_type === "product" ? "Produto" : report.target_type === "service" ? "Serviço" : report.target_type === "partner" ? "Parceiro" : report.target_type === "review" ? "Avaliação" : report.target_type}
+                                </Badge>
+                                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">{report.target_name}</h3>
+                            </div>
+                        </div>
 
-                        {report.target_type === 'product' && (
-                            <div className="flex gap-4">
-                                <div className="w-20 h-20 rounded-xl overflow-hidden border border-brand-border dark:border-dark-border shrink-0 bg-white relative shadow-sm">
-                                    {targetDetails.images?.[0] ? (
-                                        <Image src={targetDetails.images[0]} alt="Produto" fill className="object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><PackageIcon size={24} /></div>
-                                    )}
+                        {/* Rich Details Section */}
+                        {isLoading ? (
+                            <div className="flex justify-center py-4"><ThreeDotsLoader /></div>
+                        ) : targetDetails ? (
+                            <div className="p-4 bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-2xl space-y-4">
+                                <h4 className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest flex items-center gap-2">
+                                    {report.target_type === 'product' ? <PackageIcon size={14} /> : <StoreIcon size={14} />}
+                                    Detalhes do Alvo
+                                </h4>
+
+                                {report.target_type === 'product' && (
+                                    <div className="flex gap-4">
+                                        <div className="w-20 h-20 rounded-xl overflow-hidden border border-brand-border dark:border-dark-border shrink-0 bg-white relative shadow-sm">
+                                            {targetDetails.images?.[0] ? (
+                                                <Image src={targetDetails.images[0]} alt="Produto" fill className="object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><PackageIcon size={24} /></div>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col gap-1 min-w-0">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading truncate">{targetDetails.name}</span>
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body line-clamp-2 leading-relaxed">{targetDetails.description || "Sem descrição."}</span>
+                                            <div className="flex gap-4 mt-1">
+                                                <span className="text-xs font-black text-brand-green">{(targetDetails.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                <span className="text-xs font-bold text-brand-inactive-text">Estoque: {targetDetails.stock_quantity || 0}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
+                                                <StoreIcon size={12} className="text-brand-inactive-text" />
+                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">Vendedor: {targetDetails.partner?.business_type || "Desconhecido"}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {report.target_type === 'partner' && (
+                                    <div className="flex gap-4 items-center">
+                                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white dark:border-dark-border shrink-0 bg-white relative shadow-md">
+                                            {targetDetails.profile_image_url ? (
+                                                <Image src={targetDetails.profile_image_url} alt="Parceiro" fill className="object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><StoreIcon size={24} /></div>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col gap-1 min-w-0">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.business_type}</span>
+                                            <span className="text-xs font-medium text-brand-inactive-text font-mono">ID: {targetDetails.id}</span>
+                                            <span className="text-xs font-medium text-brand-inactive-text">Entrou em: {new Date(targetDetails.created_at).toLocaleDateString("pt-BR")}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : null}
+
+                        {/* Summary Grid */}
+                        {summary && (
+                            <div className="grid grid-cols-2 gap-3 p-5 bg-brand-gray/30 dark:bg-dark-border/10 rounded-2xl border border-brand-border dark:border-dark-border">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-brand-inactive-text dark:text-dark-body uppercase tracking-widest mb-1">Total Denúncias</span>
+                                    <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">{summary.total}</span>
                                 </div>
-                                <div className="flex flex-col gap-1 min-w-0">
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading truncate">{targetDetails.name}</span>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body line-clamp-2 leading-relaxed">{targetDetails.description || "Sem descrição."}</span>
-                                    <div className="flex gap-4 mt-1">
-                                        <span className="text-xs font-black text-brand-green">{(targetDetails.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                        <span className="text-xs font-bold text-brand-inactive-text">Estoque: {targetDetails.stock_quantity || 0}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/50 dark:border-dark-border/50">
-                                        <StoreIcon size={12} className="text-brand-inactive-text" />
-                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">Vendedor: {targetDetails.partner?.business_type || "Desconhecido"}</span>
-                                    </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-brand-inactive-text dark:text-dark-body uppercase tracking-widest mb-1">Denunciantes</span>
+                                    <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">{summary.distinct_reporters}</span>
                                 </div>
                             </div>
                         )}
 
-                        {report.target_type === 'partner' && (
-                            <div className="flex gap-4 items-center">
-                                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white dark:border-dark-border shrink-0 bg-white relative shadow-md">
-                                    {targetDetails.profile_image_url ? (
-                                        <Image src={targetDetails.profile_image_url} alt="Parceiro" fill className="object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><StoreIcon size={24} /></div>
-                                    )}
-                                </div>
-                                <div className="flex flex-col gap-1 min-w-0">
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{targetDetails.business_type}</span>
-                                    <span className="text-xs font-medium text-brand-inactive-text font-mono">ID: {targetDetails.id}</span>
-                                    <span className="text-xs font-medium text-brand-inactive-text">Entrou em: {new Date(targetDetails.created_at).toLocaleDateString("pt-BR")}</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ) : null}
-
-                {/* Summary Grid */}
-                {summary && (
-                    <div className="grid grid-cols-2 gap-3 p-5 bg-brand-gray/30 dark:bg-dark-border/10 rounded-2xl border border-brand-border dark:border-dark-border">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-brand-inactive-text dark:text-dark-body uppercase tracking-widest mb-1">Total Denúncias</span>
-                            <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">{summary.total}</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-brand-inactive-text dark:text-dark-body uppercase tracking-widest mb-1">Denunciantes</span>
-                            <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">{summary.distinct_reporters}</span>
-                        </div>
-                    </div>
-                )}
-
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
-                    <div className="flex gap-3">
-                        <InfoIcon className="text-blue-600 shrink-0 mt-0.5" size={18} />
-                        <div className="space-y-1">
-                            <p className="text-sm font-bold text-blue-900 dark:text-blue-300">Resumo do Alvo</p>
-                            <p className="text-xs text-blue-800 dark:text-blue-400 leading-relaxed">
-                                Este item recebeu {summary?.total || 0} denúncias no total, sendo {summary?.pending || 0} ainda pendentes de análise manual.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Reports Actions */}
-                <div className="space-y-4 pt-4">
-                    {report.status === "pending" ? (
-                        <div className="flex flex-col gap-3">
-                            <Button
-                                className="w-full h-12"
-                                onClick={() => onResolve(report)}
-                            >
-                                <CheckCircleIcon size={20} className="mr-2" /> Validar Denúncia
-                            </Button>
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
                             <div className="flex gap-3">
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 h-12"
-                                    onClick={() => onDismiss(report)}
-                                >
-                                    <CancelCircleIcon size={18} className="mr-2" /> Descartar
-                                </Button>
-                                <Button
-                                    variant="outlinered"
-                                    className="flex-1 h-12"
-                                    onClick={() => onSpam(report)}
-                                >
-                                    <AlertTriangleIcon size={18} className="mr-2" /> Spam
-                                </Button>
+                                <InfoIcon className="text-blue-600 shrink-0 mt-0.5" size={18} />
+                                <div className="space-y-1">
+                                    <p className="text-sm font-bold text-blue-900 dark:text-blue-300">Resumo do Alvo</p>
+                                    <p className="text-xs text-blue-800 dark:text-blue-400 leading-relaxed">
+                                        Este item recebeu {summary?.total || 0} denúncias no total, sendo {summary?.pending || 0} ainda pendentes de análise manual.
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    ) : report.status === "validated" ? (
-                        <Button variant="outline" className="w-full h-12" onClick={() => onRevert(report)}>
-                            <ReturnIcon size={20} className="mr-2" /> Reverter Validação
-                        </Button>
-                    ) : (
-                        <div className="flex items-center justify-center p-4 text-sm text-brand-inactive-text font-bold bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/30">
-                            Status: <strong className="ml-2">{report.status}</strong>
+
+                        {/* Reports Actions */}
+                        <div className="space-y-4 pt-4">
+                            {report.status === "pending" ? (
+                                <div className="flex flex-col gap-3">
+                                    <Button
+                                        className="w-full h-12"
+                                        onClick={() => onResolve(report)}
+                                    >
+                                        <CheckCircleIcon size={20} className="mr-2" /> Validar Denúncia
+                                    </Button>
+                                    <div className="flex gap-3">
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 h-12"
+                                            onClick={() => onDismiss(report)}
+                                        >
+                                            <CancelCircleIcon size={18} className="mr-2" /> Descartar
+                                        </Button>
+                                        <Button
+                                            variant="outlinered"
+                                            className="flex-1 h-12"
+                                            onClick={() => onSpam(report)}
+                                        >
+                                            <AlertTriangleIcon size={18} className="mr-2" /> Spam
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : report.status === "validated" ? (
+                                <Button variant="outline" className="w-full h-12" onClick={() => onRevert(report)}>
+                                    <ReturnIcon size={20} className="mr-2" /> Reverter Validação
+                                </Button>
+                            ) : (
+                                <div className="flex items-center justify-center p-4 text-sm text-brand-inactive-text font-bold bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/30">
+                                    Status: <strong className="ml-2">{report.status}</strong>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </TabsContent>
+
+                    <TabsContent value="history" className="p-6 mt-0">
+                        {isHistoryLoading ? (
+                            <div className="flex justify-center py-8"><ThreeDotsLoader /></div>
+                        ) : history.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                                <ShieldIcon size={48} className="text-brand-gray dark:text-dark-border mb-4 opacity-20" />
+                                <h4 className="text-brand-dark dark:text-dark-heading font-bold">Sem histórico</h4>
+                                <p className="text-brand-inactive-text text-sm mt-1">Este alvo ainda não sofreu nenhuma ação administrativa.</p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-4">
+                                {history.map(log => {
+                                    const metadata = (log.metadata || {}) as any
+                                    const reason = metadata.reason || metadata.action || metadata.resolution_reason
+
+                                    return (
+                                        <div key={log.id} className="p-4 bg-brand-gray/30 dark:bg-dark-border/20 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col gap-3">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight uppercase tracking-tight">
+                                                        {log.action_type.split('.').pop()?.replace('_', ' ')}
+                                                    </span>
+                                                    <span className="text-[11px] text-brand-inactive-text font-medium">{log.admin_name || log.admin_email || log.admin_user_id}</span>
+                                                </div>
+                                                <span className="text-[10px] font-black text-brand-dark dark:text-dark-heading bg-white dark:bg-dark-border px-2 py-0.5 rounded border border-brand-border/50">{new Date(log.created_at).toLocaleDateString("pt-BR")}</span>
+                                            </div>
+                                            {reason && (
+                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body italic border-l-2 border-brand-border dark:border-dark-border pl-3 py-1">
+                                                    "{String(reason)}"
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </TabsContent>
                 </div>
-            </div>
+            </Tabs>
         </div>
     ) : null
-
-    if (isMobile) {
-        return (
-            <>
-                <BottomSheet isOpen={isOpen} onClose={onClose}>
-                    {content}
-                </BottomSheet>
-                {report && (
-                    <AuditHistorySheet
-                        targetId={report.target_id}
-                        isOpen={historyOpen}
-                        onClose={() => setHistoryOpen(false)}
-                    />
-                )}
-            </>
-        )
-    }
-
-    return (
-        <Portal>
-            <div
-                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                onClick={onClose}
-            >
-                <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? (historyOpen ? "-translate-x-10 scale-[0.97] opacity-70" : "translate-x-0") : "translate-x-[120%]"}`}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {content}
-                </div>
-            </div>
-        </Portal>
-    )
-}
-
-function AuditHistorySheet({ targetId, isOpen, onClose }: { targetId: string, isOpen: boolean, onClose: () => void }) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
-    const [history, setHistory] = useState<AuditLogRow[]>([])
-    const [isLoading, setIsLoading] = useState(false)
-
-    useEffect(() => {
-        if (isOpen && targetId) {
-            setIsLoading(true)
-            getTargetAuditHistory(targetId).then(setHistory).finally(() => setIsLoading(false))
-        }
-    }, [isOpen, targetId])
-
-    const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            {/* Header */}
-            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <div className="flex flex-col gap-0.5">
-                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                        <ClockIcon size={20} className="text-brand-inactive-text" /> Histórico
-                    </h2>
-                    <p className="text-[10px] font-bold text-brand-inactive-text opacity-70 tracking-widest uppercase font-mono truncate max-w-[200px]">ID: {targetId}</p>
-                </div>
-                <Button variant="filled" onClick={onClose} size="icon">
-                    <XIcon className="w-5 h-5" />
-                </Button>
-            </header>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                {isLoading ? (
-                    <div className="flex justify-center py-8"><ThreeDotsLoader /></div>
-                ) : history.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                        <ShieldIcon size={48} className="text-brand-gray dark:text-dark-border mb-4 opacity-20" />
-                        <h4 className="text-brand-dark dark:text-dark-heading font-bold">Sem histórico</h4>
-                        <p className="text-brand-inactive-text text-sm mt-1">Este alvo ainda não sofreu nenhuma ação administrativa.</p>
-                    </div>
-                ) : (
-                    <div className="flex flex-col gap-4">
-                        {history.map(log => {
-                            const metadata = (log.metadata || {}) as any
-                            const reason = metadata.reason || metadata.action || metadata.resolution_reason
-
-                            return (
-                                <div key={log.id} className="p-4 bg-brand-gray/30 dark:bg-dark-border/20 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col gap-3">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight uppercase tracking-tight">
-                                                {log.action_type.split('.').pop()?.replace('_', ' ')}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text font-medium">{log.admin_name || log.admin_email || log.admin_user_id}</span>
-                                        </div>
-                                        <span className="text-[10px] font-black text-brand-dark dark:text-dark-heading bg-white dark:bg-dark-border px-2 py-0.5 rounded border border-brand-border/50">{new Date(log.created_at).toLocaleDateString("pt-BR")}</span>
-                                    </div>
-                                    {reason && (
-                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body italic border-l-2 border-brand-border dark:border-dark-border pl-3 py-1">
-                                            "{String(reason)}"
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
-    )
 
     if (isMobile) {
         return (
@@ -831,7 +779,7 @@ function AuditHistorySheet({ targetId, isOpen, onClose }: { targetId: string, is
     return (
         <Portal>
             <div
-                className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
                 onClick={onClose}
             >
                 <div
@@ -844,3 +792,5 @@ function AuditHistorySheet({ targetId, isOpen, onClose }: { targetId: string, is
         </Portal>
     )
 }
+
+

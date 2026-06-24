@@ -47,7 +47,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-brand-dark py-6 w-full h-[68px] flex items-center justify-between px-4 mx-auto gap-4">
-            <div className="w-full flex items-center justify-between max-w-[1300px] mx-auto">
+            <div className="w-full flex items-center justify-between max-w-[1400px] mx-auto">
                 <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-110 pt-1">
                     <img
                         src="https://img.dudit.com.br/static/Logo.png"
@@ -124,7 +124,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
 export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
         <footer className="bg-brand-dark py-16 border-t border-white/10 relative mt-auto w-full">
-            <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
 
                 {/* Seção Superior */}
                 <div className="flex flex-col md:flex-row justify-between gap-12 mb-16">

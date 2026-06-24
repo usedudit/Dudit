@@ -232,7 +232,7 @@ export function PaymentWrapper({
 
             let preferenceData: any
             try {
-            preferenceData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
+                preferenceData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
                     method: "POST",
                     body: {
                         products: orderDetails.items.map(p => ({
@@ -481,7 +481,7 @@ export function PaymentWrapper({
         >
             <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
-                    <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
+                    <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
                             src="https://img.dudit.com.br/static/Logo.png"
                             alt="Dudit"
@@ -489,7 +489,7 @@ export function PaymentWrapper({
                             height={40}
                             className="h-10 w-auto object-contain"
                         />
-                    </Link>
+                    </a>
                     {!paymentConfirmed && (
                         <div className="flex items-center text-sm font-medium text-white tracking-wide">
                             {(actualOrderNumber || orderNumber) && !(actualOrderNumber || orderNumber)?.includes('temp') ? (

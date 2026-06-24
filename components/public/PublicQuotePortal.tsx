@@ -217,7 +217,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     }
 
     // ─── RENDERING COMPUTED DATA ─────────────────────────────────────────────
-    const dataQuote = snapshot || quote
+    const dataQuote = { ...quote, ...snapshot }
     const items = snapshot?.items || quote.items || []
 
     const resolvedPartner = useMemo(() => {
@@ -533,6 +533,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                 partnerAvatar={partnerLogo || undefined}
                                                 printMode={false}
                                                 showCustomerContact={false}
+                                                salespersonName={dataQuote.seller_name || undefined}
                                             />
                                         </div>
                                     </div>
@@ -563,6 +564,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                 partnerAvatar={partnerLogo || undefined}
                                 printMode={false}
                                 showCustomerContact={false}
+                                salespersonName={dataQuote.seller_name || undefined}
                             />
                         </div>
 

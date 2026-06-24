@@ -14,6 +14,7 @@ import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
+import { ReviewsSection } from "./ReviewsSection"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
 import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
@@ -22,7 +23,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
-import { FavoriteButton } from "./FavoriteButton"
+import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug } from "@/lib/utils/slugify"
@@ -88,14 +89,25 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
 }
 
 function ActionButtons({ productId, onShareClick, className = "" }: { productId: string, onShareClick: () => void, className?: string }) {
+    const { user: favUser } = useSupabase()
+    const routerA = useRouter()
+    const { isFavorited: favIsFav, toggleFavorite: favToggle } = useFavorites()
+    const favorited = favIsFav(productId, "produto")
     return (
         <div className={`flex flex-col gap-3 ${className}`}>
-            <FavoriteButton
-                itemId={productId}
-                itemType="produto"
-                size="lg"
+            <Button
                 variant="outline"
-            />
+                size="icon"
+                onClick={async (e) => {
+                    e.stopPropagation()
+                    if (!favUser) return routerA.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
+                    await favToggle(productId, "produto")
+                }}
+                className="w-9 h-9"
+                title={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            >
+                <HeartIcon size={18} className={favorited ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+            </Button>
             <Button
                 variant="outline"
                 onClick={(e) => { e.stopPropagation(); onShareClick(); }}
@@ -169,6 +181,7 @@ export function ProductDetailsPageClient({
     const [deliveryLoading, setDeliveryLoading] = useState(false)
     const [calculatedAddress, setCalculatedAddress] = useState<string | null>(null)
     const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
+    const { isFavorited: isFav, toggleFavorite: toggleFav } = useFavorites()
 
     // Address flow states (checkout-like)
     const [userAddresses, setUserAddresses] = useState<any[]>([])
@@ -478,14 +491,12 @@ export function ProductDetailsPageClient({
         let images = (product.images || [])
             .filter((img: any) => typeof img === "string" && img.trim())
             .map(getProductImageUrl)
-        if (!images.length && variants.length > 0) {
-            const variantImages = variants
-                .map((v) => {
-                    const opts = typeof v.variant_options === "string" ? JSON.parse(v.variant_options) : v.variant_options
-                    return getProductImageUrl(v.image_url || opts?.image)
-                })
-                .filter((img): img is string => !!img && img.length > 5)
-            if (variantImages.length) images = Array.from(new Set(variantImages))
+        if (variants.length > 0) {
+            variants.forEach((v) => {
+                const opts = typeof v.variant_options === "string" ? JSON.parse(v.variant_options) : v.variant_options
+                const url = getProductImageUrl(v.image_url || opts?.image)
+                if (url && url.length > 5 && !images.includes(url)) images.push(url)
+            })
         }
         if (images.length) return images
         if (product.video_type && product.video_url) return []
@@ -528,15 +539,27 @@ export function ProductDetailsPageClient({
         [processedVariants]
     )
 
+    const imageVariantLabel = useMemo(() => {
+        const map: Record<string, string> = {}
+        processedVariants.forEach((v) => {
+            if (v.fullImgUrl && v.fullImgUrl.length > 5) {
+                const label = Object.entries(v.attributes).map(([k, val]) => `${k}: ${val}`).join(" · ")
+                if (label) map[v.fullImgUrl] = label
+            }
+        })
+        return map
+    }, [processedVariants])
+
     const pricing = useMemo(() => {
         const base = Number(product.price) || 0
         const promo = Number(product.promotional_price) || 0
         const hasPromo = promo > 0 && promo < base
-        const effective = selectedVariant ? Number(selectedVariant.price_adjustment) || base : hasPromo ? promo : base
+        const variantPrice = selectedVariant ? (Number(selectedVariant.price_adjustment) || base) : null
+        const displayOriginal = variantPrice !== null ? variantPrice : base
+        const effective = variantPrice !== null ? variantPrice : (hasPromo ? promo : base)
 
-        // Compute best price: compares manual promo vs campaign discount
-        const pricingUnitPrice = selectedVariant ? Number(selectedVariant.price_adjustment) || base : base
-        const pricingPromo = selectedVariant ? null : (hasPromo ? promo : null)
+        const pricingUnitPrice = variantPrice !== null ? variantPrice : base
+        const pricingPromo = variantPrice !== null ? null : (hasPromo ? promo : null)
         const campaignPricingResult = computeItemDisplayPrice(
             pricingUnitPrice, pricingPromo,
             activePromotions,
@@ -560,7 +583,7 @@ export function ProductDetailsPageClient({
         const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
         const installmentPrice = bestPrice / maxInstallments
 
-        const totalDiscountPercent = base > 0 ? Math.round(((base - bestPrice) / base) * 100) : 0
+        const totalDiscountPercent = displayOriginal > 0 ? Math.round(((displayOriginal - bestPrice) / displayOriginal) * 100) : 0
 
         const campaignDiscountLabel = hasCampaignDiscount && activePromo
             ? activePromo.discountType === "percentage"
@@ -569,12 +592,12 @@ export function ProductDetailsPageClient({
             : `${totalDiscountPercent}%`
 
         return {
-            current: effective, bestPrice, original: base,
+            current: effective, bestPrice, original: displayOriginal,
             hasCampaignDiscount, hasManualPromo, total,
             pix: pixTotal,
             pixDiscountPercent,
             hasCC, maxInstallments, installment: installmentPrice,
-            discountPercent: Math.round(((base - promo) / base) * 100),
+            discountPercent: displayOriginal > 0 ? Math.round(((displayOriginal - promo) / displayOriginal) * 100) : 0,
             totalDiscountPercent,
             campaignDiscountLabel,
         }
@@ -1430,8 +1453,8 @@ export function ProductDetailsPageClient({
     )
 
     // ─── Lightbox ─────────────────────────────────────────────────────────────────
-    const variantLabel = selectedVariant
-        ? Object.entries(selectedVariant.attributes || {}).map(([k, v]) => `${k}: ${v}`).join(" · ")
+    const lightboxVariantLabel = galleryItems[lightboxActiveImg]?.type === "image"
+        ? imageVariantLabel[galleryItems[lightboxActiveImg]?.src] || null
         : null
 
 
@@ -1713,12 +1736,11 @@ export function ProductDetailsPageClient({
                     productName={product.name}
                     onShare={() => setShowShareModal(true)}
                     favoriteButton={
-                        <FavoriteButton
-                            itemId={product.id}
-                            itemType="produto"
-                            size="md"
-                            variant="icon-only"
-                        />
+                        <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
+                            className="flex items-center justify-center p-1.5 transition-all duration-200 cursor-pointer select-none"
+                            title={isFav(product.id, "produto") ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                            <HeartIcon size={18} className={isFav(product.id, "produto") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                        </button>
                     }
                 />
             )}
@@ -1749,8 +1771,9 @@ export function ProductDetailsPageClient({
                                         {lightboxActiveImg + 1}/{galleryItems.length}
                                     </span>
                                     <div className="flex items-center gap-2">
-                                        <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-                                            <HeartIcon size={20} />
+                                        <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
+                                            className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                            <HeartIcon size={20} className={isFav(product.id, "produto") ? "fill-white" : ""} />
                                         </button>
                                     </div>
                                 </div>
@@ -1780,6 +1803,11 @@ export function ProductDetailsPageClient({
                                             onExitComplete={() => { lightboxJustOpened.current = false }}>
                                             {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain", `Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`, "lightbox")}
                                         </AnimatePresence>
+                                        {lightboxVariantLabel && (
+                                            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap z-10">
+                                                {lightboxVariantLabel}
+                                            </div>
+                                        )}
                                         {galleryItems.length > 1 && (
                                             <>
                                                 <Button variant="filled" onClick={() => lightboxNav(-1)}
@@ -1802,9 +1830,9 @@ export function ProductDetailsPageClient({
                                         {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain px-4", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`, "lightbox")}
                                     </AnimatePresence>
 
-                                    {variantLabel && (
+                                    {lightboxVariantLabel && (
                                         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap">
-                                            {variantLabel}
+                                            {lightboxVariantLabel}
                                         </div>
                                     )}
                                 </div>
@@ -1890,6 +1918,13 @@ export function ProductDetailsPageClient({
                                                             style={{ transformOrigin, scale: smoothScale }} />
                                                     ) : renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Vídeo de ${product.name}`)}
                                                 </AnimatePresence>
+                                                {activeImgIndex < galleryItems.length && galleryItems[activeImgIndex]?.type === "image" && imageVariantLabel[galleryItems[activeImgIndex].src] && (
+                                                    <div className="absolute bottom-3 left-3 z-10">
+                                                        <Badge variant="green" className="text-xs">
+                                                            {imageVariantLabel[galleryItems[activeImgIndex].src]}
+                                                        </Badge>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1898,6 +1933,13 @@ export function ProductDetailsPageClient({
                                             <AnimatePresence mode="wait" custom={slideDirection}>
                                                 {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                             </AnimatePresence>
+                                            {activeImgIndex < galleryItems.length && galleryItems[activeImgIndex]?.type === "image" && imageVariantLabel[galleryItems[activeImgIndex].src] && (
+                                                <div className="absolute bottom-3 left-3 z-10">
+                                                    <Badge variant="green" className="text-xs">
+                                                        {imageVariantLabel[galleryItems[activeImgIndex].src]}
+                                                    </Badge>
+                                                </div>
+                                            )}
 
                                             {/* ActionButtons and Chevron navigation arrows hidden on mobile/tablet product image card as they are already displayed in the top header */}
 
@@ -1906,12 +1948,16 @@ export function ProductDetailsPageClient({
 
                                     {/* Desktop Right Column (Actions + Next) */}
                                     <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
-                                        <FavoriteButton
-                                            itemId={product.id}
-                                            itemType="produto"
-                                            size="lg"
-                                            variant="outline"
-                                        />
+                                        {(() => {
+                                            const isFavProd = isFav(product.id, "produto")
+                                            return (
+                                                <Button variant="outline" size="icon" className="w-10 h-10"
+                                                    onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
+                                                    title={isFavProd ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                                                    <HeartIcon size={20} className={isFavProd ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                                                </Button>
+                                            )
+                                        })()}
 
                                         <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
                                             <ShareIcon className="w-5 h-5 text-brand-green" />
@@ -1972,64 +2018,7 @@ export function ProductDetailsPageClient({
                             {/* Reviews */}
                             <div ref={reviewsRef} className="border-t border-brand-border pt-2">
                                 <h3 className="text-xl font-medium text-brand-dark mb-6 mt-8">Avaliações do produto</h3>
-                                {reviews.length > 0 && (
-                                    <div className="border border-brand-border rounded-xl p-5 mb-8 flex gap-8 items-center">
-                                        <div className="text-center shrink-0">
-                                            <p className="text-5xl font-black text-brand-dark leading-none mb-2">{avgRating.toFixed(1)}</p>
-                                            <div className="flex justify-center mb-1.5"><StarRow rating={avgRating} size={14} /></div>
-                                            <p className="text-xs text-brand-inactive-text">Média de {reviews.length} avaliações</p>
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            {[5, 4, 3, 2, 1].map((star) => {
-                                                const count = reviews.filter((r) => r.rating === star).length
-                                                const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0
-                                                return (
-                                                    <div key={star} className="flex items-center gap-2">
-                                                        <span className="text-xs text-brand-inactive-text w-3 shrink-0">{star}</span>
-                                                        <StarIcon size={10} strokeWidth={0} className="text-brand-inactive-text fill-gray-400 shrink-0" />
-                                                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
-                                                        </div>
-                                                        <span className="text-xs text-brand-inactive-text w-4 text-right shrink-0">{count}</span>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                                {reviews.length > 0 ? (
-                                    <div className="space-y-6">
-                                        {reviews.map((rev: any, i: number) => (
-                                            <div key={i} className="border-b border-brand-border pb-6 last:border-0">
-                                                <div className="flex items-start gap-3 mb-3">
-                                                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-brand-inactive-text">
-                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-                                                        </svg>
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="font-semibold text-sm text-brand-dark">{rev.profiles?.full_name || "Usuário"}</span>
-                                                            <span className="text-xs text-brand-inactive-text shrink-0">
-                                                                {new Date(rev.created_at).toLocaleDateString("pt-BR")}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-1"><StarRow rating={rev.rating} size={11} /></div>
-                                                    </div>
-                                                </div>
-                                                <p className="text-gray-600 text-sm leading-relaxed ml-12">{rev.comment}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <IconPlaceholder
-                                        placeholderType="image"
-                                        imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
-                                        imageAlt="Sem avaliações"
-                                        title="Ainda não temos avaliações por aqui"
-                                        subtitle="Seja o primeiro a contar para a comunidade como foi sua experiência!"
-                                    />
-                                )}
+                                <ReviewsSection reviews={reviews} />
                             </div>
                         </div>
 

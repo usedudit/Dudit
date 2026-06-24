@@ -3,9 +3,8 @@
 import { useMemo } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
-import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR, getThemeColorsByAvatarColor } from "@/lib/quotes/quote-preview-theme";
+import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
-import { getAvatarColor } from '@/lib/utils/avatar';
 
 interface QuotePreviewProps {
     invoiceNumber: string;
@@ -29,6 +28,7 @@ interface QuotePreviewProps {
     printMode?: boolean;
     showDecoration?: boolean;
     showCustomerContact?: boolean;
+    salespersonName?: string;
 }
 
 const QuotePreview = ({
@@ -52,17 +52,16 @@ const QuotePreview = ({
     partnerAvatar,
     printMode = false,
     showDecoration = true,
-    showCustomerContact = true
+    showCustomerContact = true,
+    salespersonName
 }: QuotePreviewProps) => {
 
     const resolvedColors = useMemo(() => {
-        const avatarColor = getAvatarColor(partnerName);
-        const mapped = getThemeColorsByAvatarColor(avatarColor);
         return {
-            primary: primaryColor === QUOTE_PREVIEW_PRIMARY_COLOR ? mapped.primary : primaryColor,
-            secondary: secondaryColor === QUOTE_PREVIEW_SECONDARY_COLOR ? mapped.secondary : secondaryColor
+            primary: primaryColor,
+            secondary: secondaryColor
         };
-    }, [partnerName, primaryColor, secondaryColor]);
+    }, [primaryColor, secondaryColor]);
 
     const customerAddressText = useMemo(() => {
         if (!selectedCustomer) return null;
@@ -206,11 +205,11 @@ const QuotePreview = ({
                                             className="w-8 h-8 shrink-0 text-[13px] font-bold"
                                             style={{ backgroundColor: resolvedColors.secondary }}
                                         />
-                                        <span className="text-white font-bold text-sm">{partnerName}</span>
+                                        <span className="text-white font-bold text-md">{partnerName}</span>
                                     </div>
 
                                     <div>
-                                        <h1 className="text-3xl font-medium text-white">{quoteTitle}</h1>
+                                        <h1 className="text-2xl font-medium text-white">{quoteTitle}</h1>
                                         <p className="text-white/80 text-xs tracking-widest font-light mt-1">
                                             {quoteSubtitle || `Proposta comercial #${invoiceNumber}`}
                                         </p>
@@ -224,7 +223,7 @@ const QuotePreview = ({
                                 {page.type === 'first' && (
                                     <>
                                         <div className="px-8 py-6">
-                                            <div className="grid grid-cols-3 gap-4 border-b border-brand-border pb-6 w-full">
+                                            <div className="grid grid-cols-4 gap-4 border-b border-brand-border pb-6 w-full">
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
                                                     <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>
@@ -237,6 +236,12 @@ const QuotePreview = ({
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vencimento</span>
                                                     <span className="font-bold text-sm text-brand-dark">{formatDate(expiryDate)}</span>
                                                 </div>
+                                                {salespersonName && (
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vendedor</span>
+                                                        <span className="font-bold text-sm text-brand-dark">{salespersonName}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 

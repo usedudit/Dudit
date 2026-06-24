@@ -267,7 +267,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     onChange={(e: any) => {
                                         setSearchQuery(e.target.value);
                                         setIsProductSearchOpen(true);
-                                        // Legacy support: if handleSearchProduct is provided, call it
                                         if (handleSearchProduct) handleSearchProduct(e.target.value);
                                         if (setFieldErrors) {
                                             setFieldErrors(prev => {
@@ -281,7 +280,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         setIsProductSearchOpen(true);
                                         onSearchFocus?.();
                                     }}
-                                    className="mb-0"
+                                    variant="full-rounded"
                                     error={fieldErrors?.has("productSearch")}
                                     errorMessage={fieldErrors?.has("productSearch") ? "Adicione um item" : undefined}
                                 />

@@ -9,6 +9,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { ShareModal } from "./ShareModal"
 import { ReportModal } from "./ReportModal"
+import { ReviewsSection } from "./ReviewsSection"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { useSupabase } from "@/providers/supabase-provider"
@@ -384,58 +385,10 @@ const InfoTab = ({ partner, stats }: any) => {
     )
 }
 
-const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
-    const hasReviews = reviews.length > 0
+const ReviewsTab = ({ reviews }: any) => {
     return (
         <div className="pb-10 animate-fade-in">
-            {hasReviews ? (
-                <>
-                    <div className="border border-brand-border rounded-xl p-5 mb-8 flex gap-8 items-center">
-                        <div className="text-center shrink-0">
-                            <p className="text-5xl font-black text-brand-dark leading-none mb-2">{partner.rating.toFixed(1)}</p>
-                            <div className="flex justify-center mb-1.5"><StarRow rating={stats.reviewsCount} size={14} /></div>
-                            <p className="text-xs text-brand-inactive-text">Média de {stats.reviewsCount} avaliações</p>
-                        </div>
-                        <div className="flex-1 space-y-2">
-                            {ratingDistribution.map((row: any) => (
-                                <div key={row.star} className="flex items-center gap-3">
-                                    <span className="text-[12px] text-brand-inactive-text w-2">{row.star}</span>
-                                    <StarIcon size={10} className="text-brand-inactive-text" />
-                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-brand-green rounded-full" style={{ width: `${(row.count / stats.reviewsCount) * 100}%` }} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="space-y-8">
-                        {reviews.map((rev: any) => (
-                            <div key={rev.id} className="border-b border-brand-border pb-8 last:border-0">
-                                <div className="flex items-start gap-4 mb-3">
-                                    <div className="w-[50px] h-[50px] rounded-full overflow-hidden shrink-0">
-                                        <img src="https://img.dudit.com.br/static/Placeholder.png" className="w-full h-full object-cover" alt="" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[15px] font-semibold text-brand-dark">{rev.profiles?.full_name || "Usuario"}</span>
-                                            <span className="text-[13px] text-brand-inactive-text">{formatDate(rev.created_at)}</span>
-                                        </div>
-                                        <div className="flex gap-0.5 mb-2">
-                                            {[...Array(5)].map((_, i) => (
-                                                <StarIcon key={i} size={14} className={i < rev.rating ? "text-brand-green fill-brand-green" : "text-gray-300 fill-gray-300"} />
-                                            ))}
-                                        </div>
-                                        {rev.comment && <p className="text-[15px] text-brand-inactive-text leading-relaxed">{rev.comment}</p>}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </>
-            ) : (
-                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png" imageAlt="Sem avaliações" title="Ainda não temos avaliações por aqui" subtitle="Seja o primeiro a contar para a comunidade como foi sua experiencia!" />
-            )}
+            <ReviewsSection reviews={reviews} showItemInfo />
         </div>
     )
 }
@@ -1019,7 +972,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         {activeSection === "reviews" && (
                             <div>
                                 <h2 className="text-[24px] font-normal text-brand-dark mb-6">Avaliações</h2>
-                                <ReviewsTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} ratingDistribution={ratingDistribution} reviews={reviews} />
+                                <ReviewsTab reviews={reviews} />
                             </div>
                         )}
                         {activeSection === "gallery" && (
@@ -1088,7 +1041,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     </div>
                     <div className="px-2 pb-6">
                         {mobileModalTab === "reviews" && (
-                            <ReviewsTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} ratingDistribution={ratingDistribution} reviews={reviews} />
+                            <ReviewsTab reviews={reviews} />
                         )}
                         {mobileModalTab === "info" && (
                             <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} />

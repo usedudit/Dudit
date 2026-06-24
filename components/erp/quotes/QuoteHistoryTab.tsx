@@ -1,6 +1,5 @@
 "use client"
 
-import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 
@@ -20,7 +19,7 @@ export function QuoteHistoryTab({ entries, loading = false }: QuoteHistoryTabPro
 
     return (
         <FadeIn>
-            <HistoryTimeline 
+            <HistoryTimeline
                 entries={entries}
                 title="Histórico do Orçamento"
                 subtitle="Acompanhe todas as movimentações e alterações realizadas neste orçamento."

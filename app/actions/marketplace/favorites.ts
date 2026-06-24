@@ -152,6 +152,7 @@ export async function getUserFavoritesAction(params?: {
     items: any[]
     total: number
     error?: string
+    counts?: { total: number; produtos: number; servicos: number }
 }> {
     try {
         const user = await getCurrentUser()
@@ -188,7 +189,7 @@ export async function getUserFavoritesAction(params?: {
         }
 
         if (!favorites || favorites.length === 0) {
-            return { success: true, items: [], total: count || 0 }
+            return { success: true, items: [], total: count || 0, counts: { total: 0, produtos: 0, servicos: 0 } }
         }
 
         // Batch fetch item data
@@ -296,7 +297,20 @@ export async function getUserFavoritesAction(params?: {
             })
             .filter(Boolean)
 
-        return { success: true, items, total: count || 0 }
+        // Compute accurate counts from items that actually exist
+        const existingProdutos = items.filter((i: any) => i.itemType === "produto").length
+        const existingServicos = items.filter((i: any) => i.itemType === "servico").length
+
+        return {
+            success: true,
+            items,
+            total: items.length,
+            counts: {
+                total: existingProdutos + existingServicos,
+                produtos: existingProdutos,
+                servicos: existingServicos,
+            },
+        }
     } catch (error) {
         console.error("[Favorites] Get favorites error:", error)
         return { success: false, items: [], total: 0, error: "Erro interno" }
@@ -317,15 +331,35 @@ export async function getFavoritesCountAction(): Promise<{
         const admin = getAdminClient()
         const { data, error } = await admin
             .from("favorites")
-            .select("item_type")
+            .select("item_id, item_type")
             .eq("user_id", user.id)
 
         if (error || !data) return { total: 0, produtos: 0, servicos: 0 }
 
-        const produtos = data.filter((f: any) => f.item_type === "produto").length
-        const servicos = data.filter((f: any) => f.item_type === "servico").length
+        // Only count items that still exist in their respective tables
+        const produtoIds = data.filter((f: any) => f.item_type === "produto").map((f: any) => f.item_id)
+        const servicoIds = data.filter((f: any) => f.item_type === "servico").map((f: any) => f.item_id)
 
-        return { total: data.length, produtos, servicos }
+        const [existingProducts, existingServices] = await Promise.all([
+            produtoIds.length > 0
+                ? admin.from("products").select("id").in("id", produtoIds)
+                : Promise.resolve({ data: [] }),
+            servicoIds.length > 0
+                ? admin.from("services").select("id").in("id", servicoIds)
+                : Promise.resolve({ data: [] }),
+        ])
+
+        const existingProdutoIds = new Set((existingProducts.data || []).map((p: any) => p.id))
+        const existingServicoIds = new Set((existingServices.data || []).map((s: any) => s.id))
+
+        const produtos = data.filter(
+            (f: any) => f.item_type === "produto" && existingProdutoIds.has(f.item_id)
+        ).length
+        const servicos = data.filter(
+            (f: any) => f.item_type === "servico" && existingServicoIds.has(f.item_id)
+        ).length
+
+        return { total: produtos + servicos, produtos, servicos }
     } catch {
         return { total: 0, produtos: 0, servicos: 0 }
     }

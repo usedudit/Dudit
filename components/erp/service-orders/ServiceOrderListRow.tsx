@@ -25,6 +25,7 @@ interface ServiceOrderListRowProps {
   onDelete?: () => void
   statusColor: string
   statusLabel: string
+  children?: React.ReactNode
 }
 
 const ServiceOrderListRow = React.memo(
@@ -38,6 +39,7 @@ const ServiceOrderListRow = React.memo(
     onDelete,
     statusColor,
     statusLabel,
+    children,
   }: ServiceOrderListRowProps) => {
     const formatDate = (d: string) => {
       if (!d) return "-"
@@ -114,7 +116,9 @@ const ServiceOrderListRow = React.memo(
                 onView={onDetails}
                 onEdit={onEdit}
                 onDelete={onDelete}
-              />
+              >
+                {children}
+              </ActionsDropdown>
             </div>
           )
 

@@ -9,7 +9,7 @@ interface PageProps {
 
 export default async function PublicQuotePage({ params }: PageProps) {
     const { token } = await params
-    
+
     const headerList = await headers()
     const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1"
     const userAgent = headerList.get("user-agent") || "unknown"
@@ -22,11 +22,11 @@ export default async function PublicQuotePage({ params }: PageProps) {
     }
 
     return (
-        <PublicQuotePortal 
-            token={token} 
-            initialData={res.data} 
-            ip={ip} 
-            userAgent={userAgent} 
+        <PublicQuotePortal
+            token={token}
+            initialData={res.data}
+            ip={ip}
+            userAgent={userAgent}
         />
     )
 }

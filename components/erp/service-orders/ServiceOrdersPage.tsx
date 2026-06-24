@@ -6,12 +6,13 @@ import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, SelectionBanner, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, SelectionBanner, Tabs, TabsList, TabsTrigger, DropdownItem } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import { FadeIn } from "@/components/animations/FadeIn"
 import AlertModal from "@/components/reusable/AlertModal"
+import { ShareModal } from "@/components/marketplace/ShareModal"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import ServiceOrderListRow from "./ServiceOrderListRow"
 import ServiceOrderGridCard from "./ServiceOrderGridCard"
@@ -34,6 +35,17 @@ import {
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 
 
+
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+    aberta: ["aguardando_aprovacao", "cancelada"],
+    aguardando_aprovacao: ["aprovada", "cancelada"],
+    aprovada: ["em_andamento", "cancelada"],
+    em_andamento: ["aguardando_peca", "concluida", "cancelada"],
+    aguardando_peca: ["em_andamento", "cancelada"],
+    concluida: ["entregue"],
+    entregue: [],
+    cancelada: [],
+}
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
   { id: "order_number", label: "Nº OS", align: "left", width: "150px" },
@@ -75,6 +87,7 @@ export default function ServiceOrdersPage({
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [showShareModal, setShowShareModal] = useState<{ id: string; token: string } | null>(null)
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
   const itemsPerPage = 50
 
@@ -175,6 +188,17 @@ export default function ServiceOrdersPage({
 
   const statusColor = (status: string) => SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.variant || "gray"
   const statusLabel = (status: string) => SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    const { updateServiceOrderStatusAction } = await import("@/app/actions/erp/service-orders")
+    const res = await updateServiceOrderStatusAction(partnerId, id, newStatus)
+    if (res.success) {
+      toast({ description: "Status alterado" })
+      afterMutation()
+    } else {
+      toast({ description: res.error || "Erro ao alterar status" })
+    }
+  }
 
   const handleDelete = async (id: string) => {
     const { deleteServiceOrderAction } = await import("@/app/actions/erp/service-orders")
@@ -507,7 +531,23 @@ export default function ServiceOrdersPage({
                           onDelete={() => setConfirmDelete(o.id)}
                           statusColor={statusColor(o.status)}
                           statusLabel={statusLabel(o.status)}
-                        />
+                        >
+                          {(STATUS_TRANSITIONS[o.status] || []).map((st) => {
+                            const meta = SERVICE_ORDER_STATUS_META[st as ServiceOrderStatus]
+                            return (
+                              <DropdownItem key={st} onClick={() => handleStatusChange(o.id, st)}>
+                                Marcar como: {meta?.label}
+                              </DropdownItem>
+                            )
+                          })}
+                          <DropdownItem onClick={async () => {
+                            const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                            const token = await ensurePublicTokenAction(partnerId, o.id)
+                            if (token) setShowShareModal({ id: o.id, token })
+                          }}>
+                            Compartilhar
+                          </DropdownItem>
+                        </ServiceOrderGridCard>
                       ))}
                     </div>
                   ) : (
@@ -579,7 +619,23 @@ export default function ServiceOrdersPage({
                                 onDelete={() => setConfirmDelete(o.id)}
                                 statusColor={statusColor(o.status)}
                                 statusLabel={statusLabel(o.status)}
-                              />
+                              >
+                                {(STATUS_TRANSITIONS[o.status] || []).map((st) => {
+                                  const meta = SERVICE_ORDER_STATUS_META[st as ServiceOrderStatus]
+                                  return (
+                                    <DropdownItem key={st} onClick={() => handleStatusChange(o.id, st)}>
+                                      Marcar como: {meta?.label}
+                                    </DropdownItem>
+                                  )
+                                })}
+                                <DropdownItem onClick={async () => {
+                                  const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                  const token = await ensurePublicTokenAction(partnerId, o.id)
+                                  if (token) setShowShareModal({ id: o.id, token })
+                                }}>
+                                  Compartilhar
+                                </DropdownItem>
+                              </ServiceOrderListRow>
                             ))}
                           </tbody>
                         </table>
@@ -623,6 +679,17 @@ export default function ServiceOrdersPage({
           expected_completion_date: { presets: [], from: "", to: "" },
         })}
       />
+
+      {showShareModal && (
+        <ShareModal
+          isOpen={!!showShareModal}
+          onClose={() => setShowShareModal(null)}
+          url={`${typeof window !== 'undefined' ? window.location.origin : ''}/os/${showShareModal.token}`}
+          title={`OS #${(paginated.find(o => o.id === showShareModal.id)?.order_number) || ''}`}
+          shareMessage={`Olá! Segue o link para visualizar a Ordem de Serviço *#${(paginated.find(o => o.id === showShareModal.id)?.order_number) || ''}*:`}
+          label="Link da OS"
+        />
+      )}
     </>
   )
 }

@@ -245,15 +245,13 @@ const CategoryCarousel = ({
                 <div className="snap-start shrink-0 w-[110px]">
                     <button
                         onClick={() => onToggleCategory("__all__")}
-                        className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${
-                            selectedCategories.length === 0
-                                ? 'bg-brand-green text-white border-brand-green'
-                                : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
-                        }`}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${selectedCategories.length === 0
+                            ? 'bg-brand-green text-white border-brand-green'
+                            : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
+                            }`}
                     >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            selectedCategories.length === 0 ? 'bg-white/20' : 'bg-brand-gray'
-                        }`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedCategories.length === 0 ? 'bg-white/20' : 'bg-brand-gray'
+                            }`}>
                             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="7" height="7" rx="1" />
                                 <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -272,18 +270,16 @@ const CategoryCarousel = ({
                         <div key={cat.name} className="snap-start shrink-0 w-[110px]">
                             <button
                                 onClick={() => onToggleCategory(cat.name)}
-                                className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${
-                                    isSelected
-                                        ? 'bg-brand-green text-white border-brand-green'
-                                        : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
-                                }`}
+                                className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${isSelected
+                                    ? 'bg-brand-green text-white border-brand-green'
+                                    : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
+                                    }`}
                             >
                                 {cat.icon_url ? (
                                     <img src={cat.icon_url} alt={cat.name} className="w-10 h-10 object-contain" />
                                 ) : (
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                        isSelected ? 'bg-white/20' : 'bg-brand-gray'
-                                    }`}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-white/20' : 'bg-brand-gray'
+                                        }`}>
                                         <span className="text-lg">📦</span>
                                     </div>
                                 )}
@@ -1010,9 +1006,6 @@ export function ExplorarPageClient({
                                     updateUrl(selectedCitySlug, [], query, currentType)
                                 }}
                             />
-
-                            {/* 2. DUDIT BANNER */}
-                            <HeroBanner />
 
                             {/* 3. VENDEDORES EM DESTAQUE */}
                             {vitrinesDestaque.length > 0 && (

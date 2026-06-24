@@ -9,7 +9,7 @@ export const metadata = {
     title: "Painel de Vendas - Dudit Marketplace",
 }
 
-export default async function QuickModePainelPage() {
+export default async function PainelPage() {
     const context = await getCurrentPartnerContext()
     
     if (!context) {
@@ -18,7 +18,6 @@ export default async function QuickModePainelPage() {
 
     const { partnerId, businessInfo } = context
 
-    // Security check: if not in quick mode, redirect to regular dashboard
     if (businessInfo?.mode !== "quick") {
         redirect("/erp/dashboard")
     }
@@ -26,9 +25,6 @@ export default async function QuickModePainelPage() {
     const result = await getQuickModeHomeDataAction(partnerId)
 
     if (!result.success) {
-        if (result.redirect) {
-            redirect(result.redirect)
-        }
         return (
             <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
                 <h1 className="text-xl font-bold text-brand-red">Erro ao carregar dados</h1>

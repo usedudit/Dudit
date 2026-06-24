@@ -1,9 +1,9 @@
 
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { Dropdown, DropdownItem, Button, DatePicker, FormDropdown } from '../../reusable';
+import { X } from 'lucide-react';
+import { Button, DatePicker, FormDropdown } from '../../reusable';
 import { HistoryTimeline } from '../shared/HistoryTimeline';
 
 export const TopSelectionBar = ({ onClose, onViewSheet }: { onClose: () => void, onViewSheet: () => void }) => {

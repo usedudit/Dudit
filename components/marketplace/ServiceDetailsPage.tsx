@@ -25,12 +25,13 @@ import {
     WhatsappIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
-import { FavoriteButton } from "./FavoriteButton"
+import { useFavorites } from "@/providers/favorites-provider"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
+import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useNotification } from "@/hooks/use-notification"
 import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
@@ -188,6 +189,7 @@ export function ServiceDetailsPageClient({
     const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
     const [deliveryConfig, setDeliveryConfig] = useState<any>(null)
     const [isTeamMember, setIsTeamMember] = useState(false)
+    const { isFavorited: isFav, toggleFavorite: toggleFav } = useFavorites()
 
     // Address flow states (checkout-like)
     const [userAddresses, setUserAddresses] = useState<any[]>([])
@@ -1719,12 +1721,11 @@ export function ServiceDetailsPageClient({
                 productName={service.name}
                 onShare={() => setShowShareModal(true)}
                 favoriteButton={
-                    <FavoriteButton
-                        itemId={service.id}
-                        itemType="servico"
-                        size="md"
-                        variant="icon-only"
-                    />
+                    <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
+                        className="flex items-center justify-center p-1.5 transition-all duration-200 cursor-pointer select-none"
+                        title={isFav(service.id, "servico") ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                        <HeartIcon size={18} className={isFav(service.id, "servico") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                    </button>
                 }
             />
 
@@ -1747,8 +1748,9 @@ export function ServiceDetailsPageClient({
                                     {lightboxActiveImg + 1}/{galleryItems.length}
                                 </span>
                                 <div className="flex items-center gap-2">
-                                    <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-                                        <HeartIcon size={20} />
+                                    <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
+                                        className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                        <HeartIcon size={20} className={isFav(service.id, "servico") ? "fill-white" : ""} />
                                     </button>
                                     <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
                                         <ShareIcon size={20} />
@@ -1916,12 +1918,16 @@ export function ServiceDetailsPageClient({
                                     </div>
 
                                     <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
-                                        <FavoriteButton
-                                            itemId={service.id}
-                                            itemType="servico"
-                                            size="lg"
-                                            variant="outline"
-                                        />
+                                        {(() => {
+                                            const isFavService = isFav(service.id, "servico")
+                                            return (
+                                                <Button variant="outline" size="icon" className="w-10 h-10"
+                                                    onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
+                                                    title={isFavService ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                                                    <HeartIcon size={20} className={isFavService ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                                                </Button>
+                                            )
+                                        })()}
 
                                         <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
                                             <ShareIcon className="w-5 h-5 text-brand-green" />
@@ -1963,64 +1969,7 @@ export function ServiceDetailsPageClient({
                             {/* Reviews */}
                             <div className="border-t border-brand-border pt-2">
                                 <h3 className="text-xl font-medium text-brand-dark mb-6 mt-8">Avaliações do serviço</h3>
-                                {reviews.length > 0 && (
-                                    <div className="border border-brand-border rounded-xl p-5 mb-8 flex gap-8 items-center">
-                                        <div className="text-center shrink-0">
-                                            <p className="text-5xl font-black text-brand-dark leading-none mb-2">{avgRating.toFixed(1)}</p>
-                                            <div className="flex justify-center mb-1.5"><StarRow rating={avgRating} size={14} /></div>
-                                            <p className="text-xs text-brand-inactive-text">Média de {reviews.length} avaliações</p>
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            {[5, 4, 3, 2, 1].map((star) => {
-                                                const count = reviews.filter((r: any) => r.rating === star).length
-                                                const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0
-                                                return (
-                                                    <div key={star} className="flex items-center gap-2">
-                                                        <span className="text-xs text-brand-inactive-text w-3 shrink-0">{star}</span>
-                                                        <StarIcon size={10} strokeWidth={0} className="text-brand-inactive-text fill-gray-400 shrink-0" />
-                                                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
-                                                        </div>
-                                                        <span className="text-xs text-brand-inactive-text w-4 text-right shrink-0">{count}</span>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                                {reviews.length > 0 ? (
-                                    <div className="space-y-6">
-                                        {reviews.map((rev: any, i: number) => (
-                                            <div key={i} className="border-b border-brand-border pb-6 last:border-0">
-                                                <div className="flex items-start gap-3 mb-3">
-                                                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-brand-inactive-text">
-                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-                                                        </svg>
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="font-semibold text-sm text-brand-dark">{rev.profiles?.full_name || "Usuário"}</span>
-                                                            <span className="text-xs text-brand-inactive-text shrink-0">
-                                                                {new Date(rev.created_at).toLocaleDateString("pt-BR")}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-1"><StarRow rating={rev.rating} size={11} /></div>
-                                                    </div>
-                                                </div>
-                                                <p className="text-gray-600 text-sm leading-relaxed ml-12">{rev.comment}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <IconPlaceholder
-                                        placeholderType="image"
-                                        imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
-                                        imageAlt="Sem avaliações"
-                                        title="Ainda não temos avaliações por aqui"
-                                        subtitle="Seja o primeiro a contar como foi sua experiência!"
-                                    />
-                                )}
+                                <ReviewsSection reviews={reviews} />
                             </div>
                         </div>
 

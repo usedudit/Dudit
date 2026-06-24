@@ -308,8 +308,17 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     setDiscountType(q.discount_type === 'percentage' ? '%' : 'R$');
                     setShippingFee(q.shipping_cost?.toString() || '');
                     setOtherCosts(q.additional_costs?.toString() || '');
-                    if (q.created_by_user_id) {
-                        setSalespersonId(q.created_by_user_id);
+                    if (q.user_id || q.created_by_user_id) {
+                        setSalespersonId(q.user_id || q.created_by_user_id);
+                    }
+                    // Load preview customization from metadata
+                    const meta = q.metadata || {};
+                    if (meta.preview) {
+                        if (meta.preview.primaryColor) setPrimaryColor(meta.preview.primaryColor);
+                        if (meta.preview.secondaryColor) setSecondaryColor(meta.preview.secondaryColor);
+                        if (meta.preview.quoteTitle) setQuoteTitle(meta.preview.quoteTitle);
+                        if (meta.preview.quoteSubtitle) setQuoteSubtitle(meta.preview.quoteSubtitle);
+                        if (meta.preview.showDecoration !== undefined) setShowDecoration(meta.preview.showDecoration);
                     }
 
                     // Snapshot for dirty check
@@ -768,6 +777,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     discountValue: Number(discount) || 0,
                     shippingCost: Number(shippingFee) || 0,
                     additionalCosts: Number(otherCosts) || 0,
+                    preview: {
+                        primaryColor,
+                        secondaryColor,
+                        quoteTitle,
+                        quoteSubtitle,
+                        showDecoration,
+                    },
                 });
                 if (!upRes.success) {
                     notifyError("Erro ao salvar", (upRes as { error?: string }).error || "Ocorreu um erro inesperado.");
@@ -899,6 +915,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     sortOrder: idx,
                 })),
                 userId: salespersonId || undefined,
+                preview: {
+                    primaryColor,
+                    secondaryColor,
+                    quoteTitle,
+                    quoteSubtitle,
+                    showDecoration,
+                },
             });
 
             if (result.success) {
@@ -1143,6 +1166,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             partnerAddress={partnerAddress}
                                             partnerAvatar={partnerAvatar}
                                             showDecoration={showDecoration}
+                                            salespersonName={salespeople.find(s => s.id === salespersonId)?.name}
                                         />
                                     </FadeIn>
                                 </TabsContent>

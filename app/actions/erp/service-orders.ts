@@ -761,19 +761,55 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
     .eq("id", serviceOrderId)
 }
 
+export async function ensurePublicTokenAction(partnerId: string, serviceOrderId: string): Promise<string | null> {
+  try {
+    const admin = getAdminClient()
+    const { data } = await admin
+      .from("service_orders")
+      .select("public_token")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .single()
+    if (data?.public_token) return data.public_token
+    const newToken = crypto.randomUUID()
+    await admin.from("service_orders").update({ public_token: newToken }).eq("id", serviceOrderId)
+    return newToken
+  } catch {
+    return null
+  }
+}
+
 export async function getServiceOrderByTokenAction(
   token: string,
   ): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; statusHistory: any[]; sale: any } } | { success: false; error: string }> {
   try {
     const admin = getAdminClient()
 
-    const { data: row, error } = await admin
+    let { data: row, error } = await admin
       .from("service_orders")
       .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, token_revoked_at, customer_snapshot, created_at, sale_id, specifications")
       .eq("public_token", token)
       .single()
 
-    if (error || !row) throw new Error("Ordem de serviço não encontrada")
+    if (error || !row) {
+      // Fallback: try lookup by id for legacy OSs without public_token
+      const { data: byId } = await admin
+        .from("service_orders")
+        .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, token_revoked_at, customer_snapshot, created_at, sale_id, specifications")
+        .eq("id", token)
+        .single()
+      if (byId) {
+        // Generate public_token on the fly for this OS
+        if (!byId.public_token) {
+          await admin.from("service_orders").update({ public_token: token }).eq("id", token)
+        }
+        row = byId
+      } else {
+        throw new Error("Ordem de serviço não encontrada")
+      }
+    }
+
+    if (row.token_revoked_at) throw new Error("Link expirado ou revogado")
     if (row.token_revoked_at) throw new Error("Link expirado ou revogado")
 
     const [services, products, attachments, historyRes, statusHistoryRes, saleRes] = await Promise.all([
@@ -1211,7 +1247,42 @@ export async function confirmServiceOrderPaymentAction(payload: {
       await admin.from("service_orders").update({ sale_id: saleId }).eq("id", order.id)
     }
 
-    // 5. Create or update transaction in `transactions` table (if paidAmount > 0)
+    // 5. Create or sync orders entry so the sale appears in the orders page
+    const orderRefNote = `service_order:${order.id}:order`
+    const { data: existingOrder } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("partner_id", payload.partnerId)
+      .eq("notes", orderRefNote)
+      .limit(1)
+      .maybeSingle()
+
+    if (!existingOrder?.id) {
+      const orderNumber = saleNumber || `OS-${String(order.id).slice(0, 8).toUpperCase()}`
+      const paymentMethodSummary = payload.paymentMethod
+        ? [{ method: payload.paymentMethod, amount: payload.paidAmount }]
+        : []
+
+      await supabase.from("orders").insert({
+        partner_id: payload.partnerId,
+        order_number: orderNumber,
+        customer_name: (order.customer_snapshot as any)?.name || null,
+        buyer_id: order.customer_id || null,
+        total_amount: totalAmount,
+        paid_amount: payload.paidAmount,
+        situation: saleStatus,
+        delivery_status: "not_sent",
+        delivery_type: "pickup",
+        order_source: "admin_service_order",
+        payment_method: payload.paymentMethod || null,
+        payment_breakdown: JSON.stringify(paymentMethodSummary),
+        notes: orderRefNote,
+        created_at: new Date().toISOString(),
+        created_by: user.id,
+      })
+    }
+
+    // 6. Create or update transaction in `transactions` table (if paidAmount > 0)
     if (payload.paidAmount > 0.009) {
       const txRefNote = `service_order:${order.id}:payment`
       const { data: existingPaymentTx } = await supabase

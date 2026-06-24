@@ -35,9 +35,10 @@ interface QuickModeHomeProps {
         businessInfo: any
     }
     partnerId: string
+    isQuick?: boolean
 }
 
-export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
+export default function QuickModeHome({ data, partnerId, isQuick = true }: QuickModeHomeProps) {
     const router = useRouter()
     const { toast } = useToast()
     const [isUpgrading, setIsUpgrading] = useState(false)
@@ -319,7 +320,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     </div>
                 </div>
 
-                {/* Upgrade Block */}
+                {isQuick && (
                 <section className="bg-brand-dark dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-8 md:p-12 relative overflow-hidden text-white mt-8">
                     <div className="relative z-10 max-w-2xl">
                         <Badge variant="green" className="mb-4 bg-brand-green border-none text-white px-4 py-1.5 text-sm">RECURSO PREMIUM</Badge>
@@ -347,9 +348,11 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                         <StoreIcon size={240} className="text-brand-green" />
                     </div>
                 </section>
+                )}
             </div>
 
             {/* Modais */}
+            {isQuick && (
             <AlertModal
                 isOpen={showUpgradeModal}
                 onClose={() => setShowUpgradeModal(false)}
@@ -360,6 +363,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                 cancelText="Agora não"
                 variant="success"
             />
+            )}
 
             <AlertModal
                 isOpen={!!showDeleteModal}

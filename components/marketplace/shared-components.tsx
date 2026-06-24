@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
-import { FavoriteButton } from "./FavoriteButton"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -11,8 +11,9 @@ import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from "@/lib/u
 import { formatCurrency } from "@/lib/utils";
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
-import { Badge } from "@/components/reusable"
+import { Badge, Button } from "@/components/reusable"
 import { useFavorites } from "@/providers/favorites-provider"
+import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
@@ -266,13 +267,25 @@ function getCachedPartnerPromotions(partnerId: string) {
 }
 
 export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions }) => {
-    const { isFavorited } = useFavorites()
-    const itemType = (product as any).itemType === "plano" ? "plano" : ((product as any).itemType === "servico" ? "servico" : "produto")
-    const favorited = itemType !== "plano" ? isFavorited(product.id, itemType) : false
-
+    const { user } = useSupabase()
+    const router = useRouter()
+    const { isFavorited, toggleFavorite } = useFavorites()
     const imageUrl = getPrimaryProductDisplayImage(product)
     const distance = product.partners?.distance_km_formatted || null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
+    const partnerUserId = (partner as any)?.user_id
+    const isOwner = !!(user && partnerUserId && user.id === partnerUserId)
+    const itemType = (product as any).itemType === "plano" ? "plano" : ((product as any).itemType === "servico" ? "servico" : "produto")
+    const favorited = itemType !== "plano" ? isFavorited(product.id, itemType) : false
+    const handleFavoriteClick = useCallback(async (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (isOwner) return
+        if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
+        if (itemType === "plano") return
+        await toggleFavorite(product.id, itemType as "produto" | "servico")
+    }, [user, router, toggleFavorite, product.id, itemType, isOwner])
+
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
     const partnerId = partner?.id || null
@@ -370,14 +383,16 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         )}
                     </div>
                     {itemType !== "plano" && (
-                        <FavoriteButton
-                            itemId={product.id}
-                            itemType={itemType}
-                            size="sm"
-                            variant="overlay"
-                            className={`absolute top-2 right-2 z-10 transition-opacity ${favorited ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"
-                                }`}
-                        />
+                        <button
+                            onClick={handleFavoriteClick}
+                            className={`absolute top-2 right-2 z-10 transition-opacity w-8 h-8 rounded-full flex items-center justify-center
+                                ${favorited ? "opacity-100 bg-white shadow-md" : "opacity-0 group-hover/card:opacity-100 bg-white/90 hover:bg-white shadow-sm"}`}
+                            aria-label={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                            title={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                        >
+                            <HeartIcon size={16}
+                                className={`transition-colors duration-200 ${favorited ? "text-brand-green fill-brand-green" : "text-brand-green"}`} />
+                        </button>
                     )}
                 </div>
 

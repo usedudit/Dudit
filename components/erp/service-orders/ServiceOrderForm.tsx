@@ -11,6 +11,8 @@ import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { ChevronLeftIcon, SaveIcon, PlusIcon, TrashIcon, WrenchIcon, PackageIcon, UserIcon, TagIcon, MoneyIcon, FileIcon, CheckCircleIcon, EditIcon, SearchIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence, motion } from "framer-motion"
 import { useProductBucket, type ProductBucketItem } from "../hooks"
@@ -120,7 +122,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     // Custom OS fields
     const [status, setStatus] = useState(editData?.status || "aberta")
     const [priority, setPriority] = useState(editData?.priority || "baixa")
-    const [estimatedHours, setEstimatedHours] = useState(editData?.estimated_hours != null ? String(editData.estimated_hours) : "")
+    const [estimatedHours, setEstimatedHours] = useState(editData?.estimated_hours ?? 0)
     const [expectedCompletionTime, setExpectedCompletionTime] = useState(editData?.expected_completion_time || "")
     const [openingDate, setOpeningDate] = useState(() => {
         if (editData?.created_at) {
@@ -155,6 +157,46 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
 
 
+    const initialSnapshot = useMemo(() => JSON.stringify({
+        title: editData?.title || "",
+        description: editData?.description || "",
+        internalNotes: editData?.internal_notes || "",
+        customerId: editData?.customer_id || "",
+        assignedUserId: editData?.assigned_user_id || "",
+        status: editData?.status || "aberta",
+        priority: editData?.priority || "baixa",
+        estimatedHours: editData?.estimated_hours ?? 0,
+        expectedCompletionTime: editData?.expected_completion_time || "",
+        openingDate: editData?.created_at ? getLocalDateString(new Date(editData.created_at)) : getLocalDateString(new Date()),
+        openingTime: editData?.created_at ? getLocalTimeString(new Date(editData.created_at)) : getLocalTimeString(new Date()),
+        discountValue: editData?.discount_value || 0,
+        discountType: editData?.discount_type || 'fixed',
+        couponCode: editData?.coupon_code || "",
+        otherCosts: editData?.other_costs || 0,
+        services: editData?.services || [],
+        products: editData?.products || [],
+    }), [editData])
+
+    const currentSnapshot = useMemo(() => JSON.stringify({
+        title,
+        description,
+        internalNotes,
+        customerId,
+        assignedUserId,
+        status,
+        priority,
+        estimatedHours,
+        expectedCompletionTime,
+        openingDate,
+        openingTime,
+        discountValue,
+        discountType,
+        couponCode,
+        otherCosts,
+        services,
+        products,
+    }), [title, description, internalNotes, customerId, assignedUserId, status, priority, estimatedHours, expectedCompletionTime, openingDate, openingTime, discountValue, discountType, couponCode, otherCosts, services, products])
+
     const servicesBucket = useProductBucket<PartnerServiceBucketItem>(fetchPartnerServicesBucket, { pageSize: 10 })
     const productsBucket = useProductBucket<ProductBucketItem>(fetchPartnerProductsBucket, { pageSize: 10 })
 
@@ -178,6 +220,11 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     const [attachments, setAttachments] = useState<any[]>(editData?.attachments || [])
     const [deletedAttachmentIds, setDeletedAttachmentIds] = useState<string[]>([])
     const [saving, setSaving] = useState(false)
+
+    const isDirty = !saving && currentSnapshot !== initialSnapshot
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+    const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
+
     const [showCustomerSheet, setShowCustomerSheet] = useState(false)
     const [showServiceSheet, setShowServiceSheet] = useState(false)
     const [showProductSheet, setShowProductSheet] = useState(false)
@@ -444,7 +491,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
             assigned_user_id: assignedUserId || null,
             status,
             priority,
-            estimated_hours: estimatedHours ? Number(estimatedHours) : null,
+            estimated_hours: estimatedHours || null,
             expected_completion_time: expectedCompletionTime || null,
             discount_value: discountValue,
             discount_type: discountType,
@@ -735,7 +782,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -1030,7 +1077,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     setIsServiceSearchOpen(true)
                                                     servicesBucket.loadBucket()
                                                 }}
-                                                className="mb-0"
+                                                variant="full-rounded"
                                             />
 
                                             <AnimatePresence>
@@ -1321,7 +1368,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     setIsProductSearchOpen(true)
                                                     productsBucket.loadBucket()
                                                 }}
-                                                className="mb-0"
+                                                variant="full-rounded"
                                             />
 
                                             <AnimatePresence>
@@ -1432,8 +1479,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                 )}
                                                                             </div>
                                                                         </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            <div className="w-[120px]">
+                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                            <div className="w-[140px]">
                                                                                 <MoneyInput
                                                                                     value={unitPrice}
                                                                                     onChange={(val) => updateProductField(index, "unit_price", val)}
@@ -1639,7 +1686,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                     {/* Mobile Bottom Action Bar */}
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                        <Button variant="outline" onClick={onBack} disabled={saving} className="flex-1 h-12">
+                        <Button variant="outline" onClick={handleBack} disabled={saving} className="flex-1 h-12">
                             Cancelar
                         </Button>
                         <Button onClick={handleSave} disabled={saving} className="flex-1 h-12" leftIcon={<SaveIcon size={18} />}>
@@ -1853,6 +1900,12 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                     )}
                 </div>
             </DefaultModal>
+
+            <UnsavedChangesDialog
+                open={showConfirmDialog}
+                onConfirm={confirmNavigation}
+                onCancel={cancelNavigation}
+            />
         </FadeIn>
     )
 }

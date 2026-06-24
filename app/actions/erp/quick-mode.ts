@@ -28,9 +28,6 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
         if (partnerError || !partner) throw new Error("Parceiro não encontrado")
 
         const businessInfo = normalizeBusinessInfo(partner.business_info)
-        if (businessInfo.mode !== "quick") {
-            return { success: false, error: "Modo inválido para esta página", redirect: "/erp/dashboard" }
-        }
 
         // 2. Fetch Stats
         // - Active items (products + services)

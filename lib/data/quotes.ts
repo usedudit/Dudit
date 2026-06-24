@@ -36,14 +36,15 @@ export const getPartnerQuotesCached = cache(async (partnerId: string, limit: num
                 return { data: [], total: 0 }
             }
 
-            // Mark expired quotes on read (virtual status)
+            // Mark expired quotes on read (virtual status, never for finalized)
             const now = new Date()
             now.setHours(0, 0, 0, 0)
+            const finalizedStatuses = ['approved', 'rejected', 'expired', 'cancelled', 'converted_to_order']
 
             const mappedData = (data || []).map((q: any) => {
                 if (
                     q.expiration_date &&
-                    (q.status === 'draft' || q.status === 'sent') &&
+                    !finalizedStatuses.includes(q.status) &&
                     new Date(q.expiration_date) < now
                 ) {
                     return { ...q, status: 'expired', _originalStatus: q.status }

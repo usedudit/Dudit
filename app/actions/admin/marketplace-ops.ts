@@ -4,13 +4,22 @@ import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
+import type { CursorPaginatedResult } from "@/lib/admin/types"
 
-export async function getAdminMarketplaceOrders(params?: { status?: string; limit?: number }) {
+function sanitizeIlike(input: string): string {
+    return input.replace(/[%_\\]/g, c => `\\${c}`)
+}
+
+export async function getAdminMarketplaceOrders(
+    cursor?: string | null,
+    limit: number = 20,
+    filters?: { status?: string; search?: string }
+): Promise<CursorPaginatedResult<any>> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requireAdmin()
 
     const admin = getAdminClient()
-    const limit = Math.min(Math.max(Number(params?.limit || 50), 1), 100)
+    const pageSize = Math.min(limit, 50)
 
     let query = admin
         .from("orders")
@@ -38,24 +47,46 @@ export async function getAdminMarketplaceOrders(params?: { status?: string; limi
             order_items(id, product_id, product_name, product_price, quantity, subtotal, net_item_value),
             return_requests!order_id(id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at)
         `)
-        .order("created_at", { ascending: false })
-        .limit(limit)
 
-    if (params?.status) {
-        query = query.eq("situation", params.status)
+    if (filters?.search && filters.search.trim().length > 0) {
+        const s = sanitizeIlike(filters.search.trim())
+        query = query.ilike("order_number", `%${s}%`)
     }
+
+    if (filters?.status && filters.status !== "all") {
+        query = query.eq("situation", filters.status)
+    }
+
+    if (cursor) {
+        query = query.lt("created_at", cursor)
+    }
+
+    query = query.order("created_at", { ascending: false }).limit(pageSize + 1)
 
     const { data, error } = await query
     if (error) throw error
-    return data || []
+
+    const items = (data || []) as any[]
+    const hasMore = items.length > pageSize
+
+    return {
+        data: items.slice(0, pageSize),
+        nextCursor: hasMore && items.length > 0 ? items[pageSize - 1].created_at : null,
+        prevCursor: cursor || null,
+        hasMore,
+    }
 }
 
-export async function getAdminReturnRequests(params?: { status?: string; type?: string; source?: string; limit?: number }) {
+export async function getAdminReturnRequests(
+    cursor?: string | null,
+    limit: number = 20,
+    filters?: { status?: string; type?: string; source?: string; search?: string }
+): Promise<CursorPaginatedResult<any>> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requireAdmin()
 
     const admin = getAdminClient()
-    const limit = Math.min(Math.max(Number(params?.limit || 50), 1), 100)
+    const pageSize = Math.min(limit, 50)
 
     let query = admin
         .from("return_requests")
@@ -92,20 +123,38 @@ export async function getAdminReturnRequests(params?: { status?: string; type?: 
             return_events(id, event_type, from_status, to_status, message, metadata, created_at)
         `)
         .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(limit)
 
-    if (params?.status) {
-        query = query.eq("status", params.status)
+    if (filters?.search && filters.search.trim().length > 0) {
+        const s = sanitizeIlike(filters.search.trim())
+        query = query.or(`customer_name_snapshot.ilike.%${s}%,order_number_snapshot.ilike.%${s}%`)
     }
-    if (params?.type) {
-        query = query.eq("request_type", params.type)
+
+    if (filters?.status && filters.status !== "all") {
+        query = query.eq("status", filters.status)
     }
-    if (params?.source) {
-        query = query.eq("source", params.source)
+    if (filters?.type) {
+        query = query.eq("request_type", filters.type)
     }
+    if (filters?.source) {
+        query = query.eq("source", filters.source)
+    }
+
+    if (cursor) {
+        query = query.lt("created_at", cursor)
+    }
+
+    query = query.order("created_at", { ascending: false }).limit(pageSize + 1)
 
     const { data, error } = await query
     if (error) throw error
-    return data || []
+
+    const items = (data || []) as any[]
+    const hasMore = items.length > pageSize
+
+    return {
+        data: items.slice(0, pageSize),
+        nextCursor: hasMore && items.length > 0 ? items[pageSize - 1].created_at : null,
+        prevCursor: cursor || null,
+        hasMore,
+    }
 }

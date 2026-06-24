@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder } from "@/components/reusable"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import PaymentModal from "@/components/erp/orders/PaymentModal"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon } from "@/lib/icons"
@@ -58,9 +58,10 @@ interface ServiceOrderDetailProps {
     onBack?: () => void
     onMutation?: () => void
     onEdit?: (id: string) => void
+    onDelete?: (id: string) => void
 }
 
-export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation, onEdit }: ServiceOrderDetailProps) {
+export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation, onEdit, onDelete }: ServiceOrderDetailProps) {
     const { toast } = useToast()
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -73,6 +74,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [showShareModal, setShowShareModal] = useState(false)
+    const [confirmDelete, setConfirmDelete] = useState(false)
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {
@@ -193,7 +195,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     }, [order.services, order.products])
 
     const handleConfirmPayment = async (paymentData: any) => {
-        setLoading(true)
         try {
             const res = await confirmServiceOrderPaymentAction({
                 serviceOrderId: order.id,
@@ -209,23 +210,17 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
             })
 
             if (res.success) {
-                toast({ description: "Pagamento registrado com sucesso!" })
-                setIsPaymentModalOpen(false)
                 const detailsRes = await getServiceOrderDetailsAction(order.id, partnerId)
                 if (detailsRes.success) {
                     setOrder(detailsRes.data)
                 }
                 onMutation?.()
-                return { success: true }
+                return { success: true, orderNumber: res.orderNumber || order.order_number }
             } else {
-                toast({ description: res.error || "Erro ao processar pagamento" })
                 return { error: res.error || "Erro ao processar pagamento" }
             }
         } catch (err: any) {
-            toast({ description: err.message || "Erro inesperado" })
             return { error: err.message || "Erro inesperado" }
-        } finally {
-            setLoading(false)
         }
     }
 
@@ -348,6 +343,9 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown>
+                                            <DropdownItem onClick={handleEditClick}>
+                                                Editar OS
+                                            </DropdownItem>
                                             {availableTransitions.map((status) => {
                                                 const meta = SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]
                                                 return (
@@ -367,22 +365,24 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                     Assinar OS
                                                 </DropdownItem>
                                             )}
-                                            <DropdownItem onClick={() => window.print()}>
-                                                Imprimir OS
-                                            </DropdownItem>
-                                            <DropdownItem onClick={() => {
+                                            <DropdownItem onClick={async () => {
                                                 if (!hasMinimumPlan(planSlug, "crescer")) {
                                                     openPlanUpgrade("crescer");
-                                                } else {
-                                                    setShowShareModal(true);
+                                                    return
                                                 }
+                                                const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                                const token = await ensurePublicTokenAction(partnerId, order.id)
+                                                if (token) {
+                                                    setOrder((prev: any) => ({ ...prev, public_token: token }))
+                                                }
+                                                setShowShareModal(true);
                                             }}>
                                                 Compartilhar
                                             </DropdownItem>
+                                            <DropdownItem onClick={() => setConfirmDelete(true)} className="text-brand-red">
+                                                Excluir OS
+                                            </DropdownItem>
                                         </ActionsDropdown>
-                                        <Button onClick={handleEditClick} leftIcon={<EditIcon size={18} />}>
-                                            Editar OS
-                                        </Button>
                                     </div>
                                 </div>
 
@@ -963,6 +963,19 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                     />
                 )
             }
+
+            <AlertModal
+                isOpen={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                title="Excluir OS"
+                description="Tem certeza que deseja excluir esta ordem de serviço?"
+                onConfirm={() => {
+                    setConfirmDelete(false)
+                    onDelete?.(order.id)
+                }}
+                confirmText="Excluir"
+                variant="danger"
+            />
         </FadeIn >
     )
 }

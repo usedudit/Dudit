@@ -97,11 +97,10 @@ export function FavoriteButton({
                 >
                     <HeartIcon
                         size={iconSize}
-                        className={`transition-colors duration-200 ${
-                            favorited
-                                ? "text-brand-green fill-brand-green"
-                                : "text-brand-green hover:text-brand-green/80 fill-transparent"
-                        }`}
+                        className={`transition-colors duration-200 ${favorited
+                            ? "text-brand-green fill-brand-green"
+                            : "text-brand-green hover:text-brand-green/80 fill-transparent"
+                            }`}
                     />
                 </motion.div>
             </AnimatePresence>

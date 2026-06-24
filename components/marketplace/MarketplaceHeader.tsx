@@ -736,7 +736,6 @@ const Header: React.FC<HeaderProps> = ({
 
             <header className="hidden lg:flex flex-col w-full bg-brand-dark fixed top-0 left-0 right-0 z-[100] shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
-
                     <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
                             src="https://img.dudit.com.br/static/Logo.png"
@@ -899,11 +898,6 @@ const Header: React.FC<HeaderProps> = ({
                         <Link href="/pedidos" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <Package size={20} />
                             <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
-                        </Link>
-
-                        <Link href="/assinaturas" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
-                            <Package size={20} />
-                            <span className="text-[13px] font-medium hidden xl:block">Assinaturas</span>
                         </Link>
 
                         <Link href="/cart" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
