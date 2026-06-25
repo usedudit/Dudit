@@ -39,7 +39,7 @@ import SelectProductSheet from "./SelectProductSheet"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getTeamMembers } from "@/app/actions/erp/team"
-import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { calculateOrderPricing, computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
 interface ServiceOrderFormProps {
     partnerId: string
@@ -1114,7 +1114,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{svc.name}</div>
                                                                     </div>
                                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(svc.price || 0))}</span>
+                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, [], { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
                                                                     </div>
                                                                 </div>
                                                             ))
@@ -1406,7 +1406,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                         <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{prod.sku}</div>
                                                                     </div>
                                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(prod.price || 0))}</span>
+                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), null, [], { productId: prod.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
                                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                             {prod.stock} em estoque
                                                                         </div>

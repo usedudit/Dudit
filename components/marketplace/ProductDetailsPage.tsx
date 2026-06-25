@@ -1158,7 +1158,7 @@ export function ProductDetailsPageClient({
                         {(() => {
                             const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                             const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                            const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" no Dudit e gostaria de saber o preço.`)
+                            const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" na Dudit e gostaria de saber o preço.`)
                             const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                             return (
                                 <a
@@ -2037,7 +2037,7 @@ export function ProductDetailsPageClient({
                                 (() => {
                                     const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                                     const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                                    const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" no Dudit e gostaria de saber o preço.`)
+                                    const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" na Dudit e gostaria de saber o preço.`)
                                     const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                                     return (
                                         <a

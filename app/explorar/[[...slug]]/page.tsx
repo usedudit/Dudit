@@ -96,6 +96,12 @@ export default async function ExplorarPage({
                 const stateCode = savedState.toLowerCase()
                 redirect(`/explorar/estado-${stateCode}`)
             }
+
+            // Se tem query de busca, redireciona para Brasil inteiro
+            const searchQuery = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : null
+            if (searchQuery) {
+                redirect(`/explorar/brasil?q=${encodeURIComponent(searchQuery)}`)
+            }
         }
 
         // Se não conseguir determinar localização, mostra loader

@@ -4,15 +4,28 @@ import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
+import type { Period } from "@/lib/period-types"
+
+function getDateRangeForPeriod(period: Period) {
+  const today = getTodayYmdSaoPaulo()
+  switch (period) {
+    case "daily":
+      return { today, from: today, previousFrom: addDays(today, -1) }
+    case "weekly":
+      return { today, from: addDays(today, -6), previousFrom: addDays(today, -13) }
+    case "monthly":
+      return { today, from: addDays(today, -29), previousFrom: addDays(today, -59) }
+  }
+}
 
 export const DASHBOARD_TAGS = {
-  general: (partnerId: string) => `dashboard-general:${partnerId}`,
-  metrics: (partnerId: string) => `dashboard-metrics:${partnerId}`,
+  general: (partnerId: string, period = "monthly") => `dashboard-general:${partnerId}:${period}`,
+  metrics: (partnerId: string, period = "monthly") => `dashboard-metrics:${partnerId}:${period}`,
   alerts: (partnerId: string) => `dashboard-alerts:${partnerId}`,
-  revenue: (partnerId: string) => `dashboard-revenue:${partnerId}`,
-  revenueOrigin: (partnerId: string) => `dashboard-revenue-origin:${partnerId}`,
+  revenue: (partnerId: string, period = "monthly") => `dashboard-revenue:${partnerId}:${period}`,
+  revenueOrigin: (partnerId: string, period = "monthly") => `dashboard-revenue-origin:${partnerId}:${period}`,
   activity: (partnerId: string) => `dashboard-activity:${partnerId}`,
-  categories: (partnerId: string) => `dashboard-categories:${partnerId}`,
+  categories: (partnerId: string, period = "monthly") => `dashboard-categories:${partnerId}:${period}`,
   products: (partnerId: string) => `dashboard-products:${partnerId}`,
   services: (partnerId: string) => `dashboard-services:${partnerId}`,
   financial: (partnerId: string) => `dashboard-financial:${partnerId}`,
@@ -539,13 +552,11 @@ export async function getDashboardOperationsData(partnerId: string) {
 // MODULAR GENERAL TAB - independent queries with granular cache tags
 // ============================================================================
 
-async function getCachedGeneralMetrics(partnerId: string): Promise<{ metrics: Metric[] }> {
+async function getCachedGeneralMetrics(partnerId: string, period: Period = "monthly"): Promise<{ metrics: Metric[] }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      const today = getTodayYmdSaoPaulo()
-      const from = addDays(today, -29)
-      const previousFrom = addDays(today, -59)
+      const { today, from, previousFrom } = getDateRangeForPeriod(period)
 
       const [orders, transactions] = await Promise.all([
         supabase.from("orders").select("id, total_amount, customer_name, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${previousFrom}T00:00:00`).order("created_at", { ascending: false }).limit(300),
@@ -566,15 +577,15 @@ async function getCachedGeneralMetrics(partnerId: string): Promise<{ metrics: Me
 
       return {
         metrics: [
-          { title: "Desempenho de Vendas", value: brl(revenue), trend: `${percentTrend(revenue, previousRevenue)} vs mês passado`, tone: "green" as const },
-          { title: "Vendas Totais", value: String(periodOrders.length), trend: `${percentTrend(periodOrders.length, previousOrders.length)} vs mês passado`, tone: "blue" as const },
-          { title: "Pedido Médio", value: brl(ticket), trend: "0% vs mês passado", tone: "default" as const },
-          { title: "Clientes Atendidos", value: String(uniqueCustomers.size), trend: "0% vs mês passado", tone: "default" as const },
+          { title: "Desempenho de Vendas", value: brl(revenue), trend: `${percentTrend(revenue, previousRevenue)} vs período anterior`, tone: "green" as const },
+          { title: "Vendas Totais", value: String(periodOrders.length), trend: `${percentTrend(periodOrders.length, previousOrders.length)} vs período anterior`, tone: "blue" as const },
+          { title: "Pedido Médio", value: brl(ticket), trend: "0% vs período anterior", tone: "default" as const },
+          { title: "Clientes Atendidos", value: String(uniqueCustomers.size), trend: "0% vs período anterior", tone: "default" as const },
         ],
       }
     },
-    ["dashboard-metrics", partnerId],
-    { tags: [DASHBOARD_TAGS.metrics(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
+    ["dashboard-metrics", partnerId, period],
+    { tags: [DASHBOARD_TAGS.metrics(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 60 },
   )()
 }
 
@@ -632,13 +643,13 @@ async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promi
   )()
 }
 
-async function getCachedGeneralRevenueChart(partnerId: string): Promise<{ revenue: any[]; total: number; trend: string }> {
+async function getCachedGeneralRevenueChart(partnerId: string, period: Period = "monthly"): Promise<{ revenue: any[]; total: number; trend: string }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      const today = getTodayYmdSaoPaulo()
-      const from = addDays(today, -29)
-      const prevFrom = addDays(from, -30)
+      const { today, from } = getDateRangeForPeriod(period)
+      const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
+      const prevFrom = addDays(from, -daysInPeriod)
 
       const { data, error } = await supabase.from("transactions")
         .select("amount, payment_date, status, transaction_type, created_at")
@@ -654,8 +665,8 @@ async function getCachedGeneralRevenueChart(partnerId: string): Promise<{ revenu
       const currentRows = paidIncome.filter((tx: any) => String(tx.created_at).slice(0, 10) >= from)
       const previousRows = paidIncome.filter((tx: any) => String(tx.created_at).slice(0, 10) < from)
 
-      const currentBucket = bucketByDate(currentRows, "payment_date", "amount", 30)
-      const previousBucket = bucketByDate(previousRows, "payment_date", "amount", 30)
+      const currentBucket = bucketByDate(currentRows, "payment_date", "amount", daysInPeriod)
+      const previousBucket = bucketByDate(previousRows, "payment_date", "amount", daysInPeriod)
 
       const total = currentRows.reduce((acc: number, row: any) => acc + money(row.amount), 0)
       const prevTotal = previousRows.reduce((acc: number, row: any) => acc + money(row.amount), 0)
@@ -669,17 +680,16 @@ async function getCachedGeneralRevenueChart(partnerId: string): Promise<{ revenu
 
       return { revenue, total, trend }
     },
-    ["dashboard-revenue", partnerId],
-    { tags: [DASHBOARD_TAGS.revenue(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
+    ["dashboard-revenue", partnerId, period],
+    { tags: [DASHBOARD_TAGS.revenue(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
   )()
 }
 
-async function getCachedGeneralRevenueOrigin(partnerId: string): Promise<{ origins: ChartPoint[] }> {
+async function getCachedGeneralRevenueOrigin(partnerId: string, period: Period = "monthly"): Promise<{ origins: ChartPoint[] }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      const today = getTodayYmdSaoPaulo()
-      const from = addDays(today, -29)
+      const { today, from } = getDateRangeForPeriod(period)
       const { data, error } = await supabase.from("orders").select("id, total_amount, order_source").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(300)
       if (error) throw error
       const originMap = new Map<string, number>()
@@ -696,8 +706,8 @@ async function getCachedGeneralRevenueOrigin(partnerId: string): Promise<{ origi
       const origins = topFromMap(originMap).filter((p) => money(p.value) > 0)
       return { origins }
     },
-    ["dashboard-revenue-origin", partnerId],
-    { tags: [DASHBOARD_TAGS.revenueOrigin(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
+    ["dashboard-revenue-origin", partnerId, period],
+    { tags: [DASHBOARD_TAGS.revenueOrigin(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
   )()
 }
 
@@ -820,12 +830,11 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
   )()
 }
 
-async function getCachedGeneralTopCategories(partnerId: string, sells: string[]): Promise<{ categories: ChartPoint[] }> {
+async function getCachedGeneralTopCategories(partnerId: string, sells: string[], period: Period = "monthly"): Promise<{ categories: ChartPoint[] }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      const today = getTodayYmdSaoPaulo()
-      const from = addDays(today, -29)
+      const { today, from } = getDateRangeForPeriod(period)
       const categoryMap = new Map<string, number>()
 
       if (sells.includes("products")) {
@@ -861,8 +870,8 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[])
 
       return { categories: topFromMap(categoryMap) }
     },
-    ["dashboard-categories", partnerId, sells.sort().join(",")],
-    { tags: [DASHBOARD_TAGS.categories(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
+    ["dashboard-categories", partnerId, sells.sort().join(","), period],
+    { tags: [DASHBOARD_TAGS.categories(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
   )()
 }
 
@@ -870,9 +879,9 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[])
 // PUBLIC EXPORTS - Modular General Tab
 // ============================================================================
 
-export async function getGeneralMetrics(partnerId: string) {
+export async function getGeneralMetrics(partnerId: string, period: Period = "monthly") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralMetrics(partnerId)
+  return getCachedGeneralMetrics(partnerId, period)
 }
 
 export async function getGeneralAlerts(partnerId: string, sells: string[]) {
@@ -880,14 +889,14 @@ export async function getGeneralAlerts(partnerId: string, sells: string[]) {
   return getCachedGeneralAlerts(partnerId, sells)
 }
 
-export async function getGeneralRevenueChart(partnerId: string) {
+export async function getGeneralRevenueChart(partnerId: string, period: Period = "monthly") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralRevenueChart(partnerId)
+  return getCachedGeneralRevenueChart(partnerId, period)
 }
 
-export async function getGeneralRevenueOrigin(partnerId: string) {
+export async function getGeneralRevenueOrigin(partnerId: string, period: Period = "monthly") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralRevenueOrigin(partnerId)
+  return getCachedGeneralRevenueOrigin(partnerId, period)
 }
 
 export async function getGeneralActivity(partnerId: string) {
@@ -895,7 +904,7 @@ export async function getGeneralActivity(partnerId: string) {
   return getCachedGeneralActivity(partnerId)
 }
 
-export async function getGeneralTopCategories(partnerId: string, sells: string[]) {
+export async function getGeneralTopCategories(partnerId: string, sells: string[], period: Period = "monthly") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralTopCategories(partnerId, sells)
+  return getCachedGeneralTopCategories(partnerId, sells, period)
 }

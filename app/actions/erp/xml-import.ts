@@ -10,6 +10,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { decryptCPF } from "@/lib/crypto"
 import { validateCPF, validateCNPJ } from "@/lib/input-validator"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 
 interface ImportPreview {
   xml_import_id: string
@@ -451,7 +452,7 @@ export async function uploadXMLAction(
   xmlContent: string,
   partnerId: string,
   storeId: string,
-): Promise<{ success: boolean; preview?: ImportPreview; error?: string; validation?: any; existingImportId?: string }> {
+): Promise<{ success: boolean; preview?: ImportPreview; error?: string; validation?: any; existingImportId?: string; reimported?: boolean }> {
   try {
     await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
     await requirePermission(partnerId, "products", "create")
@@ -566,6 +567,8 @@ export async function uploadXMLAction(
     const xmlHash = crypto.createHash("sha256").update(xmlContent).digest("hex")
 
     // 7. Verificar idempotência + hash divergente
+    let isReimport = false
+    let reimportId: string | null = null
     const { data: existingImport } = await supabase
       .from("xml_imports")
       .select("id, status, xml_hash, created_at")
@@ -592,6 +595,11 @@ export async function uploadXMLAction(
           error: "Esta nota já possui um preview pendente. Finalize ou cancele a importação anterior.",
           existingImportId: existingImport.id,
         }
+      }
+      // Reversed — permite reimportar: atualiza o registro existente
+      if (existingImport.status === "reversed") {
+        isReimport = true
+        reimportId = existingImport.id
       }
     }
 
@@ -664,47 +672,100 @@ export async function uploadXMLAction(
       }
     }
 
-    // 11. Criar xml_imports
-    const { data: xmlImport, error: importErr } = await supabase
-      .from("xml_imports")
-      .insert({
-        partner_id: partnerId,
-        supplier_id: supplierId,
-        access_key: metadata.invoice.chave,
-        invoice_number: metadata.invoice.numero,
-        invoice_series: metadata.invoice.serie,
-        invoice_date: metadata.invoice.data_emissao || null,
-        data_saida: metadata.invoice.data_saida || null,
-        modelo: metadata.invoice.modelo || null,
-        protocolo: metadata.invoice.protocolo || null,
-        cstat: metadata.invoice.cstat || null,
-        ambiente: metadata.invoice.ambiente || null,
-        finalidade: metadata.invoice.finalidade || null,
-        tipo_operacao: metadata.invoice.tipo_operacao || null,
-        total_value: metadata.invoice.valor_total,
-        supplier_name: metadata.emitente.nome,
-        supplier_document: supplier.document,
-        supplier_document_type: supplier.documentType,
-        supplier_ie: metadata.emitente.ie || null,
-        status: "preview",
-        raw_xml: xmlContent,
-        xml_hash: xmlHash,
-        xml_size: Buffer.byteLength(xmlContent, "utf-8"),
-        fiscal_totals: metadata.fiscal_totals || null,
-        transport_data: metadata.transporte || null,
-        inf_cpl: metadata.inf_cpl || null,
-        inf_ad_fisco: metadata.inf_ad_fisco || null,
-        duplicatas: metadata.duplicatas?.length ? metadata.duplicatas : null,
-        items_count: metadata.produtos.length,
-        created_by: user.id,
-        created_by_ip: ip,
-      })
-      .select("id")
-      .single()
+    // 11. Criar ou reabrir xml_imports
+    let xmlImport: { id: string } | null = null
 
-    if (importErr) {
-      return { success: false, error: friendlyError(importErr.message) }
+    if (isReimport && reimportId) {
+      // Reimportação: limpa dados de reversão e volta para preview
+      await supabase.from("xml_import_items").delete().eq("xml_import_id", reimportId)
+
+      const { data: updated, error: updateErr } = await supabase
+        .from("xml_imports")
+        .update({
+          supplier_id: supplierId,
+          invoice_number: metadata.invoice.numero,
+          invoice_series: metadata.invoice.serie,
+          invoice_date: metadata.invoice.data_emissao || null,
+          data_saida: metadata.invoice.data_saida || null,
+          modelo: metadata.invoice.modelo || null,
+          protocolo: metadata.invoice.protocolo || null,
+          cstat: metadata.invoice.cstat || null,
+          ambiente: metadata.invoice.ambiente || null,
+          finalidade: metadata.invoice.finalidade || null,
+          tipo_operacao: metadata.invoice.tipo_operacao || null,
+          total_value: metadata.invoice.valor_total,
+          supplier_name: metadata.emitente.nome,
+          supplier_document: supplier.document,
+          supplier_document_type: supplier.documentType,
+          supplier_ie: metadata.emitente.ie || null,
+          status: "preview",
+          raw_xml: xmlContent,
+          xml_hash: xmlHash,
+          xml_size: Buffer.byteLength(xmlContent, "utf-8"),
+          fiscal_totals: metadata.fiscal_totals || null,
+          transport_data: metadata.transporte || null,
+          inf_cpl: metadata.inf_cpl || null,
+          inf_ad_fisco: metadata.inf_ad_fisco || null,
+          duplicatas: metadata.duplicatas?.length ? metadata.duplicatas : null,
+          items_count: metadata.produtos.length,
+          created_by: user.id,
+          created_by_ip: ip,
+          reversal_movement_id: null,
+          reversal_reason: null,
+          reversed_at: null,
+          reversed_by: null,
+          errors: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", reimportId)
+        .select("id")
+        .single()
+
+      if (updateErr) return { success: false, error: friendlyError(updateErr.message) }
+      xmlImport = updated
+    } else {
+      const { data: created, error: importErr } = await supabase
+        .from("xml_imports")
+        .insert({
+          partner_id: partnerId,
+          supplier_id: supplierId,
+          access_key: metadata.invoice.chave,
+          invoice_number: metadata.invoice.numero,
+          invoice_series: metadata.invoice.serie,
+          invoice_date: metadata.invoice.data_emissao || null,
+          data_saida: metadata.invoice.data_saida || null,
+          modelo: metadata.invoice.modelo || null,
+          protocolo: metadata.invoice.protocolo || null,
+          cstat: metadata.invoice.cstat || null,
+          ambiente: metadata.invoice.ambiente || null,
+          finalidade: metadata.invoice.finalidade || null,
+          tipo_operacao: metadata.invoice.tipo_operacao || null,
+          total_value: metadata.invoice.valor_total,
+          supplier_name: metadata.emitente.nome,
+          supplier_document: supplier.document,
+          supplier_document_type: supplier.documentType,
+          supplier_ie: metadata.emitente.ie || null,
+          status: "preview",
+          raw_xml: xmlContent,
+          xml_hash: xmlHash,
+          xml_size: Buffer.byteLength(xmlContent, "utf-8"),
+          fiscal_totals: metadata.fiscal_totals || null,
+          transport_data: metadata.transporte || null,
+          inf_cpl: metadata.inf_cpl || null,
+          inf_ad_fisco: metadata.inf_ad_fisco || null,
+          duplicatas: metadata.duplicatas?.length ? metadata.duplicatas : null,
+          items_count: metadata.produtos.length,
+          created_by: user.id,
+          created_by_ip: ip,
+        })
+        .select("id")
+        .single()
+
+      if (importErr) return { success: false, error: friendlyError(importErr.message) }
+      xmlImport = created
     }
+
+    if (!xmlImport) return { success: false, error: "Erro interno ao criar registro de importação" }
 
     // 7. Processar matching para cada produto e criar xml_import_items
     const items: ImportItemPreview[] = []
@@ -818,7 +879,19 @@ export async function uploadXMLAction(
       inf_ad_fisco: metadata.inf_ad_fisco,
     }
 
-    return { success: true, preview, validation: { docsMatch, warnings } }
+    logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "xml_imports",
+      entityId: xmlImport.id,
+      actionType: "xml_uploaded",
+      changeLines: [
+        `Upload de NF-e ${metadata.invoice.numero || ""} - ${metadata.produtos.length} produto(s) - ${metadata.emitente.nome}`,
+      ],
+      source: "manual",
+    }).catch(() => {})
+
+    return { success: true, preview, reimported: isReimport, validation: { docsMatch, warnings } }
   } catch (error: any) {
     console.error("Erro no upload XML:", error)
     return { success: false, error: friendlyError(error.message) }
@@ -985,6 +1058,19 @@ export async function confirmImportAction(
         idempotencyKey: buildIdempotencyKey("xml_import_completed", "xml_import", xmlImportId, uid),
       })).catch((err: Error) => console.error("[notifications] xml_import_completed failed", err.message))
     }
+
+    logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "xml_imports",
+      entityId: xmlImportId,
+      actionType: "xml_imported",
+      changeLines: [
+        `Importação confirmada - NF-e ${xmlImport.invoice_number || ""} - ${result.imported || 0} produto(s) importados`,
+      ],
+      metadata: { imported: result.imported, skipped: result.skipped },
+      source: "manual",
+    }).catch(() => {})
 
     return {
       success: true,
@@ -1208,6 +1294,18 @@ export async function revertImportAction(
       return { success: false, error: result.error || "Erro ao reverter importação" }
     }
 
+    logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "xml_imports",
+      entityId: xmlImportId,
+      actionType: "xml_reverted",
+      changeLines: [
+        `Importação revertida${reason ? ` - Motivo: ${reason}` : ""}`,
+      ],
+      source: "manual",
+    }).catch(() => {})
+
     return { success: true, message: result.message || "Importação revertida com sucesso" }
   } catch (error: any) {
     return { success: false, error: friendlyError(error.message) }
@@ -1269,6 +1367,58 @@ export async function getImportStockMovementsAction(
       .in("id", movementIds)
 
     return { success: true, movements: movements || [] }
+  } catch (error: any) {
+    return { success: false, error: friendlyError(error.message) }
+  }
+}
+
+export async function getXmlImportTimelineAction(
+  xmlImportId: string,
+  partnerId: string,
+): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  try {
+    await requireUser()
+    await requirePermission(partnerId, "products", "view")
+
+    const supabase = await getSupabaseServerClient()
+
+    const { data: entries, error } = await supabase
+      .from("audit_logs")
+      .select("id, actor_user_id, action_type, change_lines, metadata, created_at")
+      .eq("partner_id", partnerId)
+      .eq("entity_type", "xml_imports")
+      .eq("entity_id", xmlImportId)
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    if (error) return { success: false, error: "Erro ao carregar histórico" }
+
+    const actorIds = [...new Set((entries || []).map((e: any) => e.actor_user_id).filter(Boolean))]
+    const namesMap = new Map<string, string>()
+
+    if (actorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("user_id, full_name")
+        .in("user_id", actorIds)
+
+      if (profiles) {
+        for (const p of profiles) {
+          namesMap.set(p.user_id, p.full_name?.trim() || "Usuário")
+        }
+      }
+    }
+
+    const data = (entries || []).map((e: any) => ({
+      id: e.id,
+      actor_name: e.actor_user_id ? (namesMap.get(e.actor_user_id) || "Usuário") : "Sistema",
+      change_lines: Array.isArray(e.change_lines) ? e.change_lines : [String(e.change_lines || "")],
+      created_at: e.created_at,
+      metadata: e.metadata || null,
+      entry_type: e.action_type || "",
+    }))
+
+    return { success: true, data }
   } catch (error: any) {
     return { success: false, error: friendlyError(error.message) }
   }

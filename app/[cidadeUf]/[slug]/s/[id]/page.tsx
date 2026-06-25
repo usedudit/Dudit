@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
     const serviceUrl = `https://dudit.com.br${getServiceUrl(service)}`
 
-    const title = `${service.name} | Agendar em ${city} | Dudit`
+    const title = `${service.name} - Agendar em ${city} | Dudit`
     const description = `Agende ${service.name} em ${city}. Reserve online pela Dudit com horários disponíveis em tempo real!`
 
     return {

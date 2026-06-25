@@ -10,14 +10,16 @@ import {
   getGeneralActivity,
   getGeneralTopCategories
 } from "@/lib/data/dashboard";
+import type { Period, CompareMode } from "@/lib/period-types";
 
 interface DashboardProps {
   partnerId: string;
   sells: string[];
+  period?: Period;
+  compare?: CompareMode;
 }
 
-export async function Dashboard({ partnerId, sells }: DashboardProps) {
-  // Fetch all general dashboard data in parallel on the server
+export async function Dashboard({ partnerId, sells, period = "monthly", compare = "previous" }: DashboardProps) {
   const [
     metricsData,
     revenueChartData,
@@ -26,12 +28,12 @@ export async function Dashboard({ partnerId, sells }: DashboardProps) {
     activityData,
     topCategoriesData
   ] = await Promise.all([
-    getGeneralMetrics(partnerId),
-    getGeneralRevenueChart(partnerId),
-    getGeneralRevenueOrigin(partnerId),
+    getGeneralMetrics(partnerId, period),
+    getGeneralRevenueChart(partnerId, period),
+    getGeneralRevenueOrigin(partnerId, period),
     getGeneralAlerts(partnerId, sells),
     getGeneralActivity(partnerId),
-    getGeneralTopCategories(partnerId, sells)
+    getGeneralTopCategories(partnerId, sells, period)
   ]);
 
   return (

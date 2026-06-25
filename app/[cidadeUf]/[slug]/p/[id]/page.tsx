@@ -120,7 +120,7 @@ export default async function ProductDetailsPage({
   // --- MÁGICA DE SEO (Canonical Redirect) ---
   const correctUrl = getProductUrl(product)
   const currentPath = `/${currentCidadeUf}/${currentSlug}/p/${id}`
-  
+
   // Bugfix: Evita downgrade de slug informativo para 'vitrine' genérico (ou 'brasil')
   // Se a URL atual já tem uma cidade e o sistema quer mandar para o genérico, ignoramos o redirect.
   const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'
@@ -162,12 +162,12 @@ export default async function ProductDetailsPage({
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    description: product.description || `Produto ${product.name} na Vitrine Digital Dudit.`,
+    description: product.description || `Produto ${product.name} na Dudit.`,
     image: product.image_url || 'https://img.dudit.com.br/static/Logo.png',
     sku: product.id,
     brand: {
       '@type': 'Brand',
-      name: product.partner_id ? 'Loja Parceira Dudit' : 'Vitrine Digital Dudit'
+      name: product.partner_id ? 'Loja Parceira Dudit' : 'Dudit'
     },
     offers: {
       '@type': 'Offer',
@@ -177,7 +177,7 @@ export default async function ProductDetailsPage({
       availability: 'https://schema.org/InStock',
       seller: {
         '@type': 'Organization',
-        name: product.partner_id ? 'Dudit Associado' : 'Vitrine Digital Dudit'
+        name: product.partner_id ? 'Dudit Associado' : 'Dudit'
       }
     },
     aggregateRating: reviewCount > 0 ? {

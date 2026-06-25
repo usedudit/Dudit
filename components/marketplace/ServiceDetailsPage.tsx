@@ -1228,7 +1228,7 @@ export function ServiceDetailsPageClient({
                     {(() => {
                         const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                         const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                        const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber o preço.`)
+                        const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber o preço.`)
                         const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                         return (
                             <a
@@ -1294,7 +1294,7 @@ export function ServiceDetailsPageClient({
                             {(() => {
                                 const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                                 const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                                const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber mais informações.`)
+                                const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber mais informações.`)
                                 const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                                 return (
                                     <a
@@ -1987,7 +1987,7 @@ export function ServiceDetailsPageClient({
                             (() => {
                                 const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                                 const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                                const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber o preço.`)
+                                const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber o preço.`)
                                 const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                                 return (
                                     <a
@@ -2034,7 +2034,7 @@ export function ServiceDetailsPageClient({
                                         {(() => {
                                             const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                                             const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                                            const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber mais informações.`)
+                                            const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber mais informações.`)
                                             const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                                             return (
                                                 <a

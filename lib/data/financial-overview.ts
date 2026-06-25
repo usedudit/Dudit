@@ -3,6 +3,7 @@ import { cache } from "react"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
+import type { Period } from "@/lib/period-types"
 
 type DbTransaction = {
   id: string
@@ -229,13 +230,23 @@ function buildCashflow(transactions: DbTransaction[]) {
   }
 }
 
-export const getFinancialOverviewData = cache(async (partnerId: string): Promise<{ success: true; data: FinancialOverviewData } | { success: false; error: string }> => {
+function getFinancialDateRange(period: Period, today: string) {
+  switch (period) {
+    case "daily":
+      return { from: today, next30: dateAfterDays(today, 30), since: today }
+    case "weekly":
+      return { from: dateAfterDays(today, -6), next30: dateAfterDays(today, 30), since: dateAfterDays(today, -6) }
+    case "monthly":
+      return { from: dateAfterDays(today, -29), next30: dateAfterDays(today, 30), since: dateAfterDays(today, -29) }
+  }
+}
+
+export const getFinancialOverviewData = cache(async (partnerId: string, period: Period = "monthly"): Promise<{ success: true; data: FinancialOverviewData } | { success: false; error: string }> => {
   try {
     await requirePermission(partnerId, "financial", "view")
     const supabase = createAdminClient()
     const today = getTodayYmdSaoPaulo()
-    const next30 = dateAfterDays(today, 30)
-    const since = dateAfterDays(today, -370)
+    const { from, next30, since } = getFinancialDateRange(period, today)
 
     const accountsPromise = supabase
       .from("finance_accounts")

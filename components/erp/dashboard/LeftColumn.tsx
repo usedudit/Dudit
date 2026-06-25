@@ -6,7 +6,6 @@ import {
   TagIcon,
   Users,
   MoneyIcon,
-  ChevronDownIcon,
   CreditCardIcon,
   ShoppingCartIcon,
   PackageIcon,
@@ -15,7 +14,7 @@ import {
   AlertCircleIcon
 } from "@/lib/icons";
 import { formatCurrency as brl } from "@/lib/utils";
-import { Dropdown, DropdownItem, Button, IconPlaceholder } from "@/components/reusable";
+import { Button, IconPlaceholder } from "@/components/reusable";
 import { useRouter } from "next/navigation";
 
 export function SummaryCards({ metrics }: { metrics: any[] }) {
@@ -119,20 +118,6 @@ export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], to
     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
       <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Receita Total</h3>
-        <Dropdown
-          fullWidth={false}
-          align="right"
-          width="w-44"
-          trigger={
-            <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors">
-              <span>Últimos 30 Dias</span>
-            </button>
-          }
-        >
-          <DropdownItem>Hoje</DropdownItem>
-          <DropdownItem>Últimos 7 Dias</DropdownItem>
-          <DropdownItem>Últimos 30 Dias</DropdownItem>
-        </Dropdown>
       </div>
 
       <div className="flex flex-wrap items-end justify-between mb-8 gap-4">

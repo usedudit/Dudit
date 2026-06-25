@@ -3,7 +3,6 @@
 import React from "react";
 import {
   MoreHorizontal,
-  ChevronDownIcon as ChevronDown,
   ShoppingCartIcon,
   CreditCardIcon,
   PackageIcon,
@@ -16,7 +15,7 @@ import {
   AlertCircleIcon
 } from "@/lib/icons";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Dropdown, DropdownItem, IconPlaceholder } from "@/components/reusable";
+import { IconPlaceholder } from "@/components/reusable";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -57,20 +56,6 @@ export function TopCategories({ categoriesData }: { categoriesData: any[] }) {
     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
       <div className="flex flex-wrap items-center justify-between mb-8 gap-4">
         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Principais Categorias</h3>
-        <Dropdown
-          fullWidth={false}
-          align="right"
-          width="w-44"
-          trigger={
-            <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors">
-              <span>Últimos 30 Dias</span>
-            </button>
-          }
-        >
-          <DropdownItem>Hoje</DropdownItem>
-          <DropdownItem>Últimos 7 Dias</DropdownItem>
-          <DropdownItem>Últimos 30 Dias</DropdownItem>
-        </Dropdown>
       </div>
 
       <div className="h-[250px] w-full">

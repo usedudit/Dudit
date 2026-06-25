@@ -3,9 +3,11 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { GeneralTab } from "@/components/erp/dashboard/widgets/GeneralTab"
+import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import type { Period, CompareMode } from "@/lib/period-types"
 
 export const dynamic = "force-dynamic"
 
@@ -21,7 +23,7 @@ function DashboardSkeleton() {
     )
 }
 
-export default async function ERPDashboardPage() {
+export default async function ERPDashboardPage(props: { searchParams?: Promise<{ period?: string; compare?: string }> }) {
     const context = await getCurrentPartnerContext()
     if (!context) return <AccessDenied />
 
@@ -34,6 +36,10 @@ export default async function ERPDashboardPage() {
 
     const allAccess = await getAllUserPartnerAccess()
     const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
+
+    const searchParams = await props.searchParams
+    const period = (searchParams?.period as Period) || "monthly"
+    const compare = (searchParams?.compare as CompareMode) || "previous"
 
     return (
         <>
@@ -49,9 +55,12 @@ export default async function ERPDashboardPage() {
                                 {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                             </p>
                         </div>
+                        <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                            <GlobalPeriodFilter />
+                        </Suspense>
                     </header>
                     <Suspense fallback={<DashboardSkeleton />}>
-                        <GeneralTab partnerId={partnerId} sells={sells} />
+                        <GeneralTab partnerId={partnerId} sells={sells} period={period} compare={compare} />
                     </Suspense>
                 </div>
             </FadeIn>

@@ -596,7 +596,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                                         {FIXED_COLUMNS.map((col) => (
                                                             <th
                                                                 key={col.id}
-                                                                className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
                                                                     } ${col.id === "actions" ? "rounded-r-lg" : ""}`}
                                                                 style={{ width: col.width, minWidth: col.minWidth }}
                                                             >

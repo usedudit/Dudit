@@ -1,7 +1,6 @@
 "use client";
 
 import { formatCurrency as brl } from "@/lib/utils";
-import { Dropdown, DropdownItem } from "@/components/reusable";
 import { DashboardPieChart, CHART_COLORS } from "./charts/DashboardCharts";
 
 export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData: any[], revenueChartTrend: string }) {
@@ -12,20 +11,6 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
         <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col h-full">
             <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Origem da Receita</h3>
-                <Dropdown
-                    fullWidth={false}
-                    align="right"
-                    width="w-44"
-                    trigger={
-                        <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors">
-                            <span>Últimos 30 Dias</span>
-                        </button>
-                    }
-                >
-                    <DropdownItem>Hoje</DropdownItem>
-                    <DropdownItem>Últimos 7 Dias</DropdownItem>
-                    <DropdownItem>Últimos 30 Dias</DropdownItem>
-                </Dropdown>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center sm:items-center gap-8 sm:gap-12 flex-1">

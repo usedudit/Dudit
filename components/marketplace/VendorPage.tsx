@@ -18,8 +18,11 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, Spinner } from "@/components/reusable"
-import { ItemCard } from "./shared-components"
+import { Button, DefaultModal, Input, Spinner, MoneyInput, Separator, Checkbox } from "@/components/reusable"
+import { ItemCard, HorizontalCarousel } from "./shared-components"
+import { ExplorarMobileControls } from "./ExplorarMobileControls"
+import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
+import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { usePathname } from "next/navigation"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
@@ -503,6 +506,13 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const [searchValue, setSearchValue] = useState("")
     const [categorySearchValue, setCategorySearchValue] = useState("")
     const [isCategorySearchOpen, setIsCategorySearchOpen] = useState(false)
+    const [categorySortBy, setCategorySortBy] = useState<"relevancia" | "preco_menor" | "preco_maior" | "recentes">("relevancia")
+    const [categoryMinPrice, setCategoryMinPrice] = useState("")
+    const [categoryMaxPrice, setCategoryMaxPrice] = useState("")
+    const [categoryPromoOn, setCategoryPromoOn] = useState(false)
+    const [categorySelectedBrands, setCategorySelectedBrands] = useState<string[]>([])
+    const [isCategoryFiltersOpen, setIsCategoryFiltersOpen] = useState(false)
+    const [isCategorySortOpen, setIsCategorySortOpen] = useState(false)
     const [showShareModal, setShowShareModal] = useState(false)
     const [showReportModal, setShowReportModal] = useState(false)
     const [selectedCoupon, setSelectedCoupon] = useState<any>(null)
@@ -660,6 +670,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         setCategoryView(tag)
         setCategorySearchValue("")
         setIsCategorySearchOpen(false)
+        setCategorySortBy("relevancia")
+        setCategoryMinPrice("")
+        setCategoryMaxPrice("")
+        setCategoryPromoOn(false)
+        setCategorySelectedBrands([])
         setActiveTag(tag || "todos")
         updateCategoryUrl(tag)
         setTimeout(scrollToProducts, 0)
@@ -687,6 +702,39 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         ? (groupedItems.find(group => group.id === categoryView)?.items || [])
             .filter(item => !categorySearchValue.trim() || item.name?.toLowerCase().includes(categorySearchValue.trim().toLowerCase()))
         : []
+
+    const categoryAvailableBrands = useMemo(() => {
+        const brands = new Set<string>()
+        categoryItems.forEach(item => { if (item.brand) brands.add(item.brand) })
+        return Array.from(brands)
+    }, [categoryItems])
+
+    const categoryActiveFiltersCount = useMemo(() => {
+        let count = 0
+        if (categorySortBy !== "relevancia") count++
+        if (categoryMinPrice || categoryMaxPrice) count++
+        if (categoryPromoOn) count++
+        if (categorySelectedBrands.length > 0) count++
+        return count
+    }, [categorySortBy, categoryMinPrice, categoryMaxPrice, categoryPromoOn, categorySelectedBrands])
+
+    const categoryFilteredItems = useMemo(() => {
+        let items = categoryItems
+        if (categoryPromoOn) items = items.filter(item => item.promotional_price)
+        if (categorySelectedBrands.length > 0) items = items.filter(item => categorySelectedBrands.includes(item.brand))
+        const min = parseFloat(categoryMinPrice)
+        const max = parseFloat(categoryMaxPrice)
+        if (!isNaN(min)) items = items.filter(item => (item.promotional_price || item.price || 0) >= min)
+        if (!isNaN(max)) items = items.filter(item => (item.promotional_price || item.price || 0) <= max)
+        const sorted = [...items]
+        switch (categorySortBy) {
+            case "preco_menor": sorted.sort((a, b) => (a.promotional_price || a.price || 0) - (b.promotional_price || b.price || 0)); break
+            case "preco_maior": sorted.sort((a, b) => (b.promotional_price || b.price || 0) - (a.promotional_price || a.price || 0)); break
+            case "recentes": sorted.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()); break
+            default: break
+        }
+        return sorted
+    }, [categoryItems, categoryPromoOn, categorySelectedBrands, categoryMinPrice, categoryMaxPrice, categorySortBy])
 
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
@@ -723,7 +771,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </div>
                     </div>
                     <div className="ml-auto w-[420px]">
-                        <Input variant="full-rounded" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder={`Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
+                        <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                     </div>
                 </div>
             </div>
@@ -757,7 +805,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </div>
 
                         <div className="w-[360px]">
-                            <Input variant="full-rounded" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder={`Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
+                            <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                         </div>
 
                         <div className="flex items-start gap-3">
@@ -865,68 +913,163 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             </div>
 
+            {categoryView && (
+                <div className="lg:hidden">
+                    <ExplorarMobileControls
+                        activeFiltersCount={categoryActiveFiltersCount}
+                        onOpenFilters={() => setIsCategoryFiltersOpen(true)}
+                        onOpenSort={() => setIsCategorySortOpen(true)}
+                    />
+                    <div className="h-[46px]" />
+                </div>
+            )}
+
             <div className="flex flex-col lg:flex-row gap-10 px-0 pb-20 items-start">
                 <aside className="hidden lg:block w-[260px] shrink-0 sticky top-[198px] z-20 bg-white self-start">
-                    <div>
-                        <div className="mb-8">
-                            <h3 className="font-normal text-brand-dark text-[16px] mb-3">Sobre {partner.storeName}</h3>
-                            <div className="flex flex-col gap-1">
-                                {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
-                                    <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                        <span>{b.label}</span>
-                                        {activeSection === b.id && <Check size={16} className="ml-auto" />}
-                                    </button>
-                                ))}
-                                <Button variant="filled" onClick={handleWhatsApp} className="mt-3 rounded-full h-10 px-5 gap-2 justify-center">
-                                    <WhatsappIcon size={17} /> Contato
-                                </Button>
-                            </div>
-                        </div>
-
-                        {(services.length > 0 || hasPlans) && (
-                            <div className="mb-8 border-t border-brand-border pt-6">
-                                <h3 className="font-normal text-brand-dark text-[16px] mb-3">Catálogo</h3>
-                                <div className="flex flex-col gap-1">
-                                    <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                        <span>Produtos</span>
-                                        {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
-                                    </button>
-                                    {services.length > 0 && (
-                                        <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                            <span>Serviços</span>
-                                            {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
-                                        </button>
-                                    )}
-                                    {hasPlans && (
-                                        <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                            <span>Assinaturas</span>
-                                            {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                    {categoryView ? (
+                        <div className="border-r border-gray-100 pr-5">
+                            <div className="sticky top-[128px] space-y-6 py-5 max-h-[calc(100vh-140px)] overflow-y-hidden">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-base font-bold text-brand-dark">Filtros</h2>
+                                    {categoryActiveFiltersCount > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                setCategorySortBy("relevancia")
+                                                setCategoryMinPrice("")
+                                                setCategoryMaxPrice("")
+                                                setCategoryPromoOn(false)
+                                                setCategorySelectedBrands([])
+                                            }}
+                                            className="text-xs font-bold text-brand-green hover:underline"
+                                        >
+                                            Limpar
                                         </button>
                                     )}
                                 </div>
+                                <Separator className="my-0" />
+                                <section>
+                                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Ordenar</h3>
+                                    <select
+                                        value={categorySortBy}
+                                        onChange={(e) => setCategorySortBy(e.target.value as any)}
+                                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-brand-dark focus:outline-none focus:border-brand-green"
+                                    >
+                                        <option value="relevancia">Relevância</option>
+                                        <option value="preco_menor">Menor Preço</option>
+                                        <option value="preco_maior">Maior Preço</option>
+                                        <option value="recentes">Mais Recentes</option>
+                                    </select>
+                                </section>
+                                <section>
+                                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Preço</h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <MoneyInput
+                                            value={categoryMinPrice}
+                                            onChange={(v) => setCategoryMinPrice(String(v))}
+                                            placeholder="Mín."
+                                            className="h-10"
+                                        />
+                                        <MoneyInput
+                                            value={categoryMaxPrice}
+                                            onChange={(v) => setCategoryMaxPrice(String(v))}
+                                            placeholder="Máx."
+                                            className="h-10"
+                                        />
+                                    </div>
+                                </section>
+                                <section>
+                                    <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                        <Checkbox
+                                            checked={categoryPromoOn}
+                                            onChange={() => setCategoryPromoOn(!categoryPromoOn)}
+                                        />
+                                        <span className="text-sm font-medium text-brand-dark">Em promoção</span>
+                                    </label>
+                                </section>
+                                {categoryAvailableBrands.length > 0 && (
+                                    <section>
+                                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Marca</h3>
+                                        <div className="space-y-2">
+                                            {categoryAvailableBrands.map(brand => (
+                                                <label key={brand} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                                    <Checkbox
+                                                        checked={categorySelectedBrands.includes(brand)}
+                                                        onChange={() => {
+                                                            setCategorySelectedBrands(prev =>
+                                                                prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
+                                                            )
+                                                        }}
+                                                    />
+                                                    <span className="text-sm font-medium text-brand-dark truncate">{brand}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
                             </div>
-                        )}
-
-                        <h3 className="font-normal text-brand-dark text-[16px] mb-4">Seções</h3>
-                        <div className="flex flex-col gap-1 mb-8">
-                            {featuredItems.length > 0 && (
-                                <button onClick={() => selectTab("featured")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "featured" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                    <span>Itens destacados</span>
-                                    {activeTag === "featured" && activeSection === "products" && <Check size={16} />}
-                                </button>
-                            )}
-                            <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                <span>Todos</span>
-                                {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
-                            </button>
-                            {groupedItems.map(group => (
-                                <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                    <span className="capitalize">{group.name}</span>
-                                    {activeTag === group.id && activeSection === "products" && <Check size={16} />}
-                                </button>
-                            ))}
                         </div>
-                    </div>
+                    ) : (
+                        <div>
+                            <div className="mb-8">
+                                <h3 className="font-normal text-brand-dark text-[16px] mb-3">Sobre {partner.storeName}</h3>
+                                <div className="flex flex-col gap-1">
+                                    {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
+                                        <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                            <span>{b.label}</span>
+                                            {activeSection === b.id && <Check size={16} className="ml-auto" />}
+                                        </button>
+                                    ))}
+                                    <Button variant="filled" onClick={handleWhatsApp} className="mt-3 rounded-full h-10 px-5 gap-2 justify-center">
+                                        <WhatsappIcon size={17} /> Contato
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {(services.length > 0 || hasPlans) && (
+                                <div className="mb-8 border-t border-brand-border pt-6">
+                                    <h3 className="font-normal text-brand-dark text-[16px] mb-3">Catálogo</h3>
+                                    <div className="flex flex-col gap-1">
+                                        <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                            <span>Produtos</span>
+                                            {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                        </button>
+                                        {services.length > 0 && (
+                                            <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                                <span>Serviços</span>
+                                                {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                            </button>
+                                        )}
+                                        {hasPlans && (
+                                            <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                                <span>Assinaturas</span>
+                                                {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            <h3 className="font-normal text-brand-dark text-[16px] mb-4">Seções</h3>
+                            <div className="flex flex-col gap-1 mb-8">
+                                {featuredItems.length > 0 && (
+                                    <button onClick={() => selectTab("featured")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "featured" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                        <span>Itens destacados</span>
+                                        {activeTag === "featured" && activeSection === "products" && <Check size={16} />}
+                                    </button>
+                                )}
+                                <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                    <span>Todos</span>
+                                    {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
+                                </button>
+                                {groupedItems.map(group => (
+                                    <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                        <span className="capitalize">{group.name}</span>
+                                        {activeTag === group.id && activeSection === "products" && <Check size={16} />}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </aside>
 
                 <main id="vendor-products" className="flex-1 px-5 lg:px-0 scroll-mt-[170px]">
@@ -934,25 +1077,56 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div className="animate-fade-in">
                             {categoryView ? (
                                 <section data-category-section={categoryView} className="scroll-mt-[150px] pt-4 lg:pt-0">
-                                    <div className="flex items-center gap-2 mb-6 pt-4 lg:pt-0">
+                                    <div className="hidden lg:flex items-center gap-2 mb-6 pt-4 lg:pt-0">
                                         <button onClick={() => openCategory(null)} className="w-9 h-9 rounded-full bg-brand-gray flex items-center justify-center text-brand-dark">
                                             <ArrowLeftIcon size={18} />
                                         </button>
                                         <div>
-                                            <p className="text-[13px] text-brand-inactive-text">Vitrine</p>
                                             <h2 className="text-xl lg:text-[24px] font-semibold text-brand-dark">{groupedItems.find(group => group.id === categoryView)?.name}</h2>
+                                            <p className="text-sm font-medium text-brand-inactive-text mt-1">{categoryFilteredItems.length} resultado{categoryFilteredItems.length !== 1 ? "s" : ""} encontrado{categoryFilteredItems.length !== 1 ? "s" : ""}</p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 md:gap-x-5 md:gap-y-10">
-                                        {categoryItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} className="w-full" promotions={partnerPromotions} />)}
-                                    </div>
+                                    {categoryFilteredItems.length > 0 ? (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4">
+                                            {categoryFilteredItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} className="w-full" promotions={partnerPromotions} />)}
+                                        </div>
+                                    ) : (
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                            imageAlt="Nada encontrado"
+                                            title="Ops!"
+                                            subtitle="Nenhum item encontrado para esta categoria com os filtros atuais."
+                                        />
+                                    )}
                                 </section>
                             ) : (
                                 <>
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
-                                    <ItemsCarousel title="Produtos destacados" items={featuredItems} partner={partner} sectionId="featured" promotions={partnerPromotions} />
+                                    {featuredItems.length > 0 && (
+                                        <div id="featured" data-category-section="featured" className="scroll-mt-[150px]">
+                                            <HorizontalCarousel
+                                                title="Produtos destacados"
+                                                items={featuredItems}
+                                                renderItem={(item) => (
+                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} />
+                                                )}
+                                                itemWidthClass="w-[200px] md:w-[230px]"
+                                            />
+                                        </div>
+                                    )}
                                     {groupedItems.map(group => (
-                                        <ItemsCarousel key={group.id} title={group.name} items={group.items} partner={partner} sectionId={group.id} onSeeAll={() => openCategory(group.id)} promotions={partnerPromotions} />
+                                        <div key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px]">
+                                            <HorizontalCarousel
+                                                title={group.name}
+                                                items={group.items.slice(0, 20)}
+                                                renderItem={(item) => (
+                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} />
+                                                )}
+                                                onSeeAll={() => openCategory(group.id)}
+                                                itemWidthClass="w-[200px] md:w-[230px]"
+                                            />
+                                        </div>
                                     ))}
                                     {!groupedItems.length && (
                                         <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item encontrado" subtitle="Tente buscar por outro termo." />
@@ -1052,6 +1226,55 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     </div>
                 </div>
             </BottomSheet>
+
+            <ExplorarFiltersBottomSheet
+                isOpen={isCategoryFiltersOpen}
+                onClose={() => setIsCategoryFiltersOpen(false)}
+                selectedCitySlug={null}
+                formatCitySlug={(s) => s}
+                onCitySelect={() => {}}
+                currentType={activeContext === "Produtos" ? "produtos" : activeContext === "Servicos" ? "servicos" : "planos"}
+                typeOptions={[]}
+                onTypeChange={() => {}}
+                activeCategoriesList={[]}
+                selectedCategories={[]}
+                onToggleCategory={() => {}}
+                minPrice={categoryMinPrice}
+                onMinPriceChange={setCategoryMinPrice}
+                maxPrice={categoryMaxPrice}
+                onMaxPriceChange={setCategoryMaxPrice}
+                sortBy={categorySortBy}
+                sortOptions={[
+                    { value: "relevancia", label: "Relevância" },
+                    { value: "preco_menor", label: "Menor Preço" },
+                    { value: "preco_maior", label: "Maior Preço" },
+                    { value: "recentes", label: "Mais Recentes" },
+                ]}
+                onSortChange={(val) => setCategorySortBy(val as any)}
+                promoOn={categoryPromoOn}
+                onPromoToggle={() => setCategoryPromoOn(!categoryPromoOn)}
+                activeFiltersCount={categoryActiveFiltersCount}
+                onClearFilters={() => {
+                    setCategorySortBy("relevancia")
+                    setCategoryMinPrice("")
+                    setCategoryMaxPrice("")
+                    setCategoryPromoOn(false)
+                    setCategorySelectedBrands([])
+                }}
+            />
+
+            <ExplorarSortBottomSheet
+                isOpen={isCategorySortOpen}
+                onClose={() => setIsCategorySortOpen(false)}
+                sortBy={categorySortBy as any}
+                onSortChange={(val) => setCategorySortBy(val as any)}
+                sortOptions={[
+                    { value: "relevancia", label: "Relevância" },
+                    { value: "preco_menor", label: "Menor Preço" },
+                    { value: "preco_maior", label: "Maior Preço" },
+                    { value: "recentes", label: "Mais Recentes" },
+                ]}
+            />
         </div>
     )
 }

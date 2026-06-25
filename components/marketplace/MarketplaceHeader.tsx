@@ -400,11 +400,11 @@ const Header: React.FC<HeaderProps> = ({
                 if (match) savedCity = match[1]
             }
 
-            // If we have a city, redirect to that city with the query; otherwise redirect to /explorar with query
+            // If we have a city, redirect to that city with the query; otherwise search all of Brazil
             if (savedCity) {
                 router.push(`/explorar/${savedCity}?q=${encodeURIComponent(trimmed)}`)
             } else {
-                router.push(`/explorar?q=${encodeURIComponent(trimmed)}`)
+                router.push(`/explorar/brasil?q=${encodeURIComponent(trimmed)}`)
             }
         })
     }, [searchValue, router, setDirection])
@@ -417,7 +417,7 @@ const Header: React.FC<HeaderProps> = ({
             if (match) savedCity = match[1]
         }
 
-        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar"
+        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar/brasil"
         return [
             { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
             { label: "Produtos", href: `${basePath}?type=produtos` },
@@ -432,7 +432,7 @@ const Header: React.FC<HeaderProps> = ({
             if (match) savedCity = match[1]
         }
 
-        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar"
+        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar/brasil"
         return [
             { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
             { label: "Produtos", href: `${basePath}?type=produtos` },
@@ -630,9 +630,9 @@ const Header: React.FC<HeaderProps> = ({
                     {/* Delivery Info */}
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
                         <Link
-                            href={user ? "/perfil?tab=enderecos" : "#"}
+                            href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
                             onClick={(e) => {
-                                if (!user) {
+                                if (!user || !userLocation) {
                                     e.preventDefault()
                                     setIsVisitorModalOpen(true)
                                 }
@@ -747,9 +747,9 @@ const Header: React.FC<HeaderProps> = ({
                     </Link>
 
                     <Link
-                        href={user ? "/perfil?tab=enderecos" : "#"}
+                        href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
                         onClick={(e) => {
-                            if (!user) {
+                            if (!user || !userLocation) {
                                 e.preventDefault()
                                 setIsVisitorModalOpen(true)
                             }

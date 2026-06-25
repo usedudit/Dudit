@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { StarIcon, FlagIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
 import { IconPlaceholder } from "@/components/reusable"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 
 interface ReviewItem {
     id: string
@@ -16,10 +18,15 @@ interface ReviewItem {
         avatar_url?: string | null
         profile_image_url?: string | null
     } | null
-    products?: { name: string } | null
-    services?: { name: string } | null
+    products?: { name: string; images?: string[] | null; slug?: string | null; unit?: string | null } | null
+    services?: { name: string; images?: string[] | null; slug?: string | null; unit?: string | null } | null
     product_name?: string | null
     service_name?: string | null
+    quantity?: number | null
+    variant_name?: string | null
+    variant_options?: any
+    unit?: string | null
+    itemUrl?: string | null
 }
 
 interface ReviewsSectionProps {
@@ -45,6 +52,27 @@ function formatReviewDate(dateStr: string) {
     } catch {
         return dateStr
     }
+}
+
+const formatQty = (qty: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return `${qty} un.`;
+    }
+    return `${qty} ${unit}`;
+};
+
+function getVariantLabel(v: any): string | null {
+    if (typeof v === "string" && v.trim()) return v.trim()
+    if (typeof v === "object" && v !== null) {
+        const opts = v.variant_options || v
+        const parts: string[] = []
+        Object.entries(opts).forEach(([k, val]) => {
+            if (k !== "image" && val) parts.push(`${k}: ${val}`)
+        })
+        if (parts.length > 0) return parts.join(", ")
+    }
+    return null
 }
 
 export function ReviewsSection({ reviews, showItemInfo = false, className = "" }: ReviewsSectionProps) {
@@ -100,7 +128,16 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
 
             <div className="space-y-6">
                 {reviews.map((rev) => {
-                    const itemName = rev.products?.name || rev.services?.name || rev.product_name || rev.service_name || null
+                    const itemName = rev.products?.name || rev.services?.name || rev.product_name || rev.service_name
+                    const itemImages = rev.products?.images || rev.services?.images || null
+                    const unit = rev.unit || rev.products?.unit || rev.services?.unit
+                    const variantLabel = rev.variant_name || getVariantLabel(rev.variant_options)
+                    const itemImage = getPrimaryProductDisplayImage({
+                        images: itemImages,
+                        video_thumbnail: null,
+                        fallback_variant_image: null,
+                    })
+
                     return (
                         <div key={rev.id} className="border-b border-brand-border pb-6 last:border-0">
                             <div className="flex items-start gap-3 mb-3">
@@ -111,19 +148,9 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                 />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className="font-semibold text-sm text-brand-dark truncate">
-                                                {rev.profiles?.full_name || "Usuário"}
-                                            </span>
-                                            {showItemInfo && itemName && (
-                                                <>
-                                                    <span className="text-gray-300 text-xs shrink-0">|</span>
-                                                    <span className="text-xs text-brand-inactive-text truncate">
-                                                        {itemName}
-                                                    </span>
-                                                </>
-                                            )}
-                                        </div>
+                                        <span className="font-semibold text-sm text-brand-dark truncate">
+                                            {rev.profiles?.full_name || "Usuário"}
+                                        </span>
                                         <span className="text-xs text-brand-inactive-text shrink-0">
                                             {formatReviewDate(rev.created_at)}
                                         </span>
@@ -141,7 +168,46 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                 </div>
                             </div>
                             {rev.comment && (
-                                <p className="text-gray-600 text-sm leading-relaxed ml-12">{rev.comment}</p>
+                                <p className="text-gray-600 text-sm leading-relaxed ml-12 mb-3">{rev.comment}</p>
+                            )}
+
+                            {showItemInfo && itemName && (
+                                <div className="ml-12">
+                                    {(() => {
+                                        const card = (
+                                            <>
+                                                <div className="w-12 h-12 bg-white border border-brand-border rounded-[8px] flex items-center justify-center shrink-0">
+                                                    <img src={itemImage} alt={itemName} className="w-full h-full object-contain mix-blend-multiply rounded-[4px]" />
+                                                </div>
+                                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                    <h4 className="font-bold text-sm text-brand-dark mb-0.5 truncate">{itemName}</h4>
+                                                    {variantLabel && (
+                                                        <div className="text-xs text-brand-inactive-text mt-0.5 truncate">{variantLabel}</div>
+                                                    )}
+                                                    {rev.quantity != null && (
+                                                        <div className="flex items-center gap-2 text-xs mt-1">
+                                                            <span className="text-brand-inactive-text truncate">
+                                                                {formatQty(rev.quantity, unit)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )
+                                        if (rev.itemUrl) {
+                                            return (
+                                                <Link href={rev.itemUrl} className="flex gap-4 p-2 -mx-2 rounded-lg hover:bg-gray-50 transition-colors group">
+                                                    {card}
+                                                </Link>
+                                            )
+                                        }
+                                        return (
+                                            <div className="flex gap-4 p-2 -mx-2 rounded-lg">
+                                                {card}
+                                            </div>
+                                        )
+                                    })()}
+                                </div>
                             )}
                         </div>
                     )

@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import { Dashboard } from "../Dashboard"
+import type { Period, CompareMode } from "@/lib/period-types"
 
 function DashboardSkeleton() {
   return (
@@ -13,10 +14,10 @@ function DashboardSkeleton() {
   )
 }
 
-export function GeneralTab({ partnerId, sells }: { partnerId: string; sells: string[] }) {
+export function GeneralTab({ partnerId, sells, period, compare }: { partnerId: string; sells: string[]; period?: Period; compare?: CompareMode }) {
     return (
         <Suspense fallback={<DashboardSkeleton />}>
-            <Dashboard partnerId={partnerId} sells={sells} />
+            <Dashboard partnerId={partnerId} sells={sells} period={period} compare={compare} />
         </Suspense>
     )
 }

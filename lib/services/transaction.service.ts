@@ -12,6 +12,7 @@ interface OrderDataForTransaction {
     customer_name?: string | null
     customer_id?: string | null
     finance_account_id?: string | null
+    order_source?: string | null
 }
 
 function normalizeMethod(value?: string | null) {
@@ -177,6 +178,7 @@ export async function createTransactionFromOrder(
                 payment_type: entry.method,
                 payment_method_id: entry.paymentMethodId || null,
                 transaction_type: "income" as const,
+                origin: orderData.order_source || "manual",
                 account_id: accountId,
                 reference_note: entry.referenceNote,
             }

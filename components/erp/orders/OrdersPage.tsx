@@ -113,10 +113,10 @@ const INITIAL_FILTERS: FilterState = {
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "order_id", label: "Pedido", align: "left", width: "200px" },
-    { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "customer", label: "Cliente", align: "left", width: "250px" },
     { id: "channel", label: "Canal", align: "left", width: "150px" },
     { id: "date", label: "Data", align: "left", width: "150px" },
+    { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "status", label: "Status", align: "left", width: "80px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
@@ -1314,7 +1314,7 @@ export default function OrdersPage({
                                         <Badge
                                             variant={
                                                 calculatedStatus === "Pago" ? "green" :
-                                                calculatedStatus === "Parcialmente Pago" ? "orange" : "gray"
+                                                    calculatedStatus === "Parcialmente Pago" ? "orange" : "gray"
                                             }
                                             className="text-xs font-bold"
                                         >

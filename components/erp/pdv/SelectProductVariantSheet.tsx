@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+
 import { Button, IconPlaceholder, Input } from "@/components/reusable"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import BottomSheet from "@/components/BottomSheet"
@@ -13,8 +13,6 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { BoxIcon, XIcon, SearchIcon, FilterIcon, ArrowUpDownIcon, MoneyIcon, InfoIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-
-const sheetTransition = { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const }
 
 const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
@@ -372,8 +370,6 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                         </div>
                         <div className="min-w-0 flex-1">
                             <h3 className="truncate text-base font-bold text-brand-dark dark:text-dark-heading">{product.name}</h3>
-                            <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku || "-"}</p>
-                            <p className="mt-0.5 text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency((() => { const promo = product.promotional_price ? Number(product.promotional_price) : 0; return promo > 0 && promo < Number(product.price || 0) ? promo : Number(product.price || 0) })())}</p>
                         </div>
                     </div>
                 </div>
@@ -487,33 +483,17 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
     return (
         <>
             <Portal>
-                <AnimatePresence>
-                    {isOpen && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={sheetTransition}
-                            className="fixed inset-0 z-50 bg-black/50"
-                            onClick={onClose}
-                        >
-                            <motion.div
-                                initial={{ opacity: 0, x: 80 }}
-                                animate={{
-                                    opacity: 1,
-                                    x: isFilterOpen ? -40 : 0,
-                                    scale: isFilterOpen ? 0.97 : 1,
-                                }}
-                                exit={{ opacity: 0, x: 80 }}
-                                transition={sheetTransition}
-                                className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                {content}
-                            </motion.div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <div
+                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    onClick={onClose}
+                >
+                    <div
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {content}
+                    </div>
+                </div>
             </Portal>
             <FilterSheet
                 isOpen={isFilterOpen}

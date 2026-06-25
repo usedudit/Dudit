@@ -24,9 +24,10 @@ import {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
-import { fetchReturnOrderBucketAction } from "@/app/actions/erp/returns"
+import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction } from "@/app/actions/erp/returns"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
-import { ReturnRequest, ReturnItem } from "./types"
+import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
+import { ReturnHistoryTab } from "./ReturnHistoryTab"
 import { getReturnStatusMeta } from "./ReturnListRow"
 import { usePickerBucket, useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
@@ -206,6 +207,8 @@ export default function CreateReturnPage({
     const [evidenceImages, setEvidenceImages] = useState<(string | File)[]>([])
     const [evidenceUploads, setEvidenceUploads] = useState<any[]>([])
     const [observations, setObservations] = useState("")
+    const [returnEvents, setReturnEvents] = useState<ReturnEvent[]>([])
+    const [historyLoading, setHistoryLoading] = useState(false)
 
     const { error: notifyError } = useNotification()
     const [showImageCropper, setShowImageCropper] = useState(false)
@@ -248,6 +251,21 @@ export default function CreateReturnPage({
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
+
+    // Load return events for edit/view modes
+    useEffect(() => {
+        if ((mode === "edit" || mode === "view") && returnRequest?.id) {
+            setHistoryLoading(true)
+            getReturnRequestDetailsAction(partnerId, returnRequest.id)
+                .then((res: any) => {
+                    if (res.success && res.data?.returnEvents) {
+                        setReturnEvents(res.data.returnEvents)
+                    }
+                })
+                .catch(console.error)
+                .finally(() => setHistoryLoading(false))
+        }
+    }, [mode, returnRequest?.id, partnerId])
 
     // Load existing return data for edit/view modes
     useEffect(() => {
@@ -707,6 +725,9 @@ export default function CreateReturnPage({
                                         <TabsTrigger value="general">Dados gerais</TabsTrigger>
                                         <TabsTrigger value="evidence">Evidências</TabsTrigger>
                                         <TabsTrigger value="observations">Observações</TabsTrigger>
+                                        {mode !== "create" && (
+                                            <TabsTrigger value="history">Histórico</TabsTrigger>
+                                        )}
                                     </TabsList>
                                 </div>
                             </div>
@@ -1665,6 +1686,12 @@ export default function CreateReturnPage({
                                             />
                                         </FadeIn>
                                     </TabsContent>
+
+                                    {mode !== "create" && (
+                                        <TabsContent value="history" className="mt-0">
+                                            <ReturnHistoryTab events={returnEvents} loading={historyLoading} />
+                                        </TabsContent>
+                                    )}
                                 </div>
 
                                 {/* Customer details right column (Sticky Customer Card) */}

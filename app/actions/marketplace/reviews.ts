@@ -481,8 +481,8 @@ export async function getPartnerReviews(partnerId: string) {
     .from("reviews")
     .select(`
       *,
-      products(name, images),
-      services(name, images)
+      products(name, images, slug, unit),
+      services(name, images, slug, unit)
     `)
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
@@ -511,10 +511,44 @@ export async function getPartnerReviews(partnerId: string) {
     }
   }
 
-  return reviewsData.map((r: any) => ({
-    ...r,
-    profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
-  }))
+  const orderIds = Array.from(new Set(reviewsData.map((r: any) => r.order_id).filter(Boolean)))
+  let orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
+
+  if (orderIds.length > 0) {
+    const { data: itemsData } = await supabase
+      .from("order_items")
+      .select(`
+        id, order_id, quantity, product_id, service_id,
+        product_variants(id, variant_name, variant_options)
+      `)
+      .in("order_id", orderIds)
+
+    if (itemsData) {
+      itemsData.forEach((item: any) => {
+        const key = `${item.order_id}_${item.product_id || item.service_id}`
+        orderItemsMap.set(key, {
+          quantity: item.quantity,
+          variant_name: item.product_variants?.variant_name || null,
+          variant_options: item.product_variants?.variant_options || null,
+        })
+      })
+    }
+  }
+
+  return reviewsData.map((r: any) => {
+    const itemKey = `${r.order_id}_${r.product_id || r.service_id}`
+    const orderItem = orderItemsMap.get(itemKey)
+    const product = r.products || null
+    const service = r.services || null
+    return {
+      ...r,
+      profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null },
+      quantity: orderItem?.quantity || null,
+      variant_name: orderItem?.variant_name || null,
+      variant_options: orderItem?.variant_options || null,
+      unit: product?.unit || service?.unit || null,
+    }
+  })
 }
 
 export async function getBuyerReviewsAction() {

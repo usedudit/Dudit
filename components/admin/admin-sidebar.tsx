@@ -25,7 +25,7 @@ interface NavItem {
 const navItems: NavItem[] = [
     {
         icon: Home,
-        label: "Dashboard",
+        label: "Início",
         href: "/ddt-admin",
     },
     {

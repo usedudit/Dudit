@@ -173,7 +173,7 @@ async function getClientUserAgent(): Promise<string> {
     }
 }
 
-function normalizeReturnRow(row: any): ReturnRequestListItem {
+function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: any[] } {
     const items = (row.return_items || []).map((item: any) => {
         const productImages = item.products?.images
         const image = Array.isArray(productImages) && productImages[0] ? productImages[0] : item.products?.video_thumbnail || productImages || null
@@ -233,6 +233,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
         mpPaymentId: row.orders?.mp_payment_id || undefined,
         refundPaymentMethod: (row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].payment_method : undefined,
         items,
+        returnEvents: row.return_events || undefined,
     }
 }
 
@@ -355,7 +356,25 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             }
         }
 
-        const normalized = normalizeReturnRow(data)
+        // Resolve actor names for return_events
+        const events = (data as any)?.return_events || []
+        let eventsWithActorNames = events
+        if (events.length > 0) {
+            const actorIds = Array.from(new Set(events.map((e: any) => e.changed_by).filter(Boolean))) as string[]
+            if (actorIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from("user_profiles")
+                    .select("user_id, full_name")
+                    .in("user_id", actorIds)
+                const nameMap = new Map((profiles || []).map((p: any) => [p.user_id, p.full_name?.trim() || "Usuário"]))
+                eventsWithActorNames = events.map((e: any) => ({
+                    ...e,
+                    actor_name: e.changed_by ? nameMap.get(e.changed_by) || "Usuário" : "Sistema",
+                }))
+            }
+        }
+
+        const normalized = normalizeReturnRow({ ...data, return_events: eventsWithActorNames })
         if (buyerDetails) {
             normalized.customerEmail = normalized.customerEmail || buyerDetails.email || undefined
             normalized.customerPhone = normalized.customerPhone || buyerDetails.phone || undefined
@@ -535,6 +554,18 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 
         if (error) throw error
         const requestId = String((created as any)?.id || "")
+
+        await logAuditEvent({
+            partnerId: order.partner_id,
+            actorUserId: user.id,
+            entityType: "return_request",
+            entityId: requestId,
+            actionType: "created",
+            changeLines: ["criou solicitação de troca/devolução pelo marketplace."],
+            metadata: { orderId: base.orderId, resolution: base.resolution, source: "marketplace" },
+            source: "marketplace",
+        })
+
         await revalidateReturns(order.partner_id, base.orderId, requestId)
 
         // Notify partner team
@@ -615,6 +646,18 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
 
         if (error) throw error
         const requestId = String((created as any)?.id || "")
+
+        await logAuditEvent({
+            partnerId: order.partner_id,
+            actorUserId: user.id,
+            entityType: "return_request",
+            entityId: requestId,
+            actionType: "created",
+            changeLines: ["solicitou cancelamento do pedido pelo marketplace."],
+            metadata: { orderId: data.orderId, reason: data.reason, source: "marketplace" },
+            source: "marketplace",
+        })
+
         await revalidateReturns(order.partner_id, data.orderId, requestId)
 
         // Notify partner team

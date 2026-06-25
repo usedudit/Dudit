@@ -93,8 +93,7 @@ const CustomBarTooltip = ({ active, payload }: any) => {
 };
 
 export function TopWidgets({ data }: { data: FinancialOverviewData }) {
-    const [projectionPeriod, setProjectionPeriod] = React.useState<"sevenDays" | "thirtyDays">("thirtyDays");
-    const currentProjection = projectionPeriod === "sevenDays" ? data.projection.sevenDays : data.projection.thirtyDays;
+    const currentProjection = data.projection.thirtyDays;
 
     const netVal = currentProjection.net;
     const netFormatted = (netVal >= 0 ? "+" : "") + brl(netVal);
@@ -173,17 +172,6 @@ export function TopWidgets({ data }: { data: FinancialOverviewData }) {
             <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col lg:col-span-6 h-full">
                 <div className="flex items-center justify-between mb-8 w-full">
                     <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Projeção de receita</h3>
-                    <Dropdown
-                        trigger={
-                            <button className="flex items-center space-x-2 text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors">
-                                <span>{projectionPeriod === "sevenDays" ? "Últimos 7 Dias" : "Este Mês"}</span>
-                                <ChevronDownIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                            </button>
-                        }
-                    >
-                        <DropdownItem onClick={() => setProjectionPeriod("sevenDays")}>Últimos 7 Dias</DropdownItem>
-                        <DropdownItem onClick={() => setProjectionPeriod("thirtyDays")}>Este Mês</DropdownItem>
-                    </Dropdown>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center sm:items-center gap-8 sm:gap-12 flex-1">

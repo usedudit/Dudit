@@ -30,4 +30,16 @@ export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
   storeCreditValue: number
   returnDate?: string
   items: any[]
+  returnEvents?: ReturnEvent[]
+}
+
+export interface ReturnEvent {
+  id: string
+  return_request_id: string
+  previous_status: string | null
+  new_status: string | null
+  changed_by: string | null
+  actor_name?: string
+  notes: string | null
+  created_at: string
 }

@@ -1013,7 +1013,7 @@ export async function updateManualTransactionAction(
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePermission(partnerId, "financial", "edit")
+        const { userId } = await requirePermission(partnerId, "financial", "edit")
         const supabase = createAdminClient()
 
         const { data: current, error: currentError } = await supabase
@@ -1152,10 +1152,9 @@ export async function updateManualTransactionAction(
 
         const historyLines = buildTransactionUpdateHistoryLines(patch)
         if (historyLines.length > 0) {
-            const user = await getCurrentUser()
             await logAuditEvent({
                 partnerId,
-                actorUserId: user?.id ?? null,
+                actorUserId: userId,
                 entityType: "transaction",
                 entityId: transactionId,
                 actionType: "updated",
@@ -1388,6 +1387,21 @@ export async function createInstallmentGroupAction(input: {
                 })
             }
         }
+
+        // Log audit event for the installment group creation
+        await Promise.allSettled(
+            (inserted.data || []).map((row: any) =>
+                logAuditEvent({
+                    partnerId: input.partnerId,
+                    actorUserId: userId,
+                    entityType: "transaction",
+                    entityId: row.id,
+                    actionType: "created",
+                    changeLines: [`criou parcela ${row.installment_number || "?"} do parcelamento.`],
+                    source: "manual",
+                })
+            )
+        )
 
         await revalidateTransactions(input.partnerId)
         return { success: true as const, data: { groupId: group.id, createdCount: (inserted.data || []).length } }

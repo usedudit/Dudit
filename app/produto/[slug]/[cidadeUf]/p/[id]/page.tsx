@@ -149,12 +149,12 @@ export default async function ProductDetailsPage({
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    description: product.description || `Produto ${product.name} na Vitrine Digital Dudit.`,
+    description: product.description || `Produto ${product.name} na Dudit.`,
     image: product.image_url || 'https://img.dudit.com.br/static/Logo.png',
     sku: product.id,
     brand: {
       '@type': 'Brand',
-      name: product.partner_id ? 'Loja Parceira Dudit' : 'Vitrine Digital Dudit'
+      name: product.partner_id ? 'Loja Parceira Dudit' : 'Dudit'
     },
     offers: {
       '@type': 'Offer',
@@ -164,7 +164,7 @@ export default async function ProductDetailsPage({
       availability: 'https://schema.org/InStock',
       seller: {
         '@type': 'Organization',
-        name: product.partner_id ? 'Dudit Associado' : 'Vitrine Digital Dudit'
+        name: product.partner_id ? 'Dudit Associado' : 'Dudit'
       }
     },
     aggregateRating: reviewCount > 0 ? {

@@ -152,7 +152,7 @@ const ProductListItem = React.memo(
                                     </span>
                                 </>
                             ) : (
-                                <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
                                     {formatCurrency(product.price)}
                                 </span>
                             )}

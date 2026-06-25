@@ -712,6 +712,7 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
     customerName?: string | null
     paymentDate?: string | null
     financeAccountId?: string | null
+    orderSource?: string | null
 }) {
     try {
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
@@ -726,6 +727,7 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
             customer_id: params.customerId || null,
             customer_name: params.customerName || null,
             finance_account_id: params.financeAccountId || null,
+            order_source: params.orderSource || "manual",
         })
     } catch (error) {
         console.error("[orders_financial] createFinancialTransactionsForPaidOrder:", error)
@@ -1376,14 +1378,17 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     // Override client-sent values with server-computed ones
     couponDiscountAmount = pricingResult.couponDiscountAmount
-    let serverTotalAmount = pricingResult.finalTotal
+    const serverComputedTotal = pricingResult.finalTotal
     const serverShippingCost = pricingResult.shipping
     const breakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
     const hasBreakdown = sanitizedPaymentBreakdown.length > 0
-    const finalTotal = hasBreakdown ? breakdownTotal : serverTotalAmount
-    const paymentMethodDiscountAmount = Math.max(0, serverTotalAmount - finalTotal)
-    const paymentMethodExtraAmount = Math.max(0, finalTotal - serverTotalAmount)
-    serverTotalAmount = finalTotal
+    const finalTotal = hasBreakdown ? breakdownTotal : serverComputedTotal
+    // Usa o subtotal original do pedido como base do desconto do método,
+    // em vez do serverComputedTotal (que pode incluir brindes/promoções).
+    const discountBase = hasBreakdown ? Math.max(0, Number(data.subtotal || 0) || serverComputedTotal) : serverComputedTotal
+    const paymentMethodDiscountAmount = Math.max(0, discountBase - finalTotal)
+    const paymentMethodExtraAmount = Math.max(0, finalTotal - discountBase)
+    let serverTotalAmount = finalTotal
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const paymentState = resolvePaymentState({
@@ -1605,6 +1610,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             customerName: order.customer_name,
             paymentDate: new Date().toISOString(),
             financeAccountId: order.finance_account_id || data.financeAccountId,
+            orderSource: order.order_source || "manual",
         })
         await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
         await createSellerCommissionForPaidOrder({
@@ -2221,6 +2227,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             customerName: data.customerName || null,
             paymentDate: new Date().toISOString(),
             financeAccountId: data.financeAccountId,
+            orderSource: currentOrder.order_source || "manual",
         })
         await fulfillMarketplaceOrderIfNeeded(supabase, orderId)
         await createSellerCommissionForPaidOrder({
@@ -2881,6 +2888,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     customerName: order.customer_name || null,
                     paymentDate: new Date().toISOString(),
                     financeAccountId: order.finance_account_id || null,
+                    orderSource: order.order_source || "manual",
                 })
                 await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
                 await createSellerCommissionForPaidOrder({
@@ -3364,6 +3372,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 customerName: order.customer_name,
                 paymentDate: new Date().toISOString(),
                 financeAccountId: payload.financeAccountId,
+                orderSource: order.order_source || "manual",
             })
 
             await fulfillMarketplaceOrderIfNeeded(supabase, payload.orderId)
@@ -3396,23 +3405,6 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 })
                 .eq("id", linkedAppointment.id)
                 .eq("partner_id", payload.partnerId)
-
-            const { syncAppointmentReceivable } = await import("@/app/actions/erp/appointments")
-            await syncAppointmentReceivable({
-                supabase,
-                partnerId: payload.partnerId,
-                userId: user.id,
-                appointment: {
-                    id: linkedAppointment.id,
-                    status: linkedAppointment.status,
-                    payment_status: nextSituation === "paid" ? "paid" : "partially_paid",
-                    price: totalAmountToSave,
-                    paid_amount: nextPaidAmount,
-                    marketplace_order_id: payload.orderId,
-                    start_date: new Date().toISOString().split('T')[0],
-                    payment_method: payload.paymentMethod,
-                },
-            })
         }
 
         await revalidateOrders(payload.partnerId)

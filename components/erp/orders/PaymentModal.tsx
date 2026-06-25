@@ -982,6 +982,11 @@ const PaymentModal = ({
         setCashCalculatorInput(val > 0 ? String(Math.round(val * 100)) : "");
     };
 
+    const handlePaymentBaseAmountChange = (val: number) => {
+        userManuallyChangedRef.current = true;
+        setPaymentBaseAmount(val);
+    };
+
     const handleCashNumpadInput = (key: string) => {
         userManuallyChangedRef.current = true;
         const nextRaw = key === '.'
@@ -1874,7 +1879,7 @@ const PaymentModal = ({
                                                     />
                                                     <MoneyInput
                                                         value={paymentBaseAmount}
-                                                        onChange={setPaymentBaseAmount}
+                                                        onChange={handlePaymentBaseAmountChange}
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
@@ -1931,7 +1936,7 @@ const PaymentModal = ({
                                                     />
                                                     <MoneyInput
                                                         value={paymentBaseAmount}
-                                                        onChange={setPaymentBaseAmount}
+                                                        onChange={handlePaymentBaseAmountChange}
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>

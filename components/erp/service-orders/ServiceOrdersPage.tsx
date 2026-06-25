@@ -37,14 +37,14 @@ import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/
 
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-    aberta: ["aguardando_aprovacao", "cancelada"],
-    aguardando_aprovacao: ["aprovada", "cancelada"],
-    aprovada: ["em_andamento", "cancelada"],
-    em_andamento: ["aguardando_peca", "concluida", "cancelada"],
-    aguardando_peca: ["em_andamento", "cancelada"],
-    concluida: ["entregue"],
-    entregue: [],
-    cancelada: [],
+  aberta: ["aguardando_aprovacao", "cancelada"],
+  aguardando_aprovacao: ["aprovada", "cancelada"],
+  aprovada: ["em_andamento", "cancelada"],
+  em_andamento: ["aguardando_peca", "concluida", "cancelada"],
+  aguardando_peca: ["em_andamento", "cancelada"],
+  concluida: ["entregue"],
+  entregue: [],
+  cancelada: [],
 }
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
@@ -306,35 +306,37 @@ export default function ServiceOrdersPage({
       <AnimatePresence mode="wait">
         {entityState.isOpen && (entityState.action === "create" || entityState.action === "edit") ? (
           isLoadingDetail ? (
-            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+            <FadeIn key="loading-form" className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
               <ThreeDotsLoader />
-            </div>
+            </FadeIn>
           ) : (
-            <ServiceOrderForm
-              key={entityState.action}
-              partnerId={partnerId}
-              onBack={() => closeEntity()}
-              onSaved={() => {
-                closeEntity()
-                afterMutation()
-              }}
-              editData={entityState.action === "edit" ? currentEntity : undefined}
-            />
+            <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
+              <ServiceOrderForm
+                partnerId={partnerId}
+                onBack={() => closeEntity()}
+                onSaved={() => {
+                  closeEntity()
+                  afterMutation()
+                }}
+                editData={entityState.action === "edit" ? currentEntity : undefined}
+              />
+            </FadeIn>
           )
         ) : entityState.isOpen && entityState.action === "view" && currentEntity ? (
           isLoadingDetail ? (
-            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+            <FadeIn key="loading-detail" className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
               <ThreeDotsLoader />
-            </div>
+            </FadeIn>
           ) : (
-            <ServiceOrderDetail
-              key="detail"
-              data={currentEntity}
-              partnerId={partnerId}
-              onBack={() => closeEntity()}
-              onMutation={() => afterMutation()}
-              onEdit={(id) => openEntity("edit", id)}
-            />
+            <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">
+              <ServiceOrderDetail
+                data={currentEntity}
+                partnerId={partnerId}
+                onBack={() => closeEntity()}
+                onMutation={() => afterMutation()}
+                onEdit={(id) => openEntity("edit", id)}
+              />
+            </FadeIn>
           )
         ) : (
           <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -575,7 +577,7 @@ export default function ServiceOrdersPage({
                                 return (
                                   <th
                                     key={col.id}
-                                    className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
                                     style={{ width: col.width, minWidth: col.width }}
                                     onClick={() => {
                                       if (col.id === "actions") return

@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const state = address?.state || "BR"
 
   const storeName = partner.store_name || 'Loja Parceira'
-  const storeDescription = partner.store_description || `Conheça a loja ${storeName} na Vitrine Digital Dudit, sua conexão direta e sem taxas.`
+  const storeDescription = partner.store_description || `Conheça a loja ${storeName} na Dudit, sua conexão direta e sem taxas.`
   const url = `https://dudit.com.br${getPartnerUrl(partner)}`
 
   return {
@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       canonical: url,
     },
     openGraph: {
-      title: `${storeName} | Vitrine Digital Dudit`,
+      title: `${storeName} | Dudit`,
       description: storeDescription,
       url: url,
       images: [
@@ -91,7 +91,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       for (const planItem of item.items) {
         const qty = Number(planItem.quantity || 1)
         let itemPrice = Number(planItem.unit_price || 0)
-        
+
         if (itemPrice <= 0) {
           if (planItem.item_type === 'product' && planItem.products) {
             itemPrice = Number(planItem.products.price || 0)
@@ -141,7 +141,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   // --- MÁGICA DE SEO (Canonical Redirect) ---
   const correctUrl = getPartnerUrl(partner)
   const currentPath = `/${currentCidadeUf}/${currentSlug}/v/${id}`
-  
+
   // Bugfix: Evita downgrade de slug informativo para 'vitrine' genérico (ou 'brasil')
   const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'
   const isNewOneGeneric = correctUrl.includes('/vitrine/v/') || correctUrl.includes('/brasil/v/')

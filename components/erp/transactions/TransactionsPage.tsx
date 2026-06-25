@@ -100,9 +100,9 @@ const financialTransactionsQueryKey = (partnerId: string) => ["erp-financial-tra
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "transaction", label: "Descrição", align: "left", width: "300px" },
+    { id: "contact", label: "Contato", align: "left", width: "220px" },
     { id: "category", label: "Categoria", align: "left", width: "170px" },
     { id: "originSource", label: "Origem", align: "left", width: "150px" },
-    { id: "contact", label: "Contato", align: "left", width: "220px" },
     { id: "date", label: "Data", align: "left", width: "130px" },
     { id: "dueDate", label: "Vencimento", align: "left", width: "130px" },
     { id: "amount", label: "Valor", align: "right", width: "100px" },

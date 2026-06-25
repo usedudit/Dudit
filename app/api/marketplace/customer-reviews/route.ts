@@ -32,7 +32,10 @@ export async function GET(request: NextRequest) {
       created_at,
       product_id,
       service_id,
-      partner_id
+      partner_id,
+      order_id,
+      products(name, images, slug, unit),
+      services(name, images, slug, unit)
     `)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
@@ -42,38 +45,51 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const enriched = await Promise.all(
-    (reviews || []).map(async (review: any) => {
-      let product_name: string | null = null
-      let service_name: string | null = null
+  const orderIds = Array.from(new Set((reviews || []).map((r: any) => r.order_id).filter(Boolean)))
+  let orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
 
-      if (review.product_id) {
-        const { data: prod } = await supabase
-          .from("products")
-          .select("name")
-          .eq("id", review.product_id)
-          .maybeSingle()
-        product_name = prod?.name || null
-      } else if (review.service_id) {
-        const { data: svc } = await supabase
-          .from("services")
-          .select("name")
-          .eq("id", review.service_id)
-          .maybeSingle()
-        service_name = svc?.name || null
-      }
+  if (orderIds.length > 0) {
+    const { data: itemsData } = await supabase
+      .from("order_items")
+      .select(`
+        id, order_id, quantity, product_id, service_id,
+        product_variants(id, variant_name, variant_options)
+      `)
+      .in("order_id", orderIds)
 
-      return {
-        id: review.id,
-        rating: review.rating,
-        comment: review.comment,
-        created_at: review.created_at,
-        product_name,
-        service_name,
-        partner_id: review.partner_id,
-      }
-    }),
-  )
+    if (itemsData) {
+      itemsData.forEach((item: any) => {
+        const key = `${item.order_id}_${item.product_id || item.service_id}`
+        orderItemsMap.set(key, {
+          quantity: item.quantity,
+          variant_name: item.product_variants?.variant_name || null,
+          variant_options: item.product_variants?.variant_options || null,
+        })
+      })
+    }
+  }
+
+  const enriched = (reviews || []).map((review: any) => {
+    const itemKey = `${review.order_id}_${review.product_id || review.service_id}`
+    const orderItem = orderItemsMap.get(itemKey)
+    const product = review.products || null
+    const service = review.services || null
+    return {
+      id: review.id,
+      rating: review.rating,
+      comment: review.comment,
+      created_at: review.created_at,
+      product_name: product?.name || null,
+      service_name: service?.name || null,
+      partner_id: review.partner_id,
+      quantity: orderItem?.quantity || null,
+      variant_name: orderItem?.variant_name || null,
+      variant_options: orderItem?.variant_options || null,
+      unit: product?.unit || service?.unit || null,
+      products: product ? { name: product.name, images: product.images, slug: product.slug, unit: product.unit } : null,
+      services: service ? { name: service.name, images: service.images, slug: service.slug, unit: service.unit } : null,
+    }
+  })
 
   return NextResponse.json({ reviews: enriched })
 }

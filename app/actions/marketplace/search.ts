@@ -187,6 +187,10 @@ async function _searchMarketplaceCore(
     limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number; cidade?: string } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     if (limits.cidade) {
+        if (limits.cidade === "brasil") {
+            const { cidade: _, ...limitsWithoutCity } = limits
+            return _searchMarketplaceInternal(query, type, limitsWithoutCity)
+        }
         return searchMarketplaceByCity(query, type, limits.cidade, limits)
     }
 
