@@ -2,8 +2,7 @@
 
 import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { FormTextarea } from "@/components/reusable"
-import { FileIcon } from "@/lib/icons"
+import { FormSection, FormTextarea } from "@/components/reusable"
 
 interface OrderObservationsTabProps {
     notes: string
@@ -14,11 +13,7 @@ interface OrderObservationsTabProps {
 export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ notes, setNotes, disabled = false }) => {
     return (
         <FadeIn>
-            <div className="max-w-[800px] flex flex-col gap-4">
-                <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                    <FileIcon size={20} className="text-brand-green" />
-                    Observações do Pedido
-                </h2>
+            <FormSection title="" hasSeparator={false} className="mt-0">
                 <p className="text-sm text-brand-inactive-text">Estas informações são apenas para uso interno e não aparecerão para o cliente.</p>
                 <FormTextarea
                     name="notes"
@@ -29,7 +24,7 @@ export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ note
                     className="min-h-[250px]"
                     disabled={disabled}
                 />
-            </div>
+            </FormSection>
         </FadeIn>
     )
 }

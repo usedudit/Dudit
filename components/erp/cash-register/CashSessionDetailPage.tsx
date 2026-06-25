@@ -2,11 +2,13 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ActionsDropdown, Badge, Button, DefaultModal, DropdownItem, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { ActionsDropdown, Badge, Button, DefaultModal, DropdownItem, IconPlaceholder, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { downloadPdf } from "@/lib/pdf/download"
 import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
 import OrderListItem from "@/components/erp/orders/OrderListRow"
 
@@ -44,6 +46,7 @@ const getDifferenceTone = (value: number | null) => value == null ? "text-brand-
 
 export default function CashSessionDetailPage({ partnerId, details: initialDetails, isLoading, onBack }: { partnerId: string; details: DetailPayload | null; isLoading?: boolean; onBack?: () => void }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const isMobileDevice = useMediaQuery("(max-width: 1023px)")
     const [details, setDetails] = useState<DetailPayload | null>(initialDetails)
     const [activeTab, setActiveTab] = useState<"summary" | "movements" | "returns">("summary")
 
@@ -161,6 +164,18 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
         setMovModal(null)
         resetMovementForm()
     }, [resetMovementForm])
+
+    const handlePrintCoupon = useCallback(() => {
+        if (!session?.id) return
+        const couponType = isOpen ? "opening" : "closing"
+        const params = new URLSearchParams({ type: couponType })
+        if (isMobileDevice) {
+            downloadPdf(`/api/pdf/caixa/${session.id}?${params.toString()}`, `cupom-caixa-${session.id.slice(0, 8)}.pdf`)
+                .catch(() => window.open(`/print/caixa/${session.id}?${params.toString()}`, "_blank"))
+            return
+        }
+        window.open(`/print/caixa/${session.id}?${params.toString()}`, "_blank")
+    }, [session?.id, isOpen, isMobileDevice])
 
     useEffect(() => setDetails(initialDetails), [initialDetails])
 
@@ -350,19 +365,19 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                                         </div>
                                                         <div className="flex items-center gap-6 ml-3 shrink-0">
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-xs font-bold text-brand-inactive-text mb-1">Registrado</span>
+                                                                <span className="text-xs font-medium text-brand-inactive-text mb-1">Registrado</span>
                                                                 <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(row.calculated)}</span>
                                                             </div>
 
                                                             {!isOpen && (
                                                                 <>
                                                                     <div className="hidden sm:flex flex-col items-end border-l border-brand-border dark:border-dark-border pl-6">
-                                                                        <span className="text-xs font-bold text-brand-inactive-text mb-1">Informado</span>
+                                                                        <span className="text-xs font-medium text-brand-inactive-text mb-1">Informado</span>
                                                                         <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">{row.counted != null ? formatCurrency(row.counted) : "-"}</span>
                                                                     </div>
 
                                                                     <div className="hidden sm:flex flex-col items-end border-l border-brand-border dark:border-dark-border pl-6">
-                                                                        <span className="text-xs font-bold text-brand-inactive-text mb-1">Diferença</span>
+                                                                        <span className="text-xs font-medium text-brand-inactive-text mb-1">Diferença</span>
                                                                         <span className={`text-[15px] font-bold ${getDifferenceTone(row.difference)}`}>{row.difference != null ? formatCurrency(row.difference) : "-"}</span>
                                                                     </div>
                                                                 </>
@@ -422,7 +437,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                             <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo calculado</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.calculatedDrawerTotal)}</span></div>
                                             <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Devoluções</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalRefunds)}</span></div>
                                             <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-3">
-                                                <button type="button" className="text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline" onClick={() => notifyError("Reimpressão em breve.")}>{isOpen ? "Reimprimir cupom de abertura" : "Reimprimir cupom de fechamento"}</button>
+                                                <button type="button" className="text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline" onClick={handlePrintCoupon}>{isOpen ? "Imprimir cupom de abertura" : "Imprimir cupom de fechamento"}</button>
                                                 <Link href="/erp/transactions" className="block text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline">Ver relatório de movimentação do caixa</Link>
                                             </div>
                                         </div>
@@ -540,7 +555,15 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                             </table>
                                         </div>
                                     </div>
-                                    {sangriasReforcos.length === 0 && <div className="border border-dashed border-brand-border dark:border-dark-border rounded-2xl p-8 text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma sangria ou reforço registrado nesta sessão.</div>}
+                                    {sangriasReforcos.length === 0 &&
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/PDV.png"
+                                            imageAlt="Nenhuma sangria ou reforço"
+                                            title="Nenhuma sangria ou reforço"
+                                            subtitle="Nenhuma sangria ou reforço registrado nesta sessão."
+                                        />
+                                    }
                                 </div>
                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">

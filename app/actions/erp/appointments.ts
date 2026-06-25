@@ -963,9 +963,11 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     const isPaid = isPaidStatus(normalizedStatus) || normalizedPaymentStatus === 'paid'
     const effectivePaidAmount = paidAmountValue
 
+    const hasLinkedOrder = !!updated.marketplace_order_id
+
     let saleId: string | null = updated.sale_id || null
     let paymentTransactionId: string | null = updated.payment_transaction_id || null
-    if ((isPaid || isPartial) && Number(updated.price || 0) > 0.009) {
+    if (!hasLinkedOrder && (isPaid || isPartial) && Number(updated.price || 0) > 0.009) {
       const synced = await createAppointmentSaleAndSyncGoals({
         supabase,
         partnerId,
@@ -977,13 +979,16 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       paymentTransactionId = synced.paymentTransactionId
     }
 
-    const receivableTransactionId = await syncAppointmentReceivable({
-      supabase,
-      partnerId,
-      userId: user.id,
-      appointment: { ...updated, payment_status: normalizedPaymentStatus, paid_amount: effectivePaidAmount },
-      currentReceivableId: updated.receivable_transaction_id || null,
-    })
+    let receivableTransactionId: string | null = updated.receivable_transaction_id || null
+    if (!hasLinkedOrder) {
+      receivableTransactionId = await syncAppointmentReceivable({
+        supabase,
+        partnerId,
+        userId: user.id,
+        appointment: { ...updated, payment_status: normalizedPaymentStatus, paid_amount: effectivePaidAmount },
+        currentReceivableId: updated.receivable_transaction_id || null,
+      })
+    }
 
     // Update payment_status and paid_amount directly
     const paymentUpdatePayload: Record<string, any> = {

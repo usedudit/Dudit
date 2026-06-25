@@ -119,12 +119,12 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                             </span>
                                         </div>
                                     </td>
-                                    <td className="py-4 px-2">
+                                    <td className="py-4 px-2 text-center">
                                         <Badge variant={badge.variant}>
                                             {badge.label}
                                         </Badge>
                                     </td>
-                                    <td className="py-4 px-2 text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                    <td className="py-4 px-2 text-[13px] font-medium text-brand-dark dark:text-dark-heading text-center">
                                         {paymentDate}
                                     </td>
                                     {hasActions && (

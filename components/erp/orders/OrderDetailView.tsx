@@ -662,7 +662,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         </div>
                                                     </div>
 
-                                                    <FormSection title="Itens do Pedido" hasSeparator>
+                                                    <FormSection title="Itens do Pedido" hasSeparator className="mb-8">
                                                         <div className="space-y-4">
                                                             {sortedOrderItems.map((item: any) => {
                                                                 const isService = !!item.service_id || item.line_type === "service_booking";

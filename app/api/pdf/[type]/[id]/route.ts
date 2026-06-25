@@ -74,6 +74,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             const { data: sale } = await saleQuery.maybeSingle()
             partnerId = sale?.partner_id || null
         }
+    } else if (type === "caixa") {
+        resource = "pdv"
+        const { data: cashSession } = await supabase
+            .from("cash_sessions")
+            .select("partner_id")
+            .eq("id", id)
+            .maybeSingle()
+        
+        partnerId = cashSession?.partner_id || null
     } else {
         return new Response(JSON.stringify({ error: "Tipo de documento inválido" }), {
             status: 400,

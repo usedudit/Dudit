@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
 import { getPartnerAddressAction, getQuoteDetailsAction } from "@/app/actions/erp/quotes"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { downloadPdf } from "@/lib/pdf/download"
 import QuotePreview from "./QuotePreview"
 
 export type QuotePrintModalProps = {
@@ -100,13 +101,24 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
 
     const handlePrint = useCallback(() => {
         if (!quoteId) return
+        if (isMobile) {
+            downloadPdf(`/api/pdf/orcamento/${quoteId}`, `orcamento-${quoteId}.pdf`)
+                .catch(() => window.open(`/print/orcamento/${quoteId}`, "_blank"))
+            onClose()
+            return
+        }
         window.open(`/print/orcamento/${quoteId}`, "_blank")
         onClose()
-    }, [quoteId, onClose])
+    }, [quoteId, onClose, isMobile])
 
     const handleDownloadPdf = useCallback(() => {
-        handlePrint()
-    }, [handlePrint])
+        if (!quoteId) return
+        downloadPdf(`/api/pdf/orcamento/${quoteId}`, `orcamento-${quoteId}.pdf`)
+            .catch(() => {
+                window.open(`/print/orcamento/${quoteId}`, "_blank")
+            })
+        onClose()
+    }, [quoteId, onClose])
 
     if (!isVisible) return null
 

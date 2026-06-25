@@ -252,11 +252,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             </FormSection>
                         </section>
                     ) : (
-                        <section>
-                            <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6 flex items-center gap-2">
-                                Itens do Pedido
-                            </h3>
-
+                        <FormSection title="Itens do Pedido" hasSeparator={false}>
                             <div ref={searchRef} className={`relative mb-6 ${isMarketplaceLocked ? 'pointer-events-none opacity-60' : ''}`}>
                                 <Input
                                     label=""
@@ -615,16 +611,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     onPageChange={(page) => setCurrentPage(page)}
                                 />
                             </div>
-                        </section>
+                        </FormSection>
                     )}
 
-                    <div className="h-px bg-brand-border dark:bg-dark-border w-full my-4" />
-
-                    <section className="flex flex-col gap-6">
-                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                            Configurações do Pedido
-                        </h2>
-
+                    <FormSection title="Configurações do Pedido" hasSeparator>
                         {isPaidOrder ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
@@ -686,7 +676,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 )}
                             </div>
                         )}
-                    </section>
+                    </FormSection>
                 </div>
 
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">

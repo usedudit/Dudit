@@ -298,7 +298,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "DENY")
   response.headers.set("X-XSS-Protection", "1; mode=block")
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-  response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(), payment=()")
+  response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(self), payment=()")
   response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none")
 
@@ -347,7 +347,7 @@ export async function middleware(request: NextRequest) {
             response.headers.set("X-Frame-Options", "DENY")
             response.headers.set("X-XSS-Protection", "1; mode=block")
             response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-            response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(), payment=()")
+            response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(self), payment=()")
             response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
             // Re-apply Cache-Control for private pages
             response.headers.set("Cache-Control", "private, no-store")

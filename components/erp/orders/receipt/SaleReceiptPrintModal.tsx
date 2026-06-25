@@ -15,6 +15,7 @@ import {
     buildSaleReceiptFromOrder,
 } from "@/lib/sales/sale-receipt"
 import { applyQuotePreviewTheme } from "@/lib/quotes/quote-preview-theme"
+import { downloadPdf } from "@/lib/pdf/download"
 import SaleReceiptThermalPreview from "./SaleReceiptThermalPreview"
 import SaleReceiptA4Preview from "./SaleReceiptA4Preview"
 
@@ -111,13 +112,29 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
             footerMessage,
             showAcknowledgment: String(showAcknowledgment),
         })
+        if (isMobile) {
+            downloadPdf(`/api/pdf/recibo/${orderId}?${params.toString()}`, `recibo-${orderId}.pdf`)
+                .catch(() => window.open(`/print/recibo/${orderId}?${params.toString()}`, "_blank"))
+            onClose()
+            return
+        }
         window.open(`/print/recibo/${orderId}?${params.toString()}`, "_blank")
         onClose()
-    }, [orderId, format, footerMessage, showAcknowledgment, onClose])
+    }, [orderId, format, footerMessage, showAcknowledgment, onClose, isMobile])
 
     const handleDownloadPdf = useCallback(() => {
-        handlePrint()
-    }, [handlePrint])
+        if (!orderId) return
+        const params = new URLSearchParams({
+            format,
+            footerMessage,
+            showAcknowledgment: String(showAcknowledgment),
+        })
+        downloadPdf(`/api/pdf/recibo/${orderId}?${params.toString()}`, `recibo-${orderId}.pdf`)
+            .catch(() => {
+                window.open(`/print/recibo/${orderId}?${params.toString()}`, "_blank")
+            })
+        onClose()
+    }, [orderId, format, footerMessage, showAcknowledgment, onClose])
 
     const formatOptions = useMemo(
         () => [

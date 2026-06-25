@@ -41,26 +41,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         )
                     }
 
-                    // Request permission explicitly using standard API first
-                    let stream: MediaStream | null = null
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: true })
-                        // Stop the stream tracks immediately so html5-qrcode can use the camera
-                        stream.getTracks().forEach(track => track.stop())
-                    } catch (mediaErr: any) {
-                        if (mediaErr.name === "NotAllowedError" || mediaErr.name === "PermissionDeniedError") {
-                            console.warn("Camera permission denied (handled warning)")
-                            throw new Error("Permissão de acesso à câmera negada. Por favor, ative a permissão de câmera nas configurações do navegador.")
-                        } else if (mediaErr.name === "NotFoundError" || mediaErr.name === "DevicesNotFoundError") {
-                            console.warn("No camera device found on this system (handled warning)")
-                            throw new Error("Nenhuma câmera encontrada no dispositivo.")
-                        } else {
-                            console.error("Camera permission request failed:", mediaErr)
-                            throw new Error(`Erro ao acessar a câmera: ${mediaErr.message || mediaErr}`)
-                        }
-                    }
-
-                    // Check for camera availability
+                    // Check for camera availability (handles its own permission flow internally)
                     const devices = await Html5Qrcode.getCameras()
                     if (!devices || devices.length === 0) {
                         throw new Error("Nenhuma câmera encontrada no dispositivo.")
@@ -106,16 +87,38 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         }
                     )
                 } catch (err: any) {
-                    const isExpected = err.message?.includes("Nenhuma câmera") || err.message?.includes("Permissão") || err.message?.includes("segura");
-                    if (isExpected) {
-                        console.warn("Camera scanner initialization (handled warning):", err.message || err)
+                    const message = err.message || String(err)
+                    const isPermissionError = (
+                        err.name === "NotAllowedError" ||
+                        err.name === "PermissionDeniedError" ||
+                        message.includes("NotAllowedError") ||
+                        message.includes("Permission denied") ||
+                        message.includes("permission") ||
+                        message.includes("Permissão")
+                    )
+                    const isNoCameraError = (
+                        message.includes("Nenhuma câmera") ||
+                        err.name === "NotFoundError" ||
+                        err.name === "DevicesNotFoundError" ||
+                        message.includes("NotFoundError")
+                    )
+                    if (isPermissionError) {
+                        console.warn("Camera permission denied (handled warning)")
+                    } else if (isNoCameraError) {
+                        console.warn("No camera device found on this system (handled warning)")
                     } else {
                         console.error("Camera scanner initialization failed:", err)
                     }
                     if (isMounted) {
                         setHasPermission(false)
                         setLoading(false)
-                        setErrorMessage(err.message || "Permissão de câmera negada ou erro ao iniciar.")
+                        if (isPermissionError) {
+                            setErrorMessage("Permissão de acesso à câmera negada. Por favor, ative a permissão de câmera nas configurações do navegador.")
+                        } else if (isNoCameraError) {
+                            setErrorMessage("Nenhuma câmera encontrada no dispositivo.")
+                        } else {
+                            setErrorMessage(err.message || "Permissão de câmera negada ou erro ao iniciar.")
+                        }
                     }
                 }
             })

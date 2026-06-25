@@ -21,17 +21,20 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
   const icons = [MoneyIcon, SalesIcon, TagIcon, Users];
 
   const parseTrend = (trendStr: string) => {
-    if (!trendStr) return { percent: "↑ 0 %", isPositive: true, change: "0%" };
+    if (!trendStr) return { percent: "↑ 0 %", isPositive: true, change: "0%", vsText: "período anterior" };
     const isPositive = !trendStr.trim().startsWith("-");
     const percentMatch = trendStr.match(/([0-9.,]+)%/);
     const percentValue = percentMatch ? percentMatch[1] : "0";
     const changeMatch = trendStr.match(/^[+-]?[0-9.,]+%/);
     const change = changeMatch ? changeMatch[0] : "0%";
+    const vsMatch = trendStr.match(/vs\s+(.+)/i);
+    const vsText = vsMatch ? vsMatch[1] : "período anterior";
 
     return {
       percent: `${isPositive ? "↑" : "↓"} ${percentValue} %`,
       isPositive,
-      change
+      change,
+      vsText
     };
   };
 
@@ -43,7 +46,7 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full h-full">
       {metrics.slice(0, 4).map((metric, i) => {
         const CardIcon = icons[i % icons.length];
-        const { percent, isPositive, change } = parseTrend(metric.trend);
+        const { percent, isPositive, change, vsText } = parseTrend(metric.trend);
 
         return (
           <div key={i} className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between">
@@ -66,8 +69,8 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
 
             <div className="flex items-baseline space-x-2 mt-2">
               <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{metric.value}</h2>
-              <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs mês passado
+                <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+                <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs {vsText}
               </span>
             </div>
           </div>
@@ -77,7 +80,8 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
   );
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+function makeTooltip(secondaryLabel: string) {
+  return function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
@@ -85,7 +89,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="flex flex-col gap-1.5">
           {payload.map((entry: any, index: number) => {
             const color = entry.stroke || entry.fill || entry.color || "var(--color-brand-green)";
-            const name = entry.name === "income" ? "Este Período" : entry.name === "expense" ? "Período Anterior" : entry.name;
+            const name = entry.name === "income" ? "Este Período" : entry.name === "expense" ? (secondaryLabel || "Período Anterior") : entry.name;
             return (
               <div key={index} className="flex items-center justify-between gap-6">
                 <div className="flex items-center gap-2">
@@ -103,11 +107,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         </div>
       </div>
     );
+    }
+    return null;
   }
-  return null;
-};
+}
 
-export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], totalRevenue: number }) {
+export function Cashflow({ revenueData, totalRevenue, compareLabel }: { revenueData: any[], totalRevenue: number, compareLabel?: string }) {
+  const secondaryLabel = compareLabel || "Período Anterior"
+  const Tooltip = makeTooltip(secondaryLabel)
+
   const chartData = (revenueData || []).map(p => ({
     name: p.label,
     income: p.value,
@@ -134,7 +142,7 @@ export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], to
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-sm bg-brand-dark dark:bg-dark-border"></div>
-            <span className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Período Anterior</span>
+            <span className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">{secondaryLabel}</span>
           </div>
         </div>
       </div>
@@ -166,7 +174,7 @@ export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], to
               dx={-10}
             />
             <Tooltip
-              content={<CustomTooltip />}
+              content={<Tooltip />}
               cursor={{ stroke: 'var(--color-brand-border)', strokeWidth: 2, strokeDasharray: '4 4' }}
             />
             <Area
