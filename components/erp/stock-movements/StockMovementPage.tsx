@@ -7,8 +7,7 @@ import {
     PlusIcon,
     ArrowUpDownIcon,
     ExportFileIcon,
-    RotateIcon,
-    Package
+    ReloadIcon
 } from '@/lib/icons';
 import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal, SelectionBanner, ThreeDotsLoader } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
@@ -228,7 +227,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     const formattedMovements = useMemo(() => {
         return (loadedMovements || []).map(mov => {
             const dateObj = new Date(mov.created_at);
-            
+
             // Translate reason if English (e.g. SALE_OUT, RETURN_IN)
             let rawReason = mov.reason || MOVEMENT_TYPE_LABELS[mov.movement_type] || mov.movement_type;
             let reason = rawReason;
@@ -439,12 +438,11 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <Button variant="outline" onClick={() => { }}>
-                                    <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                                <Button variant="outline" onClick={() => { }} leftIcon={<ExportFileIcon size={18} />}>
+                                    Exportar
                                 </Button>
 
-                                <Button onClick={() => openEntity('create')}>
-                                    <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                <Button onClick={() => openEntity('create')} leftIcon={<PlusIcon size={18} />}>
                                     Nova movimentação
                                 </Button>
                             </div>
@@ -692,7 +690,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                 setUndoReason('');
                                 setModals(prev => ({ ...prev, bulkUndo: true }));
                             }}
-                            leftIcon={<RotateIcon size={18} />}
+                            leftIcon={<ReloadIcon size={18} />}
                             className="h-10 px-3"
                         >
                             Desfazer

@@ -394,11 +394,11 @@ BEGIN
       -- Registra movimentação de estoque
       IF v_stock_action IN ('add', 'weighted_average') AND v_raw_quantity > 0 THEN
         INSERT INTO public.stock_movements (
-          partner_id, movement_type, reference_type, reason, notes, created_by
+          partner_id, movement_type, reference_type, reference_name, reason, notes, created_by
         ) VALUES (
-          p_partner_id, 'purchase', 'supplier',
-          'Importação XML NF-e',
-          (SELECT invoice_number FROM public.xml_imports WHERE id = p_xml_import_id),
+          p_partner_id, 'in', 'supplier',
+          (SELECT 'NF-e ' || COALESCE(invoice_number, '') FROM public.xml_imports WHERE id = p_xml_import_id),
+          NULL, NULL,
           COALESCE(p_created_by, auth.uid())
         )
         RETURNING id INTO v_movement_id;

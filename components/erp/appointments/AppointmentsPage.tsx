@@ -72,7 +72,7 @@ function computeVisibleDateRange(date: Date, view: ViewType): { startDate: strin
 }
 
 const AppointmentsPage = ({
-    partnerId:    initialPartnerId,
+    partnerId: initialPartnerId,
     initialTeam = [],
     initialCustomers = [],
     initialServices = [],
@@ -740,8 +740,8 @@ const AppointmentsPage = ({
                                 <div className="flex items-center gap-3">
                                     <Dropdown
                                         trigger={
-                                            <Button variant="outline">
-                                                <Settings2Icon className="w-[18px] h-[18px]" /> Ações
+                                            <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
+                                                Ações
                                             </Button>
                                         }
                                         align="right"

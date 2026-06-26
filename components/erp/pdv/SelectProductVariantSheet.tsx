@@ -311,9 +311,8 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                         variant="outline"
                         className="w-[42px] h-[42px] p-0 shrink-0 flex items-center justify-center rounded-full"
                         onClick={() => setIsFilterOpen(true)}
-                    >
-                        <FilterIcon className="w-[18px] h-[18px]" />
-                    </Button>
+                        leftIcon={<FilterIcon size={18} />}
+                    />
                     <Dropdown
                         fullWidth={false}
                         align="right"
@@ -322,9 +321,8 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                             <Button
                                 variant="outline"
                                 className="w-[42px] h-[42px] p-0 shrink-0 flex items-center justify-center rounded-full"
-                            >
-                                <ArrowUpDownIcon className="w-[18px] h-[18px]" />
-                            </Button>
+                                leftIcon={<ArrowUpDownIcon size={18} />}
+                            />
                         }
                     >
                         <DropdownItem onClick={() => setSortConfig({ key: "name", direction: "asc" })}>

@@ -812,8 +812,8 @@ export default function ProductsPage({
                                     </Button>
                                     <Dropdown
                                         trigger={
-                                            <Button variant="outline">
-                                                <Settings2Icon className="w-[18px] h-[18px]" /> Ações
+                                            <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
+                                                Ações
                                             </Button>
                                         }
                                         align="right"

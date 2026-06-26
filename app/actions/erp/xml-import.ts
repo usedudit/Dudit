@@ -1007,7 +1007,8 @@ export async function confirmImportAction(
 
         if (contact) {
           const duplicatas: any[] = (xmlImport.duplicatas as any[]) || []
-          const transactions = duplicatas.length > 0
+          const hasParcelas = duplicatas.length > 1
+          const transactions = hasParcelas
             ? duplicatas.map((d: any) => ({
                 partner_id: partnerId,
                 contact_id: contact.id,
@@ -1024,9 +1025,11 @@ export async function confirmImportAction(
                 contact_id: contact.id,
                 transaction_type: "expense" as const,
                 category: "purchasing",
-                amount: xmlImport.total_value,
-                description: `NF ${xmlImport.invoice_number || ""}`,
-                due_date: new Date(Date.now() + 30 * 86400000).toISOString(),
+                amount: duplicatas.length === 1 ? duplicatas[0].valor : xmlImport.total_value,
+                description: `NF ${xmlImport.invoice_number || ""} - À vista`,
+                due_date: duplicatas.length === 1
+                  ? (duplicatas[0].vencimento || new Date(Date.now() + 30 * 86400000).toISOString())
+                  : new Date(Date.now() + 30 * 86400000).toISOString(),
                 status: "pending",
                 created_by_user_id: user.id,
               }]
@@ -1034,6 +1037,8 @@ export async function confirmImportAction(
           const { error: txErr } = await supabase.from("transactions").insert(transactions)
           if (txErr) {
             console.error("Erro ao criar contas a pagar:", txErr)
+          } else {
+            console.log(`Contas a pagar criadas: ${transactions.length} transacão(ões)`)
           }
         }
       }

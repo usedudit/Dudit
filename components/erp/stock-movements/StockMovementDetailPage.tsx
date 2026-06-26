@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
     DownloadIcon,
     ArrowRightIcon,
-    RotateIcon,
+    ReloadIcon,
     ChevronLeftIcon
 } from '@/lib/icons';
 import { Button, ThreeDotsLoader, AlertModal, Input, InfoCard } from '@/components/reusable';
@@ -183,7 +183,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     variant="outline"
                                     className="h-[42px]"
                                     onClick={() => setIsUndoModalOpen(true)}
-                                    leftIcon={<RotateIcon size={18} />}
+                                    leftIcon={<ReloadIcon size={18} />}
                                 >
                                     Desfazer
                                 </Button>
@@ -326,7 +326,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                     variant="outline"
                     className="flex-1 h-12"
                     onClick={() => setIsUndoModalOpen(true)}
-                    leftIcon={<RotateIcon size={18} />}
+                    leftIcon={<ReloadIcon size={18} />}
                 >
                     Desfazer
                 </Button>

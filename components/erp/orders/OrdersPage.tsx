@@ -893,8 +893,8 @@ export default function OrdersPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" onClick={handleExport} disabled={isExporting}>
-                                        <ExportFileIcon className="w-[18px] h-[18px]" /> {isExporting ? "Exportando..." : "Exportar"}
+                                    <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                        {isExporting ? "Exportando..." : "Exportar"}
                                     </Button>
 
                                     <Button onClick={handleAddOrder} leftIcon={<PlusIcon size={18} />} >

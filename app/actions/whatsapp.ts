@@ -623,9 +623,16 @@ export async function connectEvolutionAction(): Promise<
             return { success: false, error: "Evolution API não configurada no servidor. Configure EVOLUTION_API_URL e EVOLUTION_API_KEY." }
         }
 
-        // 2. Check for existing connection or generate new instance name
-        const existingConnection = await getActiveWhatsappConnection(context.partnerId, "evolution")
-        const instanceName = existingConnection?.instance_name || generateEvolutionInstanceName()
+        // 2. Check for existing connection (active or inactive) or generate new instance name
+        const admin = getAdminClient()
+        const { data: existingConnection } = await admin
+            .from("partner_whatsapp_connections")
+            .select("instance_name")
+            .eq("partner_id", context.partnerId)
+            .eq("provider", "evolution")
+            .maybeSingle()
+
+        const instanceName = (existingConnection as { instance_name: string | null } | null)?.instance_name || generateEvolutionInstanceName()
 
         // 3. Save/update connection in DB
         const connection = await upsertEvolutionConnection({
@@ -692,7 +699,6 @@ export async function connectEvolutionAction(): Promise<
         }
 
         // 6. Update DB status
-        const admin = getAdminClient()
         const updateData: Record<string, unknown> = {
             status: result.status,
             updated_at: new Date().toISOString(),
@@ -776,10 +782,17 @@ export async function getEvolutionStatusAction(): Promise<
             const provider = createWhatsappProviderFromConnection(connection)
             if (provider.getConnectionStatus) {
                 const result = await provider.getConnectionStatus()
+                let status = result.status
+
+                // If API is close (disconnected) but DB is in a pairing state, preserve the pairing state
+                if (result.status === "disconnected" && (connection.status === "qr_pending" || connection.status === "connecting")) {
+                    status = connection.status
+                }
+
                 return {
                     success: true,
                     data: {
-                        status: result.status,
+                        status,
                         qrCode: result.qrCode ?? null,
                         instanceName: result.instanceName ?? null,
                         phoneNumber: result.phoneNumber ?? null,

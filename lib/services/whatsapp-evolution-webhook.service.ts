@@ -239,6 +239,54 @@ async function processEvolutionConnectionEvent(params: {
     status = "qr_pending"
   }
 
+  // Extract detailed disconnect properties for logging
+  const reason = params.data.reason ?? null
+  const statusCode = params.data.statusCode ?? null
+  const lastDisconnect = params.data.lastDisconnect ?? null
+  const disconnectReason = params.data.disconnectReason ?? null
+  const disconnectionReasonCode = params.data.disconnectionReasonCode ?? null
+  const disconnectionObject = params.data.disconnectionObject ?? null
+
+  const admin = getAdminClient()
+  const { data: currentConn } = await admin
+    .from("partner_whatsapp_connections")
+    .select("status")
+    .eq("partner_id", params.partnerId)
+    .eq("provider", "evolution")
+    .maybeSingle()
+
+  if (status === "disconnected") {
+    if (currentConn && (currentConn.status === "qr_pending" || currentConn.status === "connecting")) {
+      // Ignored: expected close states during pairing / QR scanning handshake
+      SecureLogger.info("[evolution webhook] Preserved connection status during pairing", {
+        instance: params.instanceName,
+        partnerId: params.partnerId,
+        currentStatus: currentConn.status,
+        ignoredStatus: status,
+        reason,
+        statusCode,
+        lastDisconnect,
+        disconnectReason,
+        disconnectionReasonCode,
+        disconnectionObject,
+      })
+      return
+    }
+
+    // Real disconnect: log with details
+    SecureLogger.warn("[evolution webhook] Active instance disconnected", {
+      instance: params.instanceName,
+      partnerId: params.partnerId,
+      currentStatus: currentConn?.status,
+      reason,
+      statusCode,
+      lastDisconnect,
+      disconnectReason,
+      disconnectionReasonCode,
+      disconnectionObject,
+    })
+  }
+
   const extra: Record<string, string> = {}
   if (status === "connected") {
     extra.connected_at = new Date().toISOString()

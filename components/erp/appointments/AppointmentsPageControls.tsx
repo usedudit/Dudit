@@ -120,15 +120,13 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
 
                     {/* Mobile control actions (Filters and View shortcuts) */}
                     <div className="md:hidden flex items-center gap-2 shrink-0">
-                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] relative p-0 flex items-center justify-center">
-                            <FilterIcon className="w-[18px] h-[18px]" />
+                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] relative p-0 flex items-center justify-center" leftIcon={<FilterIcon size={18} />}>
                             {hasActiveFilters && <div className="absolute top-2 right-2 w-2 h-2 bg-brand-primary rounded-full"></div>}
                         </Button>
 
                         <Dropdown
                             trigger={
-                                <Button variant="outline" className="w-[42px] h-[42px] p-0 flex items-center justify-center">
-                                    <CalendarIcon className="w-[18px] h-[18px]" />
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0 flex items-center justify-center" leftIcon={<CalendarIcon size={18} />}>
                                 </Button>
                             }
                             align="right"
@@ -218,7 +216,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                                 <Button
                                     variant="outline"
                                     className="h-[42px]"
-                                    leftIcon={<CalendarIcon className="w-[18px] h-[18px]" />}
+                                    leftIcon={<CalendarIcon size={18} />}
                                 >
                                     Calendário
                                 </Button>

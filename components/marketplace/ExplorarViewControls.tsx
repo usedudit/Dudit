@@ -27,8 +27,8 @@ export function ExplorarViewControls({
                 <button
                     onClick={() => onViewModeChange("list")}
                     className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
-                            ? "bg-gray-100 text-brand-dark"
-                            : "text-gray-400 hover:text-gray-600"
+                        ? "bg-gray-100 text-brand-dark"
+                        : "text-gray-400 hover:text-gray-600"
                         }`}
                     title="Vista em lista"
                 >
@@ -37,8 +37,8 @@ export function ExplorarViewControls({
                 <button
                     onClick={() => onViewModeChange("grid")}
                     className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
-                            ? "bg-gray-100 text-brand-dark"
-                            : "text-gray-400 hover:text-gray-600"
+                        ? "bg-gray-100 text-brand-dark"
+                        : "text-gray-400 hover:text-gray-600"
                         }`}
                     title="Vista em grade"
                 >

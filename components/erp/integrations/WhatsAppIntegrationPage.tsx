@@ -131,10 +131,14 @@ export function WhatsAppIntegrationPage({
   // Initialize Evolution state from existing connection
   useEffect(() => {
     if (evoConnection) {
-      setEvoStatus(evoConnection.status)
+      // Prevent database status from overriding the local "connected" state
+      // unless the database connection is actually disconnected or error.
+      if (evoStatus !== "connected" || evoConnection.status === "disconnected" || evoConnection.status === "error") {
+        setEvoStatus(evoConnection.status)
+      }
       setEvoPhoneNumber(evoConnection.phoneNumber)
     }
-  }, [evoConnection])
+  }, [evoConnection, evoStatus])
 
   // Polling for connection status when qr_pending or connecting
   useEffect(() => {
@@ -153,7 +157,11 @@ export function WhatsAppIntegrationPage({
       const res = await getEvolutionStatusAction()
       if (res.success && res.data) {
         setEvoStatus(res.data.status)
-        setEvoQrCode(res.data.qrCode)
+        if (res.data.status === "connected") {
+          setEvoQrCode(null)
+        } else if (res.data.qrCode) {
+          setEvoQrCode(res.data.qrCode)
+        }
         setEvoPhoneNumber(res.data.phoneNumber)
         if (res.data.status === "connected") {
           toast.success("WhatsApp conectado com sucesso!")
@@ -249,7 +257,11 @@ export function WhatsAppIntegrationPage({
       const res = await getEvolutionStatusAction()
       if (!res.success) { toast.error(res.error); return }
       setEvoStatus(res.data.status)
-      setEvoQrCode(res.data.qrCode)
+      if (res.data.status === "connected") {
+        setEvoQrCode(null)
+      } else if (res.data.qrCode) {
+        setEvoQrCode(res.data.qrCode)
+      }
       setEvoPhoneNumber(res.data.phoneNumber)
       if (res.data.status === "connected") {
         toast.success("WhatsApp conectado!")

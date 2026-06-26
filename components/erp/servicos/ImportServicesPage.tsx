@@ -653,8 +653,9 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                             variant="outline"
                             className="flex-1 h-12"
                             onClick={() => { setStep("upload"); setParsedServices([]); setMapping([]) }}
+                            leftIcon={<UploadIcon size={18} />}
                         >
-                            <UploadIcon className="w-[18px] h-[18px]" /> Nova planilha
+                            Nova planilha
                         </Button>
                         <Button
                             onClick={handleMappingConfirm}

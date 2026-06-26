@@ -1447,311 +1447,311 @@ export default function TransactionsPage({
                         <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6 space-y-4">
                             {/* Summary Cards */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shrink-0">
-                                    <FileIcon className="w-5 h-5" />
+                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shrink-0">
+                                            <FileIcon className="w-5 h-5" />
+                                        </div>
+                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                            Total
+                                        </span>
+                                    </div>
+                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                        {formatCurrency(total)}
+                                    </span>
                                 </div>
-                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                    Total
-                                </span>
-                            </div>
-                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                {formatCurrency(total)}
-                            </span>
-                        </div>
 
-                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 shrink-0">
-                                    <CheckCircleIcon className="w-5 h-5" />
+                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+                                            <CheckCircleIcon className="w-5 h-5" />
+                                        </div>
+                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                            Pago
+                                        </span>
+                                    </div>
+                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                        {formatCurrency(paid)}
+                                    </span>
                                 </div>
-                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                    Pago
-                                </span>
-                            </div>
-                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                {formatCurrency(paid)}
-                            </span>
-                        </div>
 
-                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 shrink-0">
-                                    <ClockIcon className="w-5 h-5" />
+                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 shrink-0">
+                                            <ClockIcon className="w-5 h-5" />
+                                        </div>
+                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                            Restante
+                                        </span>
+                                    </div>
+                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                        {formatCurrency(pending)}
+                                    </span>
                                 </div>
-                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                    Restante
-                                </span>
-                            </div>
-                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                {formatCurrency(pending)}
-                            </span>
-                        </div>
 
-                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 shrink-0">
-                                    <InstallmentIcon className="w-5 h-5" />
+                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 shrink-0">
+                                            <InstallmentIcon className="w-5 h-5" />
+                                        </div>
+                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                            Parcelas a quitar
+                                        </span>
+                                    </div>
+                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                        {pendingCount}
+                                    </span>
                                 </div>
-                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                    Parcelas a quitar
-                                </span>
-                            </div>
-                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                {pendingCount}
-                            </span>
-                        </div>
 
-                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 shrink-0">
-                                    <CashierIcon className="w-5 h-5" />
+                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 shrink-0">
+                                            <CashierIcon className="w-5 h-5" />
+                                        </div>
+                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                            Valor total da quitação
+                                        </span>
+                                    </div>
+                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none text-brand-green">
+                                        {formatCurrency(settleModalTotalToPay)}
+                                    </span>
                                 </div>
-                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                    Valor total da quitação
-                                </span>
                             </div>
-                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none text-brand-green">
-                                {formatCurrency(settleModalTotalToPay)}
-                            </span>
-                        </div>
-                        </div>
 
-                        {/* Table / List Container */}
-                        <FormSection hasSeparator title="Parcelas pendentes">
-                            {pendingInstallments.length === 0 ? (
-                                <IconPlaceholder
-                                    icon={InstallmentIcon}
-                                    title="Nenhuma parcela pendente encontrada neste grupo."
-                                    subtitle="Nenhuma parcela pendente encontrada neste grupo. Verifique se as parcelas não foram pagas ou canceladas." />
-                            ) : (
-                                <>
-                                    {/* Desktop Table */}
-                                    <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg" style={{ width: "150px" }}>Parcela</th>
-                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Vencimento</th>
-                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Restante</th>
-                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "160px" }}>Valor Pagamento</th>
-                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "176px" }}>Meio de Pagamento</th>
-                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Juros</th>
-                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Desconto</th>
-                                                        <th className="py-3 px-2 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg text-right">Total a Pagar</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginatedPendingInstallments.map((row: any) => {
-                                                        const values = settlePaymentsByInstallment[row.id] || {
-                                                            paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
-                                                            interestAmount: "0",
-                                                            discountAmount: "0",
-                                                            paymentMethodId: paymentMethods?.[0]?.id || "",
-                                                        }
-                                                        const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
-                                                        return (
-                                                            <motion.tr
-                                                                key={row.id}
-                                                                initial={{ opacity: 0 }}
-                                                                animate={{ opacity: 1 }}
-                                                                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background"
-                                                            >
-                                                                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
-                                                                    <div className="flex flex-col text-left min-w-0">
-                                                                        <div className="flex items-center">
-                                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
-                                                                                Parcela {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                            {/* Table / List Container */}
+                            <FormSection hasSeparator title="Parcelas pendentes">
+                                {pendingInstallments.length === 0 ? (
+                                    <IconPlaceholder
+                                        icon={InstallmentIcon}
+                                        title="Nenhuma parcela pendente encontrada neste grupo."
+                                        subtitle="Nenhuma parcela pendente encontrada neste grupo. Verifique se as parcelas não foram pagas ou canceladas." />
+                                ) : (
+                                    <>
+                                        {/* Desktop Table */}
+                                        <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                            <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
+                                                    <thead>
+                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                            <th className="py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg" style={{ width: "150px" }}>Parcela</th>
+                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Vencimento</th>
+                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Restante</th>
+                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "160px" }}>Valor Pagamento</th>
+                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "176px" }}>Meio de Pagamento</th>
+                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Juros</th>
+                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Desconto</th>
+                                                            <th className="py-3 px-2 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg text-right">Total a Pagar</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {paginatedPendingInstallments.map((row: any) => {
+                                                            const values = settlePaymentsByInstallment[row.id] || {
+                                                                paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                                                interestAmount: "0",
+                                                                discountAmount: "0",
+                                                                paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                            }
+                                                            const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                                            return (
+                                                                <motion.tr
+                                                                    key={row.id}
+                                                                    initial={{ opacity: 0 }}
+                                                                    animate={{ opacity: 1 }}
+                                                                    className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background"
+                                                                >
+                                                                    <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                                                                        <div className="flex flex-col text-left min-w-0">
+                                                                            <div className="flex items-center">
+                                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                                                                    Parcela {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                                        <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                            {row.dueDate || "-"}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                            {formatCurrency(Number(row.remainingAmount || 0))}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "160px" }}>
+                                                                        <MoneyInput
+                                                                            value={Number(values.paymentAmount || 0)}
+                                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                ...prev,
+                                                                                [row.id]: { ...values, paymentAmount: String(value) }
+                                                                            }))}
+                                                                            min={0}
+                                                                        />
+                                                                    </td>
+                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "176px" }}>
+                                                                        <FormDropdown
+                                                                            value={values.paymentMethodId}
+                                                                            setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                ...prev,
+                                                                                [row.id]: { ...values, paymentMethodId: val }
+                                                                            }))}
+                                                                            options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                                                                value: pm.id,
+                                                                                label: pm.name,
+                                                                            }))}
+                                                                            placeholder="Selecione"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
+                                                                        <MoneyInput
+                                                                            value={Number(values.interestAmount || 0)}
+                                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                ...prev,
+                                                                                [row.id]: { ...values, interestAmount: String(value) }
+                                                                            }))}
+                                                                            min={0}
+                                                                        />
+                                                                    </td>
+                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
+                                                                        <MoneyInput
+                                                                            value={Number(values.discountAmount || 0)}
+                                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                ...prev,
+                                                                                [row.id]: { ...values, discountAmount: String(value) }
+                                                                            }))}
+                                                                            min={0}
+                                                                        />
+                                                                    </td>
+                                                                    <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-right">
+                                                                        <div className="flex items-center justify-end">
+                                                                            <span className="text-[13px] font-bold whitespace-nowrap text-brand-green">
+                                                                                {formatCurrency(finalPaid)}
                                                                             </span>
                                                                         </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                                                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                        {row.dueDate || "-"}
+                                                                    </td>
+                                                                </motion.tr>
+                                                            )
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        {/* Mobile Stacked View */}
+                                        <div className="md:hidden space-y-3 pb-24">
+                                            {paginatedPendingInstallments.map((row: any) => {
+                                                const values = settlePaymentsByInstallment[row.id] || {
+                                                    paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                                    interestAmount: "0",
+                                                    discountAmount: "0",
+                                                    paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                }
+                                                const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                                return (
+                                                    <motion.div
+                                                        key={row.id}
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col"
+                                                    >
+                                                        {/* Card Header */}
+                                                        <div className="flex gap-3 mb-3">
+                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                <InstallmentIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
+                                                                        {row.description}
+                                                                    </h3>
+                                                                    <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
+                                                                        {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                                                                    </Badge>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Venc: {row.dueDate || "-"}
                                                                     </span>
-                                                                </td>
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Value section */}
+                                                        <div className="border-t border-brand-border dark:border-dark-border pt-3 flex flex-col gap-3">
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Restante</span>
+                                                                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
                                                                         {formatCurrency(Number(row.remainingAmount || 0))}
                                                                     </span>
-                                                                </td>
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "160px" }}>
-                                                                    <MoneyInput
-                                                                        value={Number(values.paymentAmount || 0)}
-                                                                        onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                            ...prev,
-                                                                            [row.id]: { ...values, paymentAmount: String(value) }
-                                                                        }))}
-                                                                        min={0}
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "176px" }}>
-                                                                    <FormDropdown
-                                                                        value={values.paymentMethodId}
-                                                                        setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
-                                                                            ...prev,
-                                                                            [row.id]: { ...values, paymentMethodId: val }
-                                                                        }))}
-                                                                        options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                                                            value: pm.id,
-                                                                            label: pm.name,
-                                                                        }))}
-                                                                        placeholder="Selecione"
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
-                                                                    <MoneyInput
-                                                                        value={Number(values.interestAmount || 0)}
-                                                                        onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                            ...prev,
-                                                                            [row.id]: { ...values, interestAmount: String(value) }
-                                                                        }))}
-                                                                        min={0}
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
-                                                                    <MoneyInput
-                                                                        value={Number(values.discountAmount || 0)}
-                                                                        onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                            ...prev,
-                                                                            [row.id]: { ...values, discountAmount: String(value) }
-                                                                        }))}
-                                                                        min={0}
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-right">
-                                                                    <div className="flex items-center justify-end">
-                                                                        <span className="text-[13px] font-bold whitespace-nowrap text-brand-green">
-                                                                            {formatCurrency(finalPaid)}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
-                                                            </motion.tr>
-                                                        )
-                                                    })}
-                                                </tbody>
-                                            </table>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-2 gap-3">
+                                                                <MoneyInput
+                                                                    label="Valor Pagamento"
+                                                                    value={Number(values.paymentAmount || 0)}
+                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, paymentAmount: String(value) }
+                                                                    }))}
+                                                                    min={0}
+                                                                />
+                                                                <FormDropdown
+                                                                    label="Meio de Pagamento"
+                                                                    value={values.paymentMethodId}
+                                                                    setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, paymentMethodId: val }
+                                                                    }))}
+                                                                    options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                                                        value: pm.id,
+                                                                        label: pm.name,
+                                                                    }))}
+                                                                    placeholder="Selecione"
+                                                                />
+                                                                <MoneyInput
+                                                                    label="Juros"
+                                                                    value={Number(values.interestAmount || 0)}
+                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, interestAmount: String(value) }
+                                                                    }))}
+                                                                    min={0}
+                                                                />
+                                                                <MoneyInput
+                                                                    label="Desconto"
+                                                                    value={Number(values.discountAmount || 0)}
+                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, discountAmount: String(value) }
+                                                                    }))}
+                                                                    min={0}
+                                                                />
+                                                            </div>
+
+                                                            <div className="flex justify-between items-center bg-brand-green/5 px-4 py-3 rounded-xl border border-brand-green/10">
+                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total a Pagar</span>
+                                                                <span className="text-[15px] font-bold text-brand-green">{formatCurrency(finalPaid)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                )
+                                            })}
                                         </div>
-                                    </div>
 
-                                    {/* Mobile Stacked View */}
-                                    <div className="md:hidden space-y-3 pb-24">
-                                        {paginatedPendingInstallments.map((row: any) => {
-                                            const values = settlePaymentsByInstallment[row.id] || {
-                                                paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
-                                                interestAmount: "0",
-                                                discountAmount: "0",
-                                                paymentMethodId: paymentMethods?.[0]?.id || "",
-                                            }
-                                            const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
-                                            return (
-                                                <motion.div
-                                                    key={row.id}
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col"
-                                                >
-                                                    {/* Card Header */}
-                                                    <div className="flex gap-3 mb-3">
-                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                            <InstallmentIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
-                                                                    {row.description}
-                                                                </h3>
-                                                                <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
-                                                                    {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="flex items-center gap-1.5 mt-0.5">
-                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                    Venc: {row.dueDate || "-"}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Value section */}
-                                                    <div className="border-t border-brand-border dark:border-dark-border pt-3 flex flex-col gap-3">
-                                                        <div className="flex justify-between items-start">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Restante</span>
-                                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(Number(row.remainingAmount || 0))}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <MoneyInput
-                                                                label="Valor Pagamento"
-                                                                value={Number(values.paymentAmount || 0)}
-                                                                onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, paymentAmount: String(value) }
-                                                                }))}
-                                                                min={0}
-                                                            />
-                                                            <FormDropdown
-                                                                label="Meio de Pagamento"
-                                                                value={values.paymentMethodId}
-                                                                setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, paymentMethodId: val }
-                                                                }))}
-                                                                options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                                                    value: pm.id,
-                                                                    label: pm.name,
-                                                                }))}
-                                                                placeholder="Selecione"
-                                                            />
-                                                            <MoneyInput
-                                                                label="Juros"
-                                                                value={Number(values.interestAmount || 0)}
-                                                                onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, interestAmount: String(value) }
-                                                                }))}
-                                                                min={0}
-                                                            />
-                                                            <MoneyInput
-                                                                label="Desconto"
-                                                                value={Number(values.discountAmount || 0)}
-                                                                onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, discountAmount: String(value) }
-                                                                }))}
-                                                                min={0}
-                                                            />
-                                                        </div>
-
-                                                        <div className="flex justify-between items-center bg-brand-green/5 px-4 py-3 rounded-xl border border-brand-green/10">
-                                                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total a Pagar</span>
-                                                            <span className="text-[15px] font-bold text-brand-green">{formatCurrency(finalPaid)}</span>
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
-                                            )
-                                        })}
-                                    </div>
-
-                                    {/* Pagination */}
-                                    {pendingCount > SETTLE_PAGE_SIZE && (
-                                        <Pagination
-                                            currentPage={settlePageClamped}
-                                            totalPages={settleTotalPages}
-                                            onPageChange={setSettleInstallmentPage}
-                                            inline
-                                        />
-                                    )}
-                                </>
-                            )}
-                        </FormSection>
+                                        {/* Pagination */}
+                                        {pendingCount > SETTLE_PAGE_SIZE && (
+                                            <Pagination
+                                                currentPage={settlePageClamped}
+                                                totalPages={settleTotalPages}
+                                                onPageChange={setSettleInstallmentPage}
+                                                inline
+                                            />
+                                        )}
+                                    </>
+                                )}
+                            </FormSection>
                         </div>
                     </div>
                 </div>
@@ -1814,107 +1814,107 @@ export default function TransactionsPage({
                             ) : installmentDetail ? (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {(() => {
-                                        const total = Number(installmentDetail.group?.total_amount || 0)
-                                        const rows = installmentDetail.installments || []
-                                        const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
-                                        const overdue = rows
-                                            .filter((row: any) => row.status === "overdue")
-                                            .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
-                                        const pending = Math.max(0, total - paid)
-                                        const cards = [
-                                            {
-                                                label: "Total",
-                                                value: total,
-                                                icon: FileIcon,
-                                                bg: "bg-indigo-50 dark:bg-indigo-950/20",
-                                                text: "text-indigo-600 dark:text-indigo-400",
-                                            },
-                                            {
-                                                label: "Pago",
-                                                value: paid,
-                                                icon: CheckCircleIcon,
-                                                bg: "bg-emerald-50 dark:bg-emerald-950/20",
-                                                text: "text-emerald-600 dark:text-emerald-400",
-                                            },
-                                            {
-                                                label: "Restante",
-                                                value: pending,
-                                                icon: ClockIcon,
-                                                bg: "bg-amber-50 dark:bg-amber-950/20",
-                                                text: "text-amber-600 dark:text-amber-400",
-                                            },
-                                            {
-                                                label: "Vencido",
-                                                value: overdue,
-                                                icon: AlertTriangleIcon,
-                                                bg: "bg-rose-50 dark:bg-rose-950/20",
-                                                text: "text-rose-600 dark:text-rose-400",
-                                            },
-                                        ]
-                                        return cards.map((card) => {
-                                            const Icon = card.icon
-                                            return (
-                                                <div key={card.label} className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                                    <div className="flex items-center gap-3 mb-6">
-                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${card.bg} ${card.text} shrink-0`}>
-                                                            <Icon className="w-5 h-5" />
+                                        {(() => {
+                                            const total = Number(installmentDetail.group?.total_amount || 0)
+                                            const rows = installmentDetail.installments || []
+                                            const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
+                                            const overdue = rows
+                                                .filter((row: any) => row.status === "overdue")
+                                                .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
+                                            const pending = Math.max(0, total - paid)
+                                            const cards = [
+                                                {
+                                                    label: "Total",
+                                                    value: total,
+                                                    icon: FileIcon,
+                                                    bg: "bg-indigo-50 dark:bg-indigo-950/20",
+                                                    text: "text-indigo-600 dark:text-indigo-400",
+                                                },
+                                                {
+                                                    label: "Pago",
+                                                    value: paid,
+                                                    icon: CheckCircleIcon,
+                                                    bg: "bg-emerald-50 dark:bg-emerald-950/20",
+                                                    text: "text-emerald-600 dark:text-emerald-400",
+                                                },
+                                                {
+                                                    label: "Restante",
+                                                    value: pending,
+                                                    icon: ClockIcon,
+                                                    bg: "bg-amber-50 dark:bg-amber-950/20",
+                                                    text: "text-amber-600 dark:text-amber-400",
+                                                },
+                                                {
+                                                    label: "Vencido",
+                                                    value: overdue,
+                                                    icon: AlertTriangleIcon,
+                                                    bg: "bg-rose-50 dark:bg-rose-950/20",
+                                                    text: "text-rose-600 dark:text-rose-400",
+                                                },
+                                            ]
+                                            return cards.map((card) => {
+                                                const Icon = card.icon
+                                                return (
+                                                    <div key={card.label} className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                                        <div className="flex items-center gap-3 mb-6">
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${card.bg} ${card.text} shrink-0`}>
+                                                                <Icon className="w-5 h-5" />
+                                                            </div>
+                                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                {card.label}
+                                                            </span>
                                                         </div>
-                                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                            {card.label}
+                                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                                            {formatCurrency(card.value)}
                                                         </span>
                                                     </div>
-                                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                                        {formatCurrency(card.value)}
-                                                    </span>
-                                                </div>
-                                            )
-                                        })
-                                    })()}
+                                                )
+                                            })
+                                        })()}
+                                    </div>
+                                    {/* Table / List Container */}
+                                    <FormSection hasSeparator title="Parcelas">
+                                        <InstallmentParcelsTable
+                                            rows={
+                                                (installmentDetail.installments || []).map(
+                                                    (row: any): InstallmentParcelRow => ({
+                                                        id: row.id,
+                                                        installmentNumber: row.installmentNumber,
+                                                        totalCount: Number(installmentDetail.group?.installments_count) || 0,
+                                                        status: row.status,
+                                                        originalAmount: Number(row.originalAmount || 0),
+                                                        paidAmount: Number(row.paidAmount || 0),
+                                                        interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
+                                                        discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
+                                                        dueDate: row.dueDate ? String(row.dueDate) : null,
+                                                        finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
+                                                        paymentType: row.paymentType ? String(row.paymentType) : null,
+                                                        reason: String(installmentDetail.group?.description || "Parcela"),
+                                                        reference: String(row.description || "-"),
+                                                        remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
+                                                    }),
+                                                )
+                                            }
+                                            getActionsSlot={(row) =>
+                                                row.status === "paid" ? null : (
+                                                    <ActionsDropdown>
+                                                        <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
+                                                            <MoneyIcon className="w-4 h-4" /> Registrar pagamento
+                                                        </DropdownItem>
+                                                    </ActionsDropdown>
+                                                )
+                                            }
+                                        />
+                                    </FormSection>
                                 </div>
-                                {/* Table / List Container */}
-                                <FormSection hasSeparator title="Parcelas">
-                                    <InstallmentParcelsTable
-                                        rows={
-                                            (installmentDetail.installments || []).map(
-                                                (row: any): InstallmentParcelRow => ({
-                                                    id: row.id,
-                                                    installmentNumber: row.installmentNumber,
-                                                    totalCount: Number(installmentDetail.group?.installments_count) || 0,
-                                                    status: row.status,
-                                                    originalAmount: Number(row.originalAmount || 0),
-                                                    paidAmount: Number(row.paidAmount || 0),
-                                                    interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
-                                                    discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
-                                                    dueDate: row.dueDate ? String(row.dueDate) : null,
-                                                    finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
-                                                    paymentType: row.paymentType ? String(row.paymentType) : null,
-                                                    reason: String(installmentDetail.group?.description || "Parcela"),
-                                                    reference: String(row.description || "-"),
-                                                    remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
-                                                }),
-                                            )
-                                        }
-                                        getActionsSlot={(row) =>
-                                            row.status === "paid" ? null : (
-                                                <ActionsDropdown>
-                                                    <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
-                                                        <MoneyIcon className="w-4 h-4" /> Registrar pagamento
-                                                    </DropdownItem>
-                                                </ActionsDropdown>
-                                            )
-                                        }
-                                    />
-                                </FormSection>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
-                        )}
+                            ) : (
+                                <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
-            {renderSharedModals()}
-        </FadeIn >
+                {renderSharedModals()}
+            </FadeIn >
         )
     }
 
@@ -1992,12 +1992,11 @@ export default function TransactionsPage({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button variant="outline" onClick={() => { }}>
-                            <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                        <Button variant="outline" onClick={() => { }} leftIcon={<ExportFileIcon size={18} />}>
+                            Exportar
                         </Button>
 
-                        <Button onClick={() => openEntity("create")}>
-                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                        <Button onClick={() => openEntity("create")} leftIcon={<PlusIcon size={18} />}>
                             Nova transação
                         </Button>
                     </div>

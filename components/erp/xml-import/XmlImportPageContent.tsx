@@ -17,7 +17,8 @@ import { XmlImportHistoryTab } from "./XmlImportHistoryTab"
 import {
     UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
     SearchIcon, PlusIcon, ClockIcon, GridIcon, ListIcon,
-    PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon
+    PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon,
+    ReloadIcon
 } from "@/lib/icons"
 
 type TabType = "all" | "pending" | "completed" | "failed"
@@ -334,8 +335,8 @@ function ListContent({
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Importe produtos de notas fiscais eletrônicas.</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Button onClick={() => setShowUploadModal(true)}>
-                            <UploadIcon className="w-[18px] h-[18px]" strokeWidth={3} /> Importar XML
+                        <Button onClick={() => setShowUploadModal(true)} leftIcon={<UploadIcon size={18} />} >
+                            Importar XML
                         </Button>
                     </div>
                 </div>
@@ -642,7 +643,7 @@ function XmlUploadForm({ partnerId, storeId, onSuccess, onCancel }: { partnerId:
             <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={onCancel}>Cancelar</Button>
                 <Button onClick={handleSubmit} disabled={!file || isUploading}>
-                    {isUploading ? <span className="flex items-center gap-2"><Spinner className="w-4 h-4" /> Processando...</span> : "Analisar XML"}
+                    {isUploading ? <span className="flex items-center gap-2"><Spinner size={18} /> Processando...</span> : "Analisar XML"}
                 </Button>
             </div>
         </div>
@@ -830,433 +831,443 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     const safeConflicts = (c: any) => Array.isArray(c) ? c : []
 
     return (
-        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-            <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                <Tabs value={detailTab} onValueChange={setDetailTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                {reimported && (
-                    <div className="max-w-[1300px] mx-auto px-4 md:px-6 pt-4">
-                        <InfoCard
-                            color="orange"
-                            message="Este XML já foi importado anteriormente e teve sua importação revertida. Os dados foram restaurados para preview — revise e confirme para importar novamente."
-                        />
-                    </div>
-                )}
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-                        <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500" style={{ transform: isScrolled ? "scale(0.9)" : "scale(1)" }}>
-                            <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            </Button>
-                        </div>
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
 
-                        <div className="hidden md:flex items-start justify-between mb-4">
-                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                    <span className="truncate">NF-e {preview.invoice.numero || "—"}</span>
-                                    {isPreview && <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">Preview</Badge>}
-                                    {isFailed && <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">Erro</Badge>}
-                                    {isCompleted && !isReversed && <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">Importado</Badge>}
-                                    {isReversed && <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">Revertido</Badge>}
-                                </h1>
-                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                    <div className="flex items-center gap-2">
-                                        <span>{preview.supplier.name}</span>
-                                        <span className="text-brand-inactive-text dark:text-dark-body opacity-50">•</span>
-                                        <span>{preview.items.length} produto(s)</span>
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">NF-e {preview.invoice.numero || "—"}</span>
+                                            {isPreview && <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">Preview</Badge>}
+                                            {isFailed && <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">Erro</Badge>}
+                                            {isCompleted && !isReversed && <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">Importado</Badge>}
+                                            {isReversed && <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">Revertido</Badge>}
+                                        </h1>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            <span>{preview.supplier.name}</span>
+                                            <span className="text-brand-inactive-text dark:text-dark-body opacity-50">•</span>
+                                            <span>{preview.items.length} produto(s)</span>
+                                        </div>
                                     </div>
+
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        {isPreview && (
+                                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                                                <Button onClick={handleConfirm} disabled={isConfirming}>
+                                                    {isConfirming ? <span className="flex items-center gap-2"><Spinner size={18} /> Importando...</span> : "Confirmar Importação"}
+                                                </Button>
+                                            </div>
+                                        )}
+                                        {isCompleted && !isReversed && (
+                                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                                                <Button variant="outlinered" onClick={() => setShowRevertModal(true)} leftIcon={<ReloadIcon size={18} />}>
+                                                    Desfazer Importação
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Tabs Navigation */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="details">Detalhes</TabsTrigger>
+                                        <TabsTrigger value="history">Histórico</TabsTrigger>
+                                    </TabsList>
                                 </div>
                             </div>
-
-                            {isPreview && (
-                                <div className="flex items-center gap-3 shrink-0 ml-3">
-                                    <Button onClick={handleConfirm} disabled={isConfirming} className="h-[42px]">
-                                        {isConfirming ? <span className="flex items-center gap-2"><Spinner className="w-4 h-4" /> Importando...</span> : "Confirmar Importação"}
-                                    </Button>
-                                </div>
-                            )}
-                            {isCompleted && !isReversed && (
-                                <div className="flex items-center gap-3 shrink-0 ml-3">
-                                    <Button variant="outline" onClick={() => setShowRevertModal(true)} className="h-[42px] text-red-600 border-red-300 hover:bg-red-50">
-                                        Desfazer Importação
-                                    </Button>
-                                </div>
-                            )}
                         </div>
-                    </div>
-                </div>
 
-                <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
-                    <Tabs value={detailTab} onValueChange={setDetailTab}>
-                        <div className="-mt-4 mb-0 max-w-[1300px] mx-auto px-0 pb-0">
-                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                <TabsTrigger value="details">Detalhes</TabsTrigger>
-                                <TabsTrigger value="history">Histórico</TabsTrigger>
-                            </TabsList>
-                        </div>
-                        <TabsContent value="details" className="mt-0">
-                            <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0">
-
-                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-
-                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                        <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
-                                                    Série {preview.invoice.serie || "—"} | N° {preview.invoice.numero || "—"}
-                                                </div>
-                                                {preview.invoice.valor_total > 0 && (
-                                                    <div className="text-right">
-                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor Total</span>
-                                                        <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">R$ {preview.invoice.valor_total.toFixed(2)}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-3 mt-2">
-                                                {preview.invoice.modelo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Mod {preview.invoice.modelo}</span>}
-                                                {preview.invoice.protocolo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Prot {preview.invoice.protocolo}</span>}
-                                                {preview.invoice.ambiente === "1" && <span className="text-xs bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded text-green-700 dark:text-green-400">Produção</span>}
-                                                {preview.invoice.ambiente === "2" && <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded text-yellow-700 dark:text-yellow-400">Homologação</span>}
-                                                {preview.invoice.data_saida && <span className="text-xs text-brand-inactive-text">Saída: {safeDate(preview.invoice.data_saida)}</span>}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-white dark:bg-dark-surface">
-                                            <div className="p-6 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-14 h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20 flex items-center justify-center">
-                                                        <FileTextIcon className="w-6 h-6 text-brand-inactive-text" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{preview.supplier.name}</h4>
-                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                                            {preview.supplier.documentType === "cnpj" ? "CNPJ" : "CPF"}: {preview.supplier.document}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <InfoIcon size={14} className="text-brand-inactive-text shrink-0" />
-                                                    <span className="text-xs font-medium text-brand-inactive-text">Chave NF-e:</span>
-                                                    <span className="text-xs font-mono text-brand-dark dark:text-dark-heading break-all">{preview.invoice.chave}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {isFailed && preview.errors?.length > 0 && (
-                                        <div className="mb-8 space-y-2">
-                                            {preview.errors.map((e: any, i: number) => (
-                                                <InfoCard key={i} color="red" title={`Erro no item ${i + 1}`} message={typeof e === "string" ? e : e.error || ""} />
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <FormSection title="Produtos">
-                                        {preview.items.map((item: any) => {
-                                            const d = getDecision(item.id)
-                                            const isNew = item.match_status === "new"
-                                            const isSimilar = item.match_status === "similar"
-                                            const isMatched = item.match_status === "matched"
-                                            const isSkipped = item.match_status === "skipped"
-                                            const conflicts = safeConflicts(item.conflicts)
-
-                                            return (
-                                                <div key={item.id} className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                                    <div className="bg-white dark:bg-dark-surface">
-                                                        <div className="p-4 flex items-start justify-between gap-4">
-                                                            <div className="flex items-start gap-3 min-w-0 flex-1">
-                                                                <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border">
-                                                                    <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                </div>
-                                                                <div className="min-w-0">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{item.raw_name}</p>
-                                                                        <Badge variant={isNew ? "blue" : isSimilar ? "orange" : isSkipped ? "gray" : "green"}>
-                                                                            {isSkipped ? "Ignorado" : isNew ? "Novo" : isSimilar ? "Conflito" : "Match"}
-                                                                        </Badge>
-                                                                    </div>
-                                                                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-                                                                        {item.raw_sku && <span className="text-xs text-brand-inactive-text">SKU: {item.raw_sku}</span>}
-                                                                        {item.raw_ean && <span className="text-xs text-brand-inactive-text">EAN: {item.raw_ean}</span>}
-                                                                        {item.raw_ncm && <span className="text-xs text-brand-inactive-text">NCM: {item.raw_ncm}</span>}
-                                                                        <span className="text-xs text-brand-inactive-text">Qtd: {item.raw_quantity}</span>
-                                                                        <span className="text-xs text-brand-inactive-text">Custo: R$ {Number(item.raw_unit_cost).toFixed(4)}</span>
-                                                                        <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 mt-1">
-                                                                        {item.match_method && <p className="text-xs text-brand-green">Match por {item.match_method}</p>}
-                                                                        {item.match_confidence != null && (
-                                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.match_confidence >= 0.9
-                                                                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                                                                : item.match_confidence >= 0.7
-                                                                                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                                                                    : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                                                                                }`}>
-                                                                                {Math.round(item.match_confidence * 100)}%
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    {conflicts.map((c: any, i: number) => (
-                                                                        <div key={i} className="flex items-center gap-1.5 mt-1 text-xs">
-                                                                            {c.campo === "fornecedor_diferente" ? (
-                                                                                <div className="flex flex-col gap-1 w-full">
-                                                                                    <span className="text-orange-600 font-semibold">
-                                                                                        Produto já vinculado a outro fornecedor ({c.valor_atual_name || "desconhecido"})
-                                                                                    </span>
-                                                                                    <div className="flex gap-3 mt-1">
-                                                                                        <label className="flex items-center gap-1 cursor-pointer">
-                                                                                            <input
-                                                                                                type="radio"
-                                                                                                name={`supplier_${item.id}`}
-                                                                                                value="add"
-                                                                                                checked={supplierActions[item.id] === "add"}
-                                                                                                onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "add" }))}
-                                                                                                className="accent-brand-orange"
-                                                                                            />
-                                                                                            <span className="text-brand-dark text-xs">
-                                                                                                Adicionar {preview?.supplier.name || "novo"} como fornecedor
-                                                                                            </span>
-                                                                                        </label>
-                                                                                        <label className="flex items-center gap-1 cursor-pointer">
-                                                                                            <input
-                                                                                                type="radio"
-                                                                                                name={`supplier_${item.id}`}
-                                                                                                value="keep"
-                                                                                                checked={supplierActions[item.id] === "keep"}
-                                                                                                onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "keep" }))}
-                                                                                                className="accent-brand-orange"
-                                                                                            />
-                                                                                            <span className="text-brand-dark text-xs">Manter vínculo atual</span>
-                                                                                        </label>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <span className="font-bold text-brand-dark">{c.campo}:</span>
-                                                                                    <span className="text-yellow-600 line-through">{String(c.valor_atual ?? "")}</span>
-                                                                                    <ArrowRightIcon className="w-3 h-3 text-brand-inactive-text" />
-                                                                                    <span className="text-brand-green">{String(c.valor_xml ?? "")}</span>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            <TabsContent value="details" className="mt-0">
+                                <FadeIn key="details">
+                                    <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0">
+                                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
+                                                <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
+                                                            Série {preview.invoice.serie || "—"} | N° {preview.invoice.numero || "—"}
                                                         </div>
-
-                                                        {isPreview && !isSkipped && (
-                                                            <div className="px-4 pb-4 space-y-3">
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {isMatched && (
-                                                                        <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
-                                                                            onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
-                                                                            Manter
-                                                                        </Button>
-                                                                    )}
-                                                                    {isSimilar && (
-                                                                        <>
-                                                                            <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
-                                                                                onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
-                                                                                Manter cadastro
-                                                                            </Button>
-                                                                            <Button variant={d.decision === "update_fields" ? "default" : "outline"} size="sm"
-                                                                                onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "update_fields" } }))}>
-                                                                                Atualizar campos
-                                                                            </Button>
-                                                                        </>
-                                                                    )}
-                                                                    <Button variant={d.decision === "create_product" ? "default" : "outline"} size="sm"
-                                                                        onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "create_product" } }))}>
-                                                                        Criar novo
-                                                                    </Button>
-                                                                    <Button variant={d.decision === "ignore" ? "default" : "outline"} size="sm"
-                                                                        onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "ignore" } }))}>
-                                                                        Ignorar
-                                                                    </Button>
-                                                                </div>
-
-                                                                {d.decision !== "ignore" && (
-                                                                    <div className="flex flex-wrap gap-3 pt-1">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="text-xs font-bold text-brand-dark">Estoque:</span>
-                                                                            <select value={d.stock_action}
-                                                                                onChange={(e) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], stock_action: e.target.value } }))}
-                                                                                className="text-xs border border-brand-border rounded-lg px-2 py-1 bg-transparent text-brand-dark">
-                                                                                <option value="add">Somar</option>
-                                                                                <option value="weighted_average">Média ponderada</option>
-                                                                                <option value="ignore">Não alterar</option>
-                                                                            </select>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="text-xs font-bold text-brand-dark">Custo:</span>
-                                                                            <select value={d.cost_action}
-                                                                                onChange={(e) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], cost_action: e.target.value } }))}
-                                                                                className="text-xs border border-brand-border rounded-lg px-2 py-1 bg-transparent text-brand-dark">
-                                                                                <option value="update">Atualizar</option>
-                                                                                <option value="weighted_average">Média ponderada</option>
-                                                                                <option value="ignore">Não alterar</option>
-                                                                            </select>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
+                                                        {preview.invoice.valor_total > 0 && (
+                                                            <div className="text-right">
+                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor Total</span>
+                                                                <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">R$ {preview.invoice.valor_total.toFixed(2)}</p>
                                                             </div>
                                                         )}
                                                     </div>
+                                                    <div className="flex items-center gap-3 mt-2">
+                                                        {preview.invoice.modelo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Mod {preview.invoice.modelo}</span>}
+                                                        {preview.invoice.protocolo && <span className="text-xs bg-brand-gray dark:bg-dark-border/30 px-2 py-0.5 rounded text-brand-inactive-text">Prot {preview.invoice.protocolo}</span>}
+                                                        {preview.invoice.ambiente === "1" && <span className="text-xs bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded text-green-700 dark:text-green-400">Produção</span>}
+                                                        {preview.invoice.ambiente === "2" && <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded text-yellow-700 dark:text-yellow-400">Homologação</span>}
+                                                        {preview.invoice.data_saida && <span className="text-xs text-brand-inactive-text">Saída: {safeDate(preview.invoice.data_saida)}</span>}
+                                                    </div>
                                                 </div>
-                                            )
-                                        })}
-                                    </FormSection>
-                                </div>
 
-                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
-                                    {isFailed && preview.errors?.length > 0 && (
-                                        <InfoCard color="red" title="Erro na importação" message={
-                                            <ul className="list-disc pl-4 text-sm space-y-1">
-                                                {preview.errors.map((e: any, i: number) => (
-                                                    <li key={i}>{typeof e === "string" ? e : e.error || ""}</li>
-                                                ))}
-                                            </ul>
-                                        } />
-                                    )}
-                                    {isReversed && preview.reversed_at && (
-                                        <InfoCard color="red" title={`Importação Revertida em ${safeDateTime(preview.reversed_at)}`} message={
-                                            <p>{preview.reversal_reason}</p>
-                                        } />
-                                    )}
-                                    <SidebarCard>
-                                        <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo</h3>
-                                        <div className="space-y-3 text-sm">
-                                            {/* Itens */}
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.total}</span>
+                                                <div className="bg-white dark:bg-dark-surface">
+                                                    <div className="p-6 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-14 h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20 flex items-center justify-center">
+                                                                <FileTextIcon className="w-6 h-6 text-brand-inactive-text" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{preview.supplier.name}</h4>
+                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                    {preview.supplier.documentType === "cnpj" ? "CNPJ" : "CPF"}: {preview.supplier.document}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <InfoIcon size={14} className="text-brand-inactive-text shrink-0" />
+                                                            <span className="text-xs font-medium text-brand-inactive-text">Chave NF-e:</span>
+                                                            <span className="text-xs font-mono text-brand-dark dark:text-dark-heading break-all">{preview.invoice.chave}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            {isPreview && (
-                                                <>
+
+                                            {isFailed && preview.errors?.length > 0 && (
+                                                <div className="mb-8 space-y-2">
+                                                    {preview.errors.map((e: any, i: number) => (
+                                                        <InfoCard key={i} color="red" title={`Erro no item ${i + 1}`} message={typeof e === "string" ? e : e.error || ""} />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <FormSection title="Produtos">
+                                                {preview.items.map((item: any) => {
+                                                    const d = getDecision(item.id)
+                                                    const isNew = item.match_status === "new"
+                                                    const isSimilar = item.match_status === "similar"
+                                                    const isMatched = item.match_status === "matched"
+                                                    const isSkipped = item.match_status === "skipped"
+                                                    const conflicts = safeConflicts(item.conflicts)
+
+                                                    return (
+                                                        <div key={item.id} className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
+                                                            <div className="bg-white dark:bg-dark-surface">
+                                                                <div className="p-4 flex items-start justify-between gap-4">
+                                                                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                                                                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border">
+                                                                            <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                        </div>
+                                                                        <div className="min-w-0">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{item.raw_name}</p>
+                                                                                <Badge variant={isNew ? "blue" : isSimilar ? "orange" : isSkipped ? "gray" : "green"}>
+                                                                                    {isSkipped ? "Ignorado" : isNew ? "Novo" : isSimilar ? "Conflito" : "Match"}
+                                                                                </Badge>
+                                                                            </div>
+                                                                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                                                                {item.raw_sku && <span className="text-xs text-brand-inactive-text">SKU: {item.raw_sku}</span>}
+                                                                                {item.raw_ean && <span className="text-xs text-brand-inactive-text">EAN: {item.raw_ean}</span>}
+                                                                                {item.raw_ncm && <span className="text-xs text-brand-inactive-text">NCM: {item.raw_ncm}</span>}
+                                                                                <span className="text-xs text-brand-inactive-text">Qtd: {item.raw_quantity}</span>
+                                                                                <span className="text-xs text-brand-inactive-text">Custo: R$ {Number(item.raw_unit_cost).toFixed(4)}</span>
+                                                                                <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 mt-1">
+                                                                                {item.match_method && <p className="text-xs text-brand-green">Match por {item.match_method}</p>}
+                                                                                {item.match_confidence != null && (
+                                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.match_confidence >= 0.9
+                                                                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                                                                        : item.match_confidence >= 0.7
+                                                                                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                                                                            : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                                                                        }`}>
+                                                                                        {Math.round(item.match_confidence * 100)}%
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            {conflicts.map((c: any, i: number) => (
+                                                                                <div key={i} className="flex items-center gap-1.5 mt-1 text-xs">
+                                                                                    {c.campo === "fornecedor_diferente" ? (
+                                                                                        <div className="flex flex-col gap-1 w-full">
+                                                                                            <span className="text-orange-600 font-semibold">
+                                                                                                Produto já vinculado a outro fornecedor ({c.valor_atual_name || "desconhecido"})
+                                                                                            </span>
+                                                                                            <div className="flex gap-3 mt-1">
+                                                                                                <label className="flex items-center gap-1 cursor-pointer">
+                                                                                                    <input
+                                                                                                        type="radio"
+                                                                                                        name={`supplier_${item.id}`}
+                                                                                                        value="add"
+                                                                                                        checked={supplierActions[item.id] === "add"}
+                                                                                                        onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "add" }))}
+                                                                                                        className="accent-brand-orange"
+                                                                                                    />
+                                                                                                    <span className="text-brand-dark text-xs">
+                                                                                                        Adicionar {preview?.supplier.name || "novo"} como fornecedor
+                                                                                                    </span>
+                                                                                                </label>
+                                                                                                <label className="flex items-center gap-1 cursor-pointer">
+                                                                                                    <input
+                                                                                                        type="radio"
+                                                                                                        name={`supplier_${item.id}`}
+                                                                                                        value="keep"
+                                                                                                        checked={supplierActions[item.id] === "keep"}
+                                                                                                        onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "keep" }))}
+                                                                                                        className="accent-brand-orange"
+                                                                                                    />
+                                                                                                    <span className="text-brand-dark text-xs">Manter vínculo atual</span>
+                                                                                                </label>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <span className="font-bold text-brand-dark">{c.campo}:</span>
+                                                                                            <span className="text-yellow-600 line-through">{String(c.valor_atual ?? "")}</span>
+                                                                                            <ArrowRightIcon className="w-3 h-3 text-brand-inactive-text" />
+                                                                                            <span className="text-brand-green">{String(c.valor_xml ?? "")}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {isPreview && !isSkipped && (
+                                                                    <div className="px-4 pb-4 space-y-3">
+                                                                        <div className="flex flex-wrap gap-2">
+                                                                            {isMatched && (
+                                                                                <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
+                                                                                    onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
+                                                                                    Manter
+                                                                                </Button>
+                                                                            )}
+                                                                            {isSimilar && (
+                                                                                <>
+                                                                                    <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
+                                                                                        onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
+                                                                                        Manter cadastro
+                                                                                    </Button>
+                                                                                    <Button variant={d.decision === "update_fields" ? "default" : "outline"} size="sm"
+                                                                                        onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "update_fields" } }))}>
+                                                                                        Atualizar campos
+                                                                                    </Button>
+                                                                                </>
+                                                                            )}
+                                                                            <Button variant={d.decision === "create_product" ? "default" : "outline"} size="sm"
+                                                                                onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "create_product" } }))}>
+                                                                                Criar novo
+                                                                            </Button>
+                                                                            <Button variant={d.decision === "ignore" ? "default" : "outline"} size="sm"
+                                                                                onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "ignore" } }))}>
+                                                                                Ignorar
+                                                                            </Button>
+                                                                        </div>
+
+                                                                        {d.decision !== "ignore" && (
+                                                                            <div className="flex flex-wrap gap-3 pt-1">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-xs font-bold text-brand-dark">Estoque:</span>
+                                                                                    <select value={d.stock_action}
+                                                                                        onChange={(e) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], stock_action: e.target.value } }))}
+                                                                                        className="text-xs border border-brand-border rounded-lg px-2 py-1 bg-transparent text-brand-dark">
+                                                                                        <option value="add">Somar</option>
+                                                                                        <option value="weighted_average">Média ponderada</option>
+                                                                                        <option value="ignore">Não alterar</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-xs font-bold text-brand-dark">Custo:</span>
+                                                                                    <select value={d.cost_action}
+                                                                                        onChange={(e) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], cost_action: e.target.value } }))}
+                                                                                        className="text-xs border border-brand-border rounded-lg px-2 py-1 bg-transparent text-brand-dark">
+                                                                                        <option value="update">Atualizar</option>
+                                                                                        <option value="weighted_average">Média ponderada</option>
+                                                                                        <option value="ignore">Não alterar</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </FormSection>
+                                        </div>
+
+                                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
+                                            {isFailed && preview.errors?.length > 0 && (
+                                                <InfoCard color="red" title="Erro na importação" message={
+                                                    <ul className="list-disc pl-4 text-sm space-y-1">
+                                                        {preview.errors.map((e: any, i: number) => (
+                                                            <li key={i}>{typeof e === "string" ? e : e.error || ""}</li>
+                                                        ))}
+                                                    </ul>
+                                                } />
+                                            )}
+
+                                            {isReversed && preview.reversed_at && (
+                                                <InfoCard color="red" title={`Importação Revertida em ${safeDateTime(preview.reversed_at)}`} message={
+                                                    <p>{preview.reversal_reason}</p>
+                                                } />
+                                            )}
+
+                                            {reimported && (
+                                                <div className="max-w-[1300px] mx-auto px-4 md:px-6 pt-4">
+                                                    <InfoCard
+                                                        color="orange"
+                                                        message="Este XML já foi importado anteriormente e teve sua importação revertida. Os dados foram restaurados para preview — revise e confirme para importar novamente."
+                                                    />
+                                                </div>
+                                            )}
+                                            <SidebarCard>
+                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo</h3>
+                                                <div className="space-y-3 text-sm">
+                                                    {/* Itens */}
                                                     <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body">Novos</span>
-                                                        <span className="font-bold text-blue-600">{summaryCounts.novos}</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.total}</span>
                                                     </div>
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body">Existentes</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.existentes}</span>
-                                                    </div>
-                                                    {summaryCounts.conflitos > 0 && (
+                                                    {isPreview && (
+                                                        <>
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Novos</span>
+                                                                <span className="font-bold text-blue-600">{summaryCounts.novos}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Existentes</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.existentes}</span>
+                                                            </div>
+                                                            {summaryCounts.conflitos > 0 && (
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Conflitos</span>
+                                                                    <span className="font-bold text-orange-500">{summaryCounts.conflitos}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Movimentações</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.filter((i: any) => i.match_status !== "skipped").length}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body">Parcelas</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.duplicatas || "1"}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    {preview.invoice.valor_total > 0 && (
                                                         <div className="flex items-center justify-between gap-3">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Conflitos</span>
-                                                            <span className="font-bold text-orange-500">{summaryCounts.conflitos}</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor Total</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {preview.invoice.valor_total.toFixed(2)}</span>
                                                         </div>
                                                     )}
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body">Movimentações</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.filter((i: any) => i.match_status !== "skipped").length}</span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body">Parcelas</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.duplicatas || "1"}</span>
-                                                    </div>
-                                                </>
-                                            )}
-                                            {preview.invoice.valor_total > 0 && (
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body">Valor Total</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {preview.invoice.valor_total.toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {preview.invoice.data_emissao && (
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body">Data de Emissão</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDate(preview.invoice.data_emissao)}</span>
-                                                </div>
-                                            )}
-                                            {preview.created_at && (
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body">Importado em</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
-                                                </div>
-                                            )}
-                                            {/* Duplicatas / contas a pagar */}
-                                            {isPreview && preview.duplicatas?.length > 0 && (
-                                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Duplicatas</span>
-                                                    <div className="space-y-1">
-                                                        {preview.duplicatas.map((d: any, i: number) => (
-                                                            <div key={i} className="flex items-center justify-between text-xs">
-                                                                <span className="text-brand-dark dark:text-dark-heading">Parcela {d.numero || i + 1}</span>
-                                                                <div className="text-right">
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number(d.valor || 0).toFixed(2)}</span>
-                                                                    <span className="text-brand-inactive-text ml-1">{d.vencimento ? safeDate(d.vencimento) : ""}</span>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {isPreview && (
-                                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                    <label className="flex items-center gap-2 cursor-pointer">
-                                                        <Checkbox checked={createPayables} onChange={setCreatePayables} />
-                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Criar contas a pagar</span>
-                                                    </label>
-                                                    <p className="text-xs text-brand-inactive-text mt-1 ml-6">
-                                                        {preview.duplicatas?.length > 0
-                                                            ? `${preview.duplicatas.length} parcela(s) da NF-e`
-                                                            : "Uma conta com vencimento em 30 dias"}
-                                                    </p>
-                                                </div>
-                                            )}
-                                            {/* Finance data for completed/reversed imports */}
-                                            {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
-                                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
-                                                    <div className="space-y-1">
-                                                        {financeData.map((t: any, i: number) => (
-                                                            <div key={i} className="flex items-center justify-between text-xs">
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
-                                                                    <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
-                                                                        {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
-                                                                    </Badge>
-                                                                </div>
-                                                                <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* Stock movements for completed/reversed imports */}
-                                            {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
-                                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Movimentações de Estoque</span>
-                                                    <div className="space-y-1">
-                                                        {stockData.map((m: any, i: number) => (
-                                                            <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
-                                                                <span className="font-medium">
-                                                                    {m.movement_type === "adjustment" ? "Ajuste (reversão)" : "Entrada"}:
-                                                                </span>{' '}
-                                                                {m.stock_movement_items?.map((smi: any, j: number) => (
-                                                                    <span key={j}>
-                                                                        {smi.quantity > 0 ? "+" : ""}{smi.quantity} un
-                                                                    </span>
+                                                    {preview.invoice.data_emissao && (
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Data de Emissão</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDate(preview.invoice.data_emissao)}</span>
+                                                        </div>
+                                                    )}
+                                                    {preview.created_at && (
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Importado em</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Duplicatas / contas a pagar */}
+                                                    {isPreview && preview.duplicatas?.length > 0 && (
+                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Duplicatas</span>
+                                                            <div className="space-y-1">
+                                                                {preview.duplicatas.map((d: any, i: number) => (
+                                                                    <div key={i} className="flex items-center justify-between text-xs">
+                                                                        <span className="text-brand-dark dark:text-dark-heading">Parcela {d.numero || i + 1}</span>
+                                                                        <div className="text-right">
+                                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number(d.valor || 0).toFixed(2)}</span>
+                                                                            <span className="text-brand-inactive-text ml-1">{d.vencimento ? safeDate(d.vencimento) : ""}</span>
+                                                                        </div>
+                                                                    </div>
                                                                 ))}
                                                             </div>
-                                                        ))}
-                                                    </div>
+                                                        </div>
+                                                    )}
+                                                    {isPreview && (
+                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <Checkbox checked={createPayables} onChange={setCreatePayables} />
+                                                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Criar contas a pagar</span>
+                                                            </label>
+                                                            <p className="text-xs text-brand-inactive-text mt-1 ml-6">
+                                                                {preview.duplicatas?.length > 0
+                                                                    ? `${preview.duplicatas.length} parcela(s) da NF-e`
+                                                                    : "Uma conta com vencimento em 30 dias"}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                    {/* Finance data for completed/reversed imports */}
+                                                    {(isCompleted || isReversed) && financeData && financeData.length > 0 && (
+                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
+                                                            <div className="space-y-1">
+                                                                {financeData.map((t: any, i: number) => (
+                                                                    <div key={i} className="flex items-center justify-between text-xs">
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                                                            <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
+                                                                                {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
+                                                                            </Badge>
+                                                                        </div>
+                                                                        <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {/* Stock movements for completed/reversed imports */}
+                                                    {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
+                                                        <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Movimentações de Estoque</span>
+                                                            <div className="space-y-1">
+                                                                {stockData.map((m: any, i: number) => (
+                                                                    <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
+                                                                        <span className="font-medium">
+                                                                            {m.movement_type === "adjustment" ? "Ajuste (reversão)" : "Entrada"}:
+                                                                        </span>{' '}
+                                                                        {m.stock_movement_items?.map((smi: any, j: number) => (
+                                                                            <span key={j}>
+                                                                                {smi.quantity > 0 ? "+" : ""}{smi.quantity} un
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
+                                            </SidebarCard>
                                         </div>
-                                    </SidebarCard>
-                                </div>
-                            </div>
-                        </TabsContent>
+                                    </div>
+                                </FadeIn>
+                            </TabsContent>
 
-                        <TabsContent value="history" className="mt-0">
-                            <XmlImportHistoryTab events={historyEntries} loading={historyLoading} />
-                        </TabsContent>
-                    </Tabs>
-                </div>
+                            <TabsContent value="history" className="mt-0">
+                                <XmlImportHistoryTab events={historyEntries} loading={historyLoading} />
+                            </TabsContent>
+                        </div>
+                    </div>
+                </Tabs>
             </div>
 
             {isPreview && (
@@ -1265,7 +1276,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                         <ChevronLeftIcon className="w-5 h-5" /> Voltar
                     </Button>
                     <Button className="flex-1 h-12" onClick={handleConfirm} disabled={isConfirming}>
-                        {isConfirming ? <span className="flex items-center gap-2"><Spinner className="w-4 h-4" /> Importando...</span> : "Confirmar"}
+                        {isConfirming ? <span className="flex items-center gap-2"><Spinner size={18} /> Importando...</span> : "Confirmar"}
                     </Button>
                 </div>
             )}
@@ -1289,7 +1300,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                 Cancelar
                             </Button>
                             <Button onClick={handleRevert} disabled={isReverting} className="bg-red-600 hover:bg-red-700 text-white">
-                                {isReverting ? <span className="flex items-center gap-2"><Spinner className="w-4 h-4" /> Revertendo...</span> : "Confirmar Reversão"}
+                                {isReverting ? <span className="flex items-center gap-2"><Spinner size={18} /> Revertendo...</span> : "Confirmar Reversão"}
                             </Button>
                         </div>
                     </div>
