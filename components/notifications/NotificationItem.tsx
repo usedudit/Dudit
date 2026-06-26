@@ -51,6 +51,7 @@ export function NotificationItem({
     <Link
       ref={ref}
       href={href}
+      prefetch={false}
       onClick={onNavigate}
       className={cn(
         "block px-3 py-2.5 rounded-lg transition-colors hover:bg-brand-gray/60 dark:hover:bg-dark-border/60",

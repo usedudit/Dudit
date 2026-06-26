@@ -3,6 +3,7 @@
 import crypto from "crypto"
 import { headers } from "next/headers"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { parseNFeFull, type NFMetadata, type ProductFromXML, type DuplicataFromXML } from "@/lib/xml-parser"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
@@ -677,7 +678,10 @@ export async function uploadXMLAction(
 
     if (isReimport && reimportId) {
       // Reimportação: limpa dados de reversão e volta para preview
-      await supabase.from("xml_import_items").delete().eq("xml_import_id", reimportId)
+      // Usa admin client porque xml_import_items não tem política de DELETE via RLS
+      const admin = getAdminClient()
+      const { error: delErr } = await admin.from("xml_import_items").delete().eq("xml_import_id", reimportId)
+      if (delErr) console.error("Erro ao limpar items antigos:", delErr)
 
       const { data: updated, error: updateErr } = await supabase
         .from("xml_imports")

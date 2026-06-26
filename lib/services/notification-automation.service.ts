@@ -24,6 +24,7 @@ async function notifyPartnerTeam(params: {
   entityId: string
   ctx: Parameters<typeof buildNotificationContent>[2]
   variant?: string
+  origin?: "manual" | "automation" | "system"
 }) {
   const userIds = await getPartnerTeamUserIds(params.partnerId)
   const content = buildNotificationContent(params.type, "seller", params.ctx)
@@ -43,6 +44,7 @@ async function notifyPartnerTeam(params: {
       userId,
       params.variant,
     ),
+    origin: params.origin,
   }))
 }
 
@@ -53,6 +55,7 @@ async function notifyCustomer(params: {
   entityId: string
   ctx: Parameters<typeof buildNotificationContent>[2]
   variant?: string
+  origin?: "manual" | "automation" | "system"
 }) {
   const content = buildNotificationContent(params.type, "customer", params.ctx)
   await createNotification({
@@ -70,6 +73,7 @@ async function notifyCustomer(params: {
       params.userId,
       params.variant,
     ),
+    origin: params.origin,
   })
 }
 
@@ -227,7 +231,10 @@ export async function runScheduledNotificationJob(job: {
     .eq("id", job.id)
 }
 
-export async function onAppointmentCreated(appointment: Record<string, unknown>) {
+export async function onAppointmentCreated(
+  appointment: Record<string, unknown>,
+  origin: "manual" | "automation" | "system" = "automation",
+) {
   if (appointment.source === "unavailable") return
 
   const partnerId = String(appointment.partner_id)
@@ -252,6 +259,7 @@ export async function onAppointmentCreated(appointment: Record<string, unknown>)
       time: String(appointment.start_time).slice(0, 5),
       storeName: partner?.store_name || undefined,
     },
+    origin,
   })
 
   await scheduleNotificationAppointmentReminders({
@@ -270,6 +278,7 @@ export async function onAppointmentStatusChanged(
   appointment: Record<string, unknown>,
   previousStatus: string,
   newStatus: string,
+  origin: "manual" | "automation" | "system" = "automation",
 ) {
   const partnerId = String(appointment.partner_id)
   const appointmentId = String(appointment.id)
@@ -304,6 +313,7 @@ export async function onAppointmentStatusChanged(
         entityType: "appointment",
         entityId: appointmentId,
         ctx,
+        origin,
       })
     }
   } else if (next === "cancelado") {
@@ -318,6 +328,7 @@ export async function onAppointmentStatusChanged(
         entityType: "appointment",
         entityId: appointmentId,
         ctx,
+        origin,
       })
     }
     await notifyPartnerTeam({
@@ -326,6 +337,7 @@ export async function onAppointmentStatusChanged(
       entityType: "appointment",
       entityId: appointmentId,
       ctx,
+      origin,
     })
   }
 }
@@ -372,7 +384,7 @@ export async function onOrderStatusChanged(
   order: Record<string, unknown>,
   situation?: string,
   deliveryStatus?: string,
-  options?: { skipPartnerTeam?: boolean },
+  origin: "manual" | "automation" | "system" = "automation",
 ) {
   const partnerId = String(order.partner_id)
   const orderId = String(order.id)
@@ -417,6 +429,7 @@ export async function onOrderStatusChanged(
           mixType,
         },
         variant: mixType,
+        origin,
       })
     } else {
       await notifyPartnerTeam({
@@ -425,6 +438,7 @@ export async function onOrderStatusChanged(
         entityType: "order",
         entityId: orderId,
         ctx,
+        origin,
       })
     }
     return
@@ -440,15 +454,17 @@ export async function onOrderStatusChanged(
         entityType: "order",
         entityId: orderId,
         ctx: { ...ctx, orderNumber },
+        origin,
       })
     }
-    if (!options?.skipPartnerTeam && (situation === "paid" || situation === "cancelled" || situation === "refunded")) {
+    if (situation === "paid" || situation === "cancelled" || situation === "refunded") {
       await notifyPartnerTeam({
         partnerId,
         type,
         entityType: "order",
         entityId: orderId,
         ctx,
+        origin,
       })
     }
     return
@@ -464,6 +480,7 @@ export async function onOrderStatusChanged(
         entityType: "order",
         entityId: orderId,
         ctx: { ...ctx, orderNumber },
+        origin,
       })
     }
   }

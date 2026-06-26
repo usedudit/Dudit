@@ -870,7 +870,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       .then(([whatsapp, notifications]) => {
         for (const row of createdRows) {
           whatsapp.onAppointmentCreated(row).catch(console.error)
-          notifications.onAppointmentCreated(row).catch(console.error)
+          notifications.onAppointmentCreated(row, "manual").catch(console.error)
         }
       })
       .catch(() => { })
@@ -1080,7 +1080,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       .catch(console.error)
     import("@/lib/services/notification-automation.service")
       .then(({ onAppointmentStatusChanged }) =>
-        onAppointmentStatusChanged(finalRow, prevStatus, nextStatus),
+        onAppointmentStatusChanged(finalRow, prevStatus, nextStatus, "manual"),
       )
       .catch(console.error)
 

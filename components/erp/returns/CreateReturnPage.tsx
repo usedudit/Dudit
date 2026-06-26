@@ -1335,8 +1335,7 @@ export default function CreateReturnPage({
                                                                     { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
                                                                     { value: "APPROVED", label: "Aprovada" },
                                                                     { value: "REJECTED", label: "Recusada" },
-                                                                    { value: "RESOLVED", label: "Concluida" }
-                                                                ]}
+                                            ]}
                                                             />
 
                                                             <FormDropdown
@@ -1349,8 +1348,7 @@ export default function CreateReturnPage({
                                                                     { value: "store_credit", label: "Vale-compra" },
                                                                     { value: "exchange", label: "Troca" },
                                                                     { value: "none", label: "Sem resolução" },
-                                                                    { value: "rejected", label: "Recusada" }
-                                                                ]}
+                                                            ]}
                                                             />
 
                                                             {isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")) && (

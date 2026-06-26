@@ -58,12 +58,6 @@ export async function revalidateOrders(partnerId: string) {
         await safeRevalidateTag(`partner-${partnerId}-orders`)
     }
     await safeRevalidateTag("orders")
-
-    // Clear router cache for relevant pages
-    revalidatePath("/erp/orders")
-    revalidatePath("/erp/dashboard")
-    revalidatePath("/pedidos")
-    revalidatePath("/", "layout")
 }
 
 export async function revalidateCoupons(partnerId: string) {

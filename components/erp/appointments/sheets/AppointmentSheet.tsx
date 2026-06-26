@@ -1100,6 +1100,7 @@ export const AppointmentSheet = ({
         { value: 'Reservado', label: 'Reservado' },
         { value: 'Confirmado', label: 'Confirmado' },
         { value: 'Aguardando', label: 'Aguardando' },
+        { value: 'Concluído', label: 'Concluído' },
         { value: 'Ausência', label: 'Ausência' },
     ] as const;
 

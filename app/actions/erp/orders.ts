@@ -1633,7 +1633,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
                 { ...order, partner_id: partnerId },
                 paymentState.situation,
                 order.delivery_status,
-                { skipPartnerTeam: true },
+                "manual",
             ),
         )
         .catch(console.error)
@@ -2426,7 +2426,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     import("@/lib/services/notification-automation.service")
         .then(({ onOrderStatusChanged }) =>
-            onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery, { skipPartnerTeam: true }),
+            onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery, "manual"),
         )
         .catch(console.error)
 
@@ -3105,11 +3105,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 }
                 const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
                 onWhatsappOrder(orderPayload, situation).catch(console.error)
-                onNotifyOrder(orderPayload, situation, undefined, { skipPartnerTeam: true }).catch(console.error)
+                onNotifyOrder(orderPayload, situation, undefined, "manual").catch(console.error)
             }
             if (payload.actionType === "delivery_status" && payload.statusValue) {
                 onWhatsappOrder(orderPayload, undefined, payload.statusValue).catch(console.error)
-                onNotifyOrder(orderPayload, undefined, payload.statusValue, { skipPartnerTeam: true }).catch(console.error)
+                onNotifyOrder(orderPayload, undefined, payload.statusValue, "manual").catch(console.error)
             }
         }
     }
@@ -3415,7 +3415,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation))
                 .catch(console.error)
             import("@/lib/services/notification-automation.service")
-                .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation, undefined, { skipPartnerTeam: true }))
+                .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation, undefined, "manual"))
                 .catch(console.error)
         }
 

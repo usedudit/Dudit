@@ -646,6 +646,10 @@ export async function connectEvolutionAction(): Promise<
         // 4. Build webhook URL and create Evolution client
         const webhookUrl = getWebhookUrl("evolution", connection.id)
         const webhookEvents = [...EVOLUTION_WEBHOOK_EVENTS]
+        const webhookHeaders = connection.evolution_webhook_secret
+            ? { "x-evolution-signature": connection.evolution_webhook_secret }
+            : undefined
+
         const client = new EvolutionWhatsappClient({
             apiUrl: serverConfig.apiUrl,
             apiKey: serverConfig.apiKey,
@@ -660,7 +664,7 @@ export async function connectEvolutionAction(): Promise<
         if (alreadyExists) {
             // Instance exists — ensure webhook is configured, then connect to get QR
             try {
-                await client.setWebhook(webhookUrl, webhookEvents)
+                await client.setWebhook(webhookUrl, webhookEvents, webhookHeaders)
             } catch {
                 // Non-fatal: webhook may already be set
             }
@@ -676,13 +680,13 @@ export async function connectEvolutionAction(): Promise<
             }
         } else {
             // Instance doesn't exist — create with inline webhook + QR
-            const createResult = await client.createInstance(webhookUrl, webhookEvents)
+            const createResult = await client.createInstance(webhookUrl, webhookEvents, webhookHeaders)
             result = { status: createResult.status, qrCode: createResult.qrCode || null }
 
             // Some Evolution versions don't register webhook inline during creation.
             // Always call setWebhook as a safety net to guarantee registration.
             try {
-                await client.setWebhook(webhookUrl, webhookEvents)
+                await client.setWebhook(webhookUrl, webhookEvents, webhookHeaders)
             } catch {
                 // Non-fatal: if creation already registered it, this is a no-op
             }

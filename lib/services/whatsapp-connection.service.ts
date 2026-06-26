@@ -248,15 +248,16 @@ export async function upsertEvolutionConnection(params: {
   activate?: boolean
 }): Promise<PartnerWhatsappConnection> {
   const admin = getAdminClient()
-  const webhookSecret = randomBytes(24).toString("hex")
   const now = new Date().toISOString()
 
   const { data: existing } = await admin
     .from("partner_whatsapp_connections")
-    .select("id")
+    .select("id, evolution_webhook_secret")
     .eq("partner_id", params.partnerId)
     .eq("provider", "evolution")
     .maybeSingle()
+
+  const webhookSecret = existing?.evolution_webhook_secret || randomBytes(24).toString("hex")
 
   const row = {
     partner_id: params.partnerId,

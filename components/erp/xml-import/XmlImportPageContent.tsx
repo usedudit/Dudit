@@ -1127,12 +1127,10 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                             )}
 
                                             {reimported && (
-                                                <div className="max-w-[1300px] mx-auto px-4 md:px-6 pt-4">
-                                                    <InfoCard
-                                                        color="orange"
-                                                        message="Este XML já foi importado anteriormente e teve sua importação revertida. Os dados foram restaurados para preview — revise e confirme para importar novamente."
-                                                    />
-                                                </div>
+                                                <InfoCard
+                                                    color="orange"
+                                                    message="Este XML já foi importado anteriormente e teve sua importação revertida. Revise os dados e confirme para importar novamente."
+                                                />
                                             )}
                                             <SidebarCard>
                                                 <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo</h3>

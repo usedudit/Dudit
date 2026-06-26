@@ -51,6 +51,7 @@ export interface CreateNotificationInput {
   entityId?: string | null
   data?: Record<string, unknown>
   idempotencyKey: string
+  origin?: "manual" | "automation" | "system"
 }
 
 export interface NotificationPageCursor {

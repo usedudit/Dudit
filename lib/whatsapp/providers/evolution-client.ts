@@ -385,7 +385,11 @@ export class EvolutionWhatsappClient {
    * Returns the QR code if qrcode=true was set and the instance isn't
    * already connected.
    */
-  async createInstance(webhookUrl: string, webhookEvents: string[]): Promise<ConnectResult> {
+  async createInstance(
+    webhookUrl: string,
+    webhookEvents: string[],
+    headers?: Record<string, string>,
+  ): Promise<ConnectResult> {
     const data = await this.request<Record<string, unknown>>(
       `/instance/create`,
       {
@@ -397,6 +401,7 @@ export class EvolutionWhatsappClient {
           url: webhookUrl,
           byEvents: false,
           events: webhookEvents,
+          headers: headers,
         },
       },
       "createInstance",
@@ -415,7 +420,11 @@ export class EvolutionWhatsappClient {
    * Uses POST /webhook/set/{instanceName}.
    * Only needed when the instance already existed and webhook wasn't set during creation.
    */
-  async setWebhook(webhookUrl: string, webhookEvents: string[]): Promise<void> {
+  async setWebhook(
+    webhookUrl: string,
+    webhookEvents: string[],
+    headers?: Record<string, string>,
+  ): Promise<void> {
     await this.request(
       `/webhook/set/${this.instanceName}`,
       {
@@ -424,6 +433,7 @@ export class EvolutionWhatsappClient {
           url: webhookUrl,
           byEvents: false,
           events: webhookEvents,
+          headers: headers,
         },
       },
       "setWebhook",

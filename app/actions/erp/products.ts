@@ -1176,9 +1176,9 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
 export async function linkProductSupplierAction(productId: string, supplierId: string, supplierData?: { costPrice?: number; supplierSku?: string; leadTimeDays?: number }) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "edit")
-        const supabase = await getSupabaseServerClient()
+        const admin = getAdminClient()
 
-        const { error } = await supabase.from("product_suppliers").insert({
+        const { error } = await admin.from("product_suppliers").insert({
             product_id: productId,
             supplier_id: supplierId,
             cost_price: supplierData?.costPrice || null,
@@ -1198,8 +1198,8 @@ export async function linkProductSupplierAction(productId: string, supplierId: s
 export async function unlinkProductSupplierAction(productId: string, supplierId: string) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "edit")
-        const supabase = await getSupabaseServerClient()
-        const { error } = await supabase.from("product_suppliers").delete().eq("product_id", productId).eq("supplier_id", supplierId)
+        const admin = getAdminClient()
+        const { error } = await admin.from("product_suppliers").delete().eq("product_id", productId).eq("supplier_id", supplierId)
         if (error) return { error: error.message }
 
         revalidateSuppliers(product.partner_id)
@@ -1213,12 +1213,12 @@ export async function unlinkProductSupplierAction(productId: string, supplierId:
 export async function updateProductSupplierAction(productId: string, supplierId: string, data: { costPrice?: number | null; supplierSku?: string | null; leadTimeDays?: number | null }) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "edit")
-        const supabase = await getSupabaseServerClient()
+        const admin = getAdminClient()
         const updates: any = {}
         if (data.costPrice !== undefined) updates.cost_price = data.costPrice
         if (data.supplierSku !== undefined) updates.supplier_sku = data.supplierSku
         if (data.leadTimeDays !== undefined) updates.lead_time_days = data.leadTimeDays
-        const { error } = await supabase.from("product_suppliers").update(updates).eq("product_id", productId).eq("supplier_id", supplierId)
+        const { error } = await admin.from("product_suppliers").update(updates).eq("product_id", productId).eq("supplier_id", supplierId)
         if (error) return { error: error.message }
         revalidateSuppliers(product.partner_id)
         revalidateProducts(product.partner_id, productId)
@@ -1243,8 +1243,8 @@ export const getCachedSuppliers = async (partnerId: string) => {
 export async function getProductSuppliersAction(productId: string) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "view")
-        const supabase = await getSupabaseServerClient()
-        const { data, error } = await supabase
+        const admin = getAdminClient()
+        const { data, error } = await admin
             .from("product_suppliers")
             .select(`
                 id, product_id, supplier_id, cost_price, supplier_sku, lead_time_days,

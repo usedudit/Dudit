@@ -46,6 +46,12 @@ export async function createNotification(
   }
 
   const audience = (input.data?.audience as NotificationAudience | undefined) || "customer"
+  const origin = input.origin || "system"
+
+  if (origin === "manual" && (audience === "seller" || audience === "admin")) {
+    return { notification: null, created: false }
+  }
+
   const href = getNotificationHref({
     type: input.type,
     entityType: input.entityType ?? null,
@@ -61,7 +67,7 @@ export async function createNotification(
     message: input.message,
     entity_type: input.entityType ?? null,
     entity_id: input.entityId ?? null,
-    data: { ...input.data, href, audience },
+    data: { ...input.data, href, audience, origin },
     idempotency_key: input.idempotencyKey,
   }
 
@@ -261,6 +267,13 @@ export async function registerPushSubscription(params: {
   deviceFingerprint?: string | null
 }): Promise<{ success: boolean; error?: string }> {
   const admin = getAdminClient()
+
+  // 1. Delete this token from any other users to ensure exclusive ownership
+  await admin
+    .from("push_subscriptions")
+    .delete()
+    .eq("fcm_token", params.fcmToken)
+    .neq("user_id", params.userId)
 
   if (params.deviceFingerprint && params.deviceName) {
     const fingerprintTag = `fp:${params.deviceFingerprint}:${params.deviceName}`
