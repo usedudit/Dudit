@@ -22,7 +22,7 @@ export function toLegacyPaymentType(value: string | null | undefined): string {
 
 export function formatPaymentMethodLabel(value?: string | null): string {
   const normalized = String(value || "").trim().toLowerCase()
-  if (!normalized || normalized === "pendente") return "Dinheiro"
+  if (!normalized || normalized === "pendente" || normalized === "método não definido") return "Método não definido"
   if (normalized === "cash" || normalized === "dinheiro" || normalized === "money") return "Dinheiro"
   if (normalized === "pix") return "Pix"
   if (normalized === "credito" || normalized === "credit_card" || normalized === "cartao_credito") return "Cartão de Crédito"

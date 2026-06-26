@@ -395,7 +395,7 @@ export class EvolutionWhatsappClient {
         webhook: {
           enabled: true,
           url: webhookUrl,
-          byEvents: true,
+          byEvents: false,
           events: webhookEvents,
         },
       },
@@ -422,7 +422,7 @@ export class EvolutionWhatsappClient {
         webhook: {
           enabled: true,
           url: webhookUrl,
-          byEvents: true,
+          byEvents: false,
           events: webhookEvents,
         },
       },

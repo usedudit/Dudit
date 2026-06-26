@@ -247,6 +247,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
     const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
     const [originalPaymentBreakdown, setOriginalPaymentBreakdown] = useState<PaymentBreakdownEntry[]>([])
+    const [originalOrderSource, setOriginalOrderSource] = useState<string | null>(null)
     const [paymentMethodDiscountAmount, setPaymentMethodDiscountAmount] = useState(0)
     const [paymentMethodExtraAmount, setPaymentMethodExtraAmount] = useState(0)
     const [originalTotalAmount, setOriginalTotalAmount] = useState(0)
@@ -409,7 +410,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
     const isPaidOrderLocked = Boolean(editOrderId && originalPaymentStatus === "paid")
-    const isMarketplaceOrder = Boolean(editOrderId)
+    const isMarketplaceOrder = originalOrderSource === "Online Store"
 
     const isPaidOrder = originalPaymentStatus === 'paid' || originalPaymentStatus === 'partially_paid'
     const isDeliveredOrder = originalDeliveryStatus === 'delivered'
@@ -478,6 +479,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setSelectedCustomer(order.customers ? normalizeCustomerForCard(order.customers) : (order.buyer_id ? { id: order.buyer_id, name: order.customer_name } : null))
                 setOrderDate(order.created_at.split('T')[0])
                 setSalesChannel(normalizeSalesChannel(order.order_source))
+                setOriginalOrderSource(order.order_source || null)
                 setDeliveryMethod(order.delivery_type as any || "pickup")
                 const normalizedStatus = order.situation === "paid" ? "paid" : order.situation === "partially_paid" ? "partially_paid" : "unpaid"
                 const loadedPaymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
@@ -954,6 +956,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setOriginalPaidAmount(0)
         setOriginalPaymentMethod("Não informado")
         setOriginalPaymentBreakdown([])
+        setOriginalOrderSource(null)
         setInventoryAlreadyDeducted(false)
         setManualItemNameErrors(new Set())
         setManualItemPriceErrors(new Set())
@@ -1112,7 +1115,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             deliveryMethod,
             financeAccountId,
             paymentStatus: finalPaymentStatus,
-            paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
+            paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "Método não definido"),
             paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
             deliveryStatus: finalDeliveryStatus as any,
             paidAmount: paymentOverrides?.paidAmount,

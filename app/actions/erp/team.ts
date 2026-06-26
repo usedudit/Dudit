@@ -65,13 +65,16 @@ async function fetchPartnerTeamMembers(partnerId: string): Promise<{ members: Te
     if (!partnerUsers || partnerUsers.length === 0) return { members: [] }
 
     const userIds = partnerUsers.map((pu: any) => pu.user_id)
-    const [profilesRes, authRes] = await Promise.all([
+    const [profilesRes, authUsers] = await Promise.all([
         admin.from("user_profiles").select("user_id, full_name").in("user_id", userIds),
-        admin.from("auth.users").select("id, email").in("id", userIds),
+        Promise.all(userIds.map(async (uid: string) => {
+            const { data } = await admin.auth.admin.getUserById(uid)
+            return data?.user ? { id: data.user.id, email: data.user.email } : null
+        })),
     ])
 
     let emailMap: Record<string, string> = {}
-    if (authRes.data) for (const u of authRes.data) emailMap[u.id] = u.email || ""
+    for (const u of authUsers) if (u) emailMap[u.id] = u.email || ""
 
     const profileMap: Record<string, { full_name: string | null }> = {}
     if (profilesRes.data) for (const p of profilesRes.data) profileMap[p.user_id] = { full_name: p.full_name }

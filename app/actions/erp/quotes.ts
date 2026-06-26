@@ -687,11 +687,8 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
             .maybeSingle()
         if (profile) {
             const admin = getAdminClient()
-            const { data: authUser } = await admin
-                .from("auth.users")
-                .select("email")
-                .eq("id", quote.user_id)
-                .maybeSingle()
+            const { data: authData } = await admin.auth.admin.getUserById(quote.user_id)
+            const authUser = authData?.user ? { email: authData.user.email } : null
             sellerInfo = {
                 name: profile.full_name,
                 email: authUser?.email || null
@@ -1597,7 +1594,7 @@ export async function convertQuoteToOrderAction(data: {
                 financeAccountId: defaultFinanceAccountId,
                 paymentStatus: "unpaid" as const,
                 deliveryStatus: "not_sent" as const,
-                paymentMethod: "pendente",
+                paymentMethod: "Método não definido",
                 paymentBreakdown: [] as { method: string; amount: number }[],
                 address: hasFullDeliveryAddress && primaryAddress
                     ? {
@@ -2155,11 +2152,8 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         .eq("user_id", quote.user_id)
                         .maybeSingle()
                     if (profile) {
-                        const { data: authUser } = await admin
-                            .from("auth.users")
-                            .select("email")
-                            .eq("id", quote.user_id)
-                            .maybeSingle()
+                        const { data: authData } = await admin.auth.admin.getUserById(quote.user_id)
+                        const authUser = authData?.user ? { email: authData.user.email } : null
                         sellerInfo = {
                             name: profile.full_name,
                             email: authUser?.email || null

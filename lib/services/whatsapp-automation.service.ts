@@ -1,7 +1,7 @@
 import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { queueWhatsappMessage } from "./whatsapp-dispatch.service"
+import { queueWhatsappMessage, processWhatsappMessageById } from "./whatsapp-dispatch.service"
 import { normalizePhoneToE164 } from "@/lib/whatsapp/phone"
 import type { WhatsappAutomationTrigger } from "@/lib/whatsapp/types"
 
@@ -149,6 +149,14 @@ export async function dispatchWhatsappAutomation(params: {
     idempotencyKey,
     scheduledAt: params.scheduledAt,
   })
+
+  if (result.messageId && !result.skipped && !params.scheduledAt) {
+    try {
+      await processWhatsappMessageById(result.messageId)
+    } catch (err) {
+      console.error(`[whatsapp] Inline processing failed for message ${result.messageId}:`, err)
+    }
+  }
 
   return { queued: !result.skipped, messageId: result.messageId }
 }

@@ -815,33 +815,7 @@ export default function OrdersPage({
                                 })
                             }}
                             onUpdatePaymentStatus={(order: any) => {
-                                openPaymentStatusModal({
-                                    originalId: order.id,
-                                    displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
-                                    customer_name: order.customer_name || "Consumidor final",
-                                    customer_id: order.buyer_id || "-",
-                                    total_amount: Number(order.total_amount || 0),
-                                    statusLabel: "",
-                                    statusColor: "gray",
-                                    deliveryStatusLabel: "",
-                                    deliveryStatusColor: "gray",
-                                    isUnfulfilled: false,
-                                    formattedDate: "",
-                                    formattedTime: "",
-                                    store_name: "",
-                                    order_source: order.order_source || "Manual",
-                                    items_count: Number(order.order_items?.length || 0),
-                                    created_at_time: new Date(order.created_at || Date.now()).getTime(),
-                                    situation: order.situation || "pending",
-                                    delivery_status: order.delivery_status || "not_sent",
-                                    notes: order.notes || "",
-                                    previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
-                                    returnCount: Number(order.return_count || order.return_requests?.length || 0),
-                                    canEdit: order.situation !== "cancelled",
-                                    paidAmount: Number(order.paid_amount || 0),
-                                    payment_method: order.payment_method || "",
-                                    payment_breakdown: order.payment_breakdown || null,
-                                })
+                                openEntity('edit', order.id)
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
                             onOpenNotes={(order: any) => openNotesSheet(order)}
@@ -989,7 +963,7 @@ export default function OrdersPage({
                                                                 canEdit={o.canEdit}
                                                                 cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                 onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
-                                                                onPaymentStatus={o.situation !== "cancelled" ? () => openPaymentStatusModal(o) : undefined}
+                                                                onPaymentStatus={o.situation !== "cancelled" ? () => handleEditOrder(o) : undefined}
                                                                 onDeliveryStatus={o.situation !== "cancelled" && !o.hasOnlyServices ? () => openDeliveryStatusModal(o) : undefined}
                                                                 onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                 onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
@@ -1066,7 +1040,7 @@ export default function OrdersPage({
                                                                             cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                             onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                             onDetails={handleDetailsOrder}
-                                                                            onPaymentStatus={o.situation !== "cancelled" ? () => openPaymentStatusModal(o) : undefined}
+                                                                            onPaymentStatus={o.situation !== "cancelled" ? () => handleEditOrder(o) : undefined}
                                                                             onDeliveryStatus={o.situation !== "cancelled" && !o.hasOnlyServices ? () => openDeliveryStatusModal(o) : undefined}
                                                                             onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                             onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}

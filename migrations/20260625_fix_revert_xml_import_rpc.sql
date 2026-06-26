@@ -60,9 +60,10 @@ BEGIN
   -- 1. Create reverse stock movement
   -- =========================================================
   INSERT INTO public.stock_movements (
-    partner_id, movement_type, reference_type, reason, notes, created_by
+    partner_id, movement_type, reference_type, reference_name, reason, notes, created_by
   ) VALUES (
-    v_import.partner_id, 'adjustment', '-',
+    v_import.partner_id, 'adjustment', 'internal',
+    'NF-e ' || COALESCE(v_import.invoice_number, ''),
     'Reversão importação NF-e',
     COALESCE(p_reason, 'Reversão da importação ' || v_import.access_key),
     COALESCE(p_created_by, auth.uid())

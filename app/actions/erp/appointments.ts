@@ -712,7 +712,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
             situation: "pending",
             delivery_status: "delivered", // Fulfilled right away
             delivery_type: "pickup",
-            payment_method: "pendente",
+            payment_method: "Método não definido",
             order_source: "Manual",
             pricing_version: pricingResult.pricingVersion,
             notes: row.notes || null,

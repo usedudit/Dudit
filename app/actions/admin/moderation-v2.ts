@@ -234,11 +234,8 @@ export async function fetchModerationTarget(
                         .eq("id", data.user_id)
                         .single()
                     if (profile) {
-                        const { data: authUser } = await admin
-                            .from("auth.users")
-                            .select("email")
-                            .eq("id", data.user_id)
-                            .maybeSingle()
+                        const { data: authData } = await admin.auth.admin.getUserById(data.user_id)
+                        const authUser = authData?.user ? { email: authData.user.email } : null
                         owner = {
                             ...profile,
                             email: authUser?.email || null

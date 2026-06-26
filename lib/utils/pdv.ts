@@ -4,7 +4,7 @@ export const normalizePDVPaymentMethodLabel = (value?: string | null) => {
   if (normalized === "dinheiro") return "Dinheiro"
   if (normalized === "pix") return "Pix"
   if (normalized === "cartao" || normalized === "cartão") return "Cartão"
-  if (normalized === "pendente") return "Pendente"
+  if (normalized === "pendente" || normalized === "método não definido") return "Método não definido"
   return String(value || "").trim()
 }
 

@@ -389,7 +389,7 @@ BEGIN
         ) VALUES (
           p_partner_id, 'in', 'supplier',
           (SELECT 'NF-e ' || COALESCE(invoice_number, '') FROM public.xml_imports WHERE id = p_xml_import_id),
-          NULL, NULL,
+          'Importação XML NF-e', NULL,
           COALESCE(p_created_by, auth.uid())
         )
         RETURNING id INTO v_movement_id;

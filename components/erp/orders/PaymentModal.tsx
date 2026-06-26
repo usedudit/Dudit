@@ -60,7 +60,7 @@ const normalizePaymentMethodLabel = (value?: string | null) => {
     if (normalized.includes('cartão de débito') || normalized.includes('cartao de debito') || normalized.includes('debito') || normalized.includes('débito') || normalized.includes('debit')) return 'Cartão de Débito';
     if (normalized.includes('transferência') || normalized.includes('transferencia') || normalized.includes('ted') || normalized.includes('doc')) return 'Transferência';
     if (normalized.includes('cartao') || normalized.includes('cartão') || normalized.includes('card')) return 'Cartão';
-    if (normalized.includes('pendente')) return 'Pendente';
+    if (normalized.includes('pendente') || normalized.includes('método não definido')) return 'Método não definido';
     return String(value || '').trim();
 };
 
@@ -1410,7 +1410,7 @@ const PaymentModal = ({
             .filter((entry: any) => entry?.method && Number(entry?.amount || 0) > 0.009);
 
         const paymentMethod = isPendingPayment
-            ? 'pendente'
+            ? 'Método não definido'
             : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ');
 
         const singleRegisterAmount =
@@ -1422,7 +1422,7 @@ const PaymentModal = ({
                 : (existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : singleRegisterAmount));
 
         return {
-            paymentMethod: paymentMethod || 'pendente',
+            paymentMethod: paymentMethod || 'Método não definido',
             paymentBreakdown: mergedPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
             paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),

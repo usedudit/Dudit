@@ -112,11 +112,8 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                     .eq("user_id", quote.user_id)
                     .maybeSingle()
                 if (profile) {
-                    const { data: authUser } = await supabase
-                        .from("auth.users")
-                        .select("email")
-                        .eq("id", quote.user_id)
-                        .maybeSingle()
+                    const { data: authData } = await supabase.auth.admin.getUserById(quote.user_id)
+                    const authUser = authData?.user ? { email: authData.user.email } : null
                     userProfile = {
                         full_name: profile.full_name,
                         email: authUser?.email || null

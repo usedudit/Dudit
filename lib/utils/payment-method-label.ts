@@ -20,6 +20,7 @@ export function formatPaymentMethodLabel(
     if (norm.includes("transfer") || norm.includes("ted") || norm.includes("doc")) return "Transferência"
     if (norm.includes("cartao") || norm.includes("cartão") || norm.includes("card")) return "Cartão"
     if (norm.includes("other") || norm.includes("outro")) return "Outros"
+    if (norm.includes("método não definido") || norm.includes("pendente")) return "Método não definido"
 
     // Capitalize type if not recognized
     return typeOrName.charAt(0).toUpperCase() + typeOrName.slice(1)
