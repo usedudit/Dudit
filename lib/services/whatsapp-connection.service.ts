@@ -199,6 +199,42 @@ export function getWebhookUrl(provider: WhatsappProviderId = "meta", connectionI
   return `${origin}${suffix}`
 }
 
+// ─── Evolution Server Config ──────────────────────────────────────────────────
+
+/**
+ * Standard webhook events for Evolution API.
+ * Registered during instance creation.
+ */
+export const EVOLUTION_WEBHOOK_EVENTS = [
+  "QRCODE_UPDATED",
+  "MESSAGES_UPSERT",
+  "MESSAGES_UPDATE",
+  "SEND_MESSAGE",
+  "CONNECTION_UPDATE",
+] as const
+
+/**
+ * Reads Evolution API server config from environment variables.
+ * Returns null if not configured (Evolution tab will be disabled in UI).
+ */
+export function getEvolutionServerConfig(): { apiUrl: string; apiKey: string } | null {
+  const apiUrl = process.env.EVOLUTION_API_URL?.trim()
+  const apiKey = process.env.EVOLUTION_API_KEY?.trim()
+
+  if (!apiUrl || !apiKey) return null
+
+  return { apiUrl, apiKey }
+}
+
+/**
+ * Generates a unique, unpredictable instance name for Evolution API.
+ * Uses randomBytes for zero correlation with partnerId.
+ */
+export function generateEvolutionInstanceName(): string {
+  return `dudit_${randomBytes(8).toString("hex")}`
+}
+
+
 /**
  * Upserts an Evolution API connection with dedicated Evolution-specific fields.
  * Meta fields (access_token_encrypted, phone_number_id, business_account_id) are NOT touched.

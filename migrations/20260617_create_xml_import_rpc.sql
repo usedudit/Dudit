@@ -88,7 +88,7 @@ BEGIN
   SET status = 'preview', updated_at = NOW()
   WHERE id = p_xml_import_id
     AND partner_id = p_partner_id
-    AND status IN ('preview', 'pending');
+    AND status IN ('preview', 'pending', 'failed');
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Importação não encontrada ou já processada' USING ERRCODE = 'P0002';
@@ -396,7 +396,7 @@ BEGIN
         INSERT INTO public.stock_movements (
           partner_id, movement_type, reference_type, reason, notes, created_by
         ) VALUES (
-          p_partner_id, 'purchase', '-',
+          p_partner_id, 'purchase', 'supplier',
           'Importação XML NF-e',
           (SELECT invoice_number FROM public.xml_imports WHERE id = p_xml_import_id),
           COALESCE(p_created_by, auth.uid())

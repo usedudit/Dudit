@@ -27,18 +27,30 @@ export function createWhatsappProviderFromConnection(
     }
 
     case "evolution": {
-      if (!connection.api_key_encrypted) {
-        throw new Error("API Key da Evolution não configurada")
-      }
-      if (!connection.api_url) {
-        throw new Error("URL da Evolution API não configurada")
+      const envApiUrl = process.env.EVOLUTION_API_URL?.trim()
+      const envApiKey = process.env.EVOLUTION_API_KEY?.trim()
+
+      const apiUrl = connection.api_url || envApiUrl
+      const apiKeyEncrypted = connection.api_key_encrypted
+
+      if (!apiUrl) {
+        throw new Error("URL da Evolution API não configurada (nem no banco, nem em EVOLUTION_API_URL)")
       }
       if (!connection.instance_name) {
         throw new Error("Nome da instância Evolution não configurado")
       }
-      const apiKey = decrypt(connection.api_key_encrypted, "whatsapp")
+
+      // Use encrypted key from DB if available, otherwise fall back to env var
+      const apiKey = apiKeyEncrypted
+        ? decrypt(apiKeyEncrypted, "whatsapp")
+        : envApiKey
+
+      if (!apiKey) {
+        throw new Error("API Key da Evolution não configurada (nem no banco, nem em EVOLUTION_API_KEY)")
+      }
+
       return createEvolutionWhatsappProvider({
-        apiUrl: connection.api_url,
+        apiUrl,
         apiKey,
         instanceName: connection.instance_name,
         webhookSecret: connection.evolution_webhook_secret,

@@ -14,10 +14,10 @@ function DashboardSkeleton() {
   )
 }
 
-export function GeneralTab({ partnerId, sells, period, compare }: { partnerId: string; sells: string[]; period?: Period; compare?: CompareMode }) {
+export function GeneralTab({ partnerId, sells, period, compare, compareFrom, compareTo }: { partnerId: string; sells: string[]; period?: Period; compare?: CompareMode; compareFrom?: string; compareTo?: string }) {
     return (
         <Suspense fallback={<DashboardSkeleton />}>
-            <Dashboard partnerId={partnerId} sells={sells} period={period} compare={compare} />
+            <Dashboard partnerId={partnerId} sells={sells} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />
         </Suspense>
     )
 }

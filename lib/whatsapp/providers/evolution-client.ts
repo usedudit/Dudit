@@ -28,12 +28,39 @@ const BLOCKED_HOSTNAMES = new Set([
   "169.254.169.254",
 ])
 
+/**
+ * Normalizes and validates an Evolution API URL.
+ *
+ * Fixes the root cause of "URL da Evolution API inválida":
+ * - Auto-prepends https:// when protocol is missing
+ * - Strips trailing slashes to avoid double-slash in endpoint paths
+ * - Trims all whitespace including unicode (NBSP, Zero-Width Space)
+ */
+function normalizeEvolutionUrl(raw: string): string {
+  // Aggressive trim: remove all unicode whitespace and control characters
+  let url = raw.replace(/^[\s\u200B\uFEFF\u00A0]+|[\s\u200B\uFEFF\u00A0]+$/g, "")
+
+  // Auto-prepend https:// if no protocol is present
+  if (url && !url.match(/^https?:\/\//i)) {
+    url = `https://${url}`
+  }
+
+  // Strip trailing slashes to prevent double-slash when appending paths
+  url = url.replace(/\/+$/, "")
+
+  return url
+}
+
 function validateEvolutionUrl(url: string): URL {
+  const normalized = normalizeEvolutionUrl(url)
+
   let parsed: URL
   try {
-    parsed = new URL(url)
+    parsed = new URL(normalized)
   } catch {
-    throw new Error("URL da Evolution API inválida")
+    throw new Error(
+      `URL da Evolution API inválida: não foi possível interpretar "${url.substring(0, 60)}"`,
+    )
   }
   if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
     throw new Error(`Protocolo não permitido: ${parsed.protocol}`)
@@ -323,6 +350,83 @@ export class EvolutionWhatsappClient {
       null,
       "restartInstance",
       "PUT",
+    )
+  }
+
+  // ─── Instance Management ──────────────────────────────────────────────────
+
+  /**
+   * Checks if an instance with this client's instanceName already exists
+   * on the Evolution server by calling GET /instance/fetchInstances.
+   */
+  async instanceExists(): Promise<boolean> {
+    try {
+      const data = await this.request<unknown>(
+        `/instance/fetchInstances`,
+        null,
+        "instanceExists",
+        "GET",
+      )
+
+      const instances = Array.isArray(data) ? data : ((data as Record<string, unknown>)?.instances ?? []) as Record<string, unknown>[]
+      return (instances as Record<string, unknown>[]).some(
+        (i) => i.instanceName === this.instanceName || i.name === this.instanceName,
+      )
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Creates a new instance on the Evolution server.
+   * Uses POST /instance/create with inline webhook config to avoid
+   * a separate /webhook/set call.
+   *
+   * Returns the QR code if qrcode=true was set and the instance isn't
+   * already connected.
+   */
+  async createInstance(webhookUrl: string, webhookEvents: string[]): Promise<ConnectResult> {
+    const data = await this.request<Record<string, unknown>>(
+      `/instance/create`,
+      {
+        instanceName: this.instanceName,
+        qrcode: true,
+        integration: "WHATSAPP-BAILEYS",
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          byEvents: true,
+          events: webhookEvents,
+        },
+      },
+      "createInstance",
+    )
+
+    // Extract QR code from response
+    const qrcodeObj = (data?.qrcode ?? {}) as Record<string, unknown>
+    const qrCode = (qrcodeObj.base64 as string) || (data?.base64 as string) || (data?.code as string) || null
+    const status: WhatsappConnectionStatus = qrCode ? "qr_pending" : "connecting"
+
+    return { status, qrCode }
+  }
+
+  /**
+   * Sets/updates webhook configuration for an existing instance.
+   * Uses POST /webhook/set/{instanceName}.
+   * Only needed when the instance already existed and webhook wasn't set during creation.
+   */
+  async setWebhook(webhookUrl: string, webhookEvents: string[]): Promise<void> {
+    await this.request(
+      `/webhook/set/${this.instanceName}`,
+      {
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          byEvents: true,
+          events: webhookEvents,
+        },
+      },
+      "setWebhook",
     )
   }
 

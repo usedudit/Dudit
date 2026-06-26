@@ -6,8 +6,8 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 import type { Period } from "@/lib/period-types"
 
-function getDateRangeForPeriod(period: Period) {
-  const today = getTodayYmdSaoPaulo()
+function getDateRangeForPeriod(period: Period, todayOverride?: string) {
+  const today = todayOverride || getTodayYmdSaoPaulo()
   switch (period) {
     case "daily":
       return { today, from: today, previousFrom: addDays(today, -1) }
@@ -552,11 +552,11 @@ export async function getDashboardOperationsData(partnerId: string) {
 // MODULAR GENERAL TAB - independent queries with granular cache tags
 // ============================================================================
 
-async function getCachedGeneralMetrics(partnerId: string, period: Period = "monthly"): Promise<{ metrics: Metric[] }> {
+async function getCachedGeneralMetrics(partnerId: string, period: Period = "monthly", todayOverride?: string): Promise<{ metrics: Metric[] }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      const { today, from, previousFrom } = getDateRangeForPeriod(period)
+      const { today, from, previousFrom } = getDateRangeForPeriod(period, todayOverride)
 
       const [orders, transactions] = await Promise.all([
         supabase.from("orders").select("id, total_amount, customer_name, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${previousFrom}T00:00:00`).order("created_at", { ascending: false }).limit(300),
@@ -584,7 +584,7 @@ async function getCachedGeneralMetrics(partnerId: string, period: Period = "mont
         ],
       }
     },
-    ["dashboard-metrics", partnerId, period],
+    ["dashboard-metrics", partnerId, period, todayOverride || ""],
     { tags: [DASHBOARD_TAGS.metrics(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 60 },
   )()
 }
@@ -643,11 +643,11 @@ async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promi
   )()
 }
 
-async function getCachedGeneralRevenueChart(partnerId: string, period: Period = "monthly"): Promise<{ revenue: any[]; total: number; trend: string }> {
+async function getCachedGeneralRevenueChart(partnerId: string, period: Period = "monthly", todayOverride?: string): Promise<{ revenue: any[]; total: number; trend: string }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      const { today, from } = getDateRangeForPeriod(period)
+      const { today, from } = getDateRangeForPeriod(period, todayOverride)
       const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
       const prevFrom = addDays(from, -daysInPeriod)
 
@@ -680,7 +680,7 @@ async function getCachedGeneralRevenueChart(partnerId: string, period: Period = 
 
       return { revenue, total, trend }
     },
-    ["dashboard-revenue", partnerId, period],
+    ["dashboard-revenue", partnerId, period, todayOverride || ""],
     { tags: [DASHBOARD_TAGS.revenue(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
   )()
 }
@@ -879,9 +879,9 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[],
 // PUBLIC EXPORTS - Modular General Tab
 // ============================================================================
 
-export async function getGeneralMetrics(partnerId: string, period: Period = "monthly") {
+export async function getGeneralMetrics(partnerId: string, period: Period = "monthly", todayOverride?: string) {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralMetrics(partnerId, period)
+  return getCachedGeneralMetrics(partnerId, period, todayOverride)
 }
 
 export async function getGeneralAlerts(partnerId: string, sells: string[]) {
@@ -889,9 +889,9 @@ export async function getGeneralAlerts(partnerId: string, sells: string[]) {
   return getCachedGeneralAlerts(partnerId, sells)
 }
 
-export async function getGeneralRevenueChart(partnerId: string, period: Period = "monthly") {
+export async function getGeneralRevenueChart(partnerId: string, period: Period = "monthly", todayOverride?: string) {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralRevenueChart(partnerId, period)
+  return getCachedGeneralRevenueChart(partnerId, period, todayOverride)
 }
 
 export async function getGeneralRevenueOrigin(partnerId: string, period: Period = "monthly") {

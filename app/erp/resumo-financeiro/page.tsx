@@ -13,7 +13,7 @@ import type { Period, CompareMode } from "@/lib/period-types"
 
 export const dynamic = "force-dynamic"
 
-export default async function FinancialOverviewRoute(props: { searchParams?: Promise<{ period?: string; compare?: string }> }) {
+export default async function FinancialOverviewRoute(props: { searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string }> }) {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
@@ -37,7 +37,7 @@ export default async function FinancialOverviewRoute(props: { searchParams?: Pro
 
   const searchParams = await props.searchParams
   const period = (searchParams?.period as Period) || "monthly"
-  const compare = (searchParams?.compare as CompareMode) || "previous"
+  const compare = (searchParams?.compare as CompareMode) || "none"
 
   const result = await getFinancialOverviewData(partnerId, period)
   if (!result.success) {

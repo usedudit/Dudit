@@ -23,7 +23,7 @@ function DashboardSkeleton() {
     )
 }
 
-export default async function ERPDashboardPage(props: { searchParams?: Promise<{ period?: string; compare?: string }> }) {
+export default async function ERPDashboardPage(props: { searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string }> }) {
     const context = await getCurrentPartnerContext()
     if (!context) return <AccessDenied />
 
@@ -39,7 +39,9 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
 
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
-    const compare = (searchParams?.compare as CompareMode) || "previous"
+    const compare = (searchParams?.compare as CompareMode) || "none"
+    const compareFrom = searchParams?.compareFrom
+    const compareTo = searchParams?.compareTo
 
     return (
         <>
@@ -60,7 +62,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
                         </Suspense>
                     </header>
                     <Suspense fallback={<DashboardSkeleton />}>
-                        <GeneralTab partnerId={partnerId} sells={sells} period={period} compare={compare} />
+                        <GeneralTab partnerId={partnerId} sells={sells} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />
                     </Suspense>
                 </div>
             </FadeIn>

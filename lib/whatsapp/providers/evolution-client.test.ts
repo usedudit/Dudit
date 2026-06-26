@@ -19,10 +19,19 @@ describe("EvolutionWhatsappClient URL Validation", () => {
     expect(client).toBeDefined()
   })
 
-  it("throws on invalid URL formats", () => {
+  it("auto-prepends https:// when protocol is missing", () => {
+    const client = new EvolutionWhatsappClient({
+      apiUrl: "api.evolution.example.com",
+      apiKey: "test-api-key",
+      instanceName: "test-instance",
+    })
+    expect(client).toBeDefined()
+  })
+
+  it("throws on empty URL", () => {
     expect(() => {
       new EvolutionWhatsappClient({
-        apiUrl: "not-a-url",
+        apiUrl: "",
         apiKey: "test-api-key",
         instanceName: "test-instance",
       })

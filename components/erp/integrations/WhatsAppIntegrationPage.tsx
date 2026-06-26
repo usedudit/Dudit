@@ -2,10 +2,9 @@
 
 import React, { useState, useCallback, useRef, useEffect } from "react"
 import Link from "next/link"
-import { Button, Badge, Input, InfoCard, FormSection } from "@/components/reusable"
+import { Button, Badge, Input, InfoCard } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
-import { SkeletonLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, CheckCircleIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
@@ -21,7 +20,7 @@ import {
   disconnectEvolutionAction,
   getEvolutionStatusAction,
   testEvolutionConnectionAction,
-  connectEvolutionInstanceAction,
+  isEvolutionConfiguredAction,
   type WhatsappConnectionView,
   type WhatsappMessageView,
   type WhatsappTemplateView,
@@ -88,18 +87,13 @@ export function WhatsAppIntegrationPage({
   const [isLoading, setIsLoading] = useState(false)
   const [testPhone, setTestPhone] = useState("")
 
-  // Evolution-specific state
-  const [evoApiUrl, setEvoApiUrl] = useState("")
-  const [evoApiKey, setEvoApiKey] = useState("")
-  const [evoInstanceName, setEvoInstanceName] = useState("")
+  // Evolution-specific state (simplified — no manual config)
   const [evoStatus, setEvoStatus] = useState<string>("disconnected")
   const [evoQrCode, setEvoQrCode] = useState<string | null>(null)
   const [evoPhoneNumber, setEvoPhoneNumber] = useState<string | null>(null)
   const [evoTestPhone, setEvoTestPhone] = useState("")
-  const [evoWebhookUrl, setEvoWebhookUrl] = useState<string | null>(null)
-  const [evoWebhookSecret, setEvoWebhookSecret] = useState<string | null>(null)
   const [evoIsLoading, setEvoIsLoading] = useState(false)
-  const [evoShowSecret, setEvoShowSecret] = useState(false)
+  const [evoConfigured, setEvoConfigured] = useState<boolean | null>(null)
 
   // Header scroll
   const [isScrolled, setIsScrolled] = useState(false)
@@ -125,29 +119,34 @@ export function WhatsAppIntegrationPage({
     }
   }, [])
 
+  // Check if Evolution is configured on mount
+  useEffect(() => {
+    isEvolutionConfiguredAction().then((res) => {
+      if (res.success && res.data) {
+        setEvoConfigured(res.data.configured)
+      }
+    })
+  }, [])
+
   // Initialize Evolution state from existing connection
   useEffect(() => {
     if (evoConnection) {
       setEvoStatus(evoConnection.status)
       setEvoPhoneNumber(evoConnection.phoneNumber)
-      setEvoWebhookUrl(evoConnection.webhookUrl)
-      if (evoConnection.apiUrl && !evoApiUrl) setEvoApiUrl(evoConnection.apiUrl)
-      if (evoConnection.instanceName && !evoInstanceName) setEvoInstanceName(evoConnection.instanceName)
     }
   }, [evoConnection])
 
-  // Polling for connection status when qr_pending or connecting to improve UX
+  // Polling for connection status when qr_pending or connecting
   useEffect(() => {
     if (evoStatus !== "qr_pending" && evoStatus !== "connecting") return
 
     const startTime = Date.now()
     const interval = setInterval(async () => {
-      // Stop polling after 5 minutes of inactivity to save resources
       if (Date.now() - startTime > 5 * 60 * 1000) {
         clearInterval(interval)
         setEvoStatus("disconnected")
         setEvoQrCode(null)
-        toast.error("Tempo limite de pareamento atingido. Atualize e gere um novo QR Code.")
+        toast.error("Tempo limite de pareamento atingido. Gere um novo QR Code.")
         return
       }
 
@@ -157,7 +156,7 @@ export function WhatsAppIntegrationPage({
         setEvoQrCode(res.data.qrCode)
         setEvoPhoneNumber(res.data.phoneNumber)
         if (res.data.status === "connected") {
-          toast.success("Instância conectada com sucesso!")
+          toast.success("WhatsApp conectado com sucesso!")
           await refresh()
         }
       }
@@ -165,10 +164,6 @@ export function WhatsAppIntegrationPage({
 
     return () => clearInterval(interval)
   }, [evoStatus, refresh])
-
-
-
-
 
   // ─── Meta actions ────────────────────────────────────────────────────
 
@@ -218,56 +213,32 @@ export function WhatsAppIntegrationPage({
     await refresh()
   }
 
-  // ─── Evolution actions ───────────────────────────────────────────────
+  // ─── Evolution actions (simplified — zero config) ───────────────────
 
   const handleEvoConnect = async () => {
-    if (!evoApiUrl.trim() || !evoApiKey.trim() || !evoInstanceName.trim()) {
-      toast.error("Preencha todos os campos da Evolution API")
-      return
-    }
     setEvoIsLoading(true)
     try {
-      const res = await connectEvolutionAction({
-        apiUrl: evoApiUrl.trim(),
-        apiKey: evoApiKey.trim(),
-        instanceName: evoInstanceName.trim(),
-      })
-      if (!res.success) { toast.error(res.error); return }
-      toast.success("Conexão Evolution salva com sucesso")
-      setEvoWebhookUrl(res.data.webhookUrl)
-      setEvoWebhookSecret(res.data.webhookSecret)
-      await refresh()
-      // Try to connect the instance to get QR code
-      await handleEvoConnectInstance()
-    } finally { setEvoIsLoading(false) }
-  }
-
-  const handleEvoConnectInstance = async () => {
-    setEvoIsLoading(true)
-    try {
-      const res = await connectEvolutionInstanceAction()
+      const res = await connectEvolutionAction()
       if (!res.success) { toast.error(res.error); return }
       setEvoStatus(res.data.status)
       setEvoQrCode(res.data.qrCode)
       if (res.data.status === "connected") {
-        toast.success("Instância conectada!")
-        await refresh()
+        toast.success("WhatsApp conectado com sucesso!")
       }
+      await refresh()
     } finally { setEvoIsLoading(false) }
   }
 
   const handleEvoDisconnect = async () => {
-    if (!confirm("Desconectar integração Evolution API?")) return
+    if (!confirm("Desconectar WhatsApp (Evolution)?")) return
     setEvoIsLoading(true)
     try {
       const res = await disconnectEvolutionAction()
       if (!res.success) { toast.error(res.error); return }
-      toast.success("Evolution desconectada")
+      toast.success("WhatsApp desconectado")
       setEvoStatus("disconnected")
       setEvoQrCode(null)
       setEvoPhoneNumber(null)
-      setEvoWebhookUrl(null)
-      setEvoWebhookSecret(null)
       await refresh()
     } finally { setEvoIsLoading(false) }
   }
@@ -281,7 +252,7 @@ export function WhatsAppIntegrationPage({
       setEvoQrCode(res.data.qrCode)
       setEvoPhoneNumber(res.data.phoneNumber)
       if (res.data.status === "connected") {
-        toast.success("Instância conectada!")
+        toast.success("WhatsApp conectado!")
         await refresh()
       }
     } finally { setEvoIsLoading(false) }
@@ -308,7 +279,6 @@ export function WhatsAppIntegrationPage({
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
           <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
-            {/* Back button - desktop only */}
             <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
               <Link href="/erp/settings?tab=integracoes">
                 <Button variant="filled" className="w-10 h-10 p-0 flex items-center justify-center">
@@ -334,7 +304,6 @@ export function WhatsAppIntegrationPage({
               </div>
             </div>
 
-            {/* Mobile header */}
             <div className="flex md:hidden items-center gap-3 py-3">
               <Link href="/erp/settings?tab=integracoes" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-hover">
                 <ChevronLeftIcon size={20} />
@@ -383,16 +352,15 @@ export function WhatsAppIntegrationPage({
                   transition={{ duration: 0.2 }}
                   className="space-y-6"
                 >
-                  {/* Connection Configuration */}
                   <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface transition-all">
                     <div className="flex items-center justify-between mb-5">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-[#25D366] flex items-center justify-center text-white font-bold text-sm shrink-0">
-                          EV
+                          WA
                         </div>
                         <div>
-                          <h2 className="font-bold text-brand-dark dark:text-dark-heading">Evolution API</h2>
-                          <p className="text-xs text-brand-inactive-text dark:text-dark-body">Conecte via Evolution API</p>
+                          <h2 className="font-bold text-brand-dark dark:text-dark-heading">WhatsApp via Evolution</h2>
+                          <p className="text-xs text-brand-inactive-text dark:text-dark-body">Conexão automática via QR Code</p>
                         </div>
                       </div>
                       <Badge variant={STATUS_BADGE_MAP[evoStatus] || "gray"}>
@@ -400,186 +368,117 @@ export function WhatsAppIntegrationPage({
                       </Badge>
                     </div>
 
-                    {/* Fields */}
-                    {(!evoConnection || evoStatus === "disconnected" || evoStatus === "error") && (
+                    {/* Not configured */}
+                    {evoConfigured === false && (
+                      <InfoCard
+                        color="orange"
+                        message={<>Integração Evolution API não disponível. As variáveis de ambiente <strong>EVOLUTION_API_URL</strong> e <strong>EVOLUTION_API_KEY</strong> não estão configuradas no servidor.</>}
+                      />
+                    )}
+
+                    {/* Loading config check */}
+                    {evoConfigured === null && (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="w-6 h-6 border-2 border-brand-border border-t-brand-dark rounded-full animate-spin" />
+                      </div>
+                    )}
+
+                    {/* Configured — not connected */}
+                    {evoConfigured === true && (!evoConnection || evoStatus === "disconnected" || evoStatus === "error") && !evoQrCode && (
                       <div className="space-y-4">
-                        <Input
-                          label="URL da Evolution API"
-                          placeholder="https://evolution.seudominio.com"
-                          value={evoApiUrl}
-                          onChange={(e) => setEvoApiUrl(e.target.value)}
-                          disabled={evoIsLoading}
-                        />
-                        <Input
-                          label="API Key"
-                          placeholder="Sua API Key da Evolution"
-                          type="password"
-                          value={evoApiKey}
-                          onChange={(e) => setEvoApiKey(e.target.value)}
-                          disabled={evoIsLoading}
-                        />
-                        <Input
-                          label="Nome da Instância"
-                          placeholder="nome-da-instancia"
-                          value={evoInstanceName}
-                          onChange={(e) => setEvoInstanceName(e.target.value)}
-                          disabled={evoIsLoading}
-                        />
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                          Conecte seu WhatsApp escaneando o QR Code. A conexão é automática — basta clicar no botão abaixo.
+                        </p>
                         <Button
                           onClick={handleEvoConnect}
-                          disabled={evoIsLoading || !evoApiUrl || !evoApiKey || !evoInstanceName}
+                          disabled={evoIsLoading}
                           className="w-full h-[46px]"
                         >
-                          {evoIsLoading ? "Conectando..." : "Conectar Evolution"}
+                          {evoIsLoading ? "Conectando..." : "Conectar WhatsApp"}
                         </Button>
                       </div>
                     )}
 
-                    {/* Connected / QR Pending state */}
-                    {evoConnection && evoStatus !== "disconnected" && evoStatus !== "error" && (
+                    {/* QR Code display */}
+                    {evoQrCode && (evoStatus === "qr_pending" || evoStatus === "connecting") && (
                       <div className="space-y-4">
-                        {/* Status info */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Instância</span>
-                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{evoConnection.instanceName || "—"}</span>
+                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl p-6 flex flex-col items-center gap-4">
+                          <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                            Escaneie o QR Code com o WhatsApp para conectar
+                          </p>
+                          <div className="bg-white p-4 rounded-xl">
+                            <img
+                              src={evoQrCode.startsWith("data:") ? evoQrCode : `data:image/png;base64,${evoQrCode}`}
+                              alt="QR Code"
+                              className="w-64 h-64 object-contain"
+                            />
                           </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" onClick={handleEvoRefreshStatus} disabled={evoIsLoading}>
+                              Atualizar status
+                            </Button>
+                            <Button variant="outline" onClick={handleEvoConnect} disabled={evoIsLoading}>
+                              Gerar novo QR
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Connected state */}
+                    {evoConnection && evoStatus === "connected" && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Telefone</span>
                             <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{evoPhoneNumber || evoConnection.phoneNumber || "—"}</span>
                           </div>
                           <div>
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">URL da API</span>
-                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate block">{evoConnection.apiUrl || "—"}</span>
-                          </div>
-                          <div>
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Status</span>
-                            <Badge variant={STATUS_BADGE_MAP[evoStatus] || "gray"}>
-                              {STATUS_LABELS[evoStatus] || evoStatus}
-                            </Badge>
+                            <Badge variant="green">Conectado</Badge>
                           </div>
                         </div>
 
-                        {/* QR Code */}
-                        {evoQrCode && evoStatus === "qr_pending" && (
-                          <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl p-6 flex flex-col items-center gap-4">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                              Escaneie o QR Code com o WhatsApp para conectar
-                            </p>
-                            <div className="bg-white p-4 rounded-xl">
-                              <img
-                                src={evoQrCode.startsWith("data:") ? evoQrCode : `data:image/png;base64,${evoQrCode}`}
-                                alt="QR Code"
-                                className="w-64 h-64 object-contain"
-                              />
-                            </div>
-                            <Button variant="outline" onClick={handleEvoRefreshStatus} disabled={evoIsLoading}>
-                              Atualizar status
-                            </Button>
-                          </div>
-                        )}
-
-                        {/* Webhook info (shown after connect) */}
-                        {(evoWebhookUrl || evoConnection.webhookUrl) && (
-                          <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4 space-y-3">
-                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Configuração do Webhook</h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                              Configure esta URL e secret no painel da Evolution API para receber eventos em tempo real.
-                            </p>
-                            <div>
-                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">URL do Webhook</span>
-                              <div className="flex items-center gap-2">
-                                <code className="text-xs bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 flex-1 truncate">
-                                  {evoWebhookUrl || evoConnection.webhookUrl}
-                                </code>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(evoWebhookUrl || evoConnection.webhookUrl || "")
-                                    toast.success("URL copiada")
-                                  }}
-                                >
-                                  Copiar
-                                </Button>
-                              </div>
-                            </div>
-                            {evoWebhookSecret && (
-                              <div>
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Webhook Secret</span>
-                                <div className="flex items-center gap-2">
-                                  <code className="text-xs bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 flex-1 truncate">
-                                    {evoShowSecret ? evoWebhookSecret : "••••••••••••••••"}
-                                  </code>
-                                  <Button variant="outline" size="sm" onClick={() => setEvoShowSecret(!evoShowSecret)}>
-                                    {evoShowSecret ? "Ocultar" : "Mostrar"}
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(evoWebhookSecret)
-                                      toast.success("Secret copiado")
-                                    }}
-                                  >
-                                    Copiar
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Actions */}
                         <hr className="border-brand-border dark:border-dark-border" />
-
-                        <div className="space-y-3">
-                          {evoStatus !== "connected" && evoStatus !== "qr_pending" && (
-                            <Button
-                              variant="outline"
-                              onClick={handleEvoConnectInstance}
-                              disabled={evoIsLoading}
-                              className="w-full h-[42px]"
-                            >
-                              {evoIsLoading ? "Conectando..." : "Gerar QR Code"}
-                            </Button>
-                          )}
-
-                          {evoStatus === "connected" && (
-                            <div>
-                              <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Testar envio</h3>
-                              <div className="flex gap-2">
-                                <Input
-                                  placeholder="Telefone para teste (com DDD)"
-                                  value={evoTestPhone}
-                                  onChange={(e) => setEvoTestPhone(e.target.value)}
-                                  disabled={evoIsLoading}
-                                />
-                                <Button variant="outline" onClick={handleEvoTest} disabled={evoIsLoading || !evoTestPhone.trim()}>
-                                  Testar
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
+                        <div>
+                          <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Testar envio</h3>
                           <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              onClick={handleEvoRefreshStatus}
+                            <Input
+                              placeholder="Telefone para teste (com DDD)"
+                              value={evoTestPhone}
+                              onChange={(e) => setEvoTestPhone(e.target.value)}
                               disabled={evoIsLoading}
-                              className="flex-1 h-[42px]"
-                            >
-                              Atualizar status
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              onClick={handleEvoDisconnect}
-                              disabled={evoIsLoading}
-                              className="flex-1 h-[42px]"
-                            >
-                              Desconectar
+                            />
+                            <Button variant="outline" onClick={handleEvoTest} disabled={evoIsLoading || !evoTestPhone.trim()}>
+                              Testar
                             </Button>
                           </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={handleEvoRefreshStatus} disabled={evoIsLoading} className="flex-1 h-[42px]">
+                            Atualizar status
+                          </Button>
+                          <Button variant="destructive" onClick={handleEvoDisconnect} disabled={evoIsLoading} className="flex-1 h-[42px]">
+                            Desconectar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pending/connecting without QR */}
+                    {evoConnection && (evoStatus === "pending" || evoStatus === "connecting") && !evoQrCode && (
+                      <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                          Aguardando conexão...
+                        </p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={handleEvoConnect} disabled={evoIsLoading} className="flex-1 h-[42px]">
+                            {evoIsLoading ? "Conectando..." : "Reconectar"}
+                          </Button>
+                          <Button variant="destructive" onClick={handleEvoDisconnect} disabled={evoIsLoading} className="flex-1 h-[42px]">
+                            Desconectar
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -599,7 +498,6 @@ export function WhatsAppIntegrationPage({
                   transition={{ duration: 0.2 }}
                   className="space-y-6"
                 >
-                  {/* Connection Card */}
                   <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface transition-all">
                     <div className="flex items-center justify-between mb-5">
                       <div className="flex items-center gap-3">

@@ -596,8 +596,8 @@ export async function uploadXMLAction(
           existingImportId: existingImport.id,
         }
       }
-      // Reversed — permite reimportar: atualiza o registro existente
-      if (existingImport.status === "reversed") {
+      // Failed ou Reversed — permite reimportar: atualiza o registro existente
+      if (existingImport.status === "reversed" || existingImport.status === "failed") {
         isReimport = true
         reimportId = existingImport.id
       }
@@ -933,7 +933,7 @@ export async function confirmImportAction(
       return { success: false, error: "Importação não encontrada" }
     }
 
-    if (xmlImport.status !== "preview") {
+    if (xmlImport.status !== "preview" && xmlImport.status !== "failed") {
       return { success: false, error: "Importação já foi processada" }
     }
 

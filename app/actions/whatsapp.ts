@@ -15,7 +15,11 @@ import {
     syncWhatsappTemplates,
     upsertEvolutionConnection,
     getWebhookUrl,
+    getEvolutionServerConfig,
+    generateEvolutionInstanceName,
+    EVOLUTION_WEBHOOK_EVENTS,
 } from "@/lib/services/whatsapp-connection.service"
+import { EvolutionWhatsappClient } from "@/lib/whatsapp/providers/evolution-client"
 import { createWhatsappProviderFromConnection } from "@/lib/whatsapp/providers"
 import { exchangeMetaAuthorizationCode } from "@/lib/meta/graph-client"
 import { MetaWhatsappManagementClient } from "@/lib/whatsapp/providers/meta-management-client"
@@ -582,47 +586,124 @@ export async function dispatchWhatsappAutomationAction(params: {
 
 // ─── Evolution API Actions ───────────────────────────────────────────────────
 
-export async function connectEvolutionAction(input: {
-    apiUrl: string
-    apiKey: string
-    instanceName: string
-}): Promise<ActionResponse<{ connectionId: string; webhookUrl: string; webhookSecret: string }>> {
+/**
+ * Checks if Evolution API is configured on the server (env vars present).
+ * Used by the UI to show/hide the Evolution tab.
+ */
+export async function isEvolutionConfiguredAction(): Promise<ActionResponse<{ configured: boolean }>> {
+    try {
+        await requireUser()
+        const config = getEvolutionServerConfig()
+        return { success: true, data: { configured: config !== null } }
+    } catch (error: unknown) {
+        return { success: false, error: extractErrorMessage(error) }
+    }
+}
+
+/**
+ * Zero-input Evolution connection flow:
+ * 1. Reads EVOLUTION_API_URL + EVOLUTION_API_KEY from env vars
+ * 2. Reuses existing instance_name from DB or generates a new one
+ * 3. Checks if instance exists on Evolution server
+ * 4. Creates instance (with inline webhook) if missing, or connects existing one
+ * 5. Returns QR Code for the frontend to display
+ */
+export async function connectEvolutionAction(): Promise<
+    ActionResponse<{ connectionId: string; status: string; qrCode: string | null }>
+> {
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const context = await getCurrentPartnerContext()
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
         await requireIntegrationsAccess(context.partnerId)
 
-        if (!input.apiUrl?.trim()) return { success: false, error: "URL da Evolution API é obrigatória" }
-        if (!input.apiKey?.trim()) return { success: false, error: "API Key é obrigatória" }
-        if (!input.instanceName?.trim()) return { success: false, error: "Nome da instância é obrigatório" }
+        // 1. Read server config from env vars
+        const serverConfig = getEvolutionServerConfig()
+        if (!serverConfig) {
+            return { success: false, error: "Evolution API não configurada no servidor. Configure EVOLUTION_API_URL e EVOLUTION_API_KEY." }
+        }
 
-        // Save connection (initially as pending — not yet verified)
+        // 2. Check for existing connection or generate new instance name
+        const existingConnection = await getActiveWhatsappConnection(context.partnerId, "evolution")
+        const instanceName = existingConnection?.instance_name || generateEvolutionInstanceName()
+
+        // 3. Save/update connection in DB
         const connection = await upsertEvolutionConnection({
             partnerId: context.partnerId,
-            apiUrl: input.apiUrl.trim(),
-            apiKey: input.apiKey.trim(),
-            instanceName: input.instanceName.trim(),
+            apiUrl: serverConfig.apiUrl,
+            apiKey: serverConfig.apiKey,
+            instanceName,
             activate: true,
         })
 
-        // Try to test connectivity before marking as active
-        try {
-            const provider = createWhatsappProviderFromConnection(connection)
-            if (provider.testConnection) {
-                const isConnected = await provider.testConnection()
-                if (isConnected) {
-                    const admin = getAdminClient()
-                    await admin
-                        .from("partner_whatsapp_connections")
-                        .update({ status: "connected", connected_at: new Date().toISOString() })
-                        .eq("id", connection.id)
+        // 4. Build webhook URL and create Evolution client
+        const webhookUrl = getWebhookUrl("evolution", connection.id)
+        const webhookEvents = [...EVOLUTION_WEBHOOK_EVENTS]
+        const client = new EvolutionWhatsappClient({
+            apiUrl: serverConfig.apiUrl,
+            apiKey: serverConfig.apiKey,
+            instanceName,
+        })
+
+        // 5. Check if instance already exists on Evolution server
+        let result: { status: string; qrCode: string | null }
+
+        const alreadyExists = await client.instanceExists()
+
+        if (alreadyExists) {
+            // Instance exists — ensure webhook is configured, then connect to get QR
+            try {
+                await client.setWebhook(webhookUrl, webhookEvents)
+            } catch {
+                // Non-fatal: webhook may already be set
+            }
+
+            // Check if already connected
+            const status = await client.getConnectionStatus()
+            if (status.status === "connected") {
+                result = { status: "connected", qrCode: null }
+            } else {
+                // Not connected — get QR code
+                const connectResult = await client.connectInstance()
+                result = { status: connectResult.status, qrCode: connectResult.qrCode || null }
+            }
+        } else {
+            // Instance doesn't exist — create with inline webhook + QR
+            const createResult = await client.createInstance(webhookUrl, webhookEvents)
+            result = { status: createResult.status, qrCode: createResult.qrCode || null }
+
+            // Some Evolution versions don't register webhook inline during creation.
+            // Always call setWebhook as a safety net to guarantee registration.
+            try {
+                await client.setWebhook(webhookUrl, webhookEvents)
+            } catch {
+                // Non-fatal: if creation already registered it, this is a no-op
+            }
+
+            // Some Evolution versions don't return QR inline during creation.
+            // If no QR was returned, explicitly request it via connect endpoint.
+            if (!result.qrCode && result.status !== "connected") {
+                const connectResult = await client.connectInstance()
+                result = {
+                    status: connectResult.status,
+                    qrCode: connectResult.qrCode || null,
                 }
             }
-        } catch (testErr) {
-            // Connection saved but test failed — status remains "pending"
-            console.warn("[WhatsApp] Evolution test connection failed (connection saved)", testErr)
         }
+
+        // 6. Update DB status
+        const admin = getAdminClient()
+        const updateData: Record<string, unknown> = {
+            status: result.status,
+            updated_at: new Date().toISOString(),
+        }
+        if (result.status === "connected") {
+            updateData.connected_at = new Date().toISOString()
+        }
+        await admin
+            .from("partner_whatsapp_connections")
+            .update(updateData)
+            .eq("id", connection.id)
 
         revalidatePath("/erp/integrations/whatsapp")
 
@@ -630,8 +711,8 @@ export async function connectEvolutionAction(input: {
             success: true,
             data: {
                 connectionId: connection.id,
-                webhookUrl: getWebhookUrl("evolution", connection.id),
-                webhookSecret: connection.evolution_webhook_secret || "",
+                status: result.status,
+                qrCode: result.qrCode,
             },
         }
     } catch (error: unknown) {
@@ -766,46 +847,6 @@ export async function testEvolutionConnectionAction(phone: string): Promise<Acti
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
         console.error("[WhatsApp] testEvolutionConnectionAction error:", msg, error)
-        return { success: false, error: msg }
-    }
-}
-
-export async function connectEvolutionInstanceAction(): Promise<
-    ActionResponse<{ status: string; qrCode: string | null }>
-> {
-    try {
-        const context = await getCurrentPartnerContext()
-        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
-        await requireIntegrationsAccess(context.partnerId)
-
-        const connection = await getActiveWhatsappConnection(context.partnerId, "evolution")
-        if (!connection) {
-            return { success: false, error: "Conexão Evolution não encontrada" }
-        }
-
-        const provider = createWhatsappProviderFromConnection(connection)
-        if (!provider.connect) {
-            return { success: false, error: "Provider não suporta conexão" }
-        }
-
-        const result = await provider.connect()
-
-        // Update connection status in DB
-        const admin = getAdminClient()
-        await admin
-            .from("partner_whatsapp_connections")
-            .update({ status: result.status, updated_at: new Date().toISOString() })
-            .eq("id", connection.id)
-
-        revalidatePath("/erp/integrations/whatsapp")
-
-        return {
-            success: true,
-            data: { status: result.status, qrCode: result.qrCode || null },
-        }
-    } catch (error: unknown) {
-        const msg = extractErrorMessage(error)
-        console.error("[WhatsApp] connectEvolutionInstanceAction error:", msg, error)
         return { success: false, error: msg }
     }
 }
