@@ -585,7 +585,7 @@ export async function getCustomerOrdersAction(customerId: string) {
   const buyerIds = [customer.marketplace_user_id, customer.id].filter(Boolean)
 
   if (buyerIds.length === 0) {
-    return { orders: [] }
+    return { orders: [], stats: null }
   }
 
   const { data: orders, error } = await supabase
@@ -611,10 +611,29 @@ export async function getCustomerOrdersAction(customerId: string) {
     .limit(50)
 
   if (error) {
-    return { error: error.message }
+    return { error: error.message, stats: null }
   }
 
+  // Aggregate stats across ALL orders (no limit) for accurate KPIs
+  const { data: statsRaw } = await supabase
+    .from("orders")
+    .select("total_amount, created_at, situation")
+    .in("buyer_id", buyerIds)
+    .neq("situation", "cancelled")
 
+  let stats = null
+  if (statsRaw) {
+    const totalOrders = statsRaw.length
+    const totalSpent = statsRaw.reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0)
+    const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0
+    let lastOrderDate: string | null = null
+    for (const o of statsRaw) {
+      if (o.created_at && (!lastOrderDate || o.created_at > lastOrderDate)) {
+        lastOrderDate = o.created_at
+      }
+    }
+    stats = { totalOrders, totalSpent, avgOrder, lastOrderDate }
+  }
 
   const formattedOrders = orders.map((o: any) => {
     const deliveryInfo = getDeliveryStatusMeta(o.delivery_status) as any
@@ -655,7 +674,7 @@ export async function getCustomerOrdersAction(customerId: string) {
     }
   })
 
-  return { orders: formattedOrders }
+  return { orders: formattedOrders, stats }
 }
 
 /**

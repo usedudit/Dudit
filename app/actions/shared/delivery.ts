@@ -178,7 +178,7 @@ export async function quoteDeliveryFeeAction(input: {
   if (shouldCalculateDistance) {
     let originCoords = null;
     if (store?.latitude && store?.longitude) {
-       originCoords = { lat: store.latitude, lng: store.longitude };
+      originCoords = { lat: store.latitude, lng: store.longitude };
     }
 
     if (!originCoords) {
@@ -189,7 +189,7 @@ export async function quoteDeliveryFeeAction(input: {
     if (!destinationCoords) {
       destinationCoords = await geocodeAddress(input.destinationAddress)
     }
-    
+
     if (!destinationCoords) {
       return { success: false as const, error: "Não foi possível encontrar as coordenadas do seu endereço para entrega." }
     }
@@ -202,7 +202,7 @@ export async function quoteDeliveryFeeAction(input: {
   }
 
   const rules = capability.advancedEnabled ? (rulesRows || []).map(mapRuleRow) : []
-  
+
   try {
     const priced = calculateDeliveryFee({
       distanceKm,
@@ -212,7 +212,7 @@ export async function quoteDeliveryFeeAction(input: {
       freeDeliveryCoupon: Boolean(input.freeDeliveryCoupon),
       orderSubtotal: input.orderSubtotal,
     })
-    
+
     return {
       success: true as const,
       distanceKm,

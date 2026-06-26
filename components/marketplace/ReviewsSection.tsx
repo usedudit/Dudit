@@ -155,11 +155,11 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                             {formatReviewDate(rev.created_at)}
                                         </span>
                                     </div>
-                                    <div className="mt-1 flex items-center justify-between">
+                                    <div className="flex items-center justify-between">
                                         <StarRow rating={rev.rating} size={11} />
                                         <button
                                             onClick={() => setReportTarget({ id: rev.id, name: `${rev.profiles?.full_name || "Usuário"}` })}
-                                            className="text-brand-inactive-text hover:text-[#d32f2f] transition-colors p-1"
+                                            className="text-brand-inactive-text hover:text-brand-red transition-colors mt-1"
                                             title="Denunciar avaliação"
                                         >
                                             <FlagIcon size={14} />
@@ -168,7 +168,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                 </div>
                             </div>
                             {rev.comment && (
-                                <p className="text-gray-600 text-sm leading-relaxed ml-12 mb-3">{rev.comment}</p>
+                                <p className="text-brand-ianctive-text text-sm">{rev.comment}</p>
                             )}
 
                             {showItemInfo && itemName && (

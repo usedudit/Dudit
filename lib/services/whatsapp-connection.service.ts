@@ -3,22 +3,30 @@ import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { encrypt } from "@/lib/cryptoService"
 import { MetaWhatsappManagementClient } from "@/lib/whatsapp/providers/meta-management-client"
-import type { PartnerWhatsappConnection, WhatsappConnectionSource, WhatsappProviderId } from "@/lib/whatsapp/types"
+import type { PartnerWhatsappConnection, WhatsappConnectionSource, WhatsappConnectionStatus, WhatsappProviderId } from "@/lib/whatsapp/types"
 import { randomBytes } from "crypto"
 
+/**
+ * Gets the active WhatsApp connection for a partner.
+ * When provider is omitted, returns the first active connection regardless of provider type.
+ * This is the provider-agnostic default used by business logic.
+ */
 export async function getActiveWhatsappConnection(
   partnerId: string,
-  provider: WhatsappProviderId = "meta",
+  provider?: WhatsappProviderId,
 ): Promise<PartnerWhatsappConnection | null> {
   const admin = getAdminClient()
-  const { data } = await admin
+  let query = admin
     .from("partner_whatsapp_connections")
     .select("*")
     .eq("partner_id", partnerId)
-    .eq("provider", provider)
     .eq("is_active", true)
-    .maybeSingle()
 
+  if (provider) {
+    query = query.eq("provider", provider)
+  }
+
+  const { data } = await query.order("updated_at", { ascending: false }).maybeSingle()
   return (data as PartnerWhatsappConnection) || null
 }
 
@@ -180,9 +188,93 @@ export async function setWhatsappConnectionActive(partnerId: string, isActive: b
     .eq("provider", provider)
 }
 
-export function getWebhookUrl(): string {
+export function getWebhookUrl(provider: WhatsappProviderId = "meta", connectionId?: string): string {
   const base = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-  if (!base) return "/api/whatsapp/webhook"
+  let suffix = provider === "meta" ? "/api/whatsapp/webhook/meta" : `/api/whatsapp/webhook/${provider}`
+  if (connectionId && provider === "evolution") {
+    suffix += `?cid=${connectionId}`
+  }
+  if (!base) return suffix
   const origin = base.startsWith("http") ? base : `https://${base}`
-  return `${origin}/api/whatsapp/webhook`
+  return `${origin}${suffix}`
+}
+
+/**
+ * Upserts an Evolution API connection with dedicated Evolution-specific fields.
+ * Meta fields (access_token_encrypted, phone_number_id, business_account_id) are NOT touched.
+ */
+export async function upsertEvolutionConnection(params: {
+  partnerId: string
+  apiUrl: string
+  apiKey: string
+  instanceName: string
+  phoneNumber?: string
+  activate?: boolean
+}): Promise<PartnerWhatsappConnection> {
+  const admin = getAdminClient()
+  const webhookSecret = randomBytes(24).toString("hex")
+  const now = new Date().toISOString()
+
+  const { data: existing } = await admin
+    .from("partner_whatsapp_connections")
+    .select("id")
+    .eq("partner_id", params.partnerId)
+    .eq("provider", "evolution")
+    .maybeSingle()
+
+  const row = {
+    partner_id: params.partnerId,
+    provider: "evolution" as const,
+    phone_number: params.phoneNumber || null,
+    api_url: params.apiUrl,
+    api_key_encrypted: encrypt(params.apiKey, "whatsapp"),
+    instance_name: params.instanceName,
+    evolution_webhook_secret: webhookSecret,
+    connection_source: "evolution_manual" as const,
+    status: "pending" as WhatsappConnectionStatus,
+    is_active: params.activate !== false,
+    connected_at: null as string | null,
+    updated_at: now,
+  }
+
+  if (existing?.id) {
+    const { data, error } = await admin
+      .from("partner_whatsapp_connections")
+      .update(row)
+      .eq("id", existing.id)
+      .select("*")
+      .single()
+    if (error) throw new Error(`Supabase update failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
+    return data as PartnerWhatsappConnection
+  }
+
+  const { data, error } = await admin
+    .from("partner_whatsapp_connections")
+    .insert(row)
+    .select("*")
+    .single()
+  if (error) throw new Error(`Supabase insert failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
+  return data as PartnerWhatsappConnection
+}
+
+/**
+ * Updates connection status. Used by webhook handlers to keep status in sync.
+ */
+export async function updateConnectionStatus(
+  partnerId: string,
+  provider: WhatsappProviderId,
+  status: WhatsappConnectionStatus,
+  extra?: { phone_number?: string; connected_at?: string },
+): Promise<void> {
+  const admin = getAdminClient()
+  await admin
+    .from("partner_whatsapp_connections")
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+      ...extra,
+    })
+    .eq("partner_id", partnerId)
+    .eq("provider", provider)
+    .eq("is_active", true)
 }

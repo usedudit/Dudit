@@ -1039,26 +1039,6 @@ export async function confirmImportAction(
       }
     }
 
-    // Fire-and-forget: notification for team
-    const { getPartnerTeamUserIds, createNotificationsForUsers, buildIdempotencyKey } = await import("@/lib/services/notification.service")
-    const { buildNotificationContent } = await import("@/lib/notifications/templates")
-    const userIds = await getPartnerTeamUserIds(partnerId)
-    if (result.imported > 0 && userIds.length > 0) {
-      const { title, message } = buildNotificationContent("xml_import_completed", "seller", {
-        count: String(result.imported),
-      })
-      createNotificationsForUsers(userIds, (uid) => ({
-        userId: uid,
-        type: "xml_import_completed" as const,
-        title,
-        message,
-        entityType: "product" as const,
-        entityId: xmlImportId,
-        data: { imported: result.imported, skipped: result.skipped, invoiceNumber: xmlImport.invoice_number },
-        idempotencyKey: buildIdempotencyKey("xml_import_completed", "xml_import", xmlImportId, uid),
-      })).catch((err: Error) => console.error("[notifications] xml_import_completed failed", err.message))
-    }
-
     logAuditEvent({
       partnerId,
       actorUserId: user.id,

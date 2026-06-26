@@ -1899,7 +1899,7 @@ export function ServiceDetailsPageClient({
                                             </div>
                                         </div>
 
-                                        <div className="lg:hidden relative bg-white rounded-xl overflow-hidden" style={{ aspectRatio: "1/1" }}>
+                                        <div className="lg:hidden relative bg-white rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
                                             <AnimatePresence mode="wait" custom={slideDirection}>
                                                 <motion.img
                                                     key={activeImgIndex}

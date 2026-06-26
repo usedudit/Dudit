@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon } from "@/lib/icons"
+import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -63,7 +63,7 @@ const formatJoinDate = (createdAt: string | Date) => {
 const openWhatsApp = (phone?: string, storeName?: string) => {
     const cleaned = phone?.replace(/\D/g, "") ?? ""
     const number = cleaned.startsWith("55") ? cleaned : `55${cleaned}`
-    const text = encodeURIComponent(`Ola, ${storeName || "tudo bem"}! Vi sua vitrine na Dudit e gostaria de saber mais.`)
+    const text = encodeURIComponent(`Olá, ${storeName || "tudo bem"}! Vi sua vitrine na Dudit e gostaria de saber mais.`)
     window.open(`https://wa.me/${number}?text=${text}`, "_blank")
 }
 
@@ -157,7 +157,7 @@ const StoreStats = ({ rating, sales, createdAt, reviewsCount }: any) => (
     <div className="flex items-center justify-between mb-8">
         <StatItem
             value={reviewsCount > 0 ? formatNumber(rating || 0, 1, 1) : "Sem avaliações"}
-            label="Avaliacao"
+            label="Avaliação"
             icon={<StarIcon size={14} className="text-brand-green fill-brand-green" />}
         />
         <div className="w-[1px] h-8 bg-brand-border" />
@@ -308,11 +308,6 @@ const InfoTab = ({ partner, stats }: any) => {
 
     return (
         <div className="pb-10 space-y-8 animate-fade-in">
-            <div className="hidden lg:block">
-                <StoreStats rating={partner.rating} sales={stats.salesCount} createdAt={partner.createdAt} reviewsCount={stats.reviewsCount} />
-                <div className="h-[1px] bg-brand-border w-full mb-8" />
-            </div>
-
             {partner.storeDescription && (
                 <>
                     <div>
@@ -777,8 +772,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             </div>
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
-                <div className="w-full lg:rounded-2xl lg:mb-4 overflow-hidden relative select-none active:scale-[0.995] transition-all duration-300 group cursor-pointer shadow-sm hover:shadow-md">
-                    <img src={bannerImage} alt="Banner" className="w-full h-auto block object-cover object-center group-hover:scale-[1.02] transition-transform duration-500" />
+                <div className="w-full max-w-[1400px] mx-auto lg:rounded-2xl lg:mb-4 overflow-hidden">
+                    <img src={bannerImage} alt="Banner" className="w-full aspect-[2.65/1] md:aspect-auto md:h-[300px] object-cover object-center" />
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
@@ -827,40 +822,22 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                                     <h1 className="text-[18px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
-                                    {displayReviewsCount > 0 && (
-                                        <div className="flex items-center gap-1 text-[11px] lg:text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-1.5 py-0.5 rounded-full shrink-0">
-                                            <StarIcon size={10} className="fill-brand-green text-brand-green" />
-                                            <span className="font-bold text-brand-green">{formatNumber(displayRating || 0, 1, 1)}</span>
-                                        </div>
-                                    )}
                                 </div>
                                 <p className="text-[12px] text-brand-inactive-text font-normal leading-tight">{partner.city}, {partner.state}</p>
+                                <div className="mt-0.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
                             </div>
                         </div>
 
-                        {/* Mobile stats and actions on the right */}
-                        <div className="flex items-center gap-3 shrink-0">
-                            <div className="text-right flex flex-col justify-center">
-                                <span className="text-[13px] font-bold text-brand-dark leading-tight">{stats.salesCount} {stats.salesCount === 1 ? "venda" : "vendas"}</span>
-                                <span className="text-[10px] text-brand-inactive-text font-normal mt-0.5 leading-tight">{formatJoinDate(partner.createdAt)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                {!isStoreOwner && (
-                                    <button
-                                        onClick={() => setShowReportModal(true)}
-                                        className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-red-600 active:bg-gray-200 transition-colors"
-                                        title="Denunciar vendedor"
-                                    >
-                                        <FlagIcon size={14} />
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setIsAboutPageOpen(true)}
-                                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors"
-                                >
-                                    <InfoIcon size={14} />
-                                </button>
-                            </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <button onClick={() => setShowShareModal(true)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
+                                <ShareIcon size={14} />
+                            </button>
+                            <button
+                                onClick={() => setIsAboutPageOpen(true)}
+                                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors"
+                            >
+                                <InfoIcon size={14} />
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1072,7 +1049,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     )}
                 </aside>
 
-                <main id="vendor-products" className="flex-1 px-5 lg:px-0 scroll-mt-[170px]">
+                <main id="vendor-products" className="flex-1 min-w-0 w-full lg:w-auto px-5 lg:px-0 scroll-mt-[170px]">
                     {activeSection === "products" && (
                         <div className="animate-fade-in">
                             {categoryView ? (
@@ -1196,13 +1173,25 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <BottomSheet isOpen={isAboutPageOpen} onClose={() => setIsAboutPageOpen(false)}>
                 <div className="flex flex-col">
-                    <div className="px-1 py-2 flex flex-col items-center">
-                        <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[64px] h-[64px] border border-brand-border shrink-0 mb-3 bg-gray-50" />
-                        <h2 className="text-[20px] font-bold text-brand-dark leading-none mb-1">{partner.storeName}</h2>
-                        <p className="text-[13px] text-brand-inactive-text font-medium">{partner.city}, {partner.state}</p>
-                    </div>
-                    <div className="mt-4 mb-2 flex justify-center">
-                        <StoreStats rating={displayRating} sales={stats.salesCount} createdAt={partner.createdAt} reviewsCount={displayReviewsCount} />
+                    <div className="px-1 py-2 flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-2 shrink-0">
+                            <div className="flex flex-col items-center">
+                                <span className="text-[18px] font-bold text-brand-dark leading-tight">{stats.salesCount >= 1000 ? `${formatNumber(stats.salesCount / 1000, 1, 1)}k` : stats.salesCount}</span>
+                                <span className="text-[10px] text-brand-inactive-text font-medium uppercase leading-tight mt-0.5">Vendas</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-[13px] font-semibold text-brand-dark leading-tight whitespace-nowrap">{formatJoinDate(partner.createdAt)}</span>
+                                <span className="text-[10px] text-brand-inactive-text font-medium uppercase leading-tight mt-0.5">Na Dudit</span>
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-center min-w-0 flex-1">
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[64px] h-[64px] border border-brand-border shrink-0 mb-2 bg-gray-50" />
+                            <div className="flex items-center gap-2 min-w-0">
+                                <h2 className="text-[18px] font-bold text-brand-dark leading-none truncate">{partner.storeName}</h2>
+                                <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} />
+                            </div>
+                            <p className="text-[13px] text-brand-inactive-text font-medium mt-0.5">{partner.city}, {partner.state}</p>
+                        </div>
                     </div>
                     <div className="sticky top-0 z-40 bg-white border-b border-brand-border mb-4">
                         <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
@@ -1232,13 +1221,13 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 onClose={() => setIsCategoryFiltersOpen(false)}
                 selectedCitySlug={null}
                 formatCitySlug={(s) => s}
-                onCitySelect={() => {}}
+                onCitySelect={() => { }}
                 currentType={activeContext === "Produtos" ? "produtos" : activeContext === "Servicos" ? "servicos" : "planos"}
                 typeOptions={[]}
-                onTypeChange={() => {}}
+                onTypeChange={() => { }}
                 activeCategoriesList={[]}
                 selectedCategories={[]}
-                onToggleCategory={() => {}}
+                onToggleCategory={() => { }}
                 minPrice={categoryMinPrice}
                 onMinPriceChange={setCategoryMinPrice}
                 maxPrice={categoryMaxPrice}
@@ -1420,12 +1409,12 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
     return (
         <div className="pb-10 animate-fade-in relative">
             {localImages.length === 0 && !isStoreOwner ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-brand-inactive-text"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
-                    </div>
-                    <h3 className="text-md font-semibold text-brand-dark">Galeria de imagens vazia</h3>
-                    <p className="text-[13px] text-brand-inactive-text mt-1">Este vendedor ainda não adicionou fotos ao perfil.</p>
+                <div className="flex flex-col items-center justify-center text-center">
+                    <IconPlaceholder
+                        icon={ImageIcon}
+                        title="Galeria de imagens vazia"
+                        subtitle="Este vendedor ainda não adicionou fotos ao perfil."
+                    />
                 </div>
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

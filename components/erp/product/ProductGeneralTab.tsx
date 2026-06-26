@@ -124,10 +124,9 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                <FormSection title="Informações Básicas">
+                <FormSection title="Informações Básicas" className="mb-8">
                     <div className="mb-10">
                         <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
                     </div>

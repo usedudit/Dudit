@@ -396,7 +396,7 @@ BEGIN
         INSERT INTO public.stock_movements (
           partner_id, movement_type, reference_type, reason, notes, created_by
         ) VALUES (
-          p_partner_id, 'purchase', 'supplier',
+          p_partner_id, 'purchase', '-',
           'Importação XML NF-e',
           (SELECT invoice_number FROM public.xml_imports WHERE id = p_xml_import_id),
           COALESCE(p_created_by, auth.uid())

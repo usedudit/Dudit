@@ -74,5 +74,5 @@ export function formatPaymentMethodLabel(
   const finalName = titleWords(displayName)
   const finalType = titleWords(typeLabel)
 
-  return `${finalType} (${finalName})`
+  return finalName.toLowerCase() === finalType.toLowerCase() ? finalType : `${finalType} (${finalName})`
 }

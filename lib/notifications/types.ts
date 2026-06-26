@@ -15,7 +15,6 @@ export const NOTIFICATION_TYPES = [
   "admin_announcement",
   "low_stock",
   "replenishment_suggested",
-  "xml_import_completed",
 ] as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]

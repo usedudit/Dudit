@@ -13,7 +13,10 @@ import {
     getActiveWhatsappConnection,
     findActiveConnectionByPhoneNumberId,
     syncWhatsappTemplates,
+    upsertEvolutionConnection,
+    getWebhookUrl,
 } from "@/lib/services/whatsapp-connection.service"
+import { createWhatsappProviderFromConnection } from "@/lib/whatsapp/providers"
 import { exchangeMetaAuthorizationCode } from "@/lib/meta/graph-client"
 import { MetaWhatsappManagementClient } from "@/lib/whatsapp/providers/meta-management-client"
 import { generateWhatsappOAuthState, validateWhatsappOAuthState } from "@/lib/security/whatsapp-oauth-state"
@@ -63,6 +66,11 @@ export type WhatsappConnectionView = {
     isActive: boolean
     connectedAt: string | null
     hasToken: boolean
+    // Evolution-specific fields
+    instanceName: string | null
+    apiUrl: string | null
+    hasApiKey: boolean
+    webhookUrl: string | null
 }
 
 export type WhatsappTemplateView = {
@@ -97,6 +105,7 @@ async function requireIntegrationsAccess(partnerId: string) {
 export async function getWhatsappIntegrationAction(): Promise<
     ActionResponse<{
         connection: WhatsappConnectionView | null
+        allConnections: WhatsappConnectionView[]
         messages: WhatsappMessageView[]
         templates: WhatsappTemplateView[]
     }>
@@ -144,13 +153,42 @@ export async function getWhatsappIntegrationAction(): Promise<
                 isActive: active.is_active,
                 connectedAt: active.connected_at,
                 hasToken: !!active.access_token_encrypted,
+                instanceName: active.instance_name,
+                apiUrl: active.api_url,
+                hasApiKey: !!active.api_key_encrypted,
+                webhookUrl: active.provider === "evolution"
+                    ? getWebhookUrl("evolution", active.id)
+                    : getWebhookUrl("meta"),
             }
             : null
+
+        // Also build views for all connections (for UI provider switching)
+        const allConnectionViews: WhatsappConnectionView[] = rows.map((c: PartnerWhatsappConnection) => ({
+            id: c.id,
+            provider: c.provider,
+            phoneNumber: c.phone_number,
+            phoneNumberId: c.phone_number_id,
+            businessAccountId: c.business_account_id,
+            connectionSource: c.connection_source || "manual",
+            wabaName: c.waba_name,
+            lastSyncedAt: c.last_synced_at,
+            status: c.status,
+            isActive: c.is_active,
+            connectedAt: c.connected_at,
+            hasToken: !!c.access_token_encrypted,
+            instanceName: c.instance_name,
+            apiUrl: c.api_url,
+            hasApiKey: !!c.api_key_encrypted,
+            webhookUrl: c.provider === "evolution"
+                ? getWebhookUrl("evolution", c.id)
+                : getWebhookUrl("meta"),
+        }))
 
         return {
             success: true,
             data: {
                 connection,
+                allConnections: allConnectionViews,
                 templates: (templateRows || []).map((t: any) => {
                     const vars = (t.variables || {}) as Record<string, unknown>
                     return {
@@ -369,7 +407,7 @@ export async function syncWhatsappTemplatesAction(): Promise<ActionResponse<{ sy
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
         await requireIntegrationsAccess(context.partnerId)
 
-        const connection = await getActiveWhatsappConnection(context.partnerId)
+        const connection = await getActiveWhatsappConnection(context.partnerId, "meta")
         if (!connection?.access_token_encrypted || !connection.business_account_id) {
             return { success: false, error: "WhatsApp não está conectado" }
         }
@@ -432,7 +470,7 @@ export async function sendWhatsappTestMessageAction(phone: string): Promise<Acti
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
         await requireIntegrationsAccess(context.partnerId)
 
-        const connection = await getActiveWhatsappConnection(context.partnerId)
+        const connection = await getActiveWhatsappConnection(context.partnerId, "meta")
         if (!connection?.is_active) {
             return { success: false, error: "Integração WhatsApp não está ativa" }
         }
@@ -538,6 +576,236 @@ export async function dispatchWhatsappAutomationAction(params: {
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
         console.error("[WhatsApp] dispatchWhatsappAutomationAction error:", msg, error)
+        return { success: false, error: msg }
+    }
+}
+
+// ─── Evolution API Actions ───────────────────────────────────────────────────
+
+export async function connectEvolutionAction(input: {
+    apiUrl: string
+    apiKey: string
+    instanceName: string
+}): Promise<ActionResponse<{ connectionId: string; webhookUrl: string; webhookSecret: string }>> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        if (!input.apiUrl?.trim()) return { success: false, error: "URL da Evolution API é obrigatória" }
+        if (!input.apiKey?.trim()) return { success: false, error: "API Key é obrigatória" }
+        if (!input.instanceName?.trim()) return { success: false, error: "Nome da instância é obrigatório" }
+
+        // Save connection (initially as pending — not yet verified)
+        const connection = await upsertEvolutionConnection({
+            partnerId: context.partnerId,
+            apiUrl: input.apiUrl.trim(),
+            apiKey: input.apiKey.trim(),
+            instanceName: input.instanceName.trim(),
+            activate: true,
+        })
+
+        // Try to test connectivity before marking as active
+        try {
+            const provider = createWhatsappProviderFromConnection(connection)
+            if (provider.testConnection) {
+                const isConnected = await provider.testConnection()
+                if (isConnected) {
+                    const admin = getAdminClient()
+                    await admin
+                        .from("partner_whatsapp_connections")
+                        .update({ status: "connected", connected_at: new Date().toISOString() })
+                        .eq("id", connection.id)
+                }
+            }
+        } catch (testErr) {
+            // Connection saved but test failed — status remains "pending"
+            console.warn("[WhatsApp] Evolution test connection failed (connection saved)", testErr)
+        }
+
+        revalidatePath("/erp/integrations/whatsapp")
+
+        return {
+            success: true,
+            data: {
+                connectionId: connection.id,
+                webhookUrl: getWebhookUrl("evolution", connection.id),
+                webhookSecret: connection.evolution_webhook_secret || "",
+            },
+        }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] connectEvolutionAction error:", msg, error)
+        return { success: false, error: `Erro ao conectar Evolution: ${msg}` }
+    }
+}
+
+export async function disconnectEvolutionAction(): Promise<ActionResponse<void>> {
+    try {
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        // Try to disconnect from Evolution API before deactivating
+        const connection = await getActiveWhatsappConnection(context.partnerId, "evolution")
+        if (connection) {
+            try {
+                const provider = createWhatsappProviderFromConnection(connection)
+                if (provider.disconnect) {
+                    await provider.disconnect()
+                }
+            } catch {
+                // Continue even if disconnect call fails
+            }
+        }
+
+        await deactivateWhatsappConnection(context.partnerId, "evolution")
+        revalidatePath("/erp/integrations/whatsapp")
+        return { success: true, data: undefined }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] disconnectEvolutionAction error:", msg, error)
+        return { success: false, error: msg }
+    }
+}
+
+export async function getEvolutionStatusAction(): Promise<
+    ActionResponse<{
+        status: string
+        qrCode: string | null
+        instanceName: string | null
+        phoneNumber: string | null
+    }>
+> {
+    try {
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        const connection = await getActiveWhatsappConnection(context.partnerId, "evolution")
+        if (!connection) {
+            return {
+                success: true,
+                data: { status: "disconnected", qrCode: null, instanceName: null, phoneNumber: null },
+            }
+        }
+
+        try {
+            const provider = createWhatsappProviderFromConnection(connection)
+            if (provider.getConnectionStatus) {
+                const result = await provider.getConnectionStatus()
+                return {
+                    success: true,
+                    data: {
+                        status: result.status,
+                        qrCode: result.qrCode ?? null,
+                        instanceName: result.instanceName ?? null,
+                        phoneNumber: result.phoneNumber ?? null,
+                    },
+                }
+            }
+        } catch {
+            // If API call fails, return DB status
+        }
+
+        return {
+            success: true,
+            data: {
+                status: connection.status,
+                qrCode: null,
+                instanceName: connection.instance_name,
+                phoneNumber: connection.phone_number,
+            },
+        }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        return { success: false, error: msg }
+    }
+}
+
+export async function testEvolutionConnectionAction(phone: string): Promise<ActionResponse<{ messageId: string | null }>> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        const connection = await getActiveWhatsappConnection(context.partnerId, "evolution")
+        if (!connection?.is_active) {
+            return { success: false, error: "Integração Evolution não está ativa" }
+        }
+
+        const result = await queueWhatsappMessage({
+            partnerId: context.partnerId,
+            phoneNumber: phone,
+            messageType: "text",
+            payload: { body: "✅ Mensagem de teste do Dudit via Evolution API", triggerType: "test_message" },
+            triggerType: "test_message",
+            idempotencyKey: `test:evolution:${context.partnerId}:${phone}:${Date.now()}`,
+        })
+
+        if (result.messageId) {
+            await processWhatsappMessageById(result.messageId)
+
+            const admin = getAdminClient()
+            const { data: updatedMsg } = await admin
+                .from("whatsapp_messages")
+                .select("status, error_message")
+                .eq("id", result.messageId)
+                .single()
+
+            if (updatedMsg && updatedMsg.status === "failed") {
+                revalidatePath("/erp/integrations/whatsapp")
+                return { success: false, error: updatedMsg.error_message || "Falha ao enviar mensagem de teste" }
+            }
+        }
+
+        revalidatePath("/erp/integrations/whatsapp")
+        return { success: true, data: { messageId: result.messageId } }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] testEvolutionConnectionAction error:", msg, error)
+        return { success: false, error: msg }
+    }
+}
+
+export async function connectEvolutionInstanceAction(): Promise<
+    ActionResponse<{ status: string; qrCode: string | null }>
+> {
+    try {
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        const connection = await getActiveWhatsappConnection(context.partnerId, "evolution")
+        if (!connection) {
+            return { success: false, error: "Conexão Evolution não encontrada" }
+        }
+
+        const provider = createWhatsappProviderFromConnection(connection)
+        if (!provider.connect) {
+            return { success: false, error: "Provider não suporta conexão" }
+        }
+
+        const result = await provider.connect()
+
+        // Update connection status in DB
+        const admin = getAdminClient()
+        await admin
+            .from("partner_whatsapp_connections")
+            .update({ status: result.status, updated_at: new Date().toISOString() })
+            .eq("id", connection.id)
+
+        revalidatePath("/erp/integrations/whatsapp")
+
+        return {
+            success: true,
+            data: { status: result.status, qrCode: result.qrCode || null },
+        }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] connectEvolutionInstanceAction error:", msg, error)
         return { success: false, error: msg }
     }
 }

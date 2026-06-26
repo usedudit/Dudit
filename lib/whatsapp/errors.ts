@@ -49,3 +49,39 @@ export function classifyMetaError(code: string | number, message: string): Whats
   }
   return new WhatsappError(message, codeStr, true)
 }
+
+export function classifyEvolutionError(statusCode: number, message: string): WhatsappError {
+  const codeStr = String(statusCode)
+
+  // Permanent (non-retryable) errors
+  if (statusCode === 400) {
+    const lc = message.toLowerCase()
+    if (lc.includes("invalid") && lc.includes("phone")) {
+      return new WhatsappError(message, "INVALID_PHONE", false)
+    }
+    if (lc.includes("not found") || lc.includes("instance")) {
+      return new WhatsappError(message, "INSTANCE_NOT_FOUND", false)
+    }
+    return new WhatsappError(message, codeStr, false)
+  }
+  if (statusCode === 401 || statusCode === 403) {
+    return new WhatsappError(message, "AUTH_FAILED", false)
+  }
+  if (statusCode === 404) {
+    return new WhatsappError(message, "NOT_FOUND", false)
+  }
+
+  // Retryable errors
+  if (statusCode === 429) {
+    return new WhatsappError(message, "RATE_LIMIT", true)
+  }
+  if (statusCode >= 500) {
+    return new WhatsappError(message, "SERVICE_UNAVAILABLE", true)
+  }
+  if (statusCode === 408) {
+    return new WhatsappError(message, "TIMEOUT", true)
+  }
+
+  return new WhatsappError(message, codeStr, statusCode >= 500)
+}
+

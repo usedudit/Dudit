@@ -312,16 +312,27 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
         }
     }, [partnerId, preloadedPromotions])
 
+    const variantLowestPrice = useMemo(() => {
+        const variants = (product as any).product_variants || (product as any).variants
+        if (!variants || variants.length === 0) return null
+        const activeVariants = variants.filter((v: any) => v.is_active !== false)
+        if (activeVariants.length === 0) return null
+        const prices = activeVariants.map((v: any) => Number(v.price_adjustment)).filter((p: number) => p > 0)
+        return prices.length > 0 ? Math.min(...prices) : null
+    }, [(product as any).product_variants, (product as any).variants])
+
     const pricing = useMemo(() => {
-        const basePrice = Number(product.originalPrice) || Number(product.price) || 0
-        const individualPromo = product.originalPrice ? Number(product.price) : null
+        const hasVariants = !!(product as any).product_variants?.length || !!(product as any).variants?.length
+        const effectivePrice = hasVariants && variantLowestPrice ? variantLowestPrice : (Number(product.originalPrice) || Number(product.price) || 0)
+        const basePrice = hasVariants ? effectivePrice : (Number(product.originalPrice) || Number(product.price) || 0)
+        const individualPromo = hasVariants ? null : (product.originalPrice ? Number(product.price) : null)
         return computeItemDisplayPrice(
             basePrice,
             individualPromo,
             activePromotions,
             { productId: itemType === "produto" ? product.id : undefined, serviceId: itemType === "servico" ? product.id : undefined, categoryId: (product as any).category_id || undefined },
         )
-    }, [activePromotions, product.price, product.originalPrice, product.id, itemType, (product as any).category_id])
+    }, [activePromotions, product.price, product.originalPrice, product.id, itemType, (product as any).category_id, variantLowestPrice])
 
     const displayPrice = pricing.bestPrice
     const referencePrice = pricing.referencePrice
@@ -675,7 +686,7 @@ export const HorizontalCarousel = ({
             <div
                 ref={scrollContainerRef}
                 className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-3 px-1"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
             >
                 {banner && (
                     <div className="snap-start shrink-0 w-[170px] h-auto">

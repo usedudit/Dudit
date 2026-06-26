@@ -62,7 +62,7 @@ BEGIN
   INSERT INTO public.stock_movements (
     partner_id, movement_type, reference_type, reason, notes, created_by
   ) VALUES (
-    v_import.partner_id, 'adjustment', 'internal',
+    v_import.partner_id, 'adjustment', '-',
     'Reversão importação NF-e',
     COALESCE(p_reason, 'Reversão da importação ' || v_import.access_key),
     COALESCE(p_created_by, auth.uid())

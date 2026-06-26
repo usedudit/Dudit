@@ -1929,7 +1929,7 @@ export function ProductDetailsPageClient({
                                         </div>
 
                                         {/* Mobile main image */}
-                                        <div className="lg:hidden relative bg-white rounded-xl overflow-hidden" style={{ aspectRatio: "1/1" }}>
+                                        <div className="lg:hidden relative bg-white rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
                                             <AnimatePresence mode="wait" custom={slideDirection}>
                                                 {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                             </AnimatePresence>

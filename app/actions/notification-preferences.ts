@@ -41,3 +41,17 @@ export async function updateNotificationPreferencesAction(
   if (!result.success) return { error: result.error || "Falha ao salvar preferências" }
   return { success: true as const }
 }
+
+export async function checkUserSellerStatusAction() {
+  const user = await requireUser()
+  if (!user) return { isSeller: false }
+
+  const admin = (await import("@/lib/supabase/admin")).getAdminClient()
+  const [partnerRes, partnerUserRes] = await Promise.all([
+    admin.from("partners").select("id").eq("user_id", user.id).limit(1),
+    admin.from("partner_users").select("id").eq("user_id", user.id).limit(1),
+  ])
+
+  const isSeller = !!(partnerRes.data?.length || partnerUserRes.data?.length)
+  return { isSeller }
+}

@@ -441,7 +441,7 @@ function ListContent({
                                                                     className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${col.id !== "actions" ? "cursor-pointer select-none group" : ""}`}
                                                                     style={{ width: col.width }}>
                                                                     <div className={`relative flex items-center gap-1.5 ${justifyClass}`}>
-                                                                        <span className={col.id === "actions" ? "sr-only" : ""}>{col.label}</span>
+                                                                        <span>{col.label}</span>
                                                                         {col.id !== "actions" && (
                                                                             <div className="flex items-center">
                                                                                 <ArrowUpDownIcon
@@ -525,14 +525,14 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
             <td className="py-3 px-2 text-center">
                 <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{item.imported_items || 0}/{item.items_count || 0}</span>
             </td>
-            <td className="py-3 px-2">
-                <div className="flex justify-center"><Badge variant={meta.variant}>{meta.label}</Badge></div>
-            </td>
             <td className="py-3 px-2 text-right">
                 <div className="flex flex-col">
                     <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">{dateStr}</span>
                     {timeStr && <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{timeStr}</span>}
                 </div>
+            </td>
+            <td className="py-3 px-2 text-center">
+                <div className="flex justify-center"><Badge variant={meta.variant}>{meta.label}</Badge></div>
             </td>
             <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-center action-btn">
@@ -886,15 +886,14 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                     </div>
                 </div>
 
-                <div className="max-w-[1300px] mx-auto px-4 md:px-6 pt-2 pb-0">
-                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                        <TabsTrigger value="details">Detalhes</TabsTrigger>
-                        <TabsTrigger value="history">Histórico</TabsTrigger>
-                    </TabsList>
-                </div>
-
                 <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
                     <Tabs value={detailTab} onValueChange={setDetailTab}>
+                        <div className="-mt-4 mb-0 max-w-[1300px] mx-auto px-0 pb-0">
+                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                <TabsTrigger value="details">Detalhes</TabsTrigger>
+                                <TabsTrigger value="history">Histórico</TabsTrigger>
+                            </TabsList>
+                        </div>
                         <TabsContent value="details" className="mt-0">
                             <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0">
 

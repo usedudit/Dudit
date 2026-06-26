@@ -57,6 +57,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     }, []);
 
     const [fetchedOrders, setFetchedOrders] = useState<any[]>([]);
+    const [orderStats, setOrderStats] = useState<{ totalOrders: number; totalSpent: number; avgOrder: number; lastOrderDate: string | null } | null>(null);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
     const [customerAddress, setCustomerAddress] = useState<string | null>(null);
     const [billingAddress, setBillingAddress] = useState<string | null>(null);
@@ -221,6 +222,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             try {
                 const res = await getCustomerOrdersAction(realCustomerId);
                 if (res.orders) setFetchedOrders(res.orders);
+                if (res.stats) setOrderStats(res.stats);
             } catch (e) {
                 console.error(e);
             } finally {
@@ -286,6 +288,23 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     }, [activeTab, fetchedReviews, isLoadingReviews, realCustomerId]);
 
     const stats = useMemo(() => {
+        if (orderStats) {
+            return {
+                totalOrders: orderStats.totalOrders,
+                totalSpent: orderStats.totalSpent,
+                avgOrder: orderStats.avgOrder,
+                lastOrderDate: orderStats.lastOrderDate ? formatDate(orderStats.lastOrderDate) : '-',
+            };
+        }
+
+        if (customer.orders != null && customer.totalOrderValue != null) {
+            const totalOrders = customer.orders;
+            const totalSpent = customer.totalOrderValue;
+            const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0;
+            const lastOrderDate = customer.lastOrderDate || '-';
+            return { totalOrders, totalSpent, avgOrder, lastOrderDate };
+        }
+
         const nonCancelledOrders = fetchedOrders.filter(o => o.situation !== "cancelled");
         const totalOrders = nonCancelledOrders.length;
         const totalSpent = nonCancelledOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
@@ -294,7 +313,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             ? formatDate(nonCancelledOrders[0].createdAt)
             : '-';
         return { totalOrders, totalSpent, avgOrder, lastOrderDate };
-    }, [fetchedOrders]);
+    }, [fetchedOrders, customer.orders, customer.totalOrderValue, customer.lastOrderDate, orderStats]);
 
     const formattedOrders = useMemo(() => {
         let result = fetchedOrders.map((o: any) => ({

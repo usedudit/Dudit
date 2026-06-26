@@ -138,7 +138,7 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
   const partnerId = String(message.partner_id)
   const messageId = String(message.id)
 
-  const connection = await getActiveWhatsappConnection(partnerId, message.provider as "meta")
+  const connection = await getActiveWhatsappConnection(partnerId, message.provider as "meta" | "evolution" | "twilio" | undefined)
   if (!connection?.is_active) {
     await admin
       .from("whatsapp_messages")

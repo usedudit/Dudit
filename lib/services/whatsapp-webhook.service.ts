@@ -208,6 +208,32 @@ async function processStatusWebhook(params: {
   if (!Object.keys(updates).length) return "skipped"
 
   const admin = getAdminClient()
+
+  // Prevent status downgrades due to out-of-order webhook delivery
+  const { data: currentMsg } = await admin
+    .from("whatsapp_messages")
+    .select("status")
+    .eq("partner_id", params.partnerId)
+    .eq("provider_message_id", providerMessageId)
+    .maybeSingle()
+
+  if (currentMsg?.status && updates.status) {
+    const statusPrecedence: Record<string, number> = {
+      pending: 1,
+      queued: 2,
+      sent: 3,
+      delivered: 4,
+      read: 5,
+      failed: 6,
+      failed_permanently: 7,
+    }
+    const currentPrecedence = statusPrecedence[currentMsg.status] || 0
+    const newPrecedence = statusPrecedence[updates.status] || 0
+    if (currentPrecedence >= newPrecedence) {
+      delete updates.status
+    }
+  }
+
   await admin
     .from("whatsapp_messages")
     .update(updates)

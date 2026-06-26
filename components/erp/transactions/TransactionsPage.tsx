@@ -156,8 +156,6 @@ export default function TransactionsPage({
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
     const [search, setSearch] = useState("")
-    const [isScrolled, setIsScrolled] = useState(false)
-    const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
     const setActiveTab = forcedTab ? () => { } : setActiveTabState
@@ -187,12 +185,6 @@ export default function TransactionsPage({
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
     const observerTarget = useRef<HTMLDivElement>(null)
-
-    const handleScroll = useCallback(() => {
-        if (scrollContainerRef.current) {
-            setIsScrolled(scrollContainerRef.current.scrollTop > 5)
-        }
-    }, [])
 
     const entityPage = useEntityPage<ERPTransaction, TransactionDetailPayload, FinancialTransactionCursor>({
         entityType: "transactions",
@@ -1399,67 +1391,62 @@ export default function TransactionsPage({
         )
 
         return (
-            <FadeIn>
-                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background transition-colors duration-500 ease-in-out">
+                <div className="flex flex-col h-full overflow-hidden">
+                    {/* Header */}
+                    <div className="flex-none bg-white dark:bg-dark-surface border-b dark:border-dark-border">
+                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 md:pt-4">
 
-                        {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+                            {/* Back button - desktop only */}
+                            <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
+                                <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                </Button>
+                            </div>
 
-                                {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center">
-                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            {/* Title row - desktop */}
+                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 text-xl md:text-3xl">
+                                        <span className="truncate">Quitar todas as parcelas</span>
+                                    </h1>
+                                    <div className="hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium overflow-hidden">
+                                        Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                    </div>
+                                </div>
+                                {/* Desktop action buttons */}
+                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                    <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
+                                        Cancelar
+                                    </Button>
+                                    <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />}>
+                                        Confirmar quitação
                                     </Button>
                                 </div>
-
-                                {/* Title row */}
-                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">Quitar todas as parcelas</span>
-                                        </h1>
-
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
-                                        </div>
-                                    </div>
-
-                                    {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
-                                            Cancelar
-                                        </Button>
-                                        <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />}>
-                                            Confirmar quitação
-                                        </Button>
-                                    </div>
-                                </div>
                             </div>
-                        </div>
 
-                        {/* Mobile Title row */}
-                        <div className="flex md:hidden items-center gap-3 py-3">
-                            <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            </Button>
-                            <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
-                                <h1 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
-                                    Quitar todas as parcelas
-                                </h1>
-                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                    {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
-                                </span>
+                            {/* Mobile Title row */}
+                            <div className="flex md:hidden items-center gap-3 py-3">
+                                <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
+                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                </Button>
+                                <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
+                                    <h1 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
+                                        Quitar todas as parcelas
+                                    </h1>
+                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                        {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Main Scrollable Body */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-[1300px] mx-auto w-full custom-scrollbar pb-24 md:pb-6">
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-8">
+                    {/* Scrollable body */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6 space-y-4">
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shrink-0">
@@ -1528,6 +1515,7 @@ export default function TransactionsPage({
                             <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none text-brand-green">
                                 {formatCurrency(settleModalTotalToPay)}
                             </span>
+                        </div>
                         </div>
 
                         {/* Table / List Container */}
@@ -1764,6 +1752,7 @@ export default function TransactionsPage({
                                 </>
                             )}
                         </FormSection>
+                        </div>
                     </div>
                 </div>
 
@@ -1784,41 +1773,47 @@ export default function TransactionsPage({
 
     if (openInstallmentGroupId) {
         return (
-            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-                {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-                        <div className="flex items-center gap-3">
+            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background transition-colors duration-500 ease-in-out">
+                <div className="flex flex-col h-full overflow-hidden">
+                    {/* Header */}
+                    <div className="flex-none bg-white dark:bg-dark-surface border-b dark:border-dark-border">
+                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 md:pt-4">
+                            <div className="flex items-center gap-3">
 
-                            {/* Back button - desktop only */}
-                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500`}>
-                                <Button variant="filled" onClick={() => {
-                                    setOpenInstallmentGroupId(null)
-                                    setInstallmentDetail(null)
-                                }} className="w-10 h-10 p-0 flex items-center justify-center">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                            </div>
-                            {/* Title row */}
-                            <div className="hidden md:flex items-start justify-between">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 text-xl md:text-3xl">
-                                        <span className="truncate">Detalhes do parcelamento</span>
-                                    </h1>
+                                {/* Back button - desktop only */}
+                                <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
+                                    <Button variant="filled" onClick={() => {
+                                        setOpenInstallmentGroupId(null)
+                                        setInstallmentDetail(null)
+                                    }} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 text-xl md:text-3xl">
+                                            <span className="truncate">Detalhes do parcelamento</span>
+                                        </h1>
 
-                                    <div className="hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden max-h-20">
-                                        Resumo completo e lista de parcelas
+                                        <div className="hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium overflow-hidden">
+                                            Resumo completo e lista de parcelas
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Cells grid */}
-                        {installmentDetailLoading ? (
-                            <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
-                        ) : installmentDetail ? (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+                    {/* Scrollable Content */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6">
+                            {/* Cells grid */}
+                            {installmentDetailLoading ? (
+                                <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
+                            ) : installmentDetail ? (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     {(() => {
                                         const total = Number(installmentDetail.group?.total_amount || 0)
                                         const rows = installmentDetail.installments || []
@@ -1917,8 +1912,9 @@ export default function TransactionsPage({
                         )}
                     </div>
                 </div>
-                {renderSharedModals()}
-            </FadeIn >
+            </div>
+            {renderSharedModals()}
+        </FadeIn >
         )
     }
 

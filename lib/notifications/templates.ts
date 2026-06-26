@@ -138,13 +138,6 @@ export function buildNotificationContent(
           ? `${ctx.count} produto(s) precisam de reposição. Confira as sugestões.`
           : "Há produtos que precisam de reposição.",
       }
-    case "xml_import_completed":
-      return {
-        title: "Importação XML concluída",
-        message: ctx.count
-          ? `${ctx.count} produto(s) importados com sucesso.`
-          : "A importação de XML foi concluída.",
-      }
     case "admin_announcement":
       return {
         title: ctx.storeName || "Comunicado Dudit",

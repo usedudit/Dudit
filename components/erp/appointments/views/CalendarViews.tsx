@@ -337,7 +337,7 @@ export const DayView = ({ appointments, allAppointments = [], currentDate, staff
                                             className="absolute left-0 right-0 z-0 bg-[repeating-linear-gradient(-45deg,rgba(239,68,68,0.04),rgba(239,68,68,0.04)_10px,transparent_10px,transparent_20px)] bg-red-50/5 dark:bg-red-950/5 border-y border-red-100/10 dark:border-red-900/10 flex items-center justify-center pointer-events-none"
                                             style={{ top: `${block.top}px`, height: `${block.height}px` }}
                                         >
-                                            <span className="text-[9px] font-bold text-red-500/30 uppercase tracking-widest">{block.label}</span>
+                                            <span className="text-xs font-bold text-brand-red/70 uppercase tracking-widest">{block.label}</span>
                                         </div>
                                     ))}
 

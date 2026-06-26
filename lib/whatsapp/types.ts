@@ -1,8 +1,8 @@
 export type WhatsappProviderId = "meta" | "evolution" | "twilio"
 
-export type WhatsappConnectionSource = "manual" | "embedded_signup"
+export type WhatsappConnectionSource = "manual" | "embedded_signup" | "evolution_manual"
 
-export type WhatsappConnectionStatus = "disconnected" | "pending" | "connected" | "error"
+export type WhatsappConnectionStatus = "disconnected" | "pending" | "connected" | "error" | "qr_pending" | "connecting"
 
 export type WhatsappMessageStatus = "pending" | "queued" | "sent" | "delivered" | "read" | "failed" | "failed_permanently"
 
@@ -52,9 +52,55 @@ export interface SendTextInput {
   body: string
 }
 
+export interface SendImageInput {
+  to: string
+  imageUrl: string
+  caption?: string
+}
+
+export interface SendDocumentInput {
+  to: string
+  documentUrl: string
+  filename: string
+  caption?: string
+}
+
+export interface SendAudioInput {
+  to: string
+  audioUrl: string
+}
+
+export interface SendLocationInput {
+  to: string
+  latitude: number
+  longitude: number
+  name?: string
+  address?: string
+}
+
 export interface ProviderSendResult {
   providerMessageId: string
   raw?: unknown
+}
+
+export interface ConnectionStatusResult {
+  status: WhatsappConnectionStatus
+  qrCode?: string | null
+  instanceName?: string | null
+  phoneNumber?: string | null
+}
+
+export interface InstanceInfoResult {
+  instanceName: string
+  phoneNumber: string | null
+  status: WhatsappConnectionStatus
+  platform?: string | null
+  profilePictureUrl?: string | null
+}
+
+export interface ConnectResult {
+  status: WhatsappConnectionStatus
+  qrCode?: string | null
 }
 
 export interface PartnerWhatsappConnection {
@@ -73,6 +119,11 @@ export interface PartnerWhatsappConnection {
   status: WhatsappConnectionStatus
   is_active: boolean
   connected_at: string | null
+  // Evolution-specific fields (isolated from Meta fields)
+  instance_name: string | null
+  api_url: string | null
+  api_key_encrypted: string | null
+  evolution_webhook_secret: string | null
 }
 
 export interface WhatsappTemplateView {

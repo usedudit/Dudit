@@ -71,6 +71,7 @@ import {
     ImageUploadIcon,
     ImageDelete02Icon,
     ImageNotFound01Icon,
+    Image01Icon,
     Calendar03Icon,
     Camera01Icon,
     Facebook02Icon,
@@ -201,6 +202,7 @@ export const DuplicateIcon = CreateIcon(Copy01Icon)
 
 export const ShareIcon = CreateIcon(Share01Icon)
 export const SaveIcon = CreateIcon(FloppyDiskIcon)
+export const ImageIcon = CreateIcon(Image01Icon)
 
 export const UploadIcon = CreateIcon(ImageUploadIcon)
 export const ExportFileIcon = CreateIcon(FileUploadIcon)

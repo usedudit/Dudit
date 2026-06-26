@@ -16,9 +16,16 @@ export interface NotificationPreferenceInput {
   push_enabled: boolean
 }
 
-export const NOTIFICATION_CATEGORIES = {
+export interface NotificationCategory {
+  label: string
+  description: string
+  types: NotificationType[]
+}
+
+export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
   customer: {
-    label: "Cliente",
+    label: "Atualizações dos Pedidos",
+    description: "Novo pedido, pagamento aprovado, pedido entregue, reembolso realizado e lembretes de agendamento",
     types: [
       "order_created",
       "order_delivered",
@@ -26,45 +33,47 @@ export const NOTIFICATION_CATEGORIES = {
       "order_refunded",
       "appointment_created",
       "appointment_reminder",
-    ] as NotificationType[],
+    ],
   },
   seller: {
     label: "Vendedor",
+    description: "Notificações sobre vendas, agendamentos, estoque baixo e sugestões de reposição",
     types: [
       "order_created",
       "order_paid",
       "order_cancelled",
       "appointment_created",
       "appointment_cancelled",
-    ] as NotificationType[],
+      "low_stock",
+      "replenishment_suggested",
+    ],
   },
   system: {
     label: "Sistema",
+    description: "Comunicados da plataforma, mensagens e outras notificações",
     types: [
       "admin_announcement",
       "message_received",
       "order_shipped",
       "appointment_confirmed",
-      "appointment_reminder",
-      "low_stock",
-      "replenishment_suggested",
-      "xml_import_completed",
-    ] as NotificationType[],
+      "subscription_created",
+      "subscription_renewed",
+    ],
   },
-} as const
+}
 
 export type NotificationCategoryKey = keyof typeof NOTIFICATION_CATEGORIES
 
 export const CATEGORY_LABELS: Record<NotificationCategoryKey, string> = {
-  customer: "Cliente",
+  customer: "Atualizações dos Pedidos",
   seller: "Vendedor",
   system: "Sistema",
 }
 
 export const CATEGORY_DESCRIPTIONS: Record<NotificationCategoryKey, string> = {
-  customer: "Notificações que você recebe como comprador",
-  seller: "Notificações que você recebe como vendedor",
-  system: "Avisos importantes da plataforma e alertas do sistema",
+  customer: "Novo pedido, pagamento aprovado, pedido entregue, reembolso realizado e lembretes de agendamento",
+  seller: "Notificações sobre vendas, agendamentos, estoque baixo e sugestões de reposição",
+  system: "Comunicados da plataforma, mensagens e outras notificações",
 }
 
 export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
@@ -84,5 +93,4 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   admin_announcement: "Comunicados",
   low_stock: "Estoque baixo",
   replenishment_suggested: "Sugestões de reposição",
-  xml_import_completed: "Importação XML concluída",
 }

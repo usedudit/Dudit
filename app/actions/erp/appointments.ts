@@ -172,12 +172,12 @@ async function createAppointmentSaleAndSyncGoals(params: {
 
   const baseAmount = Number(params.appointment.price || 0)
   const finalAmount = Math.max(0, baseAmount - orderDiscount + orderExtra)
+  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
 
   if (!saleId) {
     const { data: saleNumberData } = await params.supabase.rpc("generate_sale_number")
     const saleNumber = String(saleNumberData || "").trim() || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
     activeSaleNumber = saleNumber
-    const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
 
     const { data: sale, error: saleError } = await params.supabase
       .from("sales")
@@ -246,7 +246,6 @@ async function createAppointmentSaleAndSyncGoals(params: {
 
   let paymentTransactionId = existingPaymentTx?.id || null
   if (!paymentTransactionId) {
-    const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
     const nowIso = new Date().toISOString()
     const { data: tx, error: txError } = await params.supabase
       .from("transactions")
@@ -277,6 +276,17 @@ async function createAppointmentSaleAndSyncGoals(params: {
       .single()
     if (txError) throw txError
     paymentTransactionId = tx?.id || null
+
+    if (financeAccountId && paidAmount > 0) {
+      const { error: balanceError } = await params.supabase.rpc("apply_account_balance_delta", {
+        p_account_id: financeAccountId,
+        p_partner_id: params.partnerId,
+        p_delta: Math.round(paidAmount * 100) / 100,
+      })
+      if (balanceError) {
+        console.error("[createAppointmentSaleAndSyncGoals] Erro ao atualizar saldo da conta:", balanceError.message)
+      }
+    }
   } else {
     // Sync the correct payment method / ID to the existing transaction row
     await params.supabase
@@ -961,7 +971,8 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     const normalizedPaymentStatus = String(paymentStatusValue || "")
     const isPartial = isPartialStatus(normalizedStatus) || normalizedPaymentStatus === 'partially_paid'
     const isPaid = isPaidStatus(normalizedStatus) || normalizedPaymentStatus === 'paid'
-    const effectivePaidAmount = paidAmountValue
+    const price = Number(updated.price || 0)
+    const effectivePaidAmount = (isPaid && paidAmountValue < price) ? price : paidAmountValue
 
     const hasLinkedOrder = !!updated.marketplace_order_id
 
