@@ -220,7 +220,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
 
     const invalidateList = useCallback(() => {
         if (listQueryKey) {
-            queryClient.refetchQueries({ queryKey: listQueryKey as unknown[] })
+            queryClient.invalidateQueries({ queryKey: listQueryKey as unknown[] })
         }
     }, [queryClient, listQueryKey])
 

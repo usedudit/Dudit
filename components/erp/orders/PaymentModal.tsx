@@ -496,6 +496,45 @@ const PaymentModal = ({
         // Não depender de `total`: se o pai zerar o carrinho (ex.: PDV) o total cai e apagava a tela de sucesso.
     }, [isOpen]);
 
+    // Marketplace orders: auto-navigate directly to the original payment method view (skip method selection)
+    useEffect(() => {
+        if (!isOpen || !isMarketplaceOrder || !originalPaymentMethod || isLoadingMethods) return;
+        // Only auto-navigate if we're on the initial methods screen
+        if (view !== 'methods') return;
+
+        const normalizedOriginal = normalizePaymentMethodLabel(originalPaymentMethod);
+        const methodType = (() => {
+            if (normalizedOriginal === 'Dinheiro') return 'cash';
+            if (normalizedOriginal === 'Pix') return 'pix';
+            if (normalizedOriginal === 'Cartão de Crédito') return 'credit_card';
+            if (normalizedOriginal === 'Cartão de Débito') return 'debit_card';
+            if (normalizedOriginal === 'Transferência') return 'bank_transfer';
+            return 'other';
+        })();
+
+        // Find and auto-select the matching method
+        const matchingMethods = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === methodType);
+        if (matchingMethods.length === 1) {
+            setSelectedMethodId(matchingMethods[0].id);
+            setFeeBearerOverride((matchingMethods[0].fee_bearer || 'merchant') as 'merchant' | 'customer');
+        } else if (matchingMethods.length > 1) {
+            // Try to find exact match by name
+            const exactMatch = matchingMethods.find((m: PartnerPaymentMethod) => 
+                normalizePaymentMethodLabel(m.name) === normalizedOriginal
+            );
+            if (exactMatch) {
+                setSelectedMethodId(exactMatch.id);
+                setFeeBearerOverride((exactMatch.fee_bearer || 'merchant') as 'merchant' | 'customer');
+            } else {
+                setSelectedMethodId(matchingMethods[0].id);
+                setFeeBearerOverride((matchingMethods[0].fee_bearer || 'merchant') as 'merchant' | 'customer');
+            }
+        }
+
+        // Navigate directly to the correct view
+        setView(getTargetViewForMethodType(methodType));
+    }, [isOpen, isMarketplaceOrder, originalPaymentMethod, isLoadingMethods, activeMethods, view]);
+
     // Fetch MP connection status
     useEffect(() => {
         if (!isOpen) return;
@@ -1239,6 +1278,10 @@ const PaymentModal = ({
             resetSelectedMethodPricing();
             if (editingPaymentIndex !== null) {
                 setView('split_method_select');
+            } else if (isMarketplaceOrder) {
+                // Marketplace orders: back from payment input closes the modal
+                // since they can't change the payment method
+                onClose();
             } else {
                 setView('methods');
             }
@@ -1692,7 +1735,7 @@ const PaymentModal = ({
                                                         <PaymentMethodCard
                                                             icon={MoneyIcon}
                                                             label="Dinheiro"
-                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Dinheiro'}
+                                                            disabled={isMarketplaceOrder}
                                                             onClick={() => openMethodTypeSelection("cash")}
                                                         />
                                                     )}
@@ -1700,7 +1743,7 @@ const PaymentModal = ({
                                                         <PaymentMethodCard
                                                             icon={QRCodeIcon}
                                                             label="Pix"
-                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Pix'}
+                                                            disabled={isMarketplaceOrder}
                                                             onClick={() => openMethodTypeSelection("pix")}
                                                         />
                                                     )}
@@ -1708,7 +1751,7 @@ const PaymentModal = ({
                                                         <PaymentMethodCard
                                                             icon={CreditCardIcon}
                                                             label="Cartão de Crédito"
-                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Crédito'}
+                                                            disabled={isMarketplaceOrder}
                                                             onClick={() => openMethodTypeSelection("credit_card")}
                                                         />
                                                     )}
@@ -1716,7 +1759,7 @@ const PaymentModal = ({
                                                         <PaymentMethodCard
                                                             icon={CreditCardIcon}
                                                             label="Cartão de Débito"
-                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Débito'}
+                                                            disabled={isMarketplaceOrder}
                                                             onClick={() => openMethodTypeSelection("debit_card")}
                                                         />
                                                     )}
@@ -1724,7 +1767,7 @@ const PaymentModal = ({
                                                         <PaymentMethodCard
                                                             icon={FileIcon}
                                                             label="Transferência"
-                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Transferência'}
+                                                            disabled={isMarketplaceOrder}
                                                             onClick={() => openMethodTypeSelection("bank_transfer")}
                                                         />
                                                     )}
@@ -1732,17 +1775,17 @@ const PaymentModal = ({
                                                         <PaymentMethodCard
                                                             icon={TagIcon}
                                                             label="Outros"
-                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Outros'}
+                                                            disabled={isMarketplaceOrder}
                                                             onClick={() => openMethodTypeSelection("other")}
                                                         />
                                                     )}
                                                     <PaymentMethodCard
                                                         icon={SplitIcon}
                                                         label="Dividir"
-                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin'}
+                                                        disabled={isMarketplaceOrder}
                                                         onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
                                                     />
-                                                    {mpConnected && (
+                                                    {mpConnected && !isMarketplaceOrder && (
                                                         <button
                                                             onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
                                                             className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"

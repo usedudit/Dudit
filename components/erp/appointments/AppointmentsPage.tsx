@@ -518,8 +518,11 @@ const AppointmentsPage = ({
         setIsSelectionMode(true);
     };
 
-    const handleTimeSelection = (time: string) => {
+    const handleTimeSelection = (time: string, staffId?: string) => {
         setTempSelectionTime(time);
+        if (staffId) {
+            setPreSelectedStaffId(staffId);
+        }
         setIsSelectionMode(false);
         setIsSheetOpen(true);
     };
@@ -663,7 +666,7 @@ const AppointmentsPage = ({
         if (hoverTime) {
             const timeStr = `${String(hoverTime.hour).padStart(2, '0')}:${String(hoverTime.minutes).padStart(2, '0')}`;
             if (isSelectionMode) {
-                handleTimeSelection(timeStr);
+                handleTimeSelection(timeStr, staffId);
             } else {
                 const screenWidth = window.innerWidth;
                 const align = e.clientX > screenWidth / 2 ? 'left' : 'right';
@@ -786,6 +789,15 @@ const AppointmentsPage = ({
                                 onOpenCreate={() => handleOpenCreate()}
                                 searchTerm={searchTerm}
                                 setSearchTerm={setSearchTerm}
+                                onOpenUnavailable={() => handleOpenUnavailable()}
+                                onResetView={() => {
+                                    setCurrentDate(new Date());
+                                    setViewMode('calendar');
+                                    setCalendarView('day');
+                                    setAppointmentFilters({ teamIds: [] });
+                                }}
+                                onExport={handleExport}
+                                isExporting={isExporting}
                             />
 
                             <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full">

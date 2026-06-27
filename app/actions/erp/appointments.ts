@@ -59,6 +59,7 @@ export type AppointmentInput = {
   recurrenceRule?: string | null
   recurrenceGroupId?: string | null
   fulfillmentMode?: string | null
+  salesChannel?: string | null
   services?: AppointmentServiceInfo[]
 }
 
@@ -104,6 +105,7 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
     recurrence_rule: input.recurrenceRule || null,
     recurrence_group_id: input.recurrenceGroupId || null,
     fulfillment_mode: input.fulfillmentMode || null,
+    sales_channel: input.salesChannel || "manual",
   }
 }
 
@@ -974,6 +976,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         notes: payload.notes ?? current.notes,
         status: payload.status ?? current.status,
         source: payload.source ?? current.source,
+        salesChannel: payload.salesChannel ?? current.sales_channel ?? "manual",
       },
       partnerId,
     )
@@ -1145,18 +1148,37 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         .catch(console.error)
     }
 
-    const prevStatus = String(current.status)
-    const nextStatus = String(normalizedStatus)
-    import("@/lib/services/whatsapp-automation.service")
-      .then(({ onAppointmentStatusChanged }) =>
-        onAppointmentStatusChanged(finalRow, prevStatus, nextStatus),
-      )
-      .catch(console.error)
-    import("@/lib/services/notification-automation.service")
-      .then(({ onAppointmentStatusChanged }) =>
-        onAppointmentStatusChanged(finalRow, prevStatus, nextStatus, "manual"),
-      )
-      .catch(console.error)
+    const dateChanged = current.start_date !== finalRow.start_date
+    const timeChanged = current.start_time !== finalRow.start_time
+    const rescheduled = dateChanged || timeChanged
+
+    if (rescheduled && finalRow.source !== "unavailable") {
+      import("@/lib/services/whatsapp-automation.service")
+        .then(({ onAppointmentRescheduled }) =>
+          onAppointmentRescheduled(finalRow),
+        )
+        .catch(console.error)
+      import("@/lib/services/notification-automation.service")
+        .then(({ onAppointmentRescheduled }) =>
+          onAppointmentRescheduled(finalRow, "manual"),
+        )
+        .catch(console.error)
+    } else {
+      const prevStatus = String(current.status)
+      const nextStatus = String(normalizedStatus)
+      if (prevStatus !== nextStatus) {
+        import("@/lib/services/whatsapp-automation.service")
+          .then(({ onAppointmentStatusChanged }) =>
+            onAppointmentStatusChanged(finalRow, prevStatus, nextStatus),
+          )
+          .catch(console.error)
+        import("@/lib/services/notification-automation.service")
+          .then(({ onAppointmentStatusChanged }) =>
+            onAppointmentStatusChanged(finalRow, prevStatus, nextStatus, "manual"),
+          )
+          .catch(console.error)
+      }
+    }
 
     return { success: true, item: finalRow }
   } catch (error: any) {
@@ -1278,16 +1300,16 @@ async function handleAppointmentStockMovement(params: {
   revalidateStockMovements(partnerId)
 }
 
-export async function deleteAppointmentAction(appointmentId: string) {
+export async function deleteAppointmentAction(appointmentId: string, notifyClient: boolean = true) {
   try {
     if (!appointmentId) return { success: false, error: "Agendamento inválido" }
     const { partnerId, user } = await getPartnerContextWithPermission("delete")
     const supabase = await getSupabaseServerClient()
 
-    // Log the deletion
+    // Log the deletion and optionally notify
     const { data: current } = await supabase
       .from("appointments")
-      .select("customer_name, service_name")
+      .select("id, partner_id, customer_id, customer_name, service_name, start_date, start_time, marketplace_order_id, source, status")
       .eq("id", appointmentId)
       .eq("partner_id", partnerId)
       .single()
@@ -1301,6 +1323,20 @@ export async function deleteAppointmentAction(appointmentId: string) {
         actionType: "deleted",
         changeLines: [`excluiu agendamento de ${current.customer_name} (${current.service_name}).`],
       })
+
+      if (notifyClient && current.source !== "unavailable") {
+        import("@/lib/services/whatsapp-automation.service")
+          .then(({ onAppointmentStatusChanged }) =>
+            onAppointmentStatusChanged(current, current.status, "Cancelado"),
+          )
+          .catch(console.error)
+
+        import("@/lib/services/notification-automation.service")
+          .then(({ onAppointmentStatusChanged }) =>
+            onAppointmentStatusChanged(current, current.status, "Cancelado", "manual"),
+          )
+          .catch(console.error)
+      }
     }
 
     const { error } = await supabase

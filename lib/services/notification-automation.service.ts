@@ -342,6 +342,75 @@ export async function onAppointmentStatusChanged(
   }
 }
 
+export async function onAppointmentRescheduled(
+  appointment: Record<string, unknown>,
+  origin: "manual" | "automation" | "system" = "automation",
+) {
+  const partnerId = String(appointment.partner_id)
+  const appointmentId = String(appointment.id)
+
+  const admin = getAdminClient()
+
+  // Delete old pending scheduled jobs
+  await admin
+    .from("notification_scheduled_jobs")
+    .delete()
+    .eq("entity_type", "appointment")
+    .eq("entity_id", appointmentId)
+    .eq("status", "pending")
+
+  const { data: partner } = await admin
+    .from("partners")
+    .select("store_name")
+    .eq("id", partnerId)
+    .maybeSingle()
+
+  const ctx = {
+    serviceName: String(appointment.service_name),
+    storeName: partner?.store_name || undefined,
+    customerName: String(appointment.customer_name || "Cliente"),
+    date: String(appointment.start_date),
+    time: String(appointment.start_time).slice(0, 5),
+  }
+
+  const userId = await resolveCustomerUserId({
+    customerId: appointment.customer_id as string | null,
+    marketplaceOrderId: appointment.marketplace_order_id as string | null | undefined,
+  })
+
+  if (userId) {
+    await notifyCustomer({
+      userId,
+      type: "appointment_rescheduled",
+      entityType: "appointment",
+      entityId: appointmentId,
+      ctx,
+      origin,
+    })
+  }
+
+  await notifyPartnerTeam({
+    partnerId,
+    type: "appointment_rescheduled",
+    entityType: "appointment",
+    entityId: appointmentId,
+    ctx,
+    origin,
+  })
+
+  // Schedule new reminders
+  await scheduleNotificationAppointmentReminders({
+    partnerId,
+    appointmentId,
+    startDate: String(appointment.start_date),
+    startTime: String(appointment.start_time),
+    customerId: appointment.customer_id as string | null,
+    marketplaceOrderId: appointment.marketplace_order_id as string | null | undefined,
+    serviceName: String(appointment.service_name),
+    storeName: partner?.store_name || undefined,
+  })
+}
+
 export async function notifyAppointmentCreatedFromMarketplace(params: {
   partnerId: string
   appointmentId: string

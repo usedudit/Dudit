@@ -809,7 +809,6 @@ export default function ProductsPage({
                                         }}
                                         leftIcon={<StarIcon size={18} />}
                                     >
-                                        Sugestões
                                     </Button>
                                     <Dropdown
                                         trigger={

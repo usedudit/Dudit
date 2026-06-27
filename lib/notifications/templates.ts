@@ -66,13 +66,16 @@ export function buildWhatsappMessage(
         // ── Agendamentos ──
         case "appointment_created":
             return [
-                `📅 *Novo agendamento confirmado!*`,
+                `📅 *Novo agendamento!*`,
+                ``,
                 ``,
                 `Olá, ${customer}! Seu agendamento foi registrado com sucesso.`,
                 ``,
-                `📌 *Serviço:* ${service}`,
-                when ? `🗓️ *Data:* ${when}` : "",
-                `🏪 *Local:* ${store}`,
+                ``,
+                `*Serviço:* ${service}`,
+                when ? `*Data:* ${when}` : "",
+                `*Local:* ${store}`,
+                ``,
                 ``,
                 `Qualquer dúvida, é só responder esta mensagem. Até lá! 😊`,
             ].filter(Boolean).join("\n")
@@ -81,11 +84,14 @@ export function buildWhatsappMessage(
             return [
                 `✅ *Agendamento confirmado!*`,
                 ``,
+                ``,
                 `Tudo certo, ${customer}! Seu agendamento está confirmado.`,
                 ``,
-                `📌 *Serviço:* ${service}`,
-                when ? `🗓️ *Data:* ${when}` : "",
-                `🏪 *Local:* ${store}`,
+                ``,
+                `*Serviço:* ${service}`,
+                when ? `*Data:* ${when}` : "",
+                `*Local:* ${store}`,
+                ``,
                 ``,
                 `Esperamos você! 🤗`,
             ].filter(Boolean).join("\n")
@@ -94,23 +100,44 @@ export function buildWhatsappMessage(
             return [
                 `❌ *Agendamento cancelado*`,
                 ``,
+                ``,
                 `Olá, ${customer}. Infelizmente seu agendamento foi cancelado.`,
                 ``,
-                `📌 *Serviço:* ${service}`,
-                when ? `🗓️ *Data:* ${when}` : "",
+                ``,
+                `*Serviço:* ${service}`,
+                when ? `*Data:* ${when}` : "",
+                ``,
                 ``,
                 `Se precisar reagendar, é só nos chamar aqui. Estamos à disposição! 💬`,
+            ].filter(Boolean).join("\n")
+
+        case "appointment_rescheduled":
+            return [
+                `📅 *Agendamento remarcado!*`,
+                ``,
+                ``,
+                `Olá, ${customer}! Seu agendamento foi remarcado com sucesso.`,
+                ``,
+                ``,
+                `*Serviço:* ${service}`,
+                when ? `*Novo Horário:* ${when}` : "",
+                `*Local:* ${store}`,
+                ``,
+                ``,
+                `Qualquer dúvida, é só nos chamar aqui. Até lá! 😊`,
             ].filter(Boolean).join("\n")
 
         case "appointment_reminder_24h":
             return [
                 `⏰ *Lembrete: seu agendamento é amanhã!*`,
                 ``,
+                ``,
                 `Olá, ${customer}! Passando pra lembrar que você tem um compromisso marcado.`,
                 ``,
-                `📌 *Serviço:* ${service}`,
-                when ? `🗓️ *Data:* ${when}` : "",
-                `🏪 *Local:* ${store}`,
+                ``,
+                `*Serviço:* ${service}`,
+                when ? `*Data:* ${when}` : "",
+                `*Local:* ${store}`,
                 ``,
                 `Nos vemos amanhã! 👋`,
             ].filter(Boolean).join("\n")
@@ -119,11 +146,13 @@ export function buildWhatsappMessage(
             return [
                 `⏰ *Lembrete: seu agendamento é daqui a pouco!*`,
                 ``,
+                ``,
                 `Olá, ${customer}! Seu horário está se aproximando.`,
                 ``,
-                `📌 *Serviço:* ${service}`,
-                when ? `🗓️ *Horário:* ${when}` : "",
-                `🏪 *Local:* ${store}`,
+                ``,
+                `*Serviço:* ${service}`,
+                when ? `*Horário:* ${when}` : "",
+                `*Local:* ${store}`,
                 ``,
                 `Estamos te esperando! 😊`,
             ].filter(Boolean).join("\n")
@@ -133,9 +162,13 @@ export function buildWhatsappMessage(
             return [
                 `🛒 *Pedido recebido!*`,
                 ``,
+                ``,
                 `Olá, ${customer}! Recebemos o pedido ${orderRef} com sucesso.`,
-                amount ? `💰 *Valor:* ${amount}` : "",
-                `🏪 *Vendedor:* ${store}`,
+                ``,
+                ``,
+                amount ? `*Valor:* ${amount}` : "",
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Assim que o pagamento for confirmado, te avisamos por aqui. 📲`,
             ].filter(Boolean).join("\n")
@@ -145,18 +178,25 @@ export function buildWhatsappMessage(
                 `✅ *Pagamento confirmado!*`,
                 ``,
                 `Oba, ${customer}! O pagamento do pedido ${orderRef} foi aprovado. 🎉`,
-                amount ? `💰 *Valor:* ${amount}` : "",
-                `🏪 *Vendedor:* ${store}`,
+                ``,
+                ``,
+                amount ? `*Valor:* ${amount}` : "",
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Já estamos providenciando tudo. Te manteremos atualizado! 📦`,
             ].filter(Boolean).join("\n")
 
         case "order_preparing":
             return [
-                `👨‍🍳 *Pedido em preparação!*`,
+                `📦*Pedido em preparação!*`,
+                ``,
                 ``,
                 `Olá, ${customer}! O pedido ${orderRef} já está sendo preparado.`,
-                `🏪 *Vendedor:* ${store}`,
+                ``,
+                ``,
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Logo logo ele estará pronto! ⏳`,
             ].filter(Boolean).join("\n")
@@ -165,8 +205,10 @@ export function buildWhatsappMessage(
             return [
                 `📦 *Pedido pronto para retirada!*`,
                 ``,
+                ``,
                 `Olá, ${customer}! Seu pedido ${orderRef} está pronto e te esperando.`,
-                `🏪 *Local de retirada:* ${store}`,
+                `*Local de retirada:* ${store}`,
+                ``,
                 ``,
                 `Pode vir buscar quando quiser! 🏃‍♂️`,
             ].filter(Boolean).join("\n")
@@ -175,9 +217,11 @@ export function buildWhatsappMessage(
             return [
                 `🚚 *Pedido enviado!*`,
                 ``,
+                ``,
                 `Boas notícias, ${customer}! Seu pedido ${orderRef} acabou de ser despachado.`,
-                ctx.tracking_code ? `📋 *Código de rastreio:* ${ctx.tracking_code}` : "",
-                `🏪 *Vendedor:* ${store}`,
+                ctx.tracking_code ? `*Código de rastreio:* ${ctx.tracking_code}` : "",
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Agora é só aguardar a entrega. Prepare o coração! 📦💨`,
             ].filter(Boolean).join("\n")
@@ -186,8 +230,10 @@ export function buildWhatsappMessage(
             return [
                 `🏍️ *Pedido saiu para entrega!*`,
                 ``,
+                ``,
                 `Quase lá, ${customer}! O pedido ${orderRef} está a caminho do seu endereço.`,
-                `🏪 *Vendedor:* ${store}`,
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Fique de olho, ele chega rapidinho! 🚀`,
             ].filter(Boolean).join("\n")
@@ -196,8 +242,10 @@ export function buildWhatsappMessage(
             return [
                 `🎁 *Pedido entregue!*`,
                 ``,
+                ``,
                 `Tudo certo, ${customer}! O pedido ${orderRef} foi entregue com sucesso.`,
-                `🏪 *Vendedor:* ${store}`,
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Esperamos que você goste! Se precisar de algo, estamos por aqui. 😁`,
             ].filter(Boolean).join("\n")
@@ -206,6 +254,7 @@ export function buildWhatsappMessage(
         case "delivery_route_started":
             return [
                 `🗺️ *Rota de entrega iniciada!*`,
+                ``,
                 ``,
                 `Olá, ${customer}! A rota de entrega do seu pedido foi iniciada.`,
                 `Em breve ele chega até você! 🚚`,
@@ -223,6 +272,7 @@ export function buildWhatsappMessage(
             return [
                 `✅ *Entrega realizada!*`,
                 ``,
+                ``,
                 `${customer}, sua entrega foi concluída com sucesso!`,
                 `Obrigado pela preferência! 🙏🎉`,
             ].join("\n")
@@ -231,7 +281,9 @@ export function buildWhatsappMessage(
             return [
                 `⚠️ *Tentativa de entrega sem sucesso*`,
                 ``,
+                ``,
                 `Olá, ${customer}. Infelizmente não conseguimos realizar a entrega.`,
+                ``,
                 ``,
                 `Por favor, entre em contato conosco para combinar uma nova tentativa. 📞`,
             ].join("\n")
@@ -241,9 +293,11 @@ export function buildWhatsappMessage(
             return [
                 `📋 *Novo orçamento disponível!*`,
                 ``,
+                ``,
                 `Olá, ${customer}! Preparamos um orçamento especialmente para você.`,
-                ctx.quote_number ? `📄 *Orçamento:* #${ctx.quote_number}` : "",
-                `🏪 *Vendedor:* ${store}`,
+                ctx.quote_number ? `*Orçamento:* #${ctx.quote_number}` : "",
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Dá uma olhada e nos diga o que acha! 😉`,
             ].filter(Boolean).join("\n")
@@ -252,8 +306,10 @@ export function buildWhatsappMessage(
             return [
                 `🔔 *Lembrete de orçamento*`,
                 ``,
+                ``,
                 `Olá, ${customer}! Seu orçamento${ctx.quote_number ? ` #${ctx.quote_number}` : ""} está próximo do vencimento.`,
-                `🏪 *Vendedor:* ${store}`,
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Aproveite antes que expire! Se tiver dúvidas, fale com a gente. 💬`,
             ].filter(Boolean).join("\n")
@@ -262,9 +318,11 @@ export function buildWhatsappMessage(
             return [
                 `💳 *Lembrete de pagamento*`,
                 ``,
+                ``,
                 `Olá, ${customer}! Identificamos um pagamento pendente do pedido ${orderRef}.`,
-                amount ? `💰 *Valor:* ${amount}` : "",
-                `🏪 *Vendedor:* ${store}`,
+                amount ? `*Valor:* ${amount}` : "",
+                `*Vendedor:* ${store}`,
+                ``,
                 ``,
                 `Regularize para garantir o processamento. Qualquer dúvida, estamos aqui! 🤝`,
             ].filter(Boolean).join("\n")
@@ -402,6 +460,17 @@ export function buildNotificationContent(
             return {
                 title: "❌ Agendamento cancelado",
                 message: `Atenção: seu agendamento de "${service}" em ${store}${when ? ` para ${when}` : ""} foi cancelado.`,
+            }
+        case "appointment_rescheduled":
+            if (audience === "seller") {
+                return {
+                    title: "📅 Agendamento remarcado",
+                    message: `O agendamento de "${service}" com ${customer}${when ? ` para ${when}` : ""} foi remarcado.`,
+                }
+            }
+            return {
+                title: "📅 Agendamento remarcado!",
+                message: `Tudo pronto! Seu agendamento de "${service}" em ${store}${when ? ` para ${when}` : ""} foi remarcado. Esperamos você! 😊`,
             }
         case "subscription_created":
             if (audience === "seller") {

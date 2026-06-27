@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
@@ -94,6 +94,23 @@ export default function ServiceOrdersPage({
   const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
   const itemsPerPage = 50
 
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+
+  useEffect(() => {
+    async function loadTeam() {
+      try {
+        const { getTeamMembers } = await import("@/app/actions/erp/team")
+        const res = await getTeamMembers()
+        if (res.members) {
+          setTeamMembers(res.members)
+        }
+      } catch (err) {
+        console.error("Erro ao carregar equipe:", err)
+      }
+    }
+    loadTeam()
+  }, [])
+
   const entityPage = useEntityPage<any, any, any>({
     entityType: "service_orders",
     partnerId,
@@ -124,6 +141,11 @@ export default function ServiceOrdersPage({
     search: searchVal, setSearch: setSearchVal,
     afterMutation, queryClient,
   } = entityPage
+
+  const handleMutation = useCallback(() => {
+    afterMutation()
+    queryClient.invalidateQueries({ queryKey: ["service-orders", partnerId] })
+  }, [afterMutation, queryClient, partnerId])
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setSearch(e.target.value)
@@ -206,7 +228,7 @@ export default function ServiceOrdersPage({
     const res = await updateServiceOrderStatusAction(partnerId, id, newStatus)
     if (res.success) {
       toast({ description: "Status alterado" })
-      afterMutation()
+      handleMutation()
     } else {
       toast({ description: res.error || "Erro ao alterar status" })
     }
@@ -217,7 +239,7 @@ export default function ServiceOrdersPage({
     const res = await deleteServiceOrderAction(partnerId, id)
     if (res.success) {
       toast({ description: "OS deletada" })
-      afterMutation()
+      handleMutation()
     } else {
       toast({ description: res.error || "Erro ao deletar" })
     }
@@ -328,7 +350,7 @@ export default function ServiceOrdersPage({
                 onBack={() => closeEntity()}
                 onSaved={() => {
                   closeEntity()
-                  afterMutation()
+                  handleMutation()
                 }}
                 editData={entityState.action === "edit" ? currentEntity : undefined}
               />
@@ -345,7 +367,7 @@ export default function ServiceOrdersPage({
                 data={currentEntity}
                 partnerId={partnerId}
                 onBack={() => closeEntity()}
-                onMutation={() => afterMutation()}
+                onMutation={() => handleMutation()}
                 onEdit={(id) => openEntity("edit", id)}
               />
             </FadeIn>
@@ -520,115 +542,32 @@ export default function ServiceOrdersPage({
             )}
 
             <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-4">
-              {paginated.length === 0 ? (
-                <IconPlaceholder
-                  placeholderType="image"
-                  imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
-                  title="Nenhuma ordem de serviço"
-                  subtitle={debouncedSearch ? "Nenhum resultado para esta busca." : "Crie sua primeira ordem de serviço."}
-                  itemButton={debouncedSearch ? undefined : { text: "Nova OS", action: () => openEntity("create") }}
-                />
-              ) : (
-                <>
-                  {effectiveViewMode === "grid" ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                      {paginated.map((o: any) => (
-                        <ServiceOrderGridCard
-                          key={o.id}
-                          order={o}
-                          selected={selection.has(o.id)}
-                          onSelect={() => {
-                            const next = new Set(selection)
-                            if (next.has(o.id)) next.delete(o.id)
-                            else next.add(o.id)
-                            setSelection(next)
-                          }}
-                          onDetails={() => openEntity("view", o.id)}
-                          onEdit={() => openEntity("edit", o.id)}
-                          onDelete={() => setConfirmDelete(o.id)}
-                          statusColor={statusColor(o.status)}
-                          statusLabel={statusLabel(o.status)}
-                        >
-                          {(STATUS_TRANSITIONS[o.status] || []).map((st) => {
-                            const meta = SERVICE_ORDER_STATUS_META[st as ServiceOrderStatus]
-                            return (
-                              <DropdownItem key={st} onClick={() => handleStatusChange(o.id, st)}>
-                                Marcar como: {meta?.label}
-                              </DropdownItem>
-                            )
-                          })}
-                          <DropdownItem onClick={async () => {
-                            const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                            const token = await ensurePublicTokenAction(partnerId, o.id)
-                            if (token) setShowShareModal({ id: o.id, token })
-                          }}>
-                            Compartilhar
-                          </DropdownItem>
-                        </ServiceOrderGridCard>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="w-full overflow-hidden rounded-xl relative">
-                      <div className="overflow-x-auto no-scrollbar">
-                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                          <thead>
-                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                              <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
-                                <Checkbox
-                                  checked={selection.size === paginated.length && paginated.length > 0}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) setSelection(new Set([...selection, ...paginated.map(x => x.id)]))
-                                    else {
-                                      const next = new Set(selection)
-                                      paginated.forEach(x => next.delete(x.id))
-                                      setSelection(next)
-                                    }
-                                  }}
-                                  className="bg-white dark:bg-dark-background"
-                                />
-                              </th>
-                              {COLUMNS.map((col) => {
-                                const isSorted = sortConfig?.key === col.id
-                                return (
-                                  <th
-                                    key={col.id}
-                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
-                                    style={{ width: col.width, minWidth: col.width }}
-                                    onClick={() => {
-                                      if (col.id === "actions") return
-                                      setSortConfig((prev) => ({
-                                        key: col.id,
-                                        direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
-                                      }))
-                                    }}
-                                  >
-                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                      <span>{col.label}</span>
-                                      {col.id !== "actions" && (
-                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                          <ArrowUpDownIcon
-                                            size={14}
-                                            className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </th>
-                                )
-                              })}
-                            </tr>
-                          </thead>
-                          <tbody>
+              <AnimatePresence mode="wait">
+                {paginated.length === 0 ? (
+                  <FadeIn key="empty-state" className="w-full h-full">
+                    <IconPlaceholder
+                      placeholderType="image"
+                      imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                      title="Nenhuma ordem de serviço"
+                      subtitle={debouncedSearch ? "Nenhum resultado para esta busca." : "Crie sua primeira ordem de serviço."}
+                      itemButton={debouncedSearch ? undefined : { text: "Nova OS", action: () => openEntity("create") }}
+                    />
+                  </FadeIn>
+                ) : (
+                  <AnimatePresence mode="wait">
+                    <FadeIn key={effectiveViewMode} className="w-full flex flex-col h-full justify-between gap-4">
+                      <div className="flex-1">
+                        {effectiveViewMode === "grid" ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                             {paginated.map((o: any) => (
-                              <ServiceOrderListRow
+                              <ServiceOrderGridCard
                                 key={o.id}
                                 order={o}
-                                columns={COLUMNS}
                                 selected={selection.has(o.id)}
-                                onSelect={(id) => {
+                                onSelect={() => {
                                   const next = new Set(selection)
-                                  if (next.has(id)) next.delete(id)
-                                  else next.add(id)
+                                  if (next.has(o.id)) next.delete(o.id)
+                                  else next.add(o.id)
                                   setSelection(next)
                                 }}
                                 onDetails={() => openEntity("view", o.id)}
@@ -636,6 +575,7 @@ export default function ServiceOrdersPage({
                                 onDelete={() => setConfirmDelete(o.id)}
                                 statusColor={statusColor(o.status)}
                                 statusLabel={statusLabel(o.status)}
+                                teamMembers={teamMembers}
                               >
                                 {(STATUS_TRANSITIONS[o.status] || []).map((st) => {
                                   const meta = SERVICE_ORDER_STATUS_META[st as ServiceOrderStatus]
@@ -652,23 +592,130 @@ export default function ServiceOrdersPage({
                                 }}>
                                   Compartilhar
                                 </DropdownItem>
-                              </ServiceOrderListRow>
+                              </ServiceOrderGridCard>
                             ))}
-                          </tbody>
-                        </table>
+                          </div>
+                        ) : (
+                          <div className="w-full overflow-hidden rounded-xl relative">
+                            <div className="overflow-x-auto no-scrollbar">
+                              <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                <thead>
+                                  <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                    <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                      <Checkbox
+                                        checked={selection.size === paginated.length && paginated.length > 0}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) setSelection(new Set([...selection, ...paginated.map(x => x.id)]))
+                                          else {
+                                            const next = new Set(selection)
+                                            paginated.forEach(x => next.delete(x.id))
+                                            setSelection(next)
+                                          }
+                                        }}
+                                        className="bg-white dark:bg-dark-background"
+                                      />
+                                    </th>
+                                    {COLUMNS.map((col) => {
+                                      const isSorted = sortConfig?.key === col.id
+                                      return (
+                                        <th
+                                          key={col.id}
+                                          className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                          style={{ width: col.width, minWidth: col.width }}
+                                          onClick={() => {
+                                            if (col.id === "actions") return
+                                            setSortConfig((prev) => ({
+                                              key: col.id,
+                                              direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                            }))
+                                          }}
+                                        >
+                                          <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                            <span>{col.label}</span>
+                                            {col.id !== "actions" && (
+                                              <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                <ArrowUpDownIcon
+                                                  size={14}
+                                                  className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </th>
+                                      )
+                                    })}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {paginated.map((o: any) => (
+                                    <ServiceOrderListRow
+                                      key={o.id}
+                                      order={o}
+                                      columns={COLUMNS}
+                                      selected={selection.has(o.id)}
+                                      onSelect={(id) => {
+                                        const next = new Set(selection)
+                                        if (next.has(id)) next.delete(id)
+                                        else next.add(id)
+                                        setSelection(next)
+                                      }}
+                                      onDetails={() => openEntity("view", o.id)}
+                                      onEdit={() => openEntity("edit", o.id)}
+                                      onDelete={() => setConfirmDelete(o.id)}
+                                      statusColor={statusColor(o.status)}
+                                      statusLabel={statusLabel(o.status)}
+                                      teamMembers={teamMembers}
+                                    >
+                                      {(STATUS_TRANSITIONS[o.status] || []).map((st) => {
+                                        const meta = SERVICE_ORDER_STATUS_META[st as ServiceOrderStatus]
+                                        return (
+                                          <DropdownItem key={st} onClick={() => handleStatusChange(o.id, st)}>
+                                            Marcar como: {meta?.label}
+                                          </DropdownItem>
+                                        )
+                                      })}
+                                      <DropdownItem onClick={async () => {
+                                        const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                        const token = await ensurePublicTokenAction(partnerId, o.id)
+                                        if (token) setShowShareModal({ id: o.id, token })
+                                      }}>
+                                        Compartilhar
+                                      </DropdownItem>
+                                    </ServiceOrderListRow>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
 
-                  <Pagination
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                  />
+                      {sortedOrders.length > 0 && (
+                        <div className="space-y-3">
+                          <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            onPageChange={(p) => {
+                              setPage(p)
+                              if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                void fetchNextPage()
+                              }
+                            }}
+                          />
+                          {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                            <div className="flex flex-col gap-2 py-2 px-4">
+                              <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                              <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
 
-                  <div ref={observerRef} className="h-4" />
-                </>
-              )}
+                      <div ref={observerRef} className="h-4" />
+                    </FadeIn>
+                  </AnimatePresence>
+                )}
+              </AnimatePresence>
             </div>
           </FadeIn>
         )}

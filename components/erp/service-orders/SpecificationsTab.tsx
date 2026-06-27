@@ -62,7 +62,18 @@ export default function SpecificationsTab({
     const [templateSpecs, setTemplateSpecs] = useState<{ name: string; value: string }[]>([])
 
     useEffect(() => {
-        setLocalSpecs((specifications || []).map((s, i) => ({ ...s, id: i + Date.now() })))
+        let specsArray: any[] = []
+        if (Array.isArray(specifications)) {
+            specsArray = specifications
+        } else if (typeof specifications === "string") {
+            try {
+                const parsed = JSON.parse(specifications)
+                if (Array.isArray(parsed)) {
+                    specsArray = parsed
+                }
+            } catch {}
+        }
+        setLocalSpecs(specsArray.map((s, i) => ({ ...s, id: i + Date.now() })))
     }, [specifications])
 
     const addAttribute = () => {

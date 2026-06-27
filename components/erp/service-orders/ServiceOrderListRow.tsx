@@ -25,6 +25,7 @@ interface ServiceOrderListRowProps {
   onDelete?: () => void
   statusColor: string
   statusLabel: string
+  teamMembers?: any[]
   children?: React.ReactNode
 }
 
@@ -39,6 +40,7 @@ const ServiceOrderListRow = React.memo(
     onDelete,
     statusColor,
     statusLabel,
+    teamMembers = [],
     children,
   }: ServiceOrderListRowProps) => {
     const formatDate = (d: string) => {
@@ -79,12 +81,15 @@ const ServiceOrderListRow = React.memo(
             </span>
           )
 
-        case "assigned":
+        case "assigned": {
+          const assignedMember = teamMembers.find(m => m.userId === order.assigned_user_id)
+          const assignedName = assignedMember ? assignedMember.name : "-"
           return (
             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate block">
-              {order.assigned_user_id ? "Atribuído" : "-"}
+              {assignedName}
             </span>
           )
+        }
 
         case "date":
           return (

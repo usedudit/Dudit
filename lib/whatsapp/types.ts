@@ -10,6 +10,7 @@ export type WhatsappAutomationTrigger =
   | "appointment_created"
   | "appointment_confirmed"
   | "appointment_cancelled"
+  | "appointment_rescheduled"
   | "appointment_reminder_24h"
   | "appointment_reminder_2h"
   | "order_created"

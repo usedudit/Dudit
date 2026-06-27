@@ -101,10 +101,20 @@ export async function getServiceOrderDetailsAction(
       order.sale_id ? supabase.from("sales").select("*").eq("id", order.sale_id).single() : Promise.resolve({ data: null }),
     ])
 
+    let specifications = order.specifications
+    if (typeof specifications === "string") {
+      try {
+        specifications = JSON.parse(specifications)
+      } catch {
+        specifications = []
+      }
+    }
+
     return {
       success: true,
       data: {
         ...order,
+        specifications,
         services: servicesRes.data || [],
         products: productsRes.data || [],
         attachments: attachmentsRes.data || [],
@@ -243,7 +253,7 @@ export async function createServiceOrderAction(
         payment_method: input.payment_method || null,
         payment_breakdown: input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null,
         created_at: input.created_at || undefined,
-        specifications: input.specifications ? JSON.stringify(input.specifications) : undefined,
+        specifications: input.specifications ? input.specifications : undefined,
       })
       .select("*")
       .single()
@@ -787,7 +797,14 @@ export async function getServiceOrderByTokenAction(
 
     let { data: row, error } = await admin
       .from("service_orders")
-      .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, customer_snapshot, created_at, sale_id, specifications")
+      .select(`
+        id, order_number, status, title, description, expected_completion_date, completed_at,
+        total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
+        customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id,
+        partners (
+          id, store_name, store_image_url, plan_tier
+        )
+      `)
       .eq("public_token", token)
       .single()
 
@@ -795,7 +812,14 @@ export async function getServiceOrderByTokenAction(
       // Fallback: try lookup by id for legacy OSs without public_token
       const { data: byId } = await admin
         .from("service_orders")
-        .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, customer_snapshot, created_at, sale_id, specifications")
+        .select(`
+          id, order_number, status, title, description, expected_completion_date, completed_at,
+          total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
+          customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id,
+          partners (
+            id, store_name, store_image_url, plan_tier
+          )
+        `)
         .eq("id", token)
         .single()
       if (byId) {
@@ -820,8 +844,18 @@ export async function getServiceOrderByTokenAction(
 
     const customerName = (row.customer_snapshot as any)?.name || null
 
+    let specifications = row.specifications
+    if (typeof specifications === "string") {
+      try {
+        specifications = JSON.parse(specifications)
+      } catch {
+        specifications = []
+      }
+    }
+
     const serviceOrder = {
       id: row.id,
+      partner_id: row.partner_id,
       order_number: row.order_number,
       status: row.status,
       title: row.title,
@@ -836,7 +870,10 @@ export async function getServiceOrderByTokenAction(
       signed_at: row.signed_at,
       customer_name: customerName,
       sale_id: row.sale_id,
-      specifications: row.specifications,
+      specifications,
+      metadata: row.metadata,
+      lockout_until: row.lockout_until,
+      partners: Array.isArray(row.partners) ? row.partners[0] : (row.partners || null),
     }
 
     return {
@@ -926,7 +963,7 @@ export async function updateServiceOrderAction(
       updateData.payment_breakdown = input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null
     }
     if (input.created_at !== undefined) updateData.created_at = input.created_at
-    if (input.specifications !== undefined) updateData.specifications = input.specifications.length > 0 ? JSON.stringify(input.specifications) : null
+    if (input.specifications !== undefined) updateData.specifications = input.specifications.length > 0 ? input.specifications : null
     if (input.status !== undefined) updateData.status = input.status
 
     const { data, error } = await admin
@@ -1387,7 +1424,7 @@ export async function saveServiceOrderSpecificationsAction(
 
     const { error } = await admin
       .from("service_orders")
-      .update({ specifications: JSON.stringify(specifications) })
+      .update({ specifications })
       .eq("id", serviceOrderId)
       .eq("partner_id", partnerId)
 
@@ -1397,5 +1434,189 @@ export async function saveServiceOrderSpecificationsAction(
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao salvar especificações" }
+  }
+}
+
+export async function regenerateServiceOrderApprovalCodeAction(
+  serviceOrderId: string,
+  partnerId: string,
+): Promise<{ success: true; code: string } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "service_orders", "edit")
+    const user = await requireUser()
+    const supabase = await getSupabaseServerClient()
+
+    // 1. Fetch OS to make sure it exists
+    const { data: so, error: soErr } = await supabase
+      .from("service_orders")
+      .select("id, status, metadata")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (soErr || !so) {
+      return { success: false, error: "Ordem de serviço não encontrada" }
+    }
+
+    if (so.status === "concluida" || so.status === "entregue" || so.status === "cancelada") {
+      return { success: false, error: "Não é possível alterar o código de uma OS finalizada ou cancelada." }
+    }
+
+    // 2. Generate new 4-digit code and salt
+    const plainCode = Math.floor(1000 + Math.random() * 9000).toString() // 4 digits
+    const salt = Math.random().toString(36).substring(2)
+
+    // Compute hash using RPC
+    const { data: hashData, error: hashErr } = await supabase.rpc("compute_approval_hash", {
+      salt: salt,
+      code: plainCode
+    })
+
+    if (hashErr || !hashData) {
+      console.error("[regenerateServiceOrderApprovalCodeAction] hash computation error:", hashErr)
+      return { success: false, error: "Erro ao gerar hash do código de assinatura." }
+    }
+
+    const hash = hashData as string
+
+    // 3. Update service order
+    const { error: updateErr } = await supabase
+      .from("service_orders")
+      .update({
+        approval_code_salt: salt,
+        approval_code_hash: hash,
+        failed_attempts: 0,
+        lockout_until: null,
+        lockout_count: 0,
+        metadata: {
+          ...(so.metadata || {}),
+          plain_code: plainCode
+        }
+      })
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+
+    if (updateErr) {
+      console.error("[regenerateServiceOrderApprovalCodeAction] update error:", updateErr)
+      return { success: false, error: "Erro ao salvar novo código." }
+    }
+
+    revalidatePath("/erp/service-orders")
+    return { success: true, code: plainCode }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao gerar novo código" }
+  }
+}
+
+export async function getPublicPresignedUploadUrlAction(
+  token: string,
+  fileName: string,
+  fileType: string,
+  fileSize: number,
+): Promise<
+  | { success: true; uploadUrl: string; publicUrl: string; key: string }
+  | { success: false; error: string }
+> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    
+    // 1. Fetch OS by token to get partner and assigned user details
+    const admin = getAdminClient()
+    const { data: order, error } = await admin
+      .from("service_orders")
+      .select("id, partner_id, assigned_user_id")
+      .eq("public_token", token)
+      .maybeSingle()
+
+    if (error || !order) {
+      return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
+    }
+
+    if (fileSize > MAX_FILE_SIZE) {
+      return { success: false, error: "Arquivo muito grande. Máximo: 5MB." }
+    }
+
+    const uploadUserId = order.assigned_user_id || "public-guest"
+    const prefix = R2_PREFIXES.serviceOrderSignatures
+
+    // Generate safe extension
+    const ext = fileName.split('.').pop() || "png"
+
+    const result = await generateSignedUploadUrl({
+      fileName,
+      fileType,
+      userId: uploadUserId,
+      prefix,
+      key: `users/${uploadUserId}/${prefix}${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`,
+    })
+    return { success: true, ...result }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao gerar URL" }
+  }
+}
+
+export async function signPublicServiceOrderAction(
+  token: string,
+  approverName: string,
+  approvalCode: string,
+  signatureImageKey: string,
+  ip?: string,
+  userAgent?: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    const admin = getAdminClient()
+
+    // 1. Fetch OS by token
+    const { data: order, error } = await admin
+      .from("service_orders")
+      .select("id, status, assigned_user_id, partner_id")
+      .eq("public_token", token)
+      .maybeSingle()
+
+    if (error || !order) {
+      return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
+    }
+
+    // 2. Determine auth method
+    let method = "code"
+    let loggedUser: any = null
+    try {
+      const { getCurrentUser } = await import("@/lib/auth/server-user")
+      loggedUser = await getCurrentUser()
+      if (loggedUser) {
+        method = "auth"
+      }
+    } catch {
+      // Not logged in or error getting user
+    }
+
+    // 3. Call DB function to verify and sign
+    const { data: rpcRes, error: rpcErr } = await admin.rpc("sign_public_service_order", {
+      p_so_id: order.id,
+      p_name: method === "auth" ? (loggedUser?.email || "Usuário Autenticado") : (approverName || "Cliente").trim().substring(0, 100),
+      p_code: method === "code" ? approvalCode.trim() : "",
+      p_signature_key: signatureImageKey,
+      p_ip: ip || null,
+      p_ua: userAgent || null,
+      p_method: method
+    })
+
+    if (rpcErr) {
+      console.error("[signPublicServiceOrderAction] RPC Error:", rpcErr)
+      return { success: false, error: rpcErr.message || "Erro ao assinar ordem de serviço" }
+    }
+
+    const result = rpcRes as { success: boolean; error?: string }
+    if (!result.success) {
+      return { success: false, error: result.error || "Erro ao processar assinatura" }
+    }
+
+    revalidatePath("/erp/service-orders")
+    return { success: true }
+  } catch (err: any) {
+    console.error("[signPublicServiceOrderAction] Error:", err)
+    return { success: false, error: err.message || "Erro interno ao assinar ordem de serviço" }
   }
 }

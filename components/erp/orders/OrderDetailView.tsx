@@ -375,7 +375,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const canEdit = order.situation !== "cancelled"
     const isPickupOrder = order.delivery_type === "pickup" || Number(order.delivery_fee || 0) <= 0
 
-    const isMarketplaceOrder = true
+    const isMarketplaceOrder = order.order_source === "Marketplace" || order.order_source === "Online Store"
 
     // Detect if order has services vs products for dynamic timeline labels
     const orderItems = order.order_items || []

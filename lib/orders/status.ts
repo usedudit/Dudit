@@ -68,7 +68,7 @@ export function getDeliveryStatusLabel(status?: string | null) {
 const SALES_CHANNEL_LABELS: Record<string, string> = {
   booking: "Agendamento online",
   agendamento: "Agendamento",
-  manual: "Manual",
+  manual: "Agendamento manual",
   online_storefront: "Loja online",
   "loja online": "Loja online",
   whatsapp: "WhatsApp",
@@ -89,7 +89,7 @@ export function getFulfillmentModeLabel(mode?: string | null) {
     case "pickup":
       return "Retirada"
     case "on_site":
-      return "Na loja"
+      return "No estabelecimento"
     case "customer_location":
       return "No endereço do cliente"
     default:

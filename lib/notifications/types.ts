@@ -9,6 +9,7 @@ export const NOTIFICATION_TYPES = [
   "appointment_confirmed",
   "appointment_reminder",
   "appointment_cancelled",
+  "appointment_rescheduled",
   "subscription_created",
   "subscription_renewed",
   "message_received",

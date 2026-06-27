@@ -327,7 +327,7 @@ export const DayView = ({ appointments, allAppointments = [], currentDate, staff
                         return (
                             <div key={staff.id} className="flex-1 min-w-[200px] border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface relative group resource-column">
                                 <div className="h-16 border-b border-brand-border dark:border-dark-border flex flex-col items-center justify-center sticky top-0 bg-white dark:bg-dark-surface z-20 px-2 pointer-events-none">
-                                    <div className="flex items-center gap-2"><UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-8 h-8 shrink-0 text-[10px]" /><div className="flex flex-col"><span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">{staff.name}</span><span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[100px]">{staff.role}</span></div></div>
+                                    <div className="flex items-center gap-2"><UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-8 h-8 shrink-0 text-[10px]" /><div className="flex flex-col"><span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">{staff.name}</span></div></div>
                                 </div>
                                 <div className="relative" onMouseMove={(e) => handleGridMouseMove(e, colIndex)} onMouseLeave={handleGridMouseLeave} onClick={(e) => handleGridClick(e, staff.id)}>
                                     {/* Closed Blocks */}

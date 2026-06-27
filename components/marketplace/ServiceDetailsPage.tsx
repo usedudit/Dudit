@@ -723,10 +723,10 @@ export function ServiceDetailsPageClient({
             date: selectedDate,
             time: selectedTime,
             serviceName: service.name,
-            price,
+            price: pricing.bestPrice,
             durationMinutes,
         },
-    }), [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, price, durationMinutes])
+    }), [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, pricing.bestPrice, durationMinutes])
 
     const handleBookNowCheckout = useCallback(async () => {
         if (!userId) {
@@ -788,7 +788,7 @@ export function ServiceDetailsPageClient({
                 products: [{
                     id: service.id,
                     name: lineLabel,
-                    price,
+                    price: pricing.bestPrice,
                     quantity: 1,
                 }],
                 partnerInfo: {

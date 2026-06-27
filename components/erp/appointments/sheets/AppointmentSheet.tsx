@@ -55,7 +55,7 @@ export const AppointmentSheet = ({
     appointmentsList,
 }: {
     onClose: () => void,
-    onDelete?: (id: string) => Promise<boolean>,
+    onDelete?: (id: string, notify?: boolean) => Promise<boolean>,
     mode: 'create' | 'view',
     appointment?: Appointment | null,
     onSave: (data: any | any[]) => void,
@@ -99,6 +99,7 @@ export const AppointmentSheet = ({
     const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+    const [notifyClientOnCancel, setNotifyClientOnCancel] = useState(true);
 
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
@@ -203,9 +204,53 @@ export const AppointmentSheet = ({
         if (mode === 'view' && appointment) {
             const hasStatusChanged = status !== appointment.status;
             const hasNotesChanged = notes !== (appointment.notes || '');
-            const initialServiceNames = appointment.service.split(',').map(s => s.trim()).join(',');
-            const currentServiceNames = selectedServices.map(s => s.name).join(',');
-            const hasServicesChanged = initialServiceNames !== currentServiceNames;
+
+            // Deep compare services to check if names, prices, durations or staff changed
+            const serviceNames = appointment.service.split(',').map(s => s.trim());
+            const originalServices = serviceNames.map((name, index) => {
+                let catalogService: any = null;
+                for (const category of servicesSource) {
+                    if (!category.items) continue;
+                    const found = category.items.find((i: any) => i.name === name);
+                    if (found) {
+                        catalogService = { ...found, colorClass: category.colorClass };
+                        break;
+                    }
+                }
+                return catalogService ? {
+                    ...catalogService,
+                    price: catalogService.price,
+                    staff: appointment.staff,
+                    staffId: appointment.staffId,
+                } : {
+                    id: String(990 + index),
+                    name: name,
+                    price: 0,
+                    duration: Math.floor(appointment.duration / serviceNames.length),
+                    staff: appointment.staff,
+                    staffId: appointment.staffId,
+                    colorClass: 'bg-purple-500',
+                    pricingUnit: appointment.pricingUnit || 'Por Serviço'
+                };
+            });
+
+            let hasServicesChanged = selectedServices.length !== originalServices.length;
+            if (!hasServicesChanged) {
+                for (let i = 0; i < selectedServices.length; i++) {
+                    const sel = selectedServices[i];
+                    const orig = originalServices[i];
+                    if (
+                        sel.id !== orig.id ||
+                        sel.name !== orig.name ||
+                        Number(sel.price || 0) !== Number(orig.price || 0) ||
+                        Number(sel.duration || 0) !== Number(orig.duration || 0) ||
+                        (sel.staffId || '') !== (orig.staffId || '')
+                    ) {
+                        hasServicesChanged = true;
+                        break;
+                    }
+                }
+            }
 
             const hasClientChanged = (selectedClient?.name || '') !== appointment.customer;
 
@@ -373,62 +418,86 @@ export const AppointmentSheet = ({
     // Initial State Setup
     useEffect(() => {
         if (mode === 'view' && appointment) {
-            // Split services if they were combined in a string
-            const serviceNames = appointment.service.split(',').map(s => s.trim());
-
-            // Reconstruct services with ORIGINAL pricing and duration from catalog to avoid showing aggregated totals
-            const loadedServices = serviceNames.map((name, index) => {
-                // Try to find the service in mock data to get individual price/duration
-                let catalogService: any = null;
-                for (const category of servicesSource) {
-                    if (!category.items) continue;
-                    const found = category.items.find((i: any) => i.name === name);
-                    if (found) {
-                        catalogService = { ...found, colorClass: category.colorClass };
-                        break;
-                    }
+            // Check if returning from calendar selection mode in view mode
+            if (initialDraft) {
+                // Restore draft services and client
+                setSelectedServices(initialDraft.services || []);
+                setSelectedClient(initialDraft.client || null);
+                
+                // Set the chosen date and time from calendar selection
+                if (selectedDate) {
+                    setSelectedCalDate(selectedDate);
+                    setBaseCalDate(selectedDate);
+                    setStartDateRange(formatDateStr(selectedDate));
                 }
+                if (initialTimeSlot) {
+                    setEditTime(initialTimeSlot);
+                    setSelectedTimeSlot(initialTimeSlot);
+                    setStartTimeRange(initialTimeSlot);
+                    setEndTimeRange(addMinutes(initialTimeSlot, 60));
+                }
+                if (initialStaffId) {
+                    setSelectedStaffId(initialStaffId);
+                }
+                setCurrentView('datetime');
+            } else {
+                // Split services if they were combined in a string
+                const serviceNames = appointment.service.split(',').map(s => s.trim());
 
-                return catalogService ? {
-                    ...catalogService,
-                    price: catalogService.price,
-                    staff: appointment.staff,
-                    staffId: appointment.staffId,
-                } : {
-                    id: String(990 + index),
-                    name: name,
-                    price: 0,
-                    duration: Math.floor(appointment.duration / serviceNames.length),
-                    staff: appointment.staff,
-                    staffId: appointment.staffId,
-                    colorClass: 'bg-purple-500',
-                    pricingUnit: appointment.pricingUnit || 'Por Serviço'
-                };
-            });
+                // Reconstruct services with ORIGINAL pricing and duration from catalog to avoid showing aggregated totals
+                const loadedServices = serviceNames.map((name, index) => {
+                    // Try to find the service in mock data to get individual price/duration
+                    let catalogService: any = null;
+                    for (const category of servicesSource) {
+                        if (!category.items) continue;
+                        const found = category.items.find((i: any) => i.name === name);
+                        if (found) {
+                            catalogService = { ...found, colorClass: category.colorClass };
+                            break;
+                        }
+                    }
 
-            setSelectedServices(loadedServices);
-            const foundClient = (clientsSource || []).find(c => c.name === appointment.customer);
-            setSelectedClient(foundClient || { name: appointment.customer });
+                    return catalogService ? {
+                        ...catalogService,
+                        price: catalogService.price,
+                        staff: appointment.staff,
+                        staffId: appointment.staffId,
+                    } : {
+                        id: String(990 + index),
+                        name: name,
+                        price: 0,
+                        duration: Math.floor(appointment.duration / serviceNames.length),
+                        staff: appointment.staff,
+                        staffId: appointment.staffId,
+                        colorClass: 'bg-purple-500',
+                        pricingUnit: appointment.pricingUnit || 'Por Serviço'
+                    };
+                });
 
-            // Initialize edit state
-            const [y, m, d] = appointment.date.split('-').map(Number);
-            const aptDate = new Date(y, m - 1, d);
-            setSelectedCalDate(aptDate);
-            setBaseCalDate(aptDate);
-            setEditTime(appointment.time);
-            setStatus(appointment.status);
-            setNotes(appointment.notes || '');
+                setSelectedServices(loadedServices);
+                const foundClient = (clientsSource || []).find(c => c.name === appointment.customer);
+                setSelectedClient(foundClient || { name: appointment.customer });
 
-            // Initialize Range state if needed (for editing existing multi-day)
-            setStartDateRange(appointment.date);
-            setStartTimeRange(appointment.time);
-            setEndDateRange(appointment.endDate || appointment.date);
-            setEndTimeRange(appointment.endTime || appointment.time);
+                // Initialize edit state
+                const [y, m, d] = appointment.date.split('-').map(Number);
+                const aptDate = new Date(y, m - 1, d);
+                setSelectedCalDate(aptDate);
+                setBaseCalDate(aptDate);
+                setEditTime(appointment.time);
+                setStatus(appointment.status);
+                setNotes(appointment.notes || '');
 
-            // Important: Set the selected time slot for calculations
-            setSelectedTimeSlot(appointment.time);
+                // Initialize Range state if needed (for editing existing multi-day)
+                setStartDateRange(appointment.date);
+                setStartTimeRange(appointment.time);
+                setEndDateRange(appointment.endDate || appointment.date);
+                setEndTimeRange(appointment.endTime || appointment.time);
 
-            setCurrentView('summary');
+                // Important: Set the selected time slot for calculations
+                setSelectedTimeSlot(appointment.time);
+
+                setCurrentView('summary');
+            }
         } else {
             // Restore draft data if returning from selection mode
             if (initialDraft) {
@@ -448,6 +517,7 @@ export const AppointmentSheet = ({
 
             if (initialTimeSlot) {
                 setSelectedTimeSlot(initialTimeSlot);
+                setEditTime(initialTimeSlot); // Also sync editTime
             }
 
             if (initialStaffId) {
@@ -459,8 +529,8 @@ export const AppointmentSheet = ({
             // Standard Flow Initialization for Create Mode
             if (mode === 'create') {
                 if (initialDraft) {
-                    // If returning from draft (calendar selection), go to Summary
-                    setCurrentView('summary');
+                    // If returning from draft (calendar selection), go to Datetime step
+                    setCurrentView('datetime');
                 } else {
                     // Start at Services
                     setCurrentView('services');
@@ -1107,6 +1177,10 @@ export const AppointmentSheet = ({
         { value: 'Ausência', label: 'Ausência' },
     ] as const;
 
+    const statusOptions = mode === 'create'
+        ? VIEW_STATUS_OPTIONS.filter(opt => opt.value !== 'Concluído' && opt.value !== 'Ausência')
+        : VIEW_STATUS_OPTIONS;
+
     const calendarMonthYear = useMemo(() => {
         const formatted = baseCalDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
         return formatted.charAt(0).toUpperCase() + formatted.slice(1);
@@ -1518,7 +1592,7 @@ export const AppointmentSheet = ({
                                                 timeSlots.map((slot, i) => (
                                                     <button
                                                         key={i}
-                                                        onClick={() => setSelectedTimeSlot(slot)}
+                                                        onClick={() => { setSelectedTimeSlot(slot); setEditTime(slot); }}
                                                         className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark bg-brand-dark text-white' : 'border-brand-border dark:border-dark-border hover:border-gray-300 text-brand-dark dark:text-dark-heading'}`}
                                                     >
                                                         {slot}
@@ -1666,7 +1740,7 @@ export const AppointmentSheet = ({
                                                 }
                                             >
                                                 <div className="min-w-[140px]">
-                                                    {VIEW_STATUS_OPTIONS.map(opt => (
+                                                    {statusOptions.map(opt => (
                                                         <DropdownItem key={opt.value} onClick={() => handleStatusChange(opt.value)}>{opt.label}</DropdownItem>
                                                     ))}
                                                 </div>
@@ -2453,7 +2527,7 @@ export const AppointmentSheet = ({
                 onConfirm={async () => {
                     setIsCancelConfirmOpen(false);
                     if (appointment?.id && onDelete) {
-                        const success = await onDelete(appointment.id);
+                        const success = await onDelete(appointment.id, notifyClientOnCancel);
                         if (success) {
                             toast.success("Cancelado", "Agendamento cancelado com sucesso.");
                         } else {
@@ -2462,7 +2536,20 @@ export const AppointmentSheet = ({
                     }
                 }}
                 title="Cancelar agendamento?"
-                message="Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente."
+                message={
+                    <div className="space-y-4 text-center sm:text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
+                        </p>
+                        <div className="flex items-center gap-2 mt-4 p-3 bg-gray-50 dark:bg-zinc-900/50 rounded-xl justify-center sm:justify-start">
+                            <Checkbox
+                                label="Notificar o cliente sobre o cancelamento"
+                                checked={notifyClientOnCancel}
+                                onChange={(checked) => setNotifyClientOnCancel(!!checked)}
+                            />
+                        </div>
+                    </div>
+                }
                 confirmText="Cancelar agendamento"
                 cancelText="Voltar"
                 variant="danger"

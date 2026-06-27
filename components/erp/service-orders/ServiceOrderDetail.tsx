@@ -75,6 +75,33 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [showShareModal, setShowShareModal] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
+    const [isRegeneratingCode, setIsRegeneratingCode] = useState(false)
+
+    const handleRegenerateCode = async () => {
+        if (isRegeneratingCode || !order) return;
+        setIsRegeneratingCode(true);
+        try {
+            const { regenerateServiceOrderApprovalCodeAction } = await import("@/app/actions/erp/service-orders")
+            const res = await regenerateServiceOrderApprovalCodeAction(order.id, partnerId);
+            if (res.success) {
+                setOrder((prev: any) => ({
+                    ...prev,
+                    metadata: {
+                        ...(prev.metadata || {}),
+                        plain_code: res.code
+                    }
+                }));
+                toast({ description: `Novo código de assinatura gerado: ${res.code}` });
+                onMutation?.();
+            } else {
+                toast({ description: res.error || "Não foi possível regenerar o código." });
+            }
+        } catch {
+            toast({ description: "Erro ao conectar ao servidor." });
+        } finally {
+            setIsRegeneratingCode(false);
+        }
+    };
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {
@@ -722,6 +749,60 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                     showMap={false}
                                                 />
 
+                                                {/* Online Signature Link & Code Card */}
+                                                {hasMinimumPlan(planSlug, "crescer") ? (
+                                                    <SidebarCard hasTopStrip>
+                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Assinatura Online</h3>
+                                                        <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente visualizar e assinar online.</p>
+                                                        
+                                                        <div className="space-y-3">
+                                                            <Button
+                                                                variant="outline"
+                                                                className="w-full text-xs font-semibold justify-center py-2.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30"
+                                                                onClick={() => {
+                                                                    const text = `Olá! Segue o link para visualizar e assinar a Ordem de Serviço *#${order.order_number}*:\n\n${window.location.origin}/os/${order.public_token}\n\n*Código de Assinatura:* ${order.metadata?.plain_code || "Enviado por aqui"}`;
+                                                                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+                                                                }}
+                                                            >
+                                                                Compartilhar no WhatsApp
+                                                            </Button>
+
+                                                            <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center">
+                                                                <div>
+                                                                    <span className="text-xs text-brand-inactive-text block">Código de Assinatura</span>
+                                                                    <span className="text-lg font-bold text-emerald-500 tracking-wider">
+                                                                        {order.metadata?.plain_code || "---"}
+                                                                    </span>
+                                                                </div>
+
+                                                                {!order.signature_image_key && order.status !== "concluida" && order.status !== "entregue" && order.status !== "cancelada" && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        className="text-xs py-1 h-[32px] rounded-lg border-brand-border dark:border-dark-border"
+                                                                        onClick={handleRegenerateCode}
+                                                                        disabled={isRegeneratingCode}
+                                                                    >
+                                                                        {isRegeneratingCode ? "Gerando..." : "Novo Código"}
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </SidebarCard>
+                                                ) : (
+                                                    <SidebarCard>
+                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                            Link de Assinatura Online
+                                                        </h3>
+                                                        <div className="flex flex-col items-center text-center py-4">
+                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível no plano Crescer</p>
+                                                            <p className="text-xs text-brand-inactive-text mb-4">Compartilhe a OS online e receba a assinatura do cliente em tempo real.</p>
+                                                            <Button onClick={() => openPlanUpgrade("crescer")} className="text-xs h-9">
+                                                                Fazer upgrade
+                                                            </Button>
+                                                        </div>
+                                                    </SidebarCard>
+                                                )}
+
                                                 {/* Client Signature Card where Totals used to be */}
                                                 {order.signature_image_key ? (
                                                     <SidebarCard hasTopStrip>
@@ -738,11 +819,11 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         </div>
                                                     </SidebarCard>
                                                 ) : (
-                                                    order.status === "concluida" && (
+                                                    order.status !== "cancelada" && order.status !== "entregue" && (
                                                         <SidebarCard hasTopStrip>
                                                             <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Assinatura do Cliente</h3>
                                                             <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                                                                <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço foi concluída mas ainda não foi assinada.</p>
+                                                                <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>
                                                                 <Button variant="outline" size="sm" onClick={() => {
                                                                     if (!hasMinimumPlan(planSlug, "crescer")) {
                                                                         openPlanUpgrade("crescer");

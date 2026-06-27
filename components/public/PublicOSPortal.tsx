@@ -1,17 +1,36 @@
 "use client"
 
-import React from "react"
-import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
+import React, { useState, useEffect, useRef, useMemo } from "react"
+import {
+    getServiceOrderByTokenAction,
+    getPublicPresignedUploadUrlAction,
+    signPublicServiceOrderAction
+} from "@/app/actions/erp/service-orders"
+import {
+    Button,
+    Badge,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
+    CustomerCard,
+    FormSection,
+    DefaultModal,
+    Input
+} from "@/components/reusable"
+import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { formatCurrency } from "@/lib/utils"
-import { Badge, IconPlaceholder } from "@/components/reusable"
-import { CheckCircleIcon } from "@/lib/icons"
+import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
-import Link from "next/link"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
 interface PublicOSPortalProps {
+    token: string
+    ip: string
+    userAgent: string
     data: {
         serviceOrder: any
         services: any[]
@@ -23,214 +42,655 @@ interface PublicOSPortalProps {
     }
 }
 
-export default function PublicOSPortal({ data }: PublicOSPortalProps) {
-    const { serviceOrder: order, services, products, attachments, history, sale } = data
+export default function PublicOSPortal({ token, data: initialData, ip, userAgent }: PublicOSPortalProps) {
+    // ─── STATE MANAGEMENT ────────────────────────────────────────────────────
+    const [order, setOrder] = useState(initialData.serviceOrder)
+    const [services, setServices] = useState(initialData.services)
+    const [products, setProducts] = useState(initialData.products)
+    const [attachments, setAttachments] = useState(initialData.attachments)
+    const [history, setHistory] = useState(initialData.history)
+    const [statusHistory, setStatusHistory] = useState(initialData.statusHistory)
+    const [sale, setSale] = useState(initialData.sale)
+
+    const [activeTab, setActiveTab] = useState("Dados Gerais")
+
+    // Signature Modal
+    const [showSignModal, setShowSignModal] = useState(false)
+    const [isProcessingSignature, setIsProcessingSignature] = useState(false)
+    const [signerName, setSignerName] = useState("")
+    const [signatureCode, setSignatureCode] = useState("")
+    const [hasCanvasContent, setHasCanvasContent] = useState(false)
+
+    // Canvas drawing states
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const [isDrawing, setIsDrawing] = useState(false)
+
+    // Notifications & Messages
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+    // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
+    const buildImageUrl = (key: string) => {
+        if (!key) return ""
+        return key.startsWith("http") ? key : `${CDN_URL}/${key}`
+    }
+
+    const formatDateString = (dateStr: string) => {
+        if (!dateStr) return "---"
+        const parts = dateStr.split("-")
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`
+        }
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) return dateStr
+        return d.toLocaleDateString("pt-BR")
+    }
+
+    const formatDateTime = (dateVal: string | Date) => {
+        const d = new Date(dateVal)
+        if (isNaN(d.getTime())) return ""
+        return `${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+    }
+
+    // Resolve Partner Details
+    const partner = order?.partners || null
+    const partnerName = partner?.store_name || "Parceiro"
+    const partnerLogo = partner?.store_image_url ? buildImageUrl(partner.store_image_url) : null
+    const partnerPlan = partner?.plan_tier || "free"
+
+    // Check if Before & After sections are allowed based on the partner's plan
+    const beforeAfterEnabled = hasMinimumPlan(partnerPlan, "crescer")
+
+    // ─── REAL-TIME POLLING ───────────────────────────────────────────────────
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            try {
+                // Find token from URL path or parameter
+                const token = order?.public_token || window.location.pathname.split("/").pop() || ""
+                if (!token) return
+
+                const res = await getServiceOrderByTokenAction(token)
+                if (res.success && res.data) {
+                    setOrder(res.data.serviceOrder)
+                    setServices(res.data.services)
+                    setProducts(res.data.products)
+                    setAttachments(res.data.attachments)
+                    setHistory(res.data.history)
+                    setStatusHistory(res.data.statusHistory)
+                    setSale(res.data.sale)
+                }
+            } catch (err) {
+                console.error("Erro no polling da OS pública:", err)
+            }
+        }, 15000)
+
+        return () => clearInterval(interval)
+    }, [order?.public_token])
+
+    // ─── CANVAS DRAWING LOGIC ────────────────────────────────────────────────
+    useEffect(() => {
+        if (!showSignModal) return
+        // Small delay to ensure modal is rendered
+        const timer = setTimeout(() => {
+            const canvas = canvasRef.current
+            if (!canvas) return
+            const ctx = canvas.getContext("2d")
+            if (!ctx) return
+            ctx.strokeStyle = "#1a1a2e"
+            ctx.lineWidth = 2.5
+            ctx.lineCap = "round"
+            ctx.lineJoin = "round"
+        }, 100)
+        return () => clearTimeout(timer)
+    }, [showSignModal])
+
+    const getPos = (e: React.MouseEvent | React.TouchEvent) => {
+        const canvas = canvasRef.current
+        if (!canvas) return { x: 0, y: 0 }
+        const rect = canvas.getBoundingClientRect()
+
+        if ("touches" in e) {
+            if (e.touches.length === 0) return { x: 0, y: 0 }
+            const touch = e.touches[0]
+            return {
+                x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+                y: (touch.clientY - rect.top) * (canvas.height / rect.height),
+            }
+        }
+
+        return {
+            x: (e.clientX - rect.left) * (canvas.width / rect.width),
+            y: (e.clientY - rect.top) * (canvas.height / rect.height),
+        }
+    }
+
+    const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+        e.preventDefault()
+        const pos = getPos(e)
+        const canvas = canvasRef.current
+        const ctx = canvas?.getContext("2d")
+        if (!ctx || !canvas) return
+
+        ctx.beginPath()
+        ctx.moveTo(pos.x, pos.y)
+        setIsDrawing(true)
+        setHasCanvasContent(true)
+    }
+
+    const draw = (e: React.MouseEvent | React.TouchEvent) => {
+        e.preventDefault()
+        if (!isDrawing) return
+        const pos = getPos(e)
+        const canvas = canvasRef.current
+        const ctx = canvas?.getContext("2d")
+        if (!ctx) return
+
+        ctx.lineTo(pos.x, pos.y)
+        ctx.stroke()
+    }
+
+    const stopDrawing = () => {
+        setIsDrawing(false)
+    }
+
+    const clearCanvas = () => {
+        const canvas = canvasRef.current
+        const ctx = canvas?.getContext("2d")
+        if (!ctx || !canvas) return
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        setHasCanvasContent(false)
+    }
+
+    // ─── ONLINE SIGNING FLOW ─────────────────────────────────────────────────
+    const handleSignOS = async () => {
+        const canvas = canvasRef.current
+        if (!canvas || !signerName.trim() || signatureCode.length < 4) return
+
+        setIsProcessingSignature(true)
+        setErrorMessage(null)
+
+        try {
+            // 1. Convert Canvas signature to Blob
+            const blob = await new Promise<Blob | null>((resolve) =>
+                canvas.toBlob(resolve, "image/png")
+            )
+
+            if (!blob) {
+                throw new Error("Erro ao capturar imagem da assinatura.")
+            }
+
+            const token = order.public_token || window.location.pathname.split("/").pop() || ""
+            const fileName = `signature-${Date.now()}.png`
+
+            // 2. Request public presigned upload URL
+            const urlRes = await getPublicPresignedUploadUrlAction(token, fileName, "image/png", blob.size)
+            if (!urlRes.success) {
+                throw new Error(urlRes.error || "Erro ao obter autorização para salvar assinatura.")
+            }
+
+            // 3. Upload Blob to R2
+            const uploadRes = await fetch(urlRes.uploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": "image/png" },
+                body: blob,
+            })
+
+            if (!uploadRes.ok) {
+                throw new Error("Erro ao fazer o upload da assinatura.")
+            }
+
+            // 4. Submit signature & verify code on backend
+            const signRes = await signPublicServiceOrderAction(
+                token,
+                signerName,
+                signatureCode,
+                urlRes.key,
+                ip,
+                userAgent
+            )
+
+            if (signRes.success) {
+                setSuccessMessage("Ordem de serviço assinada com sucesso!")
+                setShowSignModal(false)
+                
+                // Refresh local data
+                const refreshRes = await getServiceOrderByTokenAction(token)
+                if (refreshRes.success && refreshRes.data) {
+                    setOrder(refreshRes.data.serviceOrder)
+                    setServices(refreshRes.data.services)
+                    setProducts(refreshRes.data.products)
+                    setAttachments(refreshRes.data.attachments)
+                    setHistory(refreshRes.data.history)
+                }
+            } else {
+                setErrorMessage(signRes.error || "Erro ao verificar código e assinar.")
+            }
+
+        } catch (err: any) {
+            setErrorMessage(err.message || "Ocorreu um erro ao processar a assinatura.")
+        } finally {
+            setIsProcessingSignature(false)
+        }
+    }
+
+    const isFinalized = order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
-    const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`
-    const formatDate = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "-"
-    const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "-"
+    // Group attachments by category
+    const groupedAttachments = useMemo(() => {
+        const g: Record<string, any[]> = { normal: [], antes: [], depois: [] }
+        for (const att of attachments || []) {
+            const cat = att.category || "normal"
+            if (!g[cat]) g[cat] = []
+            g[cat].push(att)
+        }
+        return g
+    }, [attachments])
 
     return (
-        <div className="min-h-screen bg-brand-gray dark:bg-dark-surface p-4">
-            <div className="max-w-[800px] mx-auto space-y-6">
-                {/* Header */}
-                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                OS #{order.order_number}
-                            </h1>
-                            <p className="text-sm text-brand-inactive-text mt-1">
-                                Criada em {formatDateTime(order.created_at)}
-                            </p>
-                        </div>
-                        {statusMeta && (
-                            <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
-                        )}
-                    </div>
+        <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative text-left">
+            <style>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                        <div>
-                            <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Cliente</label>
-                            <p className="text-[14px] font-medium text-brand-dark dark:text-dark-heading mt-0.5">
-                                {order.customer_name || "-"}
-                            </p>
-                        </div>
-                        {order.expected_completion_date && (
-                            <div>
-                                <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Previsão de conclusão</label>
-                                <p className="text-[14px] font-medium text-brand-dark dark:text-dark-heading mt-0.5">
-                                    {formatDate(order.expected_completion_date)}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                <div className="flex-1 w-full h-full relative pb-20 md:pb-0 flex flex-col overflow-hidden">
+                    <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
 
-                {/* Título e descrição */}
-                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                    <h2 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-2">{order.title}</h2>
-                    {order.description && (
-                        <p className="text-[14px] text-brand-inactive-text whitespace-pre-wrap">{order.description}</p>
-                    )}
-                </div>
+                        {/* LEFT COLUMN: INFO & ACTIONS */}
+                        <div
+                            className={`w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative`}
+                        >
+                            {/* Sticky Header */}
+                            <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+                                <div className="px-4 md:px-6 pt-4 pb-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            {partnerLogo ? (
+                                                <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-lg border border-brand-border dark:border-dark-border" />
+                                            ) : (
+                                                <div className="h-9 w-9 rounded-lg bg-brand-green flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                                    {partnerName.substring(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block leading-tight">{partnerName}</span>
+                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block tracking-wider">Ordem de Serviço #{order.order_number}</span>
+                                            </div>
+                                        </div>
 
-                {/* Serviços */}
-                {services.length > 0 && (
-                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                        <h3 className="font-bold text-[15px] mb-4 text-brand-dark dark:text-dark-heading">Serviços Realizados</h3>
-                        <div className="space-y-3">
-                            {services.map((svc: any) => (
-                                <div key={svc.id} className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50 last:border-0">
-                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{svc.service_name}</span>
-                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(svc.total_price)}</span>
-                                </div>
-                            ))}
-                            <div className="flex justify-between items-center pt-2">
-                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Total Serviços</span>
-                                <span className="text-[13px] font-bold">{formatCurrency(order.total_service_amount || 0)}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Produtos */}
-                {products.length > 0 && (
-                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                        <h3 className="font-bold text-[15px] mb-4 text-brand-dark dark:text-dark-heading">Produtos Utilizados</h3>
-                        <div className="space-y-3">
-                            {products.map((prod: any) => (
-                                <div key={prod.id} className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50 last:border-0">
-                                    <div>
-                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{prod.product_name}</span>
-                                        <span className="text-[11px] text-brand-inactive-text ml-2">x{prod.quantity}</span>
+                                        <div className="flex items-center gap-2">
+                                            {statusMeta && (
+                                                <Badge variant={statusMeta.variant}>
+                                                    {statusMeta.label}
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
-                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(prod.total_price)}</span>
+
+                                    {/* Responsive Tabs List */}
+                                    <div className="w-full mt-4">
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
+                                            <TabsTrigger value="Anexos">Anexos</TabsTrigger>
+                                            <TabsTrigger value="Histórico">Histórico</TabsTrigger>
+                                            <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
+                                        </TabsList>
+                                    </div>
                                 </div>
-                            ))}
-                            <div className="flex justify-between items-center pt-2">
-                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Total Produtos</span>
-                                <span className="text-[13px] font-bold">{formatCurrency(order.total_product_amount || 0)}</span>
                             </div>
-                        </div>
-                    </div>
-                )}
 
-                {/* Total geral */}
-                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                    <div className="flex justify-between items-center">
-                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">Total Geral</span>
-                        <span className="text-[18px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_amount || 0)}</span>
-                    </div>
-                </div>
+                            {/* Scrollable Content inside left column */}
+                            <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24">
+                                {/* Success and Error Banners */}
+                                {successMessage && (
+                                    <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-2xl flex items-center gap-3">
+                                        <span className="text-xs font-semibold">{successMessage}</span>
+                                        <button onClick={() => setSuccessMessage(null)} className="ml-auto text-green-500 hover:text-green-700">✕</button>
+                                    </div>
+                                )}
 
-                {/* Venda Vinculada (portal) */}
-                {sale && (
-                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                        <h3 className="font-bold text-[15px] mb-3 text-brand-dark dark:text-dark-heading">Pagamento</h3>
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center text-[13px]">
-                                <span className="text-brand-inactive-text">Valor</span>
-                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(sale.final_amount || sale.total_amount || 0)}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-[13px]">
-                                <span className="text-brand-inactive-text">Pago</span>
-                                <span className="font-bold text-brand-green">{formatCurrency(sale.paid_amount || 0)}</span>
-                            </div>
-                            {sale.payment_status === "partially_paid" && (
-                                <div className="flex justify-between items-center text-[13px]">
-                                    <span className="text-brand-inactive-text">Restante</span>
-                                    <span className="font-bold text-brand-red">
-                                        {formatCurrency((sale.final_amount || sale.total_amount || 0) - (sale.paid_amount || 0))}
-                                    </span>
-                                </div>
-                            )}
-                            <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
-                                <span className="text-brand-inactive-text">Status</span>
-                                <Badge variant={sale.payment_status === "paid" ? "green" : sale.payment_status === "partially_paid" ? "orange" : "gray"}>
-                                    {sale.payment_status === "paid" ? "Pago" : sale.payment_status === "partially_paid" ? "Parcialmente Pago" : "Pendente"}
-                                </Badge>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                                {errorMessage && (
+                                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center gap-3">
+                                        <span className="text-xs font-semibold">{errorMessage}</span>
+                                        <button onClick={() => setErrorMessage(null)} className="ml-auto text-red-500 hover:text-red-700">✕</button>
+                                    </div>
+                                )}
 
-                {/* Assinatura */}
-                {order.signature_image_key && (
-                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                        <h3 className="font-bold text-[15px] mb-3 text-brand-dark dark:text-dark-heading">Assinatura</h3>
-                        <img
-                            src={buildImageUrl(order.signature_image_key)}
-                            alt="Assinatura"
-                            className="max-w-[300px] max-h-[120px] border border-brand-border rounded-lg p-2 bg-white"
-                        />
-                        <p className="text-xs text-brand-inactive-text mt-2">
-                            Assinado em: {formatDateTime(order.signed_at)}
-                        </p>
-                    </div>
-                )}
+                                <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
 
-                {/* Anexos */}
-                {attachments.length > 0 && (
-                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                        <h3 className="font-bold text-[15px] mb-3 text-brand-dark dark:text-dark-heading">Anexos</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {attachments.map((att: any) => (
-                                <div key={att.file_key} className="rounded-xl overflow-hidden border border-brand-border">
-                                    {att.file_type?.startsWith("image/") ? (
-                                        <img
-                                            src={buildImageUrl(att.file_key)}
-                                            alt={att.file_name || ""}
-                                            className="w-full h-28 object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-28 bg-brand-gray flex items-center justify-center text-xs text-brand-inactive-text">
-                                            {att.file_name || "Anexo"}
+                                    {/* ─── TAB: DADOS GERAIS ─── */}
+                                    {activeTab === "Dados Gerais" && (
+                                        <div className="space-y-8 text-left">
+                                            <FormSection title="Informações do serviço">
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Código da OS</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">#{order.order_number}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de abertura</span>
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">{formatDateTime(order.created_at)}</span>
+                                                    </div>
+                                                    {order.expected_completion_date && (
+                                                        <div className="flex justify-between items-center text-xs">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Previsão de conclusão</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(order.expected_completion_date)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </FormSection>
+
+                                            <FormSection title="Prestador de Serviço" hasSeparator>
+                                                <div className="space-y-2">
+                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{partnerName}</p>
+                                                    {partner?.address && <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">{partner.address}</p>}
+                                                    {partner?.phone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {partner.phone}</p>}
+                                                </div>
+                                            </FormSection>
+
+                                            <FormSection title="Cliente" hasSeparator>
+                                                {order.customer_snapshot ? (
+                                                    <CustomerCard customer={order.customer_snapshot} chrome="minimal" />
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{order.customer_name || "Consumidor final"}</p>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum cadastro de cliente vinculado.</p>
+                                                    </div>
+                                                )}
+                                            </FormSection>
+
+                                            {order.description && (
+                                                <FormSection title="Descrição / Observações" hasSeparator>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.description}</p>
+                                                </FormSection>
+                                            )}
+
+                                            {/* Specifications if any */}
+                                            {order.specifications && order.specifications.length > 0 && (
+                                                <FormSection title="Especificações" hasSeparator>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {order.specifications.map((spec: any, idx: number) => (
+                                                            <div key={idx} className="border border-brand-border dark:border-dark-border rounded-xl p-3">
+                                                                <span className="text-[10px] text-brand-inactive-text block font-bold uppercase">{spec.name}</span>
+                                                                <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading mt-0.5 block">{spec.value}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </FormSection>
+                                            )}
+
+                                            {/* Sign Button */}
+                                            {!isFinalized ? (
+                                                <div className="pt-6 border-t border-brand-border dark:border-dark-border">
+                                                    <Button
+                                                        onClick={() => {
+                                                            setSignerName(order.customer_name || "")
+                                                            setShowSignModal(true)
+                                                        }}
+                                                        className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm h-11"
+                                                    >
+                                                        ✓ Assinar Ordem de Serviço
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div className="p-4 rounded-2xl border text-xs font-semibold text-left space-y-2">
+                                                    {order.signature_image_key ? (
+                                                        <div className="bg-green-50 border-green-100 text-green-800 p-2.5 rounded-xl space-y-1">
+                                                            <div className="font-bold text-sm text-green-900 flex items-center gap-1.5">
+                                                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                                                Assinado pelo cliente
+                                                            </div>
+                                                            <div>Assinatura capturada via portal público.</div>
+                                                            <div>Data da assinatura: {formatDateTime(order.signed_at)}</div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-gray-50 border-brand-border text-brand-dark p-2.5 rounded-xl">
+                                                            Ordem de serviço finalizada ou cancelada.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
+
+                                    {/* ─── TAB: ANEXOS ─── */}
+                                    {activeTab === "Anexos" && (
+                                        <div className="space-y-6 text-left">
+                                            {/* If before/after enabled, group attachments */}
+                                            {beforeAfterEnabled ? (
+                                                <>
+                                                    {/* Antes */}
+                                                    <FormSection title="Antes">
+                                                        {groupedAttachments.antes.length === 0 ? (
+                                                            <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado antes do serviço.</p>
+                                                        ) : (
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                                {groupedAttachments.antes.map((att: any, idx: number) => (
+                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                        {att.file_type?.startsWith("image/") ? (
+                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </FormSection>
+
+                                                    {/* Depois */}
+                                                    <FormSection title="Depois" hasSeparator>
+                                                        {groupedAttachments.depois.length === 0 ? (
+                                                            <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado depois do serviço.</p>
+                                                        ) : (
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                                {groupedAttachments.depois.map((att: any, idx: number) => (
+                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                        {att.file_type?.startsWith("image/") ? (
+                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </FormSection>
+
+                                                    {/* Gerais / Outros */}
+                                                    {groupedAttachments.normal.length > 0 && (
+                                                        <FormSection title="Outros Anexos" hasSeparator>
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                                {groupedAttachments.normal.map((att: any, idx: number) => (
+                                                                    <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                        {att.file_type?.startsWith("image/") ? (
+                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </FormSection>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                /* Standalone list of all attachments */
+                                                <FormSection title="Anexos">
+                                                    {attachments.length === 0 ? (
+                                                        <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado nesta ordem de serviço.</p>
+                                                    ) : (
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                            {attachments.map((att: any, idx: number) => (
+                                                                <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                    {att.file_type?.startsWith("image/") ? (
+                                                                        <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <span className="text-xs text-brand-inactive-text text-center px-2 truncate w-full">{att.file_name || "Anexo"}</span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </FormSection>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* ─── TAB: HISTÓRICO ─── */}
+                                    {activeTab === "Histórico" && (
+                                        <div className="space-y-4 text-left">
+                                            {history.length === 0 ? (
+                                                <div className="text-center py-8 text-xs text-brand-inactive-text italic">
+                                                    Nenhum histórico operacional disponível.
+                                                </div>
+                                            ) : (
+                                                <HistoryTimeline
+                                                    entries={history.map((h: any) => ({
+                                                        id: h.id,
+                                                        actor_name: "Sistema",
+                                                        change_lines: h.change_lines || [],
+                                                        created_at: h.created_at,
+                                                        entry_type: h.action_type,
+                                                    }))}
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+
                                 </div>
-                            ))}
+
+                                {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
+                                <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
+                                    <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
+                                        <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
+                                            <OSPreview
+                                                invoiceNumber={order.order_number}
+                                                orderDate={order.created_at}
+                                                expectedCompletionDate={order.expected_completion_date}
+                                                selectedCustomer={order.customer_snapshot}
+                                                services={services}
+                                                products={products}
+                                                totalServiceAmount={Number(order.total_service_amount || 0)}
+                                                totalProductAmount={Number(order.total_product_amount || 0)}
+                                                totalAmount={Number(order.total_amount || 0)}
+                                                description={order.description}
+                                                signatureImageKey={order.signature_image_key}
+                                                signedAt={order.signed_at}
+                                                partnerName={partnerName}
+                                                partnerAvatar={partnerLogo || undefined}
+                                                printMode={false}
+                                                showCustomerContact={false}
+                                            />
+                                        </div>
+                                    </div>
+                                </TabsContent>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: PREVIEW (DESKTOP ONLY) */}
+                        <div className="hidden lg:flex lg:w-1/2 bg-brand-gray/30 dark:bg-dark-border/10 overflow-auto no-scrollbar relative flex-col h-full">
+                            <OSPreview
+                                invoiceNumber={order.order_number}
+                                orderDate={order.created_at}
+                                expectedCompletionDate={order.expected_completion_date}
+                                selectedCustomer={order.customer_snapshot}
+                                services={services}
+                                products={products}
+                                totalServiceAmount={Number(order.total_service_amount || 0)}
+                                totalProductAmount={Number(order.total_product_amount || 0)}
+                                totalAmount={Number(order.total_amount || 0)}
+                                description={order.description}
+                                signatureImageKey={order.signature_image_key}
+                                signedAt={order.signed_at}
+                                partnerName={partnerName}
+                                partnerAvatar={partnerLogo || undefined}
+                                printMode={false}
+                                showCustomerContact={false}
+                            />
+                        </div>
+
+                    </div>
+                </div>
+            </Tabs>
+
+            {/* ─── MODAL: SIGN SERVICE ORDER ─────────────────────────────────────── */}
+            <DefaultModal
+                isOpen={showSignModal}
+                onClose={() => setShowSignModal(false)}
+                title="Assinar Ordem de Serviço"
+                maxWidth="md"
+                footer={
+                    <div className="flex gap-3 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowSignModal(false)}
+                            className="flex-1 py-2.5 h-auto"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleSignOS}
+                            disabled={!signerName.trim() || signatureCode.length < 4 || !hasCanvasContent || isProcessingSignature}
+                            className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
+                        >
+                            {isProcessingSignature ? "Assinando..." : "Confirmar Assinatura"}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4 text-left">
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        Preencha os campos abaixo e desenhe sua assinatura no quadro. O código de assinatura de 4 dígitos foi gerado pelo profissional responsável pela OS.
+                    </p>
+
+                    <div className="space-y-3">
+                        <Input
+                            label="Nome completo do signatário"
+                            value={signerName}
+                            onChange={(e) => setSignerName(e.target.value)}
+                            placeholder="Ex: João da Silva"
+                        />
+
+                        <Input
+                            label="Código de assinatura (4 dígitos)"
+                            maxLength={4}
+                            value={signatureCode}
+                            onChange={(e) => setSignatureCode(e.target.value.replace(/\D/g, ""))}
+                            placeholder="0000"
+                        />
+
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold uppercase text-brand-inactive-text dark:text-dark-body">Desenhe sua assinatura abaixo</label>
+                            <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white">
+                                <canvas
+                                    ref={canvasRef}
+                                    width={500}
+                                    height={200}
+                                    className="w-full touch-none cursor-crosshair"
+                                    style={{ height: "200px" }}
+                                    onMouseDown={startDrawing}
+                                    onMouseMove={draw}
+                                    onMouseUp={stopDrawing}
+                                    onMouseLeave={stopDrawing}
+                                    onTouchStart={startDrawing}
+                                    onTouchMove={draw}
+                                    onTouchEnd={stopDrawing}
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={clearCanvas}
+                                className="text-[11px] font-semibold text-brand-inactive-text hover:text-brand-dark transition-colors pt-1"
+                            >
+                                Limpar quadro
+                            </button>
                         </div>
                     </div>
-                )}
-
-                {/* Timeline */}
-                {history.length > 0 && (
-                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                        <h3 className="font-bold text-[15px] mb-3 text-brand-dark dark:text-dark-heading">Histórico</h3>
-                        <HistoryTimeline
-                            entries={history.map((h: any) => ({
-                                id: h.id,
-                                actor_name: "Sistema",
-                                change_lines: h.change_lines || [],
-                                created_at: h.created_at,
-                                entry_type: h.action_type,
-                            }))}
-                        />
-                    </div>
-                )}
-
-                {/* Status final */}
-                {order.status === "concluida" || order.status === "entregue" ? (
-                    <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
-                        <CheckCircleIcon className="w-10 h-10 mx-auto text-green-600 mb-2" />
-                        <h3 className="font-bold text-[15px] text-green-700">Serviço {statusMeta?.label || "Concluído"}</h3>
-                        {order.completed_at && (
-                            <p className="text-sm text-green-600 mt-1">
-                                Finalizado em {formatDateTime(order.completed_at)}
-                            </p>
-                        )}
-                    </div>
-                ) : null}
-
-                {/* Footer */}
-                <div className="text-center py-4">
-                    <p className="text-xs text-brand-inactive-text">
-                        Dudit - Gestão simplificada para seu negócio
-                    </p>
                 </div>
-            </div>
+            </DefaultModal>
         </div>
     )
 }

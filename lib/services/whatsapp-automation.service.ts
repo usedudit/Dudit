@@ -18,6 +18,7 @@ const TEMPLATE_BY_TRIGGER: Partial<Record<WhatsappAutomationTrigger, string>> = 
   appointment_created: "appointment_created",
   appointment_confirmed: "appointment_confirmed",
   appointment_cancelled: "appointment_cancelled",
+  appointment_rescheduled: "appointment_rescheduled",
   appointment_reminder_24h: "appointment_reminder",
   appointment_reminder_2h: "appointment_reminder",
   order_created: "order_created",
@@ -401,6 +402,54 @@ export async function onAppointmentStatusChanged(
       templateVariables: vars,
     })
   }
+}
+
+export async function onAppointmentRescheduled(appointment: Record<string, unknown>) {
+  const partnerId = String(appointment.partner_id)
+  const appointmentId = String(appointment.id)
+
+  const admin = getAdminClient()
+
+  // Delete old pending scheduled jobs
+  await admin
+    .from("whatsapp_scheduled_jobs")
+    .delete()
+    .eq("entity_type", "appointment")
+    .eq("entity_id", appointmentId)
+    .eq("status", "pending")
+
+  const { data: partner } = await admin
+    .from("partners")
+    .select("store_name")
+    .eq("id", partnerId)
+    .maybeSingle()
+
+  const vars = {
+    customer_name: String(appointment.customer_name || "Cliente"),
+    service_name: String(appointment.service_name),
+    date: String(appointment.start_date),
+    time: String(appointment.start_time),
+    store_name: partner?.store_name || "",
+  }
+
+  await dispatchWhatsappAutomation({
+    partnerId,
+    trigger: "appointment_rescheduled",
+    entityType: "appointment",
+    entityId: appointmentId,
+    appointmentId,
+    customerId: appointment.customer_id as string | null,
+    templateVariables: vars,
+  })
+
+  // Schedule new reminders
+  await scheduleAppointmentReminders({
+    partnerId,
+    appointmentId,
+    startDate: String(appointment.start_date),
+    startTime: String(appointment.start_time),
+    customerId: appointment.customer_id as string | null,
+  })
 }
 
 const ORDER_TRIGGER_MAP: Record<string, WhatsappAutomationTrigger> = {

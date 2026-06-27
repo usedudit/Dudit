@@ -13,10 +13,10 @@ import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
-    title: "Produtos e serviços perto de você",
+    title: "Dudit - Achou, anunciou, resolveu.",
     description: "Descubra produtos, serviços e negócios perto de você. Compre direto de quem vende na sua cidade, sem taxa. Milhares de opções na sua região.",
     openGraph: {
-        title: "Produtos e serviços perto de você | Dudit",
+        title: "Dudit - Achou, anunciou, resolveu.",
         description: "Descubra produtos, serviços e negócios perto de você.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         site: "@dudit",
         creator: "@dudit",
-        title: "Produtos e serviços perto de você | Dudit",
+        title: "Dudit - Achou, anunciou, resolveu.",
         description: "Descubra produtos, serviços e negócios perto de você.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },

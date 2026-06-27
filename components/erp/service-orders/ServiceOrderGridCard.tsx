@@ -15,6 +15,7 @@ interface ServiceOrderGridCardProps {
   onDelete?: () => void
   statusColor: string
   statusLabel: string
+  teamMembers?: any[]
   children?: React.ReactNode
 }
 
@@ -28,12 +29,16 @@ const ServiceOrderGridCard = React.memo(
     onDelete,
     statusColor,
     statusLabel,
+    teamMembers = [],
     children,
   }: ServiceOrderGridCardProps) => {
     const formatDate = (d: string) => {
       if (!d) return "-"
       return new Date(d).toLocaleDateString("pt-BR")
     }
+
+    const assignedMember = teamMembers.find(m => m.userId === order.assigned_user_id)
+    const assignedName = assignedMember ? assignedMember.name : "-"
 
     return (
       <motion.div
@@ -100,15 +105,26 @@ const ServiceOrderGridCard = React.memo(
             </div>
           </div>
 
-          {/* Row 2: Previsão & Actions */}
-          <div className="flex justify-between items-end gap-2">
+          {/* Row 2: Responsável & Previsão */}
+          <div className="flex justify-between items-start gap-2">
             <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Previsão</span>
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Responsável</span>
               <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                {order.expected_completion_date ? formatDate(order.expected_completion_date) : "Não definida"}
+                {assignedName}
               </span>
             </div>
 
+            <div className="flex flex-col gap-0.5 items-end shrink-0">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Previsão</span>
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                {order.expected_completion_date ? formatDate(order.expected_completion_date) : "Não definida"}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 3: Valor & Actions */}
+          <div className="flex justify-between items-center gap-2">
+            <div></div>
             {/* Botão de Ações */}
             <div
               className="shrink-0 flex items-center gap-3"

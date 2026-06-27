@@ -238,14 +238,14 @@ const SupplierTableSection = React.memo(({ suppliers, totalCount, columns, heade
                 />
             </div>
         ) : (
-            <div className="w-full overflow-hidden bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl">
+            <div className="w-full overflow-hidden rounded-xl relative">
                 <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
                         <thead>
-                            <tr className="bg-brand-slate dark:bg-dark-surface">
-                                <th className="py-2.5 px-4 pl-6 rounded-tl-xl border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body w-12"></th>
+                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"></th>
                                 {headers.map((h) => (
-                                    <th key={h.id} className={`py-2.5 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}>
+                                    <th key={h.id} className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}>
                                         {h.label}
                                     </th>
                                 ))}
@@ -286,7 +286,7 @@ const SupplierTableSection = React.memo(({ suppliers, totalCount, columns, heade
                 )}
             </div>
         )}
-    </div>
+    </div >
 ))
 SupplierTableSection.displayName = "SupplierTableSection"
 
