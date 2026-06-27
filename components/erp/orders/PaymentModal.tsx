@@ -1107,7 +1107,7 @@ const PaymentModal = ({
         }
         : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total: displayTransactionTotal };
 
-    const selectedMethodObj = selectedMethodId ? activeMethods.find((m) => m.id === selectedMethodId) : null;
+    const selectedMethodObj = selectedMethodId ? activeMethods.find((m: any) => m.id === selectedMethodId) : null;
 
     const getBaseAmountFromFinal = (finalAmt: number) => {
         if (!paymentCalculation?.success || !selectedMethodObj) {
@@ -1294,7 +1294,7 @@ const PaymentModal = ({
 
     const openMethodTypeSelection = (methodType: string) => {
         resetSelectedMethodPricing({ clearType: false });
-        const methodsOfType = activeMethods.filter((method) => normalizeMethodType(method.type) === methodType);
+        const methodsOfType = activeMethods.filter((method: any) => normalizeMethodType(method.type) === methodType);
 
         if (methodsOfType.length === 0 && methodType !== "cash") {
             toast({
@@ -1355,7 +1355,7 @@ const PaymentModal = ({
                     })
                 : [{
                     method: (() => {
-                        const selectedMethodObj = activeMethods.find((method) => method.id === selectedMethodId);
+                        const selectedMethodObj = activeMethods.find((method: any) => method.id === selectedMethodId);
                         if (selectedMethodObj) {
                             return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
                         }
@@ -1549,7 +1549,7 @@ const PaymentModal = ({
     );
 
     const getIconForMethod = (method: string | null, paymentMethodId?: string | null) => {
-        const resolvedType = normalizeMethodType(activeMethods.find((m) => m.id === paymentMethodId)?.type || method);
+        const resolvedType = normalizeMethodType(activeMethods.find((m: any) => m.id === paymentMethodId)?.type || method);
         if (resolvedType === 'cash') return MoneyIcon;
         if (resolvedType === 'pix') return QRCodeIcon;
         if (['credit_card', 'debit_card'].includes(resolvedType)) return CreditCardIcon;
@@ -2059,7 +2059,7 @@ const PaymentModal = ({
                                         <motion.div key="split_method_select" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full">
                                             <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione o método</h3>
                                             <div className="grid grid-cols-2 gap-4">
-                                                {activeMethods.map((method) => {
+                                                {activeMethods.map((method: any) => {
                                                     const normalizedType = normalizeMethodType(method.type);
                                                     const MethodIcon = normalizedType === "cash"
                                                         ? MoneyIcon
@@ -2088,8 +2088,8 @@ const PaymentModal = ({
                                             <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione um método</h3>
                                             <div className="grid grid-cols-2 gap-4">
                                                 {activeMethods
-                                                    .filter((method) => normalizeMethodType(method.type) === selectedMethodType)
-                                                    .map((method) => {
+                                                    .filter((method: any) => normalizeMethodType(method.type) === selectedMethodType)
+                                                    .map((method: any) => {
                                                         const normalizedType = normalizeMethodType(method.type);
                                                         const MethodIcon = normalizedType === "cash"
                                                             ? MoneyIcon

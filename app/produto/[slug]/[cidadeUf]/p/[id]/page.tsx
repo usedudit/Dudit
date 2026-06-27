@@ -146,12 +146,17 @@ export default async function ProductDetailsPage({
     : 5.0; // rating neutro padrão
 
   // BreadcrumbList Schema
+  const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
+  const address = p?.addresses?.[0] || p?.address || p || {}
+  const city = address?.city || "Brasil"
+  const productUrl = `https://dudit.com.br${getProductUrl(product)}`
+
   const breadcrumbLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
-      { '@type': 'ListItem', position: 2, name: city, item: `https://dudit.com.br/explorar/${cidadeUf}` },
+      { '@type': 'ListItem', position: 2, name: city, item: `https://dudit.com.br/explorar/${currentCidadeUf}` },
       { '@type': 'ListItem', position: 3, name: product.name, item: productUrl },
     ],
   }
@@ -191,6 +196,10 @@ export default async function ProductDetailsPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
 
       <ProductDetailsPageClient
