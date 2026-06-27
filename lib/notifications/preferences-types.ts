@@ -35,6 +35,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
       "order_refunded",
       "appointment_created",
       "appointment_reminder",
+      "appointment_rescheduled",
     ],
   },
   seller: {
@@ -46,6 +47,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
       "order_cancelled",
       "appointment_created",
       "appointment_cancelled",
+      "appointment_rescheduled",
       "low_stock",
       "replenishment_suggested",
     ],
@@ -89,6 +91,7 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   appointment_confirmed: "Agendamento confirmado",
   appointment_reminder: "Lembrete de agendamento",
   appointment_cancelled: "Agendamento cancelado",
+  appointment_rescheduled: "Agendamento reagendado",
   subscription_created: "Nova assinatura",
   subscription_renewed: "Assinatura renovada",
   message_received: "Nova mensagem",

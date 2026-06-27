@@ -115,6 +115,7 @@ export async function shouldDeliverWhatsapp(
     appointment_created: "appointment_created",
     appointment_confirmed: "appointment_confirmed",
     appointment_cancelled: "appointment_cancelled",
+    appointment_rescheduled: "appointment_rescheduled",
     appointment_reminder_24h: "appointment_reminder",
     appointment_reminder_2h: "appointment_reminder",
     order_created: "order_created",
