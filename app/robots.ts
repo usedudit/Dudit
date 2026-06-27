@@ -5,34 +5,51 @@ export default function robots(): MetadataRoute.Robots {
         rules: [
             {
                 userAgent: '*',
+                allow: '/',
                 disallow: [
                     '/api/',
                     '/auth/',
                     '/erp/',
                     '/cart/',
+                    '/checkout/',
                     '/payment/',
                     '/pedidos/',
                     '/dashboard/',
                     '/invite/',
                     '/select-erp/',
-                    '/perfil/'
+                    '/perfil/',
+                    '/assinaturas/',
+                    '/print/',
+                    '/ddt-admin/',
+                    '/~offline/',
                 ],
             },
-            // Googlebot regras explícitas (Performance de Crawl)
             {
                 userAgent: 'Googlebot',
+                allow: '/',
                 disallow: [
                     '/api/',
+                    '/auth/',
                     '/erp/',
                     '/cart/',
-                    '/auth/',
-                    '*?sort=*',       // Bloqueia parâmetros de filtro
-                    '*?searchValue=*',// Bloqueia buscas por ter zero valia orgânica (Thin Content)
-                    '*?category=*',    // Bloqueia categorização dinâmica de Lojas p/ economizar budget
-                    '*?tab=*',    // Bloqueia tabs
-                    '*?q=*'       // Bloqueia queries genericas da exploração
-                ]
-            }
+                    '/checkout/',
+                    '/payment/',
+                    '/pedidos/',
+                    '/dashboard/',
+                    '/invite/',
+                    '/select-erp/',
+                    '/perfil/',
+                    '/assinaturas/',
+                    '/print/',
+                    '/ddt-admin/',
+                    '/~offline/',
+                    '*?sort=*',
+                    '*?searchValue=*',
+                    '*?category=*',
+                    '*?tab=*',
+                    '*?q=*',
+                ],
+            },
         ],
         sitemap: 'https://dudit.com.br/sitemap.xml',
     }

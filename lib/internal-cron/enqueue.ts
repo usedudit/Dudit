@@ -37,7 +37,7 @@ export async function enqueueTriggerTask(
   correlation?: CronCorrelation,
 ): Promise<boolean> {
   if (!process.env.TRIGGER_SECRET_KEY) {
-    cronLogger.error("enqueue", "TRIGGER_SECRET_KEY is not configured — cannot enqueue tasks", {
+    cronLogger.error("enqueue", "TRIGGER_SECRET_KEY is not configured - cannot enqueue tasks", {
       taskId,
     }, correlation)
     throw new Error("TRIGGER_SECRET_KEY is required for Trigger.dev task enqueue")
@@ -45,7 +45,7 @@ export async function enqueueTriggerTask(
 
   for (let attempt = 0; attempt < MAX_ENQUEUE_RETRIES; attempt++) {
     try {
-      // @ts-ignore — Trigger.dev SDK types are resolved at runtime via its own build pipeline
+      // @ts-ignore - Trigger.dev SDK types are resolved at runtime via its own build pipeline
       const { tasks } = await import("@trigger.dev/sdk/v3")
 
       const triggerOptions: Record<string, unknown> = {}
@@ -75,7 +75,7 @@ export async function enqueueTriggerTask(
         return false
       }
 
-      cronLogger.warn("enqueue", `Enqueue attempt ${attempt + 1} failed — retrying`, {
+      cronLogger.warn("enqueue", `Enqueue attempt ${attempt + 1} failed - retrying`, {
         taskId,
         error: errorMessage,
         nextAttempt: attempt + 2,

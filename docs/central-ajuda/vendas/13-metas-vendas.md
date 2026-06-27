@@ -25,19 +25,19 @@ Legenda: Inicie o cadastro de uma nova meta.
 3. Preencha as informações:
 
 **Configurações básicas:**
-- **Nome da meta** — Ex: "Meta de julho", "Desafio de vendas".
-- **Período** — **Semanal** (seg a domingo) ou **Mensal** (do dia 1 ao último dia do mês).
-- **Datas de início e fim** — Defina o intervalo da meta.
-- **Tipo de meta** — **Vendas** (valor de produtos), **Ordens de serviço** ou **Ambos**.
+- **Nome da meta** - Ex: "Meta de julho", "Desafio de vendas".
+- **Período** - **Semanal** (seg a domingo) ou **Mensal** (do dia 1 ao último dia do mês).
+- **Datas de início e fim** - Defina o intervalo da meta.
+- **Tipo de meta** - **Vendas** (valor de produtos), **Ordens de serviço** ou **Ambos**.
 
 **A quem se aplica:**
-- **Todos os vendedores** — A meta vale para a equipe toda, e o progresso é coletivo.
-- **Vendedor específico** — Você escolhe um ou mais vendedores. Cada um tem seu próprio progresso.
+- **Todos os vendedores** - A meta vale para a equipe toda, e o progresso é coletivo.
+- **Vendedor específico** - Você escolhe um ou mais vendedores. Cada um tem seu próprio progresso.
 
 **Valor e bônus:**
-- **Valor da meta** — Quanto a equipe/vendedor precisa vender para atingir.
-- **Tipo de bônus** — **Valor fixo** (ex: R$ 500,00) ou **Percentual** (ex: 5% do valor vendido).
-- **Lançamento automático** — Se ativado, quando a meta é atingida o sistema lança o bônus como despesa automaticamente. Você precisa selecionar a **conta financeira** para o lançamento.
+- **Valor da meta** - Quanto a equipe/vendedor precisa vender para atingir.
+- **Tipo de bônus** - **Valor fixo** (ex: R$ 500,00) ou **Percentual** (ex: 5% do valor vendido).
+- **Lançamento automático** - Se ativado, quando a meta é atingida o sistema lança o bônus como despesa automaticamente. Você precisa selecionar a **conta financeira** para o lançamento.
 
 [IMAGEM: Formulário de criação de meta completo]
 Legenda: Defina período, valor e bônus da meta.

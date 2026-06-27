@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/reusable/Button';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
     ArrowRight,
@@ -17,7 +17,10 @@ import {
     CheckCircle2,
     MessageCircle,
     Calendar,
-    Wrench
+    Wrench,
+    Search,
+    Star,
+    Package
 } from 'lucide-react';
 import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
 
@@ -27,156 +30,95 @@ const Hero = () => {
             <GridLines />
             <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full">
                 <div className="grid lg:grid-cols-2 gap-12 items-center">
-
                     <motion.div
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                     >
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark leading-[1.1] mb-6">
-                            Descubra, venda e alugue localmente. Sem comissão.
+                        <span className="text-brand-green text-sm font-bold tracking-[0.2em] uppercase mb-4 block">Dudit</span>
+                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-brand-dark leading-[0.85] mb-6">
+                            Achou,<br />
+                            <span className="text-brand-green">anunciou,</span><br />
+                            resolveu.
                         </h1>
-                        <p className="text-brand-dark text-lg md:text-xl font-medium mb-8 max-w-lg leading-tight">
-                            Crie sua vitrine online em minutos e receba pedidos direto no celular. Sem taxas por venda, sem intermediários e focado no seu bairro.
+                        <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
+                            Gerencie seu negócio, divulgue seus produtos e serviços e seja encontrado por clientes da sua região.
                         </p>
-
                         <div className="flex flex-wrap gap-4">
-                            <Button>Criar minha vitrine</Button>
-                            <Button variant="outline">Explorar Dudit</Button>
+                            <Button>Começar grátis</Button>
+                            <Button variant="outline">Explorar a Dudit</Button>
                         </div>
-
                     </motion.div>
 
-                    {/* Hero Dashboard Mockup */}
                     <motion.div
                         initial={{ opacity: 0, x: 50 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="relative"
                     >
-                        {/* Main Dashboard Card */}
-                        <div className="bg-white rounded-xl overflow-hidden transform rotate-1 md:rotate-0 hover:rotate-0 transition-all duration-500">
-                            <div className="bg-gray-100 p-4 border-b border-gray-200 flex items-center gap-4">
-                                <div className="flex gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-brand-red"></div>
-                                    <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                                    <div className="w-3 h-3 rounded-full bg-brand-green"></div>
+                        <div className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-xl">
+                            <div className="bg-gray-50 p-3 border-b border-gray-100 flex items-center gap-2">
+                                <div className="flex gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-red"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-green"></div>
                                 </div>
-                                <div className="bg-white px-3 py-1 rounded text-xs text-brand-inactive-text flex-1 text-center font-mono">dudit.com.br/sua-vitrine</div>
+                                <div className="bg-white px-3 py-1 rounded text-[10px] text-brand-inactive-text flex-1 text-center font-mono border border-gray-100">dudit.com.br</div>
                             </div>
-                            <div className="p-6 flex gap-6">
-                                <div className="w-16 hidden sm:flex flex-col gap-6 text-brand-inactive-text">
-                                    <Box className="w-5 h-5 text-brand-dark" />
-                                    <Layout className="w-5 h-5" />
-                                    <PieChart className="w-5 h-5" />
-                                    <User className="w-5 h-5" />
+                            <div className="p-6 space-y-3">
+                                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <ShoppingBag className="w-4 h-4 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark">Achou</div>
+                                        <div className="text-xs text-brand-inactive-text">Encontrou o que precisava</div>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-end mb-8">
-                                        <div>
-                                            <p className="text-sm text-brand-inactive-text mb-1">Vendas (Comissão Zero)</p>
-                                            <h3 className="text-3xl font-bold text-brand-dark">R$ 54.897,00</h3>
-                                            <p className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
-                                                <TrendingUp className="w-3 h-3" /> 100% do lucro é seu
-                                            </p>
-                                        </div>
-                                        <div className="text-xs text-brand-inactive-text">Hoje, 15:30</div>
+                                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                        <Store className="w-4 h-4 text-green-600" />
                                     </div>
-                                    {/* Chart Mockup */}
-                                    <div className="h-40 flex items-end justify-between gap-2 mb-8">
-                                        {[40, 65, 45, 80, 55, 70, 60, 90, 75, 50, 60].map((h, i) => (
-                                            <div key={i} className="w-full bg-brand-slate rounded-t-sm relative group">
-                                                <motion.div
-                                                    initial={{ height: 0 }}
-                                                    animate={{ height: `${h}%` }}
-                                                    transition={{ duration: 1, delay: 0.5 + (i * 0.1) }}
-                                                    className="absolute bottom-0 left-0 right-0 bg-brand-dark opacity-10 group-hover:opacity-20 group-hover:bg-brand-green transition-all"
-                                                />
-                                                <motion.div
-                                                    className="absolute w-full h-full border-t-2 border-brand-dark/20"
-                                                    style={{ top: `${100 - h}%` }}
-                                                />
-                                            </div>
-                                        ))}
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark">Anunciou</div>
+                                        <div className="text-xs text-brand-inactive-text">Divulgou para sua região</div>
                                     </div>
-
-                                    {/* List Mockup - Showing "Qualquer coisa" (Product, Service, Rental) */}
-                                    <div className="space-y-4">
-                                        <p className="text-sm font-semibold text-brand-dark mb-2">Últimos Pedidos</p>
-
-                                        {/* Product */}
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                                    <Box className="w-4 h-4 text-blue-600" />
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-brand-dark">Tênis Esportivo</div>
-                                                    <div className="text-[10px] text-brand-inactive-text">Produto • Envio Correios</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-xs font-bold text-brand-dark">R$ 299,90</div>
-                                            </div>
-                                        </div>
-
-                                        {/* Service */}
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center">
-                                                    <Calendar className="w-4 h-4 text-purple-600" />
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-brand-dark">Corte de Cabelo</div>
-                                                    <div className="text-[10px] text-brand-inactive-text">Serviço • Hoje, 16:00</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-xs font-bold text-brand-dark">R$ 65,00</div>
-                                            </div>
-                                        </div>
-
-                                        {/* Rental */}
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 bg-orange-100 rounded flex items-center justify-center">
-                                                    <ShoppingBag className="w-4 h-4 text-orange-600" />
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-brand-dark">Furadeira Impacto</div>
-                                                    <div className="text-[10px] text-brand-inactive-text">Aluguel • 2 dias</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-xs font-bold text-brand-dark">R$ 45,00</div>
-                                            </div>
-                                        </div>
-
+                                </div>
+                                <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                        <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark">Resolveu</div>
+                                        <div className="text-xs text-brand-inactive-text">Venda feita, cliente feliz</div>
+                                    </div>
+                                </div>
+                                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                                    <div className="text-center">
+                                        <div className="text-xl font-bold text-brand-green">0%</div>
+                                        <div className="text-[10px] text-brand-inactive-text">comissão</div>
+                                    </div>
+                                    <div className="h-8 w-px bg-gray-100"></div>
+                                    <div className="text-center">
+                                        <div className="text-xl font-bold text-brand-dark">100%</div>
+                                        <div className="text-[10px] text-brand-inactive-text">do lucro é seu</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Floating Mobile Mockup */}
                         <motion.div
-                            className="absolute -right-4 md:-right-12 bottom-12 w-56 bg-white rounded-2xl p-4 border border-gray-100 shadow-xl hidden md:block"
-                            animate={{ y: [0, -15, 0] }}
-                            transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+                            className="absolute -right-4 md:-right-8 -bottom-6 w-44 bg-white rounded-2xl p-4 border border-gray-100 shadow-lg hidden md:block"
+                            animate={{ y: [0, -10, 0] }}
+                            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                         >
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-10 h-10 bg-brand-green/20 rounded-full flex items-center justify-center">
-                                    <TrendingUp className="w-5 h-5 text-brand-dark" />
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="w-8 h-8 bg-brand-green/20 rounded-full flex items-center justify-center">
+                                    <TrendingUp className="w-4 h-4 text-brand-dark" />
                                 </div>
-                                <div>
-                                    <div className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">Nova venda</div>
-                                    <div className="text-sm font-bold text-brand-dark">R$ 150,00</div>
-                                </div>
+                                <div className="text-xs font-bold text-brand-dark">Nova venda</div>
                             </div>
-                            <div className="bg-gray-50 rounded-lg p-2 text-xs">
-                                <div className="flex justify-between text-brand-inactive-text mb-1">
-                                    <span>Taxa Dudit</span>
-                                    <span className="line-through">R$ 15,00</span>
-                                </div>
+                            <div className="bg-brand-green/10 rounded-lg p-2 text-xs">
                                 <div className="flex justify-between font-bold text-brand-dark">
                                     <span>Você recebe</span>
                                     <span className="text-brand-green">R$ 150,00</span>
@@ -184,6 +126,149 @@ const Hero = () => {
                             </div>
                         </motion.div>
                     </motion.div>
+                </div>
+            </div>
+        </section>
+    );
+};
+
+const CadastroFlow = () => {
+    const steps = [
+        { icon: Box, title: "Cadastre um produto", desc: "ou serviço no sistema" },
+        { icon: Package, title: "Organiza seu estoque", desc: "automaticamente" },
+        { icon: Layout, title: "Atualiza seu catálogo", desc: "em tempo real" },
+        { icon: User, title: "Aparece no seu perfil", desc: "vitrine online pronta" },
+        { icon: ShoppingBag, title: "Pode aparecer no marketplace", desc: "mais visibilidade" },
+    ];
+
+    return (
+        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
+            <GridLines />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <SectionHeader
+                    subtitle="UM CADASTRO, TUDO CONECTADO"
+                    title="Tudo começa com um cadastro."
+                />
+
+                <div className="relative mt-16">
+                    <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-3 justify-center">
+                        {steps.map((step, idx) => (
+                            <React.Fragment key={idx}>
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: idx * 0.12 }}
+                                    className="bg-white border border-gray-100 rounded-xl p-5 w-full lg:w-44 text-center hover:border-brand-green/30 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-11 h-11 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
+                                        <step.icon className="w-5 h-5 text-brand-dark" />
+                                    </div>
+                                    <h4 className="text-sm font-bold text-brand-dark mb-0.5">{step.title}</h4>
+                                    <p className="text-xs text-brand-inactive-text">{step.desc}</p>
+                                </motion.div>
+                                {idx < steps.length - 1 && (
+                                    <div className="hidden lg:flex items-center shrink-0">
+                                        <ArrowRight className="w-5 h-5 text-brand-inactive-text" />
+                                    </div>
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </div>
+
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.6 }}
+                        className="text-center mt-10"
+                    >
+                        <div className="inline-flex items-center gap-2 bg-brand-green/10 text-brand-dark text-sm font-bold px-5 py-2.5 rounded-full">
+                            <CheckCircle2 className="w-4 h-4 text-brand-green" />
+                            Sem cadastrar duas vezes
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
+        </section>
+    );
+};
+
+const ParaQuemCompra = () => {
+    const items = [
+        { icon: Search, title: "Encontre produtos", desc: "Busque o que precisa perto de você" },
+        { icon: Wrench, title: "Descubra serviços", desc: "Profissionais da sua região" },
+        { icon: Calendar, title: "Agende", desc: "Horários sem burocracia" },
+        { icon: MessageCircle, title: "Converse", desc: "Tire dúvidas direto com o vendedor" },
+        { icon: Star, title: "Avalie", desc: "Ajude outros compradores" },
+    ];
+
+    return (
+        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
+            <GridLines />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <SectionHeader
+                    subtitle="EXPERIÊNCIA COMPLETA"
+                    title="Para quem compra."
+                />
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-12">
+                    {items.map((item, idx) => (
+                        <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: idx * 0.08 }}
+                            className="bg-white border border-gray-100 rounded-xl p-5 text-center hover:border-brand-green/30 hover:shadow-sm transition-all group"
+                        >
+                            <div className="w-10 h-10 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
+                                <item.icon className="w-5 h-5 text-brand-dark" />
+                            </div>
+                            <h4 className="text-sm font-bold text-brand-dark mb-0.5">{item.title}</h4>
+                            <p className="text-xs text-brand-inactive-text">{item.desc}</p>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+};
+
+const ParaQuemVende = () => {
+    const items = [
+        { icon: PieChart, title: "Controle", desc: "Suas vendas e finanças em um só lugar" },
+        { icon: Layout, title: "Organize", desc: "Seu estoque e agenda sem esforço" },
+        { icon: TrendingUp, title: "Venda", desc: "Produtos, serviços e locações" },
+        { icon: Store, title: "Divulgue", desc: "Sua vitrine online para toda região" },
+    ];
+
+    return (
+        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
+            <GridLines />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <SectionHeader
+                    subtitle="FERRAMENTAS COMPLETAS"
+                    title="Para quem vende."
+                />
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12">
+                    {items.map((item, idx) => (
+                        <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: idx * 0.1 }}
+                            className="bg-white border border-gray-100 rounded-xl p-6 text-center hover:border-brand-green/30 hover:shadow-sm transition-all group"
+                        >
+                            <div className="w-12 h-12 bg-brand-green/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-brand-green/20 transition-colors">
+                                <item.icon className="w-6 h-6 text-brand-dark" />
+                            </div>
+                            <h4 className="text-base font-bold text-brand-dark mb-1">{item.title}</h4>
+                            <p className="text-sm text-brand-inactive-text">{item.desc}</p>
+                        </motion.div>
+                    ))}
                 </div>
             </div>
         </section>
@@ -851,6 +936,9 @@ const HomePage = () => {
                 {activePage === 'home' && (
                     <>
                         <Hero />
+                        <CadastroFlow />
+                        <ParaQuemCompra />
+                        <ParaQuemVende />
                         <Solutions />
                         <BentoFeatures />
                         <PaymentSuite />

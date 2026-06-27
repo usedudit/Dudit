@@ -1,7 +1,7 @@
 /**
  * Minimal commerce capability model.
  * Catalog fields: fulfillment_modes, payment_requirement (services), scheduling_enabled.
- * Checkout behavior is derived — avoid item_type branching outside resolution.
+ * Checkout behavior is derived - avoid item_type branching outside resolution.
  */
 
 export const FULFILLMENT_MODES = [

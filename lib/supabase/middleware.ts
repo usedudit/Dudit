@@ -383,14 +383,14 @@ export async function middleware(request: NextRequest) {
 
           // ================================================================
           // PARALLEL: Ban check + Partner status check
-          // These are independent queries — run them concurrently to save ~30-50ms
+          // These are independent queries - run them concurrently to save ~30-50ms
           // ================================================================
-          const isAllowedWhenBanned = 
+          const isAllowedWhenBanned =
             pathname === "/banned" || pathname.startsWith("/banned/") ||
             pathname === "/auth/sign-out" || pathname.startsWith("/auth/sign-out/") ||
             pathname === "/auth/callback" || pathname.startsWith("/auth/callback/")
 
-          // Ban check ONLY on protected routes — public pages (marketplace, explorar, etc.)
+          // Ban check ONLY on protected routes - public pages (marketplace, explorar, etc.)
           // don't need ban enforcement. This avoids a user_profiles query on every public page
           // visited by a logged-in user.
           const needsBanCheck = !isAllowedWhenBanned && isProtected
@@ -402,17 +402,17 @@ export async function middleware(request: NextRequest) {
           const [profileResult, partnerResult] = await Promise.all([
             needsBanCheck
               ? supabase
-                  .from("user_profiles")
-                  .select("banned_at, banned_until")
-                  .eq("user_id", user.id)
-                  .maybeSingle()
+                .from("user_profiles")
+                .select("banned_at, banned_until")
+                .eq("user_id", user.id)
+                .maybeSingle()
               : Promise.resolve({ data: null }),
             needsPartnerCheck
               ? supabase
-                  .from("partners")
-                  .select("is_active, erp_disabled")
-                  .eq("id", activePartnerId!)
-                  .maybeSingle()
+                .from("partners")
+                .select("is_active, erp_disabled")
+                .eq("id", activePartnerId!)
+                .maybeSingle()
               : Promise.resolve({ data: null }),
           ])
 
@@ -504,4 +504,4 @@ export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|ajuda|institucional|~offline|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
   ],
-}
+}

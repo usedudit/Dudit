@@ -1,9 +1,11 @@
 import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { queueWhatsappMessage, processWhatsappMessageById } from "./whatsapp-dispatch.service"
+import { queueWhatsappMessage, processWhatsappMessageById, logWhatsappAutomation } from "./whatsapp-dispatch.service"
 import { normalizePhoneToE164 } from "@/lib/whatsapp/phone"
 import { buildWhatsappMessage } from "@/lib/notifications/templates"
+import { resolveCustomerUserId } from "./notification.service"
+import { shouldDeliverWhatsapp } from "./notification-preferences.service"
 import type { WhatsappAutomationTrigger } from "@/lib/whatsapp/types"
 
 const APPOINTMENT_BUTTONS = [
@@ -94,10 +96,10 @@ export async function scheduleWhatsappJob(params: {
       runAt: params.runAt.toISOString(),
     })
   } catch (err) {
-    // Log the error explicitly — Trigger.dev is required, not optional.
+    // Log the error explicitly - Trigger.dev is required, not optional.
     // The DB record (whatsapp_scheduled_jobs) serves as recovery source
     // and will be picked up by the cron-job.org → process-whatsapp-reminders endpoint.
-    console.error("[whatsapp] Failed to enqueue Trigger.dev job — will be recovered by cron sweep", {
+    console.error("[whatsapp] Failed to enqueue Trigger.dev job - will be recovered by cron sweep", {
       jobType: params.jobType,
       entityId: params.entityId,
       error: err instanceof Error ? err.message : "unknown",
@@ -126,6 +128,27 @@ export async function dispatchWhatsappAutomation(params: {
     fallbackPhone: params.phone,
   })
   if (!phone) return { queued: false, reason: "no_phone" }
+
+  const userId = await resolveCustomerUserId({
+    customerId: params.customerId,
+    marketplaceOrderId: params.orderId || params.appointmentId,
+  })
+
+  if (userId) {
+    const isEnabled = await shouldDeliverWhatsapp(userId, params.trigger)
+    if (!isEnabled) {
+      await logWhatsappAutomation({
+        partnerId: params.partnerId,
+        triggerType: params.trigger,
+        entityType: params.entityType,
+        entityId: params.entityId,
+        executionStatus: "skipped",
+        payload: { reason: "disabled_by_user" },
+        response: { reason: "whatsapp_disabled_by_user" },
+      })
+      return { queued: false, reason: "whatsapp_disabled_by_user" }
+    }
+  }
 
   const body = buildWhatsappMessage(params.trigger, params.templateVariables || {})
   const idempotencyKey = `${params.trigger}:${params.entityType}:${params.entityId}`

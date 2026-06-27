@@ -13,7 +13,7 @@
  * Pure function – zero side effects, zero DB calls, runs identically on
  * client and server.
  *
- * ORDER OF OPERATIONS (fixed — NEVER reorder):
+ * ORDER OF OPERATIONS (fixed - NEVER reorder):
  *   1. subtotalOriginal = sum of basePrice × quantity (before any discount)
  *   2. Best item price = per-item min(unitPrice, manualPrice, campaignPrice)
  *   3. ERP manual discount (optional, applied on top of step 2)
@@ -321,14 +321,14 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
   const units: CartUnit[] = []
 
-    for (const item of items) {
+  for (const item of items) {
     const qty = clampMin0(Number(item.quantity) || 0)
     const unitP = clampMin0(Number(item.unitPrice) || 0)
     const baseP = item.basePrice != null ? clampMin0(Number(item.basePrice) || 0) : unitP
     // promotionalPrice of 0 means free (will be clamped to R$0.01 minimum)
     const promoP = item.promotionalPrice != null && item.promotionalPrice >= 0 && item.promotionalPrice < baseP
-        ? clampMin0(item.promotionalPrice)
-        : null
+      ? clampMin0(item.promotionalPrice)
+      : null
 
     // Manual effective price (promotionalPrice if valid, else unitPrice)
     const manualEffective = promoP ?? unitP
@@ -1047,8 +1047,8 @@ export function computeItemCampaignPricing(
   const bestPrice = Math.min(unitPrice, manualPrice, campaignPrice)
   const discountSource: DiscountSource =
     bestPrice === manualPrice && manualPrice < unitPrice ? "manual"
-    : bestPrice === campaignPrice && campaignPrice < unitPrice ? "campaign"
-    : "none"
+      : bestPrice === campaignPrice && campaignPrice < unitPrice ? "campaign"
+        : "none"
 
   return {
     effectivePrice: bestPrice,
@@ -1081,7 +1081,7 @@ export interface BestItemPrice {
 }
 
 if (!(globalThis as any).__pricing_stats) {
-  ;(globalThis as any).__pricing_stats = { computeCount: 0, findBestCount: 0, campaignPricingCount: 0 }
+  ; (globalThis as any).__pricing_stats = { computeCount: 0, findBestCount: 0, campaignPricingCount: 0 }
 }
 
 export function getPricingCallStats() {
@@ -1090,9 +1090,9 @@ export function getPricingCallStats() {
 
 export function resetPricingCallStats() {
   if ((globalThis as any).__pricing_stats) {
-    ;(globalThis as any).__pricing_stats.computeCount = 0
-    ;(globalThis as any).__pricing_stats.findBestCount = 0
-    ;(globalThis as any).__pricing_stats.campaignPricingCount = 0
+    ; (globalThis as any).__pricing_stats.computeCount = 0
+      ; (globalThis as any).__pricing_stats.findBestCount = 0
+      ; (globalThis as any).__pricing_stats.campaignPricingCount = 0
   }
 }
 
@@ -1106,8 +1106,8 @@ export function computeItemDisplayPrice(
   const raw = findBestItemPrice(unitPrice, individualPromo, promotions, itemMeta)
   const badgeVariant: BadgeVariant =
     raw.discountSource === "campaign" ? "blue"
-    : raw.discountSource === "manual" ? "orange"
-    : null
+      : raw.discountSource === "manual" ? "orange"
+        : null
   const hasDiscount = raw.bestPrice < unitPrice
   const couponEligible = !hasDiscount
   return { ...raw, originalPrice: unitPrice, badgeVariant, hasDiscount, couponEligible }

@@ -45,7 +45,7 @@ export type CheckoutFulfillmentResult = {
   appointmentIds?: string[]
   subscriptionIds?: string[]
   executionIds?: string[]
-  /** Paid orders where the selected slot was taken — buyer must reschedule */
+  /** Paid orders where the selected slot was taken - buyer must reschedule */
   rescheduleRequired?: Array<{
     serviceId?: string | null
     serviceName?: string

@@ -28,7 +28,7 @@ async function main() {
   // 2. Reset counters
   const { error: resetError } = await supabase.rpc("backfill_reset_marketplace_counters")
   if (resetError) {
-    console.log("[backfill] Run migration 20260608 first —", resetError.message)
+    console.log("[backfill] Run migration 20260608 first -", resetError.message)
   }
 
   // 3. Replay paid marketplace orders (buyer_id = vitrine orders)

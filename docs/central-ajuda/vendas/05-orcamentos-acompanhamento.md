@@ -1,6 +1,6 @@
 # Acompanhando e convertendo orçamentos
 
-Depois que você envia um orçamento, o cliente pode interagir com ele online. Você acompanha cada etapa — desde o envio até a aprovação ou rejeição — e, quando chega a hora, converte o orçamento em pedido com um clique.
+Depois que você envia um orçamento, o cliente pode interagir com ele online. Você acompanha cada etapa - desde o envio até a aprovação ou rejeição - e, quando chega a hora, converte o orçamento em pedido com um clique.
 
 [IMAGEM: Listagem de orçamentos com indicadores de status]
 Legenda: Cada orçamento mostra seu status atual com cores diferentes.
@@ -36,8 +36,8 @@ Legenda: Todas as ações ficam registradas para consulta.
 Se o cliente acessar o link do orçamento, ele pode:
 
 - **Visualizar** todos os itens, quantidades e valores.
-- **Aprovar** o orçamento — indicando que aceita a proposta.
-- **Rejeitar** o orçamento — opcionalmente informando o motivo.
+- **Aprovar** o orçamento - indicando que aceita a proposta.
+- **Rejeitar** o orçamento - opcionalmente informando o motivo.
 
 Quando o cliente aprova ou rejeita, você recebe a notificação no sistema e o status é atualizado automaticamente.
 

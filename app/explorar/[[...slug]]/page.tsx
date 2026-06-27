@@ -28,20 +28,208 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "outros": "Outros"
 }
 
+const ESTADO_MAP: Record<string, string> = {
+    ac: "Acre", al: "Alagoas", ap: "Amapá", am: "Amazonas",
+    ba: "Bahia", ce: "Ceará", df: "Distrito Federal",
+    es: "Espírito Santo", go: "Goiás", ma: "Maranhão",
+    mt: "Mato Grosso", ms: "Mato Grosso do Sul", mg: "Minas Gerais",
+    pa: "Pará", pb: "Paraíba", pr: "Paraná", pe: "Pernambuco",
+    pi: "Piauí", rj: "Rio de Janeiro", rn: "Rio Grande do Norte",
+    rs: "Rio Grande do Sul", ro: "Rondônia", rr: "Roraima",
+    sc: "Santa Catarina", sp: "São Paulo", se: "Sergipe", to: "Tocantins",
+}
+
 export async function generateMetadata({
-    params
+    params,
 }: {
     params: Promise<{ slug?: string[] }>
 }): Promise<Metadata> {
+    const resolvedParams = await params
+    const slug = resolvedParams.slug || []
+    const [location, category] = slug
+
+    const categoryName = category ? (CATEGORY_SLUG_MAP[category] || category.replace(/-/g, " ")) : null
+
+    // Build canonical URL without query params
+    const pathParts = slug.length > 0 ? ["/explorar", ...slug] : ["/explorar"]
+    const canonical = `https://dudit.com.br${pathParts.join("/")}`
+
+    // Base site name for OG
+    const ogSiteName = "Dudit"
+
+    // --- CASE 1: /explorar (no slug) ---
+    if (!location) {
+        const title = "Explorar - Produtos e serviços perto de você"
+        const description =
+            "Descubra produtos, serviços e negócios perto de você. Explore, compare e compre direto de quem vende na sua cidade."
+        return {
+            title,
+            description,
+            robots: { index: true, follow: true },
+            alternates: { canonical },
+            openGraph: {
+                title: `Explorar | ${ogSiteName}`,
+                description,
+                url: canonical,
+                siteName: ogSiteName,
+            },
+            twitter: {
+                card: "summary_large_image",
+                title: `Explorar | ${ogSiteName}`,
+                description,
+            },
+        }
+    }
+
+    // --- CASE 2: /explorar/brasil or /explorar/brasil/[categoria] ---
+    if (location === "brasil") {
+        if (categoryName) {
+            const title = `${categoryName} no Brasil inteiro`
+            const description =
+                `Encontre ${categoryName.toLowerCase()} em todo o Brasil. Compre direto de quem vende, sem taxa e sem sair de casa.`
+            return {
+                title,
+                description,
+                robots: { index: true, follow: true },
+                alternates: { canonical },
+                openGraph: {
+                    title: `${title} | ${ogSiteName}`,
+                    description,
+                    url: canonical,
+                    siteName: ogSiteName,
+                },
+                twitter: {
+                    card: "summary_large_image",
+                    title: `${title} | ${ogSiteName}`,
+                    description,
+                },
+            }
+        }
+
+        const title = "Comprar no Brasil inteiro - Produtos e serviços"
+        const description =
+            "Encontre produtos e serviços em todo o Brasil. Compre de quem vende perto de você, direto e sem taxa."
+        return {
+            title,
+            description,
+            robots: { index: true, follow: true },
+            alternates: { canonical },
+            openGraph: {
+                title: `${title} | ${ogSiteName}`,
+                description,
+                url: canonical,
+                siteName: ogSiteName,
+            },
+            twitter: {
+                card: "summary_large_image",
+                title: `${title} | ${ogSiteName}`,
+                description,
+            },
+        }
+    }
+
+    // --- CASE 3: /explorar/estado-[uf] or /explorar/estado-[uf]/[categoria] ---
+    const isEstado = location.startsWith("estado-")
+    if (isEstado) {
+        const uf = location.replace("estado-", "").toLowerCase()
+        const estadoNome = ESTADO_MAP[uf] || uf.toUpperCase()
+
+        if (categoryName) {
+            const title = `${categoryName} em ${estadoNome}`
+            const description =
+                `Encontre ${categoryName.toLowerCase()} em ${estadoNome}. Compre de quem vende perto de você, sem taxa.`
+            return {
+                title,
+                description,
+                robots: { index: true, follow: true },
+                alternates: { canonical },
+                openGraph: {
+                    title: `${title} | ${ogSiteName}`,
+                    description,
+                    url: canonical,
+                    siteName: ogSiteName,
+                },
+                twitter: {
+                    card: "summary_large_image",
+                    title: `${title} | ${ogSiteName}`,
+                    description,
+                },
+            }
+        }
+
+        const title = `Comprar em ${estadoNome} - Produtos e serviços`
+        const description =
+            `Encontre produtos e serviços em ${estadoNome}. Compre de quem vende perto de você, direto e sem taxa.`
+        return {
+            title,
+            description,
+            robots: { index: true, follow: true },
+            alternates: { canonical },
+            openGraph: {
+                title: `${title} | ${ogSiteName}`,
+                description,
+                url: canonical,
+                siteName: ogSiteName,
+            },
+            twitter: {
+                card: "summary_large_image",
+                title: `${title} | ${ogSiteName}`,
+                description,
+            },
+        }
+    }
+
+    // --- CASE 4: /explorar/[cidade-uf] or /explorar/[cidade-uf]/[categoria] ---
+    // Format city name from slug (e.g., "cambe-pr" -> "Cambe, PR")
+    const cityNameRaw = location
+        .split("-")
+        .slice(0, -1)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")
+    const stateUf = location.split("-").pop()?.toUpperCase() || ""
+    const cidadeDisplay = `${cityNameRaw}, ${stateUf}`
+
+    if (categoryName) {
+        const title = `${categoryName} em ${cidadeDisplay}`
+        const description =
+            `Encontre ${categoryName.toLowerCase()} em ${cidadeDisplay}. Compre de quem vende perto de você, sem taxa.`
+        return {
+            title,
+            description,
+            robots: { index: true, follow: true },
+            alternates: { canonical },
+            openGraph: {
+                title: `${title} | ${ogSiteName}`,
+                description,
+                url: canonical,
+                siteName: ogSiteName,
+            },
+            twitter: {
+                card: "summary_large_image",
+                title: `${title} | ${ogSiteName}`,
+                description,
+            },
+        }
+    }
+
+    const title = `Comprar em ${cidadeDisplay} - Produtos e serviços`
+    const description =
+        `Encontre produtos e serviços em ${cidadeDisplay}. Compre de quem vende perto de você, direto e sem taxa.`
     return {
-        title: "Explorar Produtos e Serviços Perto de Você | Dudit",
-        description: "Chega de esperar dias pela entrega. Encontre os melhores produtos, serviços e negócios locais na sua cidade e compre sem pagar taxas extras.",
-        robots: {
-            index: true,
-            follow: true
+        title,
+        description,
+        robots: { index: true, follow: true },
+        alternates: { canonical },
+        openGraph: {
+            title: `${title} | ${ogSiteName}`,
+            description,
+            url: canonical,
+            siteName: ogSiteName,
         },
-        alternates: {
-            canonical: "https://dudit.com.br/explorar",
+        twitter: {
+            card: "summary_large_image",
+            title: `${title} | ${ogSiteName}`,
+            description,
         },
     }
 }

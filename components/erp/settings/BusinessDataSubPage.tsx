@@ -19,7 +19,8 @@ import {
     TabsContent,
     AlertModal,
     SavingStatusModal,
-    NumberInputWithCheckbox
+    NumberInputWithCheckbox,
+    FormSection
 } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
@@ -355,8 +356,7 @@ export const BusinessDataSubPage = ({
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                             {/* Identificação */}
-                                            <div className="mb-8">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
+                                            <FormSection title="Identificação">
                                                 <div className="grid grid-cols-12 gap-5">
                                                     <div className="col-span-12 md:col-span-6">
                                                         <Input
@@ -393,13 +393,11 @@ export const BusinessDataSubPage = ({
                                                         rows={3}
                                                     />
                                                 </div>
-                                            </div>
+                                            </FormSection>
 
-                                            <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
 
                                             {/* Dados Tributários */}
-                                            <div className="mt-8">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Dados tributários</h3>
+                                            <FormSection title="Dados tributários">
                                                 <div className="space-y-6">
                                                     <div>
                                                         <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
@@ -431,7 +429,7 @@ export const BusinessDataSubPage = ({
                                                         />
                                                     </motion.div>
                                                 </div>
-                                            </div>
+                                            </FormSection>
 
                                             {/* O que você oferece? */}
                                             <div className="mt-8">
@@ -501,8 +499,7 @@ export const BusinessDataSubPage = ({
                                 <TabsContent value="address" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                            <section>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço do negócio</h3>
+                                            <FormSection title="Endereço" >
                                                 <div className="space-y-4">
                                                     <CepInput
                                                         value={addresses.zipCode}
@@ -597,7 +594,7 @@ export const BusinessDataSubPage = ({
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </section>
+                                            </FormSection>
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
@@ -666,18 +663,20 @@ export const BusinessDataSubPage = ({
 
                 <SavingStatusModal isOpen={isLoading} text="Salvando configurações..." />
 
-                {showConfirmDialog && (
-                    <AlertModal
-                        isOpen={showConfirmDialog}
-                        onClose={cancelNavigation}
-                        onConfirm={confirmNavigation}
-                        title="Sair sem salvar?"
-                        description="Você tem alterações nos dados do negócio que ainda não foram salvas."
-                        confirmText="Sair sem salvar"
-                        cancelText="Continuar editando"
-                        variant="warning"
-                    />
-                )}
+                {
+                    showConfirmDialog && (
+                        <AlertModal
+                            isOpen={showConfirmDialog}
+                            onClose={cancelNavigation}
+                            onConfirm={confirmNavigation}
+                            title="Sair sem salvar?"
+                            description="Você tem alterações nos dados do negócio que ainda não foram salvas."
+                            confirmText="Sair sem salvar"
+                            cancelText="Continuar editando"
+                            variant="warning"
+                        />
+                    )
+                }
 
                 <AlertModal
                     isOpen={showValidationModal}
@@ -702,7 +701,7 @@ export const BusinessDataSubPage = ({
                     }}
                 />
 
-            </div>
-        </FadeIn>
+            </div >
+        </FadeIn >
     )
 }

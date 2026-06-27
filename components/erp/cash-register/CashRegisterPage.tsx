@@ -15,7 +15,7 @@ import {
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import { Separator } from "@/components/reusable/Separator"
-import { ArrowUpDownIcon, CreditCardIcon, MoneyIcon, QRCodeIcon } from "@/lib/icons"
+import { ArrowUpDownIcon, CreditCardIcon, MoneyIcon, QRCodeIcon, ExportFileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import {
     EMPTY_DATE_PERIOD,
@@ -38,6 +38,7 @@ import {
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useErpExport } from "@/hooks/use-erp-export"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 import CashRegisterPageControls from "./CashRegisterPageControls"
@@ -118,6 +119,7 @@ export default function CashRegisterPage({
     initialActiveSession: any | null
 }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { exportData, isExporting } = useErpExport()
     const isMobile = useMediaQuery("(max-width: 768px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -328,6 +330,15 @@ export default function CashRegisterPage({
         resetCloseForm()
     }
 
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "cash-register",
+            format: "xlsx",
+            filters: { search: debouncedSearch, status: filters.status, datePeriod: filters.dateOpenedPeriod },
+        })
+    }, [exportData, partnerId, debouncedSearch, filters.status, filters.dateOpenedPeriod])
+
     const handleClearFilters = useCallback(() => {
         setSearch("")
         setFilters({
@@ -511,6 +522,9 @@ export default function CashRegisterPage({
                             </div>
 
                             <div className="flex items-center gap-3">
+                                <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                    {isExporting ? "Exportando..." : "Exportar"}
+                                </Button>
                                 {!activeSession?.id ? (
                                     <Button onClick={() => setOpenModal(true)}>Abrir Caixa</Button>
                                 ) : (

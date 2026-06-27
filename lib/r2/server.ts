@@ -23,7 +23,7 @@ export interface SignedUrlResponse {
   uploadUrl: string
   publicUrl: string
   key: string
-  /** Exact Content-Type included in the AWS SigV4 signature — client PUT must use this value. */
+  /** Exact Content-Type included in the AWS SigV4 signature - client PUT must use this value. */
   contentType: string
 }
 

@@ -636,7 +636,7 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     }
 
     if (!chosen) {
-        console.log(`[DISCOVER][NEARBY] No band with >=${minItems} items — skipping`)
+        console.log(`[DISCOVER][NEARBY] No band with >=${minItems} items - skipping`)
         return null
     }
 
@@ -1657,21 +1657,21 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
 
     console.log(`[Discover] Phase 3 (FALLBACK): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
-    // 4. ULTIMATE FALLBACK — any products at all (no ranking required)
+    // 4. ULTIMATE FALLBACK - any products at all (no ranking required)
     if (pool.length < 5) {
         const result = await fetchAllProducts(tiers, ctx).catch(() => null)
         if (result && result.items.length >= 1) {
             console.log(`[Discover] Ultimate fallback: allProducts → ${result.items.length} items`)
             pool.push(result)
         } else {
-            console.warn(`[Discover] Ultimate fallback: allProducts empty — database may be empty`)
+            console.warn(`[Discover] Ultimate fallback: allProducts empty - database may be empty`)
         }
     }
 
     console.log(`[Discover] Phase 4 (ULTIMATE): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
-    // 5. Proximity (nearby) — only with coords, only if room
-    //    Vitrines are NOT reserved — they participate in the seeded MEDIUM rotation
+    // 5. Proximity (nearby) - only with coords, only if room
+    //    Vitrines are NOT reserved - they participate in the seeded MEDIUM rotation
     if (pool.length < 6 && ctx.scope === "city" && ctx.coords) {
         for (const def of PROXIMITY_SECTIONS) {
             if (pool.length >= 6) break
@@ -1735,7 +1735,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
 
     console.log(`[Discover] Phase 6 (SIXTH): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
-    // 7. Global dedup with auto-refill — sections never drop below 1 item
+    // 7. Global dedup with auto-refill - sections never drop below 1 item
     const globalSeen = new Set<string>()
     let totalRemovedByDedup = 0
     const finalSections: HomeSection[] = []
@@ -1768,11 +1768,11 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             console.log(`[Discover] DEDUP ${section.id}: before=${beforeCount} removed=${removedCount} refilled=${refilled} after=${deduped.length}`)
         }
 
-        // Never drop a section entirely — if dedup killed everything, keep original
+        // Never drop a section entirely - if dedup killed everything, keep original
         if (deduped.length >= 1) {
             finalSections.push({ ...section, items: deduped.slice(0, 20) })
         } else {
-            console.log(`[Discover] DEDUP would kill section "${section.id}" — keeping it anyway`)
+            console.log(`[Discover] DEDUP would kill section "${section.id}" - keeping it anyway`)
             finalSections.push(section)
         }
     }

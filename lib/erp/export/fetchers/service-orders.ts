@@ -1,0 +1,75 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { sanitizeSearchTerm } from "../filters"
+import { fetchAllPages } from "../paginate"
+import { mapServiceOrderRow, SERVICE_ORDER_EXPORT_COLUMNS } from "../mappers"
+import type { ServiceOrdersExportFilters } from "../types"
+import { EXPORT_CHUNK_SIZE } from "../constants"
+
+const SERVICE_ORDER_SELECT = `
+  id, order_number, title, status, customer_snapshot, assigned_user_id,
+  expected_completion_date, total_amount, created_at,
+  user_profiles!assigned_user_id(full_name)
+`
+
+export async function fetchServiceOrdersExport(
+  supabase: SupabaseClient,
+  partnerId: string,
+  filters: ServiceOrdersExportFilters,
+): Promise<import("../types").ExportResult> {
+  const search = sanitizeSearchTerm(filters.search)
+  const selectedIds = (filters.selectedIds || []).filter(Boolean)
+
+  const rawRows = await fetchAllPages<any>({
+    chunkSize: EXPORT_CHUNK_SIZE,
+    fetchPage: async (cursor) => {
+      let query = supabase
+        .from("service_orders")
+        .select(SERVICE_ORDER_SELECT)
+        .eq("partner_id", partnerId)
+
+      if (selectedIds.length > 0) {
+        query = query.in("id", selectedIds)
+      }
+
+      const statuses = (filters.status || []).filter(Boolean)
+      if (statuses.length > 0) query = query.in("status", statuses)
+
+      if (filters.activeTab && filters.activeTab !== "all") {
+        const tabMap: Record<string, string[]> = {
+          aberta: ["aberta"],
+          em_andamento: ["em_andamento", "aguardando_aprovacao", "aguardando_peca"],
+          concluida: ["concluida", "entregue"],
+          cancelada: ["cancelada"],
+        }
+        const tabStatuses = tabMap[filters.activeTab]
+        if (tabStatuses?.length) query = query.in("status", tabStatuses)
+      }
+
+      if (search) {
+        query = query.or(
+          `order_number.ilike.%${search}%,title.ilike.%${search}%`,
+        )
+      }
+
+      if (cursor?.createdAt && cursor?.id) {
+        query = query.or(`created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`)
+      }
+
+      const { data, error } = await query
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(EXPORT_CHUNK_SIZE)
+
+      if (error) throw error
+      const rows = data || []
+      const last = rows[rows.length - 1]
+      return {
+        rows,
+        nextCursor: last ? { createdAt: String(last.created_at), id: String(last.id) } : null,
+      }
+    },
+  })
+
+  const rows = rawRows.map(mapServiceOrderRow)
+  return { columns: SERVICE_ORDER_EXPORT_COLUMNS, rows, rowCount: rows.length }
+}

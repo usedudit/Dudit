@@ -126,7 +126,7 @@ Você pode exportar a lista de produtos atual para uma planilha Excel (.xlsx). A
 
 - **Crie categorias antes de cadastrar produtos**: planeje sua árvore de categorias com antecedência para manter a organização desde o início.
 - **Use SKUs padronizados**: isso facilita a localização no sistema e a integração com marketplaces e transportadoras.
-- **Aproveite a busca por código de barras**: você pode usar um leitor de código de barras para localizar produtos rapidamente — o sistema identifica tanto GTIN quanto SKU.
+- **Aproveite a busca por código de barras**: você pode usar um leitor de código de barras para localizar produtos rapidamente - o sistema identifica tanto GTIN quanto SKU.
 - **Edição em massa com cuidado**: antes de alterar preços ou estoques em lote, verifique se a seleção está correta.
 
 ## Perguntas frequentes

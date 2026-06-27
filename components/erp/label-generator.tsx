@@ -198,10 +198,10 @@ export function LabelGenerator({ products }: { products: Product[] }) {
               <ul className="text-sm text-muted-foreground space-y-1">
                 {LABEL_PRESETS.map((p) => (
                   <li key={p.id}>
-                    ✓ {p.name} — {p.description}
+                    ✓ {p.name} - {p.description}
                   </li>
                 ))}
-                <li>✓ Customizado — definir medidas manualmente</li>
+                <li>✓ Customizado - definir medidas manualmente</li>
               </ul>
               <Button onClick={() => setShowPrintModal(true)} className="w-full mt-4" size="lg">
                 <PrinterIcon className="mr-2 h-4 w-4" />

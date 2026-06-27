@@ -32,7 +32,7 @@ Sim. O orçamento é vinculado a um cliente. Se ele não existir, cadastre na ho
 Não. Você precisa clicar em **Converter em pedido**. A conversão leva todos os itens e dados do cliente para o novo pedido.
 
 **Posso duplicar um orçamento?**
-Sim. Você pode duplicar para criar uma cópia e ajustar o que precisar — útil para orçamentos recorrentes.
+Sim. Você pode duplicar para criar uma cópia e ajustar o que precisar - útil para orçamentos recorrentes.
 
 ---
 

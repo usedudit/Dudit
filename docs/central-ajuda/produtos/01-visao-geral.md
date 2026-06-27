@@ -35,7 +35,7 @@ Legenda: Acesso à seção de produtos pelo menu principal.
 ## Dicas importantes
 
 - Mantenha os dados fiscais sempre corretos (NCM, origem) para emitir notas fiscais sem problemas.
-- Organize seus produtos em categorias desde o início — isso facilita a gestão e ajuda os clientes a encontrarem o que procuram.
+- Organize seus produtos em categorias desde o início - isso facilita a gestão e ajuda os clientes a encontrarem o que procuram.
 - Produtos com imagens de qualidade vendem mais. Tire fotos com boa iluminação e fundo neutro.
 
 ## Perguntas frequentes

@@ -214,7 +214,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            {supplier.supplier_code || "—"} • {supplier.email || 'Sem e-mail'}
+                                            {supplier.supplier_code || "-"} • {supplier.email || 'Sem e-mail'}
                                         </div>
                                     </div>
 
@@ -264,7 +264,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                                 </Badge>
                                                             </div>
                                                             <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {supplier.supplier_code || "—"} • {supplier.email || 'Sem e-mail'}
+                                                                {supplier.supplier_code || "-"} • {supplier.email || 'Sem e-mail'}
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-1 text-sm text-brand-inactive-text dark:text-dark-body">
                                                                 <span>Fornecedor desde {supplier.created_at ? formatDate(supplier.created_at) : '-'}</span>
@@ -403,7 +403,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         </div>
                                                         <div className="min-w-0">
                                                             <h4 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">{supplier.name}</h4>
-                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{supplier.supplier_code || "—"}</p>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{supplier.supplier_code || "-"}</p>
                                                         </div>
                                                     </div>
 

@@ -10,7 +10,7 @@ Legenda: Quando o caixa está aberto, você vê o saldo atual e as movimentaçõ
 ## Quando utilizar
 
 - Todo dia útil, antes de começar as vendas presenciais.
-- Quando precisar retirar dinheiro do caixa (sangria) — por exemplo, para pagar um fornecedor.
+- Quando precisar retirar dinheiro do caixa (sangria) - por exemplo, para pagar um fornecedor.
 - Quando precisar colocar mais dinheiro no caixa (reforço/suprimento).
 - No fim do expediente, para fechar o caixa e conferir o movimento do dia.
 
@@ -22,7 +22,7 @@ Legenda: Quando o caixa está aberto, você vê o saldo atual e as movimentaçõ
 [IMAGEM: Tela de abertura de caixa com campo de valor inicial]
 Legenda: Informe o valor em dinheiro que está no caixa no início do dia.
 
-3. Informe o **valor inicial** (troco) — é o dinheiro que você está colocando no caixa para começar o dia.
+3. Informe o **valor inicial** (troco) - é o dinheiro que você está colocando no caixa para começar o dia.
 4. Opcionalmente, adicione uma **observação** (ex: "Abertura com R$ 200,00 de troco").
 5. Clique em **Abrir caixa**.
 
@@ -32,9 +32,9 @@ Pronto. Agora o PDV está liberado para vendas.
 
 Durante o expediente, pode ser necessário movimentar o dinheiro do caixa:
 
-**Sangria (retirada):** Use quando precisar tirar dinheiro do caixa — por exemplo, para pagar um fornecedor ou depositar no banco.
+**Sangria (retirada):** Use quando precisar tirar dinheiro do caixa - por exemplo, para pagar um fornecedor ou depositar no banco.
 
-**Reforço (depósito):** Use quando colocar mais dinheiro no caixa — por exemplo, troco extra que foi buscar no banco.
+**Reforço (depósito):** Use quando colocar mais dinheiro no caixa - por exemplo, troco extra que foi buscar no banco.
 
 Para registrar:
 
@@ -54,7 +54,7 @@ A movimentação aparece automaticamente na lista e o saldo do caixa é atualiza
    - Total de vendas agrupadas por forma de pagamento.
    - Valor calculado (o que o sistema espera que tenha no caixa).
    - Movimentações (sangrias e reforços).
-3. **Informe a contagem do dinheiro** — Digite quanto tem em cada forma de pagamento (ex: R$ 500,00 em dinheiro, R$ 800,00 em cartão).
+3. **Informe a contagem do dinheiro** - Digite quanto tem em cada forma de pagamento (ex: R$ 500,00 em dinheiro, R$ 800,00 em cartão).
 
 [IMAGEM: Tela de fechamento com contagem por método]
 Legenda: Confira cada método de pagamento e informe o valor contado.

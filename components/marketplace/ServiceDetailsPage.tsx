@@ -769,7 +769,7 @@ export function ServiceDetailsPageClient({
             }
 
             const lineLabel = schedulingEnabled && selectedDate && selectedTime
-                ? `${service.name} — ${selectedDate} ${selectedTime}`
+                ? `${service.name} - ${selectedDate} ${selectedTime}`
                 : service.name
 
             const cartLine = cartItemId

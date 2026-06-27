@@ -15,9 +15,9 @@ interface NotificationsViewProps {
   navigate: (view: View) => void
 }
 
-function getPref(preferences: NotificationPreference[], type: NotificationType): { enabled: boolean; push_enabled: boolean } {
+function getPref(preferences: NotificationPreference[], type: NotificationType): { enabled: boolean; push_enabled: boolean; whatsapp_enabled: boolean } {
   const p = preferences.find((p) => p.type === type)
-  return { enabled: p?.enabled ?? true, push_enabled: p?.push_enabled ?? true }
+  return { enabled: p?.enabled ?? true, push_enabled: p?.push_enabled ?? true, whatsapp_enabled: p?.whatsapp_enabled ?? true }
 }
 
 export function NotificationsView({ navigate }: NotificationsViewProps) {
@@ -53,7 +53,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
     fetchPreferences()
   }, [fetchPreferences])
 
-  const toggle = useCallback((type: NotificationType, field: "enabled" | "push_enabled") => {
+  const toggle = useCallback((type: NotificationType, field: "enabled" | "push_enabled" | "whatsapp_enabled") => {
     setPreferences((prev) => {
       const existing = prev.find((p) => p.type === type)
       if (existing) {
@@ -61,12 +61,12 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
           p.type === type ? { ...p, [field]: !p[field] } : p,
         )
       }
-      const defaults = { enabled: true, push_enabled: true }
+      const defaults = { enabled: true, push_enabled: true, whatsapp_enabled: true }
       return [...prev, { ...defaults, [field]: !defaults[field], id: "", user_id: "", type, created_at: "", updated_at: "" } as NotificationPreference]
     })
   }, [])
 
-  const toggleSection = useCallback((types: NotificationType[], field: "enabled" | "push_enabled") => {
+  const toggleSection = useCallback((types: NotificationType[], field: "enabled" | "push_enabled" | "whatsapp_enabled") => {
     const allOn = types.every((type) => {
       const pref = getPref(preferences, type)
       return pref[field]
@@ -81,7 +81,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
         } else {
           newPrefs.push({
             id: "", user_id: "", type, created_at: "", updated_at: "",
-            enabled: true, push_enabled: true,
+            enabled: true, push_enabled: true, whatsapp_enabled: true,
             [field]: newValue,
           } as NotificationPreference)
         }
@@ -97,6 +97,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
         type: p.type,
         enabled: p.enabled,
         push_enabled: p.push_enabled,
+        whatsapp_enabled: p.whatsapp_enabled,
       }))
       const res = await updateNotificationPreferencesAction(inputs)
       if (res.success) {
@@ -152,7 +153,8 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
           {entries.map(([key, category], idx) => {
             const pushOn = category.types.every((type) => getPref(preferences, type).push_enabled)
             const enabledOn = category.types.every((type) => getPref(preferences, type).enabled)
-
+            const whatsappOn = category.types.every((type) => getPref(preferences, type).whatsapp_enabled)
+ 
             return (
               <FormSection
                 key={key}
@@ -178,6 +180,15 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
                       className="rounded border-brand-border text-brand-green focus:ring-brand-green/30"
                     />
                     In-app
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={whatsappOn}
+                      onChange={() => toggleSection(category.types, "whatsapp_enabled")}
+                      className="rounded border-brand-border text-brand-green focus:ring-brand-green/30"
+                    />
+                    WhatsApp
                   </label>
                 </div>
               </FormSection>

@@ -36,10 +36,10 @@ Cada **pedido dentro da entrega** também tem seu próprio status (Pendente, Sai
 1. Abra a entrega que deseja atualizar.
 2. Clique no botão de status atual.
 3. Escolha o novo status:
-   - **Em preparação** — Os pedidos estão sendo separados.
-   - **Saiu para entrega** — O entregador saiu para a rota.
-   - **Entregue** — Todos os pedidos foram entregues (disponível apenas quando todos estiverem concluídos).
-   - **Cancelada** — A entrega não será realizada.
+   - **Em preparação** - Os pedidos estão sendo separados.
+   - **Saiu para entrega** - O entregador saiu para a rota.
+   - **Entregue** - Todos os pedidos foram entregues (disponível apenas quando todos estiverem concluídos).
+   - **Cancelada** - A entrega não será realizada.
 
 [IMAGEM: Opções de atualização de status da entrega]
 Legenda: O sistema mostra apenas os status disponíveis para a etapa atual.
@@ -81,7 +81,7 @@ Na seção de entregas, você encontra um painel com métricas:
 - **Tempo médio** por entrega.
 - **Distância total percorrida**.
 - **Média de pedidos por entrega**.
-- **Ranking de entregadores** — Quem entregou mais e o tempo médio de cada um.
+- **Ranking de entregadores** - Quem entregou mais e o tempo médio de cada um.
 
 [IMAGEM: Painel de métricas de entregas]
 Legenda: Acompanhe o desempenho da sua operação logística.
@@ -90,7 +90,7 @@ Legenda: Acompanhe o desempenho da sua operação logística.
 
 - Atualizar o status **por pedido** dá mais visibilidade do que está acontecendo na rota.
 - Quando um pedido é marcado como **Entregue**, o frete é automaticamente contabilizado como comissão para o entregador (se configurado).
-- Se o entregador usa o sistema pelo celular, ele mesmo pode atualizar os status — você só acompanha.
+- Se o entregador usa o sistema pelo celular, ele mesmo pode atualizar os status - você só acompanha.
 - Pedidos com **Falha na entrega** podem ser reagendados e incluídos em uma nova rota.
 
 ## Problemas comuns

@@ -20,8 +20,10 @@ import ServiceOrderForm from "./ServiceOrderForm"
 import ServiceOrderDetail from "./ServiceOrderDetail"
 import {
   PlusIcon, WrenchIcon, SearchIcon, FilterIcon, TrashIcon,
-  ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon,
+  ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon, ExportFileIcon,
 } from "@/lib/icons"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import {
   isDatePeriodFilterActive,
   resolveDatePeriodBounds,
@@ -89,6 +91,7 @@ export default function ServiceOrdersPage({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState<{ id: string; token: string } | null>(null)
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
+  const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
   const itemsPerPage = 50
 
   const entityPage = useEntityPage<any, any, any>({
@@ -188,6 +191,15 @@ export default function ServiceOrdersPage({
 
   const statusColor = (status: string) => SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.variant || "gray"
   const statusLabel = (status: string) => SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status
+
+  const handleExport = useCallback(() => {
+    void exportData({
+      partnerId,
+      module: "service-orders",
+      format: "xlsx",
+      filters: { search: debouncedSearch, activeTab, status: filters.status },
+    }, { selectedIds: selection, totalCount: sortedOrders.length })
+  }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, selection, sortedOrders.length])
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     const { updateServiceOrderStatusAction } = await import("@/app/actions/erp/service-orders")
@@ -354,6 +366,9 @@ export default function ServiceOrdersPage({
               </div>
 
               <div className="flex items-center gap-3">
+                <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                  {isExporting ? "Exportando..." : "Exportar"}
+                </Button>
                 <Button
                   onClick={() => openEntity("create")}
                   className="w-full"
@@ -680,6 +695,15 @@ export default function ServiceOrdersPage({
           total: { min: "", max: "" },
           expected_completion_date: { presets: [], from: "", to: "" },
         })}
+      />
+
+      <ExportSelectionModal
+        isOpen={selectionModal.isOpen}
+        selectedCount={selectionModal.selectedCount}
+        totalCount={selectionModal.totalCount}
+        onExportSelected={handleExportSelected}
+        onExportAll={handleExportAll}
+        onClose={closeSelectionModal}
       />
 
       {showShareModal && (

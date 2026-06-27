@@ -263,7 +263,7 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
 
             // Em caso de erro inesperado na RPC, não bloqueamos o acesso já validado pelo cache.
             if (!accessError && stillHasAccess === false) {
-                // Access revoked — clear stale cookie and invalidate cached access
+                // Access revoked - clear stale cookie and invalidate cached access
                 await clearActivePartner()
                 const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
                 revalidateUserAccess(user.id)

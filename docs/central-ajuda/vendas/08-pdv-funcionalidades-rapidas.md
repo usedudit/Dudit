@@ -21,7 +21,7 @@ Se o cliente pede um produto que ainda não existe no sistema:
 3. Informe:
    - **Nome do produto** (obrigatório).
    - **Preço** (obrigatório).
-   - **Quantidade em estoque** (opcional — se não informar, fica como 0).
+   - **Quantidade em estoque** (opcional - se não informar, fica como 0).
 
 [IMAGEM: Modal de criação rápida de produto]
 Legenda: Apenas o essencial para não atrasar o atendimento.
@@ -72,7 +72,7 @@ Ao adicionar itens ao carrinho:
 - Brindes aparecem no carrinho com valor zero e a tag **[BRINDE]**.
 - Descontos promocionais são aplicados automaticamente no item.
 
-Você não precisa fazer nada — as promoções são calculadas em tempo real. Se quiser conferir, veja o resumo do carrinho antes de finalizar.
+Você não precisa fazer nada - as promoções são calculadas em tempo real. Se quiser conferir, veja o resumo do carrinho antes de finalizar.
 
 [IMAGEM: Carrinho com brinde aplicado automaticamente]
 Legenda: Brindes aparecem identificados e com valor zero.

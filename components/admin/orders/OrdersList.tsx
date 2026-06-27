@@ -293,7 +293,7 @@ function OrderDetailsSheet({ order, isOpen, onClose }: OrderDetailsSheetProps) {
                         <div>
                             <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Pagamento</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                {order.situation || "-"} — {order.payment_method || order.payment_provider || "-"}
+                                {order.situation || "-"} - {order.payment_method || order.payment_provider || "-"}
                             </span>
                         </div>
                     </div>

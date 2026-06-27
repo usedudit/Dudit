@@ -1,18 +1,18 @@
 import { formatCurrency } from "@/lib/utils"
-import { getDeliveryStatusLabel, getPaymentStatusLabel } from "@/lib/orders/status"
+import { getDeliveryStatusLabel, getPaymentStatusLabel, getSalesChannelLabel, getFulfillmentModeLabel } from "@/lib/orders/status"
 import { mapCustomerStatusLabel, stockStatusFromQuantity } from "./filters"
 import type { ExportColumnDef, ExportRow } from "./types"
 
 function formatPaymentMethods(row: any): string {
   const breakdown = Array.isArray(row.payment_breakdown) ? row.payment_breakdown : []
   if (breakdown.length > 0) {
-    return breakdown.map((p: any) => String(p.method || p.name || "—")).filter(Boolean).join(", ")
+    return breakdown.map((p: any) => String(p.method || p.name || "-")).filter(Boolean).join(", ")
   }
-  return String(row.payment_method || "—")
+  return String(row.payment_method || "-")
 }
 
 function formatItemNames(items: any[] | null | undefined): string {
-  if (!Array.isArray(items) || items.length === 0) return "—"
+  if (!Array.isArray(items) || items.length === 0) return "-"
   return items.map((it) => String(it.product_name || it.name || "Item")).join("; ")
 }
 
@@ -60,14 +60,14 @@ export function mapOrderRow(row: any, sellerNames: Map<string, string>): ExportR
   const sellerId = row.created_by || row.finalized_by_user_id || ""
 
   return {
-    orderNumber: row.order_number || row.sale_number || row.id?.slice(0, 8) || "—",
-    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "—",
+    orderNumber: row.order_number || row.sale_number || row.id?.slice(0, 8) || "-",
+    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
     customer: row.customer_name || "Consumidor final",
-    salesperson: sellerNames.get(String(sellerId)) || "—",
+    salesperson: sellerNames.get(String(sellerId)) || "-",
     items: formatItemNames(items),
     paymentStatus: situationLabel(row.situation || row.payment_status || row.status || "pending"),
     paymentMethods: formatPaymentMethods(row),
-    deliveryStatus: getDeliveryStatusLabel(row.delivery_status) || row.delivery_status || "—",
+    deliveryStatus: getDeliveryStatusLabel(row.delivery_status) || row.delivery_status || "-",
     channel: row.order_source || row.sales_channel || "Presencial",
     subtotal: formatCurrency(subtotal),
     couponDiscount: formatCurrency(couponDiscount),
@@ -93,9 +93,9 @@ export const PRODUCT_EXPORT_COLUMNS: ExportColumnDef[] = [
 export function mapProductRow(row: any): ExportRow {
   const stock = Number(row.stock_quantity ?? 0)
   return {
-    name: row.name || "—",
-    sku: row.sku || "—",
-    category: row.category?.name || row.category || "—",
+    name: row.name || "-",
+    sku: row.sku || "-",
+    category: row.category?.name || row.category || "-",
     stock,
     cost: formatCurrency(Number(row.cost_price ?? 0)),
     price: formatCurrency(Number(row.price ?? 0)),
@@ -115,10 +115,10 @@ export const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
 
 export function mapCustomerRow(row: any, stats?: { orders: number; ltv: number }): ExportRow {
   return {
-    name: row.name || "—",
-    email: row.email || "—",
-    phone: row.phone || "—",
-    createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString("pt-BR") : "—",
+    name: row.name || "-",
+    email: row.email || "-",
+    phone: row.phone || "-",
+    createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString("pt-BR") : "-",
     totalOrders: stats?.orders ?? 0,
     lifetimeValue: formatCurrency(stats?.ltv ?? 0),
   }
@@ -134,8 +134,8 @@ export const SERVICE_EXPORT_COLUMNS: ExportColumnDef[] = [
 
 export function mapServiceRow(row: any): ExportRow {
   return {
-    name: row.name || "—",
-    category: row.service_categories?.name || "—",
+    name: row.name || "-",
+    category: row.service_categories?.name || "-",
     price: formatCurrency(Number(row.price ?? 0)),
     duration: Number(row.duration_minutes ?? 0),
     status: row.is_active ? "Ativo" : "Inativo",
@@ -154,17 +154,27 @@ export const APPOINTMENT_EXPORT_COLUMNS: ExportColumnDef[] = [
   { header: "Modo Atendimento", key: "fulfillmentMode", width: 18 },
 ]
 
+const APPOINTMENT_STATUS_LABELS: Record<string, string> = {
+  booked: "Reservado",
+  confirmed: "Confirmado",
+  completed: "Concluído",
+  cancelled: "Cancelado",
+  no_show: "Não Compareceu",
+  in_progress: "Em Andamento",
+  pending: "Pendente",
+}
+
 export function mapAppointmentRow(row: any): ExportRow {
   return {
-    date: row.start_date || "—",
+    date: row.start_date || "-",
     time: String(row.start_time || "").slice(0, 5),
-    customer: row.customer_name || "—",
-    professional: row.staff_name || "—",
-    service: row.service_name || "—",
-    status: row.status || "—",
-    paymentStatus: row.payment_status || "—",
-    salesChannel: row.sales_channel || "—",
-    fulfillmentMode: row.fulfillment_mode || "—",
+    customer: row.customer_name || "-",
+    professional: row.staff_name || "-",
+    service: row.service_name || "-",
+    status: APPOINTMENT_STATUS_LABELS[row.status] || row.status || "-",
+    paymentStatus: getPaymentStatusLabel(row.payment_status) || row.payment_status || "-",
+    salesChannel: getSalesChannelLabel(row.sales_channel) || row.sales_channel || "-",
+    fulfillmentMode: getFulfillmentModeLabel(row.fulfillment_mode) || row.fulfillment_mode || "-",
   }
 }
 
@@ -185,11 +195,11 @@ export function mapSubscriptionRow(row: any): ExportRow {
     expired: "Expirada",
   }
   return {
-    customer: row.customers?.name || row.customer?.name || "—",
-    plan: row.recurring_plans?.name || row.plan?.name || "—",
-    status: statusLabels[row.status] || row.status || "—",
-    nextBilling: row.next_execution_at ? new Date(row.next_execution_at).toLocaleDateString("pt-BR") : "—",
-    startedAt: row.started_at ? new Date(row.started_at).toLocaleDateString("pt-BR") : "—",
+    customer: row.customers?.name || row.customer?.name || "-",
+    plan: row.recurring_plans?.name || row.plan?.name || "-",
+    status: statusLabels[row.status] || row.status || "-",
+    nextBilling: row.next_execution_at ? new Date(row.next_execution_at).toLocaleDateString("pt-BR") : "-",
+    startedAt: row.started_at ? new Date(row.started_at).toLocaleDateString("pt-BR") : "-",
     salesChannel: row.delivery_type === "delivery" ? "Entrega" : "Retirada",
   }
 }
@@ -204,4 +214,270 @@ export function applyProductStockFilter(row: any, stockLabels: string[]): boolea
 export function applyCustomerStatusFilter(row: any, labels: string[]): boolean {
   if (!labels.length) return true
   return labels.includes(mapCustomerStatusLabel(row.status))
+}
+
+// ── Returns (Devoluções) ─────────────────────────────────────────────
+
+export const RETURN_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "ID", key: "id", width: 36 },
+  { header: "Data", key: "date", width: 20 },
+  { header: "Cliente", key: "customer", width: 28 },
+  { header: "Pedido", key: "orderNumber", width: 18 },
+  { header: "Tipo", key: "requestType", width: 20 },
+  { header: "Resolução", key: "resolution", width: 20 },
+  { header: "Status", key: "status", width: 18 },
+  { header: "Valor", key: "amount", width: 14 },
+  { header: "Motivo", key: "reason", width: 30 },
+]
+
+const RETURN_STATUS_LABELS: Record<string, string> = {
+  PENDING_REVIEW: "Pendente",
+  UNDER_ANALYSIS: "Em Análise",
+  APPROVED: "Aprovado",
+  REJECTED: "Rejeitado",
+  WAITING_CUSTOMER: "Aguardando Cliente",
+  WAITING_ITEM_RETURN: "Aguardando Item",
+  PROCESSING: "Processando",
+  RESOLVED: "Resolvido",
+  EXPIRED: "Expirado",
+  ESCALATED: "Escalado",
+}
+
+const RETURN_REQUEST_TYPE_LABELS: Record<string, string> = {
+  cancellation: "Cancelamento",
+  return: "Devolução",
+  exchange: "Troca",
+  refund: "Reembolso",
+  store_credit: "Crédito na Loja",
+}
+
+const RETURN_RESOLUTION_LABELS: Record<string, string> = {
+  exchange: "Troca",
+  refund: "Reembolso",
+  store_credit: "Crédito na Loja",
+  none: "Nenhum",
+  rejected: "Rejeitado",
+}
+
+export function mapReturnRow(row: any): ExportRow {
+  const rawStatus = row.status || ""
+  return {
+    id: row.id?.slice(0, 8) || "-",
+    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    customer: row.customer_name_snapshot || "-",
+    orderNumber: row.order_number_snapshot || row.orders?.order_number || "-",
+    requestType: RETURN_REQUEST_TYPE_LABELS[row.request_type] || row.request_type || "-",
+    resolution: RETURN_RESOLUTION_LABELS[row.desired_resolution] || row.desired_resolution || "-",
+    status: RETURN_STATUS_LABELS[rawStatus] || rawStatus || "-",
+    amount: formatCurrency(Number(row.refund_amount ?? row.store_credit_amount ?? 0)),
+    reason: row.customer_reason || row.reason || "-",
+  }
+}
+
+// ── Stock Movements (Movimentação de Estoque) ────────────────────────
+
+export const STOCK_MOVEMENT_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "Data", key: "date", width: 20 },
+  { header: "Tipo", key: "movementType", width: 16 },
+  { header: "Produto", key: "product", width: 28 },
+  { header: "SKU", key: "sku", width: 16 },
+  { header: "Quantidade", key: "quantity", width: 12 },
+  { header: "Motivo", key: "reason", width: 22 },
+  { header: "Referência", key: "reference", width: 18 },
+  { header: "Responsável", key: "createdBy", width: 22 },
+]
+
+const MOVEMENT_TYPE_LABELS: Record<string, string> = {
+  sale: "Venda",
+  return: "Devolução",
+  adjustment: "Ajuste",
+  purchase: "Compra",
+  damage: "Danificado",
+  loss: "Perda",
+  in: "Entrada",
+  out: "Saída",
+}
+
+export function mapStockMovementRow(row: any): ExportRow {
+  const items = row.stock_movement_items || []
+  const productNames = items.map((i: any) => i.products?.name || i.product_name || "-").filter(Boolean).join("; ")
+  const skus = items.map((i: any) => i.products?.sku || i.sku || "").filter(Boolean).join("; ")
+  const totalQty = items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
+  return {
+    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    movementType: MOVEMENT_TYPE_LABELS[row.movement_type] || row.movement_type || "-",
+    product: productNames || "-",
+    sku: skus || "-",
+    quantity: totalQty || Number(row.quantity || 0),
+    reason: row.reason || "-",
+    reference: row.reference_name || row.orders?.order_number || "-",
+    createdBy: row.user_profiles?.full_name || row.created_by_name || "-",
+  }
+}
+
+// ── Transactions (Transações Financeiras) ────────────────────────────
+
+export const TRANSACTION_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "Data", key: "date", width: 20 },
+  { header: "Descrição", key: "description", width: 32 },
+  { header: "Categoria", key: "category", width: 20 },
+  { header: "Tipo", key: "transactionType", width: 16 },
+  { header: "Valor", key: "amount", width: 14 },
+  { header: "Status", key: "status", width: 14 },
+  { header: "Vencimento", key: "dueDate", width: 16 },
+  { header: "Pagamento", key: "paymentDate", width: 16 },
+  { header: "Conta", key: "account", width: 20 },
+  { header: "Forma Pagto.", key: "paymentType", width: 18 },
+]
+
+const TRANSACTION_TYPE_LABELS: Record<string, string> = {
+  income: "Receita",
+  expense: "Despesa",
+  transfer: "Transferência",
+  adjustment: "Ajuste",
+  refund: "Reembolso",
+}
+
+const TRANSACTION_STATUS_LABELS: Record<string, string> = {
+  paid: "Pago",
+  pending: "Pendente",
+  cancelled: "Cancelado",
+}
+
+export function mapTransactionRow(row: any): ExportRow {
+  return {
+    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    description: row.description || "-",
+    category: row.transaction_categories?.name || row.category || "-",
+    transactionType: TRANSACTION_TYPE_LABELS[row.transaction_type] || row.transaction_type || "-",
+    amount: formatCurrency(Number(row.amount ?? 0)),
+    status: TRANSACTION_STATUS_LABELS[row.status] || row.status || "-",
+    dueDate: row.due_date ? new Date(row.due_date).toLocaleDateString("pt-BR") : "-",
+    paymentDate: row.payment_date ? new Date(row.payment_date).toLocaleDateString("pt-BR") : "-",
+    account: row.financial_accounts?.name || row.account_name || "-",
+    paymentType: row.payment_methods?.name || row.payment_type || "-",
+  }
+}
+
+// ── Suppliers (Fornecedores) ─────────────────────────────────────────
+
+export const SUPPLIER_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "Nome", key: "name", width: 28 },
+  { header: "Email", key: "email", width: 28 },
+  { header: "Telefone", key: "phone", width: 18 },
+  { header: "CPF/CNPJ", key: "document", width: 18 },
+  { header: "Cidade", key: "city", width: 20 },
+  { header: "UF", key: "state", width: 6 },
+  { header: "Status", key: "status", width: 12 },
+  { header: "Cadastro", key: "createdAt", width: 16 },
+]
+
+export function mapSupplierRow(row: any): ExportRow {
+  return {
+    name: row.name || "-",
+    email: row.email || "-",
+    phone: row.phone || "-",
+    document: row.cnpj || row.cpf || "-",
+    city: row.city || "-",
+    state: row.state || "-",
+    status: row.status === "ativo" ? "Ativo" : row.status === "inativo" ? "Inativo" : row.status || "-",
+    createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString("pt-BR") : "-",
+  }
+}
+
+// ── Service Orders (Ordens de Serviço) ───────────────────────────────
+
+export const SERVICE_ORDER_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "Nº OS", key: "orderNumber", width: 14 },
+  { header: "Cliente", key: "customer", width: 28 },
+  { header: "Título", key: "title", width: 28 },
+  { header: "Status", key: "status", width: 20 },
+  { header: "Técnico", key: "assignedUser", width: 22 },
+  { header: "Previsão", key: "expectedCompletion", width: 16 },
+  { header: "Valor", key: "totalAmount", width: 14 },
+  { header: "Criação", key: "createdAt", width: 20 },
+]
+
+const SERVICE_ORDER_STATUS_LABELS: Record<string, string> = {
+  aberta: "Aberta",
+  aguardando_aprovacao: "Aguardando Aprovação",
+  aprovada: "Aprovada",
+  em_andamento: "Em Andamento",
+  aguardando_peca: "Aguardando Peça",
+  concluida: "Concluída",
+  entregue: "Entregue",
+  cancelada: "Cancelada",
+}
+
+export function mapServiceOrderRow(row: any): ExportRow {
+  const customer = row.customer_snapshot
+  return {
+    orderNumber: row.order_number || row.id?.slice(0, 8) || "-",
+    customer: typeof customer === "object" && customer ? (customer as any).name || "-" : "-",
+    title: row.title || "-",
+    status: SERVICE_ORDER_STATUS_LABELS[row.status] || row.status || "-",
+    assignedUser: row.user_profiles?.full_name || row.assigned_user_name || "-",
+    expectedCompletion: row.expected_completion_date ? new Date(row.expected_completion_date).toLocaleDateString("pt-BR") : "-",
+    totalAmount: formatCurrency(Number(row.total_amount ?? 0)),
+    createdAt: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+  }
+}
+
+// ── Cash Register (Controle de Caixa) ────────────────────────────────
+
+export const CASH_REGISTER_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "Abertura", key: "openedAt", width: 20 },
+  { header: "Fechamento", key: "closedAt", width: 20 },
+  { header: "Status", key: "status", width: 12 },
+  { header: "Responsável", key: "openedBy", width: 22 },
+  { header: "Saldo Inicial", key: "initialAmount", width: 16 },
+  { header: "Saldo Final", key: "closingAmount", width: 16 },
+  { header: "Diferença", key: "difference", width: 14 },
+  { header: "Observações", key: "notes", width: 28 },
+]
+
+export function mapCashRegisterRow(row: any): ExportRow {
+  return {
+    openedAt: row.opened_at ? new Date(row.opened_at).toLocaleString("pt-BR") : "-",
+    closedAt: row.closed_at ? new Date(row.closed_at).toLocaleString("pt-BR") : "-",
+    status: row.status === "open" ? "Aberto" : row.status === "closed" ? "Fechado" : row.status || "-",
+    openedBy: row.opener?.full_name || row.opened_by_name || "-",
+    initialAmount: formatCurrency(Number(row.initial_amount ?? 0)),
+    closingAmount: formatCurrency(Number(row.closing_amount ?? 0)),
+    difference: formatCurrency(Number(row.difference_amount ?? 0)),
+    notes: row.notes || "-",
+  }
+}
+
+// ── XML Import (Importação XML) ──────────────────────────────────────
+
+export const XML_IMPORT_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "NF-e", key: "invoiceNumber", width: 16 },
+  { header: "Série", key: "invoiceSeries", width: 8 },
+  { header: "Fornecedor", key: "supplier", width: 28 },
+  { header: "Valor", key: "totalValue", width: 16 },
+  { header: "Itens", key: "itemsCount", width: 10 },
+  { header: "Status", key: "status", width: 14 },
+  { header: "Data", key: "date", width: 20 },
+  { header: "Chave Acesso", key: "accessKey", width: 48 },
+]
+
+const XML_IMPORT_STATUS_LABELS: Record<string, string> = {
+  preview: "Pré-visualização",
+  completed: "Concluído",
+  failed: "Falha",
+  reversed: "Estornado",
+}
+
+export function mapXmlImportRow(row: any): ExportRow {
+  return {
+    invoiceNumber: row.invoice_number || "-",
+    invoiceSeries: row.invoice_series || "-",
+    supplier: row.supplier_name || "-",
+    totalValue: formatCurrency(Number(row.total_value ?? 0)),
+    itemsCount: Number(row.items_count ?? 0),
+    status: XML_IMPORT_STATUS_LABELS[row.status] || row.status || "-",
+    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    accessKey: row.access_key || "-",
+  }
 }

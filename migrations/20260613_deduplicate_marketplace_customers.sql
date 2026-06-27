@@ -2,7 +2,7 @@
 -- Safety-net deduplication for marketplace customers (idempotent)
 -- =============================================================================
 -- Uses EXECUTE for dynamic SQL so it won't fail if the column doesn't exist.
--- Safe to rerun — no-ops when no duplicates or unique index is already in place.
+-- Safe to rerun - no-ops when no duplicates or unique index is already in place.
 -- =============================================================================
 
 DO $$

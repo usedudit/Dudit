@@ -65,7 +65,7 @@ const SupplierListRow = React.memo(
             <div className="flex flex-col">
               {supplier.email && <span className="text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]">{supplier.email}</span>}
               {supplier.phone && <span className="text-xs text-brand-inactive-text dark:text-dark-body">{supplier.phone}</span>}
-              {!supplier.email && !supplier.phone && <span className="text-[13px] text-brand-inactive-text">—</span>}
+              {!supplier.email && !supplier.phone && <span className="text-[13px] text-brand-inactive-text">-</span>}
             </div>
           )
 
@@ -93,7 +93,7 @@ const SupplierListRow = React.memo(
         case "code":
           return (
             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-              {supplier.supplier_code || "—"}
+              {supplier.supplier_code || "-"}
             </span>
           )
 

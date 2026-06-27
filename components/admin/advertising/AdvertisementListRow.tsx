@@ -38,7 +38,7 @@ export default function AdvertisementListRow({
     onToggleStatus,
     onDelete,
 }: AdvertisementListRowProps) {
-    const period = `${new Date(ad.starts_at).toLocaleDateString("pt-BR")} — ${new Date(ad.ends_at).toLocaleDateString("pt-BR")}`
+    const period = `${new Date(ad.starts_at).toLocaleDateString("pt-BR")} - ${new Date(ad.ends_at).toLocaleDateString("pt-BR")}`
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-4 md:p-5 flex flex-col md:flex-row gap-4 md:items-center">

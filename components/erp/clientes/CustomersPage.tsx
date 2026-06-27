@@ -39,6 +39,7 @@ import {
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 
 // --- TYPES & INTERFACES ---
 
@@ -94,7 +95,7 @@ export default function CustomersPage({
 }) {
     const router = useRouter()
     const { toast } = useToast()
-    const { exportData, isExporting } = useErpExport()
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -320,8 +321,8 @@ export default function CustomersPage({
                 activeTab,
                 status: filters.status,
             },
-        })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters.status])
+        }, { selectedIds: selection.ids, totalCount: filteredCustomers.length })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, selection.ids, filteredCustomers.length])
 
     // Handlers (URL-driven)
     const handleAddCustomer = () => openEntity('create')
@@ -701,6 +702,15 @@ export default function CustomersPage({
             />
 
             <SavingStatusModal isOpen={isDeletingCustomer || isProcessingBulk} text={isDeletingCustomer ? "Excluindo cliente..." : "Processando..."} />
+
+            <ExportSelectionModal
+                isOpen={selectionModal.isOpen}
+                selectedCount={selectionModal.selectedCount}
+                totalCount={selectionModal.totalCount}
+                onExportSelected={handleExportSelected}
+                onExportAll={handleExportAll}
+                onClose={closeSelectionModal}
+            />
 
             <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}>
                 <Button

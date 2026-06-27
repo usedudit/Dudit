@@ -19,7 +19,7 @@ ALTER TABLE public.cart_items
 ALTER TABLE public.cart_items
   ADD COLUMN IF NOT EXISTS pay_deposit_only BOOLEAN NOT NULL DEFAULT FALSE;
 
--- product_id was NOT NULL — relax for non-product lines
+-- product_id was NOT NULL - relax for non-product lines
 ALTER TABLE public.cart_items ALTER COLUMN product_id DROP NOT NULL;
 
 ALTER TABLE public.cart_items

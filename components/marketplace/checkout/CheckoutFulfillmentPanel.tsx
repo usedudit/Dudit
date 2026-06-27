@@ -45,7 +45,7 @@ function AddressBlock({
             <p className="text-md font-bold text-brand-dark dark:text-dark-heading">{title}</p>
             <p className="text-sm text-brand-inactive-text">
               {selectedAddress.street}, {selectedAddress.number}
-              {selectedAddress.neighborhood ? ` — ${selectedAddress.neighborhood}` : ""}
+              {selectedAddress.neighborhood ? ` - ${selectedAddress.neighborhood}` : ""}
             </p>
           </div>
         </div>

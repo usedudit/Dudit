@@ -662,7 +662,7 @@ export async function connectEvolutionAction(): Promise<
         const alreadyExists = await client.instanceExists()
 
         if (alreadyExists) {
-            // Instance exists — ensure webhook is configured, then connect to get QR
+            // Instance exists - ensure webhook is configured, then connect to get QR
             try {
                 await client.setWebhook(webhookUrl, webhookEvents, webhookHeaders)
             } catch {
@@ -674,12 +674,12 @@ export async function connectEvolutionAction(): Promise<
             if (status.status === "connected") {
                 result = { status: "connected", qrCode: null }
             } else {
-                // Not connected — get QR code
+                // Not connected - get QR code
                 const connectResult = await client.connectInstance()
                 result = { status: connectResult.status, qrCode: connectResult.qrCode || null }
             }
         } else {
-            // Instance doesn't exist — create with inline webhook + QR
+            // Instance doesn't exist - create with inline webhook + QR
             const createResult = await client.createInstance(webhookUrl, webhookEvents, webhookHeaders)
             result = { status: createResult.status, qrCode: createResult.qrCode || null }
 

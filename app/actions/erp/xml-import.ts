@@ -485,7 +485,7 @@ export async function uploadXMLAction(
     }
 
     if (metadata.invoice.tipo_operacao === "1") {
-      warnings.push("NF-e de saída (tpNF=1) — o emissor registrou como saída, mas como você é o destinatário, será tratada como entrada normalmente.")
+      warnings.push("NF-e de saída (tpNF=1) - o emissor registrou como saída, mas como você é o destinatário, será tratada como entrada normalmente.")
     }
 
     // 3. Validar autorização SEFAZ
@@ -522,9 +522,9 @@ export async function uploadXMLAction(
 
     if (metadata.invoice.finalidade) {
       const fin = metadata.invoice.finalidade
-      if (fin === "2") warnings.push("NF-e complementar — verifique se os valores estão corretos")
-      if (fin === "3") warnings.push("NF-e de ajuste — verifique se deseja importar")
-      if (fin === "4") warnings.push("NF-e de devolução — verifique os valores")
+      if (fin === "2") warnings.push("NF-e complementar - verifique se os valores estão corretos")
+      if (fin === "3") warnings.push("NF-e de ajuste - verifique se deseja importar")
+      if (fin === "4") warnings.push("NF-e de devolução - verifique os valores")
     }
 
     // 5. Validar destinatário da NF
@@ -597,7 +597,7 @@ export async function uploadXMLAction(
           existingImportId: existingImport.id,
         }
       }
-      // Failed ou Reversed — permite reimportar: atualiza o registro existente
+      // Failed ou Reversed - permite reimportar: atualiza o registro existente
       if (existingImport.status === "reversed" || existingImport.status === "failed") {
         isReimport = true
         reimportId = existingImport.id
@@ -893,7 +893,7 @@ export async function uploadXMLAction(
         `Upload de NF-e ${metadata.invoice.numero || ""} - ${metadata.produtos.length} produto(s) - ${metadata.emitente.nome}`,
       ],
       source: "manual",
-    }).catch(() => {})
+    }).catch(() => { })
 
     return { success: true, preview, reimported: isReimport, validation: { docsMatch, warnings } }
   } catch (error: any) {
@@ -1014,29 +1014,29 @@ export async function confirmImportAction(
           const hasParcelas = duplicatas.length > 1
           const transactions = hasParcelas
             ? duplicatas.map((d: any) => ({
-                partner_id: partnerId,
-                contact_id: contact.id,
-                transaction_type: "expense" as const,
-                category: "purchasing",
-                amount: d.valor,
-                description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
-                due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
-                status: "pending",
-                created_by_user_id: user.id,
-              }))
+              partner_id: partnerId,
+              contact_id: contact.id,
+              transaction_type: "expense" as const,
+              category: "purchasing",
+              amount: d.valor,
+              description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
+              due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
+              status: "pending",
+              created_by_user_id: user.id,
+            }))
             : [{
-                partner_id: partnerId,
-                contact_id: contact.id,
-                transaction_type: "expense" as const,
-                category: "purchasing",
-                amount: duplicatas.length === 1 ? duplicatas[0].valor : xmlImport.total_value,
-                description: `NF ${xmlImport.invoice_number || ""} - À vista`,
-                due_date: duplicatas.length === 1
-                  ? (duplicatas[0].vencimento || new Date(Date.now() + 30 * 86400000).toISOString())
-                  : new Date(Date.now() + 30 * 86400000).toISOString(),
-                status: "pending",
-                created_by_user_id: user.id,
-              }]
+              partner_id: partnerId,
+              contact_id: contact.id,
+              transaction_type: "expense" as const,
+              category: "purchasing",
+              amount: duplicatas.length === 1 ? duplicatas[0].valor : xmlImport.total_value,
+              description: `NF ${xmlImport.invoice_number || ""} - À vista`,
+              due_date: duplicatas.length === 1
+                ? (duplicatas[0].vencimento || new Date(Date.now() + 30 * 86400000).toISOString())
+                : new Date(Date.now() + 30 * 86400000).toISOString(),
+              status: "pending",
+              created_by_user_id: user.id,
+            }]
 
           const { error: txErr } = await supabase.from("transactions").insert(transactions)
           if (txErr) {
@@ -1059,7 +1059,7 @@ export async function confirmImportAction(
       ],
       metadata: { imported: result.imported, skipped: result.skipped },
       source: "manual",
-    }).catch(() => {})
+    }).catch(() => { })
 
     return {
       success: true,
@@ -1293,7 +1293,7 @@ export async function revertImportAction(
         `Importação revertida${reason ? ` - Motivo: ${reason}` : ""}`,
       ],
       source: "manual",
-    }).catch(() => {})
+    }).catch(() => { })
 
     return { success: true, message: result.message || "Importação revertida com sucesso" }
   } catch (error: any) {

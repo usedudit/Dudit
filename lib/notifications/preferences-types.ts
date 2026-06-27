@@ -6,6 +6,7 @@ export interface NotificationPreference {
   type: NotificationType
   enabled: boolean
   push_enabled: boolean
+  whatsapp_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -14,6 +15,7 @@ export interface NotificationPreferenceInput {
   type: NotificationType
   enabled: boolean
   push_enabled: boolean
+  whatsapp_enabled: boolean
 }
 
 export interface NotificationCategory {

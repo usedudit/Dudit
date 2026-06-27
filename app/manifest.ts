@@ -2,16 +2,16 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Dudit — Produtos e Serviços Perto de Você',
+    name: 'Dudit - Compre local, venda mais',
     short_name: 'Dudit',
     description:
-      'Encontre produtos, serviços e negócios da sua cidade. Crie sua vitrine digital e venda sem comissão.',
+      'Compre de quem vende perto de você. Descubra produtos e serviços locais e gerencie seu negócio em um só lugar.',
     start_url: '/',
     display: 'standalone',
     background_color: '#003229',
     theme_color: '#003229',
     orientation: 'any',
-    categories: ['business', 'shopping', 'productivity'],
+    categories: ['business', 'shopping', 'productivity', 'local'],
     lang: 'pt-BR',
     dir: 'ltr',
     icons: [

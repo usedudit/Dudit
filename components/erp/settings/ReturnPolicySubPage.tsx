@@ -27,18 +27,18 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      const res = await getPartnerReturnPolicyAction(partnerId)
-      if (cancelled) return
-      if (res.success) {
-        setPolicy(res.data.policy)
-        setStoreName(res.data.storeName || "")
-      } else {
-        notifyError(res.error || "Erro ao carregar")
-      }
-      setLoading(false)
-    })()
+      ; (async () => {
+        setLoading(true)
+        const res = await getPartnerReturnPolicyAction(partnerId)
+        if (cancelled) return
+        if (res.success) {
+          setPolicy(res.data.policy)
+          setStoreName(res.data.storeName || "")
+        } else {
+          notifyError(res.error || "Erro ao carregar")
+        }
+        setLoading(false)
+      })()
     return () => { cancelled = true }
   }, [partnerId, notifyError])
 
@@ -107,7 +107,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
         </div>
 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-6 max-w-4xl mx-auto w-full space-y-6">
-          <FormSection title="Referência legal (informativo)" description="Não bloqueia regras legais — apenas orientação.">
+          <FormSection title="Referência legal (informativo)" description="Não bloqueia regras legais - apenas orientação.">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
                 label="Arrependimento online (dias)"
@@ -207,7 +207,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
               value={policy.receiptMessage || ""}
               onChange={(e) => update("receiptMessage", e.target.value || null)}
               rows={3}
-              placeholder="Opcional — ex.: Consulte nossa política de trocas na loja ou no pedido."
+              placeholder="Opcional - ex.: Consulte nossa política de trocas na loja ou no pedido."
             />
           </FormSection>
         </div>

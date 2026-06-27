@@ -26,21 +26,21 @@ declare const self: ServiceWorkerGlobalScope
 // ============================================================
 const PRECACHE_EXCLUDE_PATTERNS = [
   /\/app\/api\//,          // API routes rodam no servidor
-  /\/app\/erp\//,          // ERP — privado, precisa de auth + dados live
-  /\/app\/ddt-admin\//,    // Admin — privado
-  /\/app\/auth\//,         // Auth — transiente
-  /\/app\/cart\//,          // Carrinho — privado
-  /\/app\/checkout\//,     // Checkout — privado
-  /\/app\/payment\//,      // Pagamento — privado
-  /\/app\/dashboard\//,    // Dashboard — privado
-  /\/app\/pedidos\//,      // Pedidos — privado
-  /\/app\/perfil\//,       // Perfil — privado
-  /\/app\/select-erp\//,   // Seleção ERP — privado
+  /\/app\/erp\//,          // ERP - privado, precisa de auth + dados live
+  /\/app\/ddt-admin\//,    // Admin - privado
+  /\/app\/auth\//,         // Auth - transiente
+  /\/app\/cart\//,          // Carrinho - privado
+  /\/app\/checkout\//,     // Checkout - privado
+  /\/app\/payment\//,      // Pagamento - privado
+  /\/app\/dashboard\//,    // Dashboard - privado
+  /\/app\/pedidos\//,      // Pedidos - privado
+  /\/app\/perfil\//,       // Perfil - privado
+  /\/app\/select-erp\//,   // Seleção ERP - privado
   /\/app\/banned\//,       // Ban page
-  /\/app\/account\//,      // Conta — privado
-  /\/app\/invite\//,       // Convites — privado
-  /\/app\/assinaturas\//, // Assinaturas — privado
-  /\/loading-[a-f0-9]+\.js$/, // Loading skeletons — dispensáveis
+  /\/app\/account\//,      // Conta - privado
+  /\/app\/invite\//,       // Convites - privado
+  /\/app\/assinaturas\//, // Assinaturas - privado
+  /\/loading-[a-f0-9]+\.js$/, // Loading skeletons - dispensáveis
 ]
 
 function filterPrecacheManifest(
@@ -55,7 +55,7 @@ function filterPrecacheManifest(
 
 // ============================================================
 // REGRA ABSOLUTA: Rotas que NUNCA devem ser cacheadas
-// Path-based exclusions — sem leitura de cookies
+// Path-based exclusions - sem leitura de cookies
 // ============================================================
 const UNCACHEABLE_PREFIXES = [
   "/erp",
@@ -108,7 +108,7 @@ const networkOnlyErrorHandler = {
 
 const duditRuntimeCaching = [
   // BLOQUEIO TOTAL: ERP, API, Auth, Server Actions, rotas privadas
-  // NOTA: navigation requests (document) passam direto — sem interferência do SW
+  // NOTA: navigation requests (document) passam direto - sem interferência do SW
   {
     matcher: ({ request, url }: { request: Request; url: URL }) =>
       request.destination !== "document" && isUncacheableRequest(request, url),
@@ -117,7 +117,7 @@ const duditRuntimeCaching = [
     }),
   },
 
-  // Fontes Google — Stale While Revalidate, 30 dias
+  // Fontes Google - Stale While Revalidate, 30 dias
   {
     matcher: ({ url }: { url: URL }) =>
       url.hostname === "fonts.googleapis.com" ||
@@ -131,7 +131,7 @@ const duditRuntimeCaching = [
     }),
   },
 
-  // Imagens CDN — Stale While Revalidate, 7 dias, max 150 entries
+  // Imagens CDN - Stale While Revalidate, 7 dias, max 150 entries
   {
     matcher: ({ url }: { url: URL }) =>
       url.hostname.includes("img.dudit.com.br") ||
@@ -149,7 +149,7 @@ const duditRuntimeCaching = [
     }),
   },
 
-  // Assets estáticos Next.js — Cache First (imutáveis, hash no nome)
+  // Assets estáticos Next.js - Cache First (imutáveis, hash no nome)
   {
     matcher: ({ url }: { url: URL }) =>
       url.pathname.startsWith("/_next/static"),
@@ -166,7 +166,7 @@ const duditRuntimeCaching = [
     }),
   },
 
-  // Páginas públicas marketplace — Network First com fallback para cache
+  // Páginas públicas marketplace - Network First com fallback para cache
   {
     matcher: ({ request, url }: { request: Request; url: URL }) => {
       if (request.destination !== "document") return false
@@ -230,7 +230,7 @@ const serwist = new Serwist({
 serwist.addEventListeners()
 
 // ============================================================
-// Firebase Cloud Messaging — background push (Android PWA)
+// Firebase Cloud Messaging - background push (Android PWA)
 // Config is injected at build time from NEXT_PUBLIC_* env vars.
 // ============================================================
 const FCM_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || ""

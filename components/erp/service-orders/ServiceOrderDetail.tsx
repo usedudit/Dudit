@@ -148,8 +148,8 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         }
     }
 
-    const formatDateStr = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
-    const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "—"
+    const formatDateStr = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "-"
+    const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "-"
 
     const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`
 
@@ -496,7 +496,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         <ListItem
                                                             icon={WrenchIcon}
                                                             title="Prioridade"
-                                                            description={order.priority ? (PRIORITY_META[order.priority]?.label || order.priority) : "—"}
+                                                            description={order.priority ? (PRIORITY_META[order.priority]?.label || order.priority) : "-"}
                                                             className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
                                                             right={
                                                                 order.priority ? (
@@ -511,7 +511,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         <ListItem
                                                             icon={ClockIcon}
                                                             title="Tempo Estimado"
-                                                            description={order.estimated_hours ? `${order.estimated_hours} ${order.estimated_hours === 1 ? 'hora' : 'horas'}` : "—"}
+                                                            description={order.estimated_hours ? `${order.estimated_hours} ${order.estimated_hours === 1 ? 'hora' : 'horas'}` : "-"}
                                                             className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
                                                         />
                                                         <ListItem
@@ -519,7 +519,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             title="Previsão de Conclusão"
                                                             description={order.expected_completion_date
                                                                 ? `${formatDateStr(order.expected_completion_date)}${order.expected_completion_time ? ` às ${order.expected_completion_time}` : ""}`
-                                                                : "—"
+                                                                : "-"
                                                             }
                                                             className="border border-brand-border dark:border-dark-border rounded-xl px-4 py-3 bg-brand-gray/5"
                                                         />
@@ -611,7 +611,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             <div className="flex justify-between items-center text-[13px]">
                                                                 <span className="text-brand-inactive-text">Venda</span>
                                                                 <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
-                                                                    #{order.sale.sale_number || "—"}
+                                                                    #{order.sale.sale_number || "-"}
                                                                 </span>
                                                             </div>
                                                             <div className="flex justify-between items-center text-[13px]">

@@ -40,7 +40,7 @@ export const LABEL_PRESETS: LabelPreset[] = [
   {
     id: "pimaco-a4355",
     name: "Pimaco A4355",
-    description: "63,5 × 31 mm — 3 colunas × 8 linhas",
+    description: "63,5 × 31 mm - 3 colunas × 8 linhas",
     labelWidth: 63.5,
     labelHeight: 31,
     cols: 3,
@@ -55,7 +55,7 @@ export const LABEL_PRESETS: LabelPreset[] = [
   {
     id: "pimaco-a4360",
     name: "Pimaco A4360",
-    description: "84 × 27 mm — 2 colunas × 10 linhas",
+    description: "84 × 27 mm - 2 colunas × 10 linhas",
     labelWidth: 84,
     labelHeight: 27,
     cols: 2,
@@ -70,7 +70,7 @@ export const LABEL_PRESETS: LabelPreset[] = [
   {
     id: "pimaco-a4362",
     name: "Pimaco A4362",
-    description: "100 × 36 mm — 2 colunas × 7 linhas",
+    description: "100 × 36 mm - 2 colunas × 7 linhas",
     labelWidth: 100,
     labelHeight: 36,
     cols: 2,
@@ -85,7 +85,7 @@ export const LABEL_PRESETS: LabelPreset[] = [
   {
     id: "pimaco-a4354",
     name: "Pimaco A4354",
-    description: "99 × 38,1 mm — 2 colunas × 7 linhas",
+    description: "99 × 38,1 mm - 2 colunas × 7 linhas",
     labelWidth: 99,
     labelHeight: 38.1,
     cols: 2,
@@ -100,7 +100,7 @@ export const LABEL_PRESETS: LabelPreset[] = [
   {
     id: "pimaco-a4255",
     name: "Pimaco A4255",
-    description: "25,4 × 101,6 mm — 5 colunas × 2 linhas",
+    description: "25,4 × 101,6 mm - 5 colunas × 2 linhas",
     labelWidth: 25.4,
     labelHeight: 101.6,
     cols: 5,
@@ -133,7 +133,7 @@ export function buildCustomPreset(params: {
   return {
     id: "custom",
     name: "Customizado",
-    description: `${params.labelWidth} × ${params.labelHeight} mm — ${params.cols} colunas × ${params.rows} linhas`,
+    description: `${params.labelWidth} × ${params.labelHeight} mm - ${params.cols} colunas × ${params.rows} linhas`,
     ...params,
   }
 }

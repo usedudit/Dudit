@@ -1807,7 +1807,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
 
     if (saleError || !sale) return { error: "Pedido não encontrado" }
 
-    // P3: cliente, vendedor e pre_sale são independentes — resolve em paralelo.
+    // P3: cliente, vendedor e pre_sale são independentes - resolve em paralelo.
     const [customers, saleSellerName, saleDraft] = await Promise.all([
         sale.customer_id
             ? supabase
@@ -3293,15 +3293,32 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         if (payload.servicePrice !== undefined) {
             orderPrice = Number(payload.servicePrice || 0)
 
+            // Delete existing non-gift service items then recreate individual items
             await supabase
                 .from("order_items")
-                .update({
-                    product_name: payload.serviceName || "Serviço",
-                    product_price: orderPrice,
-                    subtotal: orderPrice,
-                    service_id: payload.serviceId || null,
-                })
+                .delete()
                 .eq("order_id", payload.orderId)
+                .neq("is_gift", true)
+
+            const svcNames = String(payload.serviceName || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
+            const svcCount = svcNames.length
+            const svcUnitPrice = svcCount > 1 ? Math.round((orderPrice / svcCount) * 100) / 100 : orderPrice
+            const serviceItems = svcNames.map((name: string) => ({
+                order_id: payload.orderId,
+                product_id: null,
+                variant_id: null,
+                product_name: name,
+                product_price: svcUnitPrice,
+                quantity: 1,
+                subtotal: svcUnitPrice,
+                line_type: "service_booking",
+                service_id: payload.serviceId || null,
+                is_gift: false,
+                original_price: null,
+                is_promotional: false,
+                promotion_id: null,
+            }))
+            await supabase.from("order_items").insert(serviceItems)
         }
 
         const breakdownTotal = (payload.paymentBreakdown || []).reduce((s, e) => s + Number(e.amount || 0), 0)

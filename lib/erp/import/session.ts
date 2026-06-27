@@ -20,7 +20,7 @@ export async function createImportSession(
   const payloadPreview = JSON.stringify(session)
   const sizeBytes = new TextEncoder().encode(payloadPreview).length
   if (sizeBytes > 900_000) {
-    console.warn(`[ImportSession] Session payload large: ${(sizeBytes / 1024).toFixed(1)} KB — rows=${data.rows.length}, headers=${data.headers.length}`)
+    console.warn(`[ImportSession] Session payload large: ${(sizeBytes / 1024).toFixed(1)} KB - rows=${data.rows.length}, headers=${data.headers.length}`)
   }
 
   try {
@@ -42,7 +42,7 @@ export async function getImportSession(
   try {
     const data = await redis.get<ImportSession>(key)
     if (!data) {
-      console.warn(`[ImportSession] Session not found in Redis — key=${key}, partnerId=${partnerId}, sessionId=${sessionId}`)
+      console.warn(`[ImportSession] Session not found in Redis - key=${key}, partnerId=${partnerId}, sessionId=${sessionId}`)
       return null
     }
     return data

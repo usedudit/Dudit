@@ -34,7 +34,8 @@ export async function updateNotificationPreferencesAction(
       typeof i.type === "string" &&
       validTypes.has(i.type) &&
       typeof i.enabled === "boolean" &&
-      typeof i.push_enabled === "boolean",
+      typeof i.push_enabled === "boolean" &&
+      typeof i.whatsapp_enabled === "boolean",
   )
 
   const result = await upsertNotificationPreferences(user.id, sanitized)

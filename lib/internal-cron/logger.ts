@@ -2,7 +2,7 @@ import "server-only"
 
 /**
  * Correlation context for structured cron/job logging.
- * All fields are optional — pass whichever IDs are relevant to the current operation.
+ * All fields are optional - pass whichever IDs are relevant to the current operation.
  */
 export interface CronCorrelation {
   jobId?: string

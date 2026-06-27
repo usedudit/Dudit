@@ -36,10 +36,10 @@ interface SelectedItem {
 
 const presetOptions = [
   ...LABEL_PRESETS.map((p) => ({
-    label: `${p.name} — ${p.description}`,
+    label: `${p.name} - ${p.description}`,
     value: p.id,
   })),
-  { label: "Customizado — Definir medidas manualmente", value: "custom" },
+  { label: "Customizado - Definir medidas manualmente", value: "custom" },
 ]
 
 const SELECTED_PAGE_SIZE = 8
@@ -412,7 +412,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                 </div>
               </div>
 
-              {/* Right — preview */}
+              {/* Right - preview */}
               <div
                 className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"}`}
               >

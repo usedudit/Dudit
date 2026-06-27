@@ -61,7 +61,7 @@ export default async function AdminReturnDetailPage({
                 <ul className="text-sm space-y-1">
                   {(request.return_items as Array<Record<string, unknown>>).map((item) => (
                     <li key={String(item.id)}>
-                      {String(item.product_name_snapshot)} × {String(item.quantity)} — {formatCurrency(Number(item.net_item_value_snapshot || 0))}
+                      {String(item.product_name_snapshot)} × {String(item.quantity)} - {formatCurrency(Number(item.net_item_value_snapshot || 0))}
                     </li>
                   ))}
                 </ul>
@@ -103,7 +103,7 @@ export default async function AdminReturnDetailPage({
               <h3 className="font-semibold mb-2">Moderação</h3>
               <ul className="text-sm space-y-1 max-h-48 overflow-y-auto">
                 {moderationActions.map((a: Record<string, unknown>) => (
-                  <li key={String(a.id)}>{String(a.action_type)} — {formatDate(String(a.created_at))}</li>
+                  <li key={String(a.id)}>{String(a.action_type)} - {formatDate(String(a.created_at))}</li>
                 ))}
                 {moderationActions.length === 0 && (
                   <li className="text-brand-inactive-text">Nenhuma ação registrada</li>

@@ -18,10 +18,10 @@ Legenda: O PDV é dividido em carrinho (esquerda) e resumo (direita).
 
 ### 1. Adicione itens ao carrinho
 
-- **Busque por nome** — Digite o nome do produto. Conforme você digita, o sistema sugere resultados.
-- **Selecione variações** — Se o produto tem variações (cor, tamanho), uma janela abre para você escolher a opção correta.
-- **Adicione serviços** — Serviços também aparecem na busca e podem ser misturados com produtos no mesmo carrinho.
-- **Ajuste a quantidade** — Use os botões + e - ou digite o número diretamente.
+- **Busque por nome** - Digite o nome do produto. Conforme você digita, o sistema sugere resultados.
+- **Selecione variações** - Se o produto tem variações (cor, tamanho), uma janela abre para você escolher a opção correta.
+- **Adicione serviços** - Serviços também aparecem na busca e podem ser misturados com produtos no mesmo carrinho.
+- **Ajuste a quantidade** - Use os botões + e - ou digite o número diretamente.
 
 [IMAGEM: Busca de produtos no PDV com sugestões]
 Legenda: A busca encontra produtos e serviços cadastrados.
@@ -30,8 +30,8 @@ Legenda: A busca encontra produtos e serviços cadastrados.
 
 Você pode conceder descontos de duas formas:
 
-- **Desconto por item** — Clique no item do carrinho e aplique um desconto fixo ou percentual naquele item específico.
-- **Desconto geral** — Aplique um desconto sobre o total do carrinho (valor fixo ou percentual).
+- **Desconto por item** - Clique no item do carrinho e aplique um desconto fixo ou percentual naquele item específico.
+- **Desconto geral** - Aplique um desconto sobre o total do carrinho (valor fixo ou percentual).
 
 Se o cliente tem um **cupom de desconto**, informe o código no campo apropriado. O sistema valida se o cupom é válido e aplica automaticamente.
 

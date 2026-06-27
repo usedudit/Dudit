@@ -462,7 +462,7 @@ export class EvolutionWhatsappClient {
     if (this.circuitBreaker.isOpen()) {
       throw classifyEvolutionError(
         503,
-        `Circuit breaker aberto para ${this.instanceName} — muitas falhas recentes`,
+        `Circuit breaker aberto para ${this.instanceName} - muitas falhas recentes`,
       )
     }
 
@@ -556,7 +556,7 @@ export class EvolutionWhatsappClient {
           continue
         }
 
-        // Already classified errors (WhatsappError) — re-throw
+        // Already classified errors (WhatsappError) - re-throw
         if (err instanceof Error && err.name === "WhatsappError") {
           throw err
         }

@@ -44,7 +44,7 @@ Após confirmar:
 
 - O status do pedido muda para **Cancelado**.
 - O **estoque** dos itens é restaurado automaticamente.
-- O valor pago (se houver) não é estornado automaticamente — você precisa processar o reembolso manualmente pela seção de [Devoluções e trocas](./06-devolucoes-trocas.md).
+- O valor pago (se houver) não é estornado automaticamente - você precisa processar o reembolso manualmente pela seção de [Devoluções e trocas](./06-devolucoes-trocas.md).
 
 ## O que acontece com o estoque
 
@@ -61,7 +61,7 @@ Isso vale para pedidos que já tiveram o estoque baixado (pedidos com status "Pa
 ## Problemas comuns
 
 **"Cancelei o pedido mas o produto ainda aparece no estoque."**
-Verifique se o pedido já tinha o estoque baixado. Pedidos com status "Pendente" ou "Não pago" geralmente não baixam o estoque — nesse caso não há o que restaurar.
+Verifique se o pedido já tinha o estoque baixado. Pedidos com status "Pendente" ou "Não pago" geralmente não baixam o estoque - nesse caso não há o que restaurar.
 
 **"Preciso desfazer um cancelamento."**
 Não é possível reverter um cancelamento. Você precisará criar um novo pedido com os mesmos itens.

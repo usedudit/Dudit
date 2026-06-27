@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     CONSTRAINT notifications_idempotency_key_unique UNIQUE (idempotency_key)
 );
 
-COMMENT ON TABLE public.notifications IS 'In-app notification center — always persisted before push delivery.';
+COMMENT ON TABLE public.notifications IS 'In-app notification center - always persisted before push delivery.';
 COMMENT ON COLUMN public.notifications.idempotency_key IS 'Race-safe dedup key: {type}:{entity}:{user}:{variant}';
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created

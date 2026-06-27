@@ -41,6 +41,8 @@ import {
 } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon } from "@/lib/icons"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 
 function ymdFromRaw(raw: string | null | undefined): string | null {
     if (!raw) return null
@@ -184,6 +186,7 @@ export default function TransactionsPage({
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
     const observerTarget = useRef<HTMLDivElement>(null)
 
     const entityPage = useEntityPage<ERPTransaction, TransactionDetailPayload, FinancialTransactionCursor>({
@@ -782,6 +785,22 @@ export default function TransactionsPage({
             return { ids }
         })
     }, [])
+
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "transactions",
+            format: "xlsx",
+            filters: {
+                search: debouncedSearch,
+                activeTab,
+                status: filters.status,
+                category: filters.category,
+                paymentType: filters.paymentType,
+                datePeriod: filters.datePeriod,
+            },
+        }, { selectedIds: selection.ids, totalCount: filteredTransactions.length })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, filteredTransactions.length])
 
     const handleClearFilters = () => {
         setSearch("")
@@ -1992,8 +2011,8 @@ export default function TransactionsPage({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button variant="outline" onClick={() => { }} leftIcon={<ExportFileIcon size={18} />}>
-                            Exportar
+                        <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                            {isExporting ? "Exportando..." : "Exportar"}
                         </Button>
 
                         <Button onClick={() => openEntity("create")} leftIcon={<PlusIcon size={18} />}>
@@ -2219,6 +2238,15 @@ export default function TransactionsPage({
                 filters={filters}
                 setFilters={setFilters as any}
                 onClear={() => setFilters(INITIAL_FILTERS)}
+            />
+
+            <ExportSelectionModal
+                isOpen={selectionModal.isOpen}
+                selectedCount={selectionModal.selectedCount}
+                totalCount={selectionModal.totalCount}
+                onExportSelected={handleExportSelected}
+                onExportAll={handleExportAll}
+                onClose={closeSelectionModal}
             />
 
             <FloatingActionBar

@@ -506,7 +506,7 @@ async function _searchMarketplaceInternal(
 
 
 
-// Lógica de FTS (Full-Text Search) — PostgreSQL ts_rank_cd via RPC
+// Lógica de FTS (Full-Text Search) - PostgreSQL ts_rank_cd via RPC
 type MarketplaceSearchHit = { item_type: string; id: string; rank: number; created_at: string }
 
 async function hydrateMarketplaceSearchHits(

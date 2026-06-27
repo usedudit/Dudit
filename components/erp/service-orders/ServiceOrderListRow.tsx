@@ -75,21 +75,21 @@ const ServiceOrderListRow = React.memo(
         case "customer":
           return (
             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[180px] block">
-              {order.customer_snapshot?.name || "—"}
+              {order.customer_snapshot?.name || "-"}
             </span>
           )
 
         case "assigned":
           return (
             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate block">
-              {order.assigned_user_id ? "Atribuído" : "—"}
+              {order.assigned_user_id ? "Atribuído" : "-"}
             </span>
           )
 
         case "date":
           return (
             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-              {order.expected_completion_date ? formatDate(order.expected_completion_date) : "—"}
+              {order.expected_completion_date ? formatDate(order.expected_completion_date) : "-"}
             </span>
           )
 
@@ -143,14 +143,12 @@ const ServiceOrderListRow = React.memo(
         {columns.map((col) => (
           <td
             key={col.id}
-            className={`p-2 border-b border-brand-border dark:border-dark-border ${
-              col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-            }`}
+            className={`p-2 border-b border-brand-border dark:border-dark-border ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+              }`}
             style={{ width: col.width, minWidth: col.width }}
           >
-            <div className={`flex items-center w-full min-w-0 ${
-              col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"
-            }`}>
+            <div className={`flex items-center w-full min-w-0 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"
+              }`}>
               {renderCellContent(col.id)}
             </div>
           </td>

@@ -21,7 +21,7 @@ export type CronAuthResult =
  *
  * @param req - The incoming Request object
  * @param jobName - Name of the job for logging context
- * @returns CronAuthResult — either { ok: true } or { ok: false, error: NextResponse }
+ * @returns CronAuthResult - either { ok: true } or { ok: false, error: NextResponse }
  */
 export function validateCronRequest(req: Request, jobName: string): CronAuthResult {
   // 1. Method validation

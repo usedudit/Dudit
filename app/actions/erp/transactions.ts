@@ -543,7 +543,7 @@ export async function getFinancialTransactionsAction(
                 const pmLabels = txPayments
                     .map((p: any) => p.payment_method_id ? paymentMethodLabelById.get(p.payment_method_id) : null)
                     .filter(Boolean) as string[]
-                
+
                 // Add the transaction's own payment method / payment type as fallback
                 const ownLabel = t.payment_method_id
                     ? paymentMethodLabelById.get(t.payment_method_id)
@@ -633,7 +633,7 @@ export async function getFinancialTransactionsAction(
                         // Check if it's Mercado Pago
                         const isMercadoPagoOrder = order && order.payment_provider === "Mercado Pago";
                         const isMercadoPagoAccount = t.account_id && integrationSourceByAccountId.get(t.account_id) === "mercadopago";
-                        
+
                         if (isMercadoPagoOrder || isMercadoPagoAccount) {
                             if (ownLabel.includes("Mercado Pago")) {
                                 return ownLabel;
@@ -647,10 +647,10 @@ export async function getFinancialTransactionsAction(
                             if (baseLower === "bank_transfer") base = "Pix";
                             else if (baseLower.includes("credit")) base = "Cartão de Crédito";
                             else if (baseLower.includes("debit")) base = "Cartão de Débito";
-                            
+
                             return `Mercado Pago (${base})`;
                         }
-                        
+
                         return ownLabel;
                     })(),
                 status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
@@ -1415,7 +1415,7 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
         await requirePermission(input.partnerId, "financial", "view")
         const supabase = createAdminClient()
 
-        // PERF: Batch 1 — group metadata + installment transactions (independent reads)
+        // PERF: Batch 1 - group metadata + installment transactions (independent reads)
         const [groupResult, rowsResult] = await Promise.all([
             supabase
                 .from("installment_groups")
@@ -1441,7 +1441,7 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
             if ((row as any).payment_method_id) paymentMethodIds.add(String((row as any).payment_method_id))
         }
 
-        // PERF: Batch 2 — payments + payment methods (both depend on rows, independent of each other)
+        // PERF: Batch 2 - payments + payment methods (both depend on rows, independent of each other)
         const [paymentsResult, pmsResult] = await Promise.all([
             transactionIds.length > 0
                 ? supabase
@@ -2543,7 +2543,7 @@ export async function getTransactionDetailsAction(
                 const fallbackPaid = paidFlagFromStatus && agg.base <= 0 ? original : 0
                 const principalCleared = Math.max(0, Math.round((agg.base + fallbackPaid) * 100) / 100)
                 const remainingAmount = Math.max(0, Math.round((original - principalCleared) * 100) / 100)
-                
+
                 const txPayments = (paymentRows || []).filter((p: any) => p.transaction_id === g.id)
                 const pmLabels = txPayments
                     .map((p: any) => p.payment_method_id ? pmMap.get(p.payment_method_id) : null)
@@ -2683,12 +2683,12 @@ export async function getTransactionDetailsAction(
                 const additionalCosts = Math.max(0, Number((ord as any).additional_costs || 0))
                 const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + deliveryFee + additionalCosts)
                 const finalTotal = Math.max(0, Number((ord as any).total_amount || 0))
-                
-                const dbPaymentMethodDiscount = (ord as any).payment_method_discount_amount != null 
-                    ? Number((ord as any).payment_method_discount_amount) 
+
+                const dbPaymentMethodDiscount = (ord as any).payment_method_discount_amount != null
+                    ? Number((ord as any).payment_method_discount_amount)
                     : null
-                const dbPaymentMethodExtra = (ord as any).payment_method_extra_amount != null 
-                    ? Number((ord as any).payment_method_extra_amount) 
+                const dbPaymentMethodExtra = (ord as any).payment_method_extra_amount != null
+                    ? Number((ord as any).payment_method_extra_amount)
                     : null
 
                 const dbBreakdown = Array.isArray((ord as any).payment_breakdown) && (ord as any).payment_breakdown.length > 0

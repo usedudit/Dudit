@@ -1,5 +1,5 @@
 -- ============================================================================
--- Returns / exchanges stabilization (extends 20260522 — no parallel system)
+-- Returns / exchanges stabilization (extends 20260522 - no parallel system)
 -- ============================================================================
 
 -- Chain lineage on return line items

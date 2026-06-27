@@ -31,6 +31,13 @@ export type AppointmentStatus =
   | "Partially Paid"
   | "Pago Parcialmente"
 
+export type AppointmentServiceInfo = {
+  id: string | null
+  name: string
+  price: number
+  categoryId?: string | null
+}
+
 export type AppointmentInput = {
   customerName: string
   customerId?: string | null
@@ -52,6 +59,7 @@ export type AppointmentInput = {
   recurrenceRule?: string | null
   recurrenceGroupId?: string | null
   fulfillmentMode?: string | null
+  services?: AppointmentServiceInfo[]
 }
 
 function safeRevalidateTag(tag: string) {
@@ -202,18 +210,22 @@ async function createAppointmentSaleAndSyncGoals(params: {
     saleId = sale?.id || null
 
     if (saleId) {
-      await params.supabase.from("sale_items").insert({
+      const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
+      const svcCount = svcNames.length
+      const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
+      const saleItems = svcNames.map((name: string) => ({
         sale_id: saleId,
         partner_id: params.partnerId,
         product_id: null,
         variant_id: null,
-        product_name: params.appointment.service_name || "Serviço",
+        product_name: name,
         variant_name: null,
-        unit_price: baseAmount,
+        unit_price: svcUnitPrice,
         quantity: 1,
-        subtotal: baseAmount,
-        total_price: baseAmount,
-      })
+        subtotal: svcUnitPrice,
+        total_price: svcUnitPrice,
+      }))
+      await params.supabase.from("sale_items").insert(saleItems)
     }
   } else {
     const { error: saleUpdateError } = await params.supabase
@@ -231,15 +243,28 @@ async function createAppointmentSaleAndSyncGoals(params: {
 
     if (saleUpdateError) throw saleUpdateError
 
+    // Delete and recreate sale_items to support multiple services
     await params.supabase
       .from("sale_items")
-      .update({
-        product_name: params.appointment.service_name || "Serviço",
-        unit_price: baseAmount,
-        subtotal: baseAmount,
-        total_price: baseAmount,
-      })
+      .delete()
       .eq("sale_id", saleId)
+
+    const svcNames = String(params.appointment.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
+    const svcCount = svcNames.length
+    const svcUnitPrice = svcCount > 1 ? Math.round((baseAmount / svcCount) * 100) / 100 : baseAmount
+    const saleItems = svcNames.map((name: string) => ({
+      sale_id: saleId,
+      partner_id: params.partnerId,
+      product_id: null,
+      variant_id: null,
+      product_name: name,
+      variant_name: null,
+      unit_price: svcUnitPrice,
+      quantity: 1,
+      subtotal: svcUnitPrice,
+      total_price: svcUnitPrice,
+    }))
+    await params.supabase.from("sale_items").insert(saleItems)
   }
 
   const fallbackSaleNumber = activeSaleNumber || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
@@ -677,7 +702,8 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     // Receivable sync is only needed for appointments with price > 0
     // Unavailable slots (price=0) never need receivables
     const receivableUpdates: Array<{ id: string; receivableId: string }> = []
-    for (const row of createdRows) {
+    for (let i = 0; i < createdRows.length; i++) {
+      const row = createdRows[i]
       const price = Number(row.price || 0)
       if (price > 0.009 && row.source !== "unavailable") {
         // ── Central pricing engine ──────────────────────────────────────────
@@ -727,8 +753,34 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
         if (order?.id) {
           // 2. Insert into order_items
-          const itemsToInsert = [
-            {
+          // Get individual services from original payload for this row
+          const origInput = payload[i]
+          const individualServices = origInput?.services || []
+
+          let serviceItems: any[]
+          if (individualServices.length > 1) {
+            // Multiple services: create one order_item per service
+            const totalIndPrice = individualServices.reduce((s, svc) => s + Number(svc.price || 0), 0)
+            const scale = totalIndPrice > 0 ? pricingResult.subtotal / totalIndPrice : 1
+            serviceItems = individualServices.map((svc) => ({
+              order_id: order.id,
+              product_id: null,
+              variant_id: null,
+              product_name: svc.name,
+              product_price: Math.round(Number(svc.price || 0) * scale * 100) / 100,
+              quantity: 1,
+              subtotal: Math.round(Number(svc.price || 0) * scale * 100) / 100,
+              line_type: "service_booking",
+              fulfillment_mode: row.fulfillment_mode || "on_site",
+              service_id: svc.id || null,
+              is_gift: false,
+              original_price: null,
+              is_promotional: false,
+              promotion_id: null,
+            }))
+          } else {
+            // Single service: use existing approach
+            serviceItems = [{
               order_id: order.id,
               product_id: null,
               variant_id: null,
@@ -743,7 +795,11 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
               original_price: null,
               is_promotional: false,
               promotion_id: null,
-            },
+            }]
+          }
+
+          const itemsToInsert = [
+            ...serviceItems,
             ...giftItems.map(item => ({
               order_id: order.id,
               product_id: item.product_id,
@@ -954,16 +1010,33 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         .eq("id", updated.marketplace_order_id)
         .eq("partner_id", partnerId)
 
+      // Delete existing service order_items then recreate with individual services
       await supabase
         .from("order_items")
-        .update({
-          product_name: updated.service_name || "Serviço",
-          product_price: orderPrice,
-          subtotal: orderPrice,
-          fulfillment_mode: updated.fulfillment_mode || "on_site",
-          service_id: updated.service_id,
-        })
+        .delete()
         .eq("order_id", updated.marketplace_order_id)
+        .neq("is_gift", true)
+
+      const svcNames = String(updated.service_name || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
+      const svcCount = svcNames.length
+      const svcUnitPrice = svcCount > 1 ? Math.round((orderPrice / svcCount) * 100) / 100 : orderPrice
+      const serviceItems = svcNames.map((name: string) => ({
+        order_id: updated.marketplace_order_id,
+        product_id: null,
+        variant_id: null,
+        product_name: name,
+        product_price: svcUnitPrice,
+        quantity: 1,
+        subtotal: svcUnitPrice,
+        line_type: "service_booking",
+        fulfillment_mode: updated.fulfillment_mode || "on_site",
+        service_id: updated.service_id,
+        is_gift: false,
+        original_price: null,
+        is_promotional: false,
+        promotion_id: null,
+      }))
+      await supabase.from("order_items").insert(serviceItems)
     }
 
     const paidAmountFromPayload = Math.max(0, Number((payload as any)?.paidAmount ?? updated.paid_amount ?? 0))

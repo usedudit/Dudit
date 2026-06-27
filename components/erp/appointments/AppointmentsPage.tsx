@@ -147,7 +147,7 @@ const AppointmentsPage = ({
     const [draftData, setDraftData] = useState<{ services: any[], client: any, staffId?: number } | null>(null);
     const [preSelectedStaffId, setPreSelectedStaffId] = useState<string | undefined>(undefined);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-    const { exportData, isExporting } = useErpExport();
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport();
 
     const mapDbAppointment = useCallback((row: any): Appointment => ({
         id: String(row.id),
@@ -491,6 +491,7 @@ const AppointmentsPage = ({
                     notes: item.notes || null,
                     status: item.status || 'Reservado',
                     customerId: item.customerId || realClients.find((c) => c.name === item.customerName)?.id || null,
+                    services: item.services || undefined,
                 }));
 
                 const createRes = await createAppointmentsAction(rows);

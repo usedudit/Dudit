@@ -28,8 +28,8 @@ export default function PublicOSPortal({ data }: PublicOSPortalProps) {
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
     const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`
-    const formatDate = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
-    const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "—"
+    const formatDate = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "-"
+    const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "-"
 
     return (
         <div className="min-h-screen bg-brand-gray dark:bg-dark-surface p-4">
@@ -54,7 +54,7 @@ export default function PublicOSPortal({ data }: PublicOSPortalProps) {
                         <div>
                             <label className="text-[11px] font-bold uppercase text-brand-inactive-text">Cliente</label>
                             <p className="text-[14px] font-medium text-brand-dark dark:text-dark-heading mt-0.5">
-                                {order.customer_name || "—"}
+                                {order.customer_name || "-"}
                             </p>
                         </div>
                         {order.expected_completion_date && (
@@ -227,7 +227,7 @@ export default function PublicOSPortal({ data }: PublicOSPortalProps) {
                 {/* Footer */}
                 <div className="text-center py-4">
                     <p className="text-xs text-brand-inactive-text">
-                        Dudit — Gestão simplificada para seu negócio
+                        Dudit - Gestão simplificada para seu negócio
                     </p>
                 </div>
             </div>

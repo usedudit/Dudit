@@ -376,7 +376,7 @@ export async function scheduleNotificationJob(params: {
       runAt: params.runAt.toISOString(),
     })
   } catch (err) {
-    console.error("[notifications] Trigger.dev enqueue failed — cron sweep will recover", {
+    console.error("[notifications] Trigger.dev enqueue failed - cron sweep will recover", {
       jobType: params.jobType,
       entityId: params.entityId,
       error: err instanceof Error ? err.message : "unknown",

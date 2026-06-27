@@ -246,7 +246,7 @@ Legenda: Acesso à seção de produtos pelo menu principal.
 ## Dicas importantes
 
 - Mantenha os dados fiscais sempre corretos (NCM, origem) para emitir notas fiscais sem problemas.
-- Organize seus produtos em categorias desde o início — isso facilita a gestão e ajuda os clientes a encontrarem o que procuram.
+- Organize seus produtos em categorias desde o início - isso facilita a gestão e ajuda os clientes a encontrarem o que procuram.
 - Produtos com imagens de qualidade vendem mais. Tire fotos com boa iluminação e fundo neutro.
 
 ## Perguntas frequentes
@@ -514,7 +514,7 @@ Você pode exportar a lista de produtos atual para uma planilha Excel (.xlsx). A
 
 - **Crie categorias antes de cadastrar produtos**: planeje sua árvore de categorias com antecedência para manter a organização desde o início.
 - **Use SKUs padronizados**: isso facilita a localização no sistema e a integração com marketplaces e transportadoras.
-- **Aproveite a busca por código de barras**: você pode usar um leitor de código de barras para localizar produtos rapidamente — o sistema identifica tanto GTIN quanto SKU.
+- **Aproveite a busca por código de barras**: você pode usar um leitor de código de barras para localizar produtos rapidamente - o sistema identifica tanto GTIN quanto SKU.
 - **Edição em massa com cuidado**: antes de alterar preços ou estoques em lote, verifique se a seleção está correta.
 
 ## Perguntas frequentes
@@ -569,11 +569,11 @@ Legenda: Acesse a aba de variações para configurar as opções do produto.
 
 Clique em **Adicionar variação**. Você pode criar combinações simples ou múltiplas:
 
-**Exemplo 1 — Variação simples (apenas cor):**
+**Exemplo 1 - Variação simples (apenas cor):**
 - Tipo: "Cor"
 - Valores: "Azul", "Preto", "Branco"
 
-**Exemplo 2 — Variação combinada (cor + tamanho):**
+**Exemplo 2 - Variação combinada (cor + tamanho):**
 - Tipo: "Cor / Tamanho"
 - Valores: "Azul / P", "Azul / M", "Azul / G", "Preto / P", "Preto / M", "Preto / G"
 
@@ -1115,7 +1115,7 @@ Depende do seu plano. Se você tentar cadastrar e atingir o limite, o sistema av
                 content: `
 O módulo de **Vendas** é onde você gerencia tudo o que envolve comercializar seus produtos e serviços: desde a criação de um orçamento até a entrega ao cliente final. É o coração operacional do seu negócio.
 
-Esta seção reúne **pedidos**, **orçamentos**, **PDV**, **caixa**, **devoluções**, **entregas** e **metas** — tudo em um só lugar.
+Esta seção reúne **pedidos**, **orçamentos**, **PDV**, **caixa**, **devoluções**, **entregas** e **metas** - tudo em um só lugar.
 
 [IMAGEM: Tela principal do módulo de Vendas com os atalhos para cada subseção]
 Legenda: O menu de vendas dá acesso rápido a todas as operações do dia a dia.
@@ -1124,33 +1124,33 @@ Legenda: O menu de vendas dá acesso rápido a todas as operações do dia a dia
 
 Toda venda passa por etapas que se conectam entre si. Veja o fluxo básico:
 
-1. **Antes da venda** — Você cria orçamentos para clientes ou prepara o PDV para atendimento presencial.
-2. **A venda acontece** — O pedido é gerado (manual, PDV, orçamento convertido, loja online ou WhatsApp).
-3. **Pós-venda** — O pedido pode ser entregue, faturado e, se necessário, devolvido ou trocado.
-4. **Gestão** — Metas de vendas acompanham o desempenho da equipe. O caixa registra todas as movimentações financeiras do PDV.
+1. **Antes da venda** - Você cria orçamentos para clientes ou prepara o PDV para atendimento presencial.
+2. **A venda acontece** - O pedido é gerado (manual, PDV, orçamento convertido, loja online ou WhatsApp).
+3. **Pós-venda** - O pedido pode ser entregue, faturado e, se necessário, devolvido ou trocado.
+4. **Gestão** - Metas de vendas acompanham o desempenho da equipe. O caixa registra todas as movimentações financeiras do PDV.
 
 [IMAGEM: Fluxograma simples mostrando a jornada: Orçamento → Pedido → Pagamento → Expedição/Entrega → Devolução (opcional)]
 Legenda: Ciclo completo de uma venda na plataforma.
 
 ## O que você encontra nesta seção
 
-**Pedidos** — Central de acompanhamento. Aqui você cria, edita, cancela e acompanha todos os pedidos da loja. Cada pedido armazena itens, cliente, forma de pagamento, endereço de entrega e histórico de alterações.
+**Pedidos** - Central de acompanhamento. Aqui você cria, edita, cancela e acompanha todos os pedidos da loja. Cada pedido armazena itens, cliente, forma de pagamento, endereço de entrega e histórico de alterações.
 
-**Orçamentos** — Crie propostas profissionais para enviar aos clientes. O cliente pode visualizar, aprovar ou rejeitar online. Com um clique, o orçamento vira pedido.
+**Orçamentos** - Crie propostas profissionais para enviar aos clientes. O cliente pode visualizar, aprovar ou rejeitar online. Com um clique, o orçamento vira pedido.
 
-**PDV (Ponto de Venda)** — O balcão digital. Ideal para vendas presenciais: adicione itens ao carrinho, aplique descontos, divida o pagamento em múltiplas formas e finalize a venda.
+**PDV (Ponto de Venda)** - O balcão digital. Ideal para vendas presenciais: adicione itens ao carrinho, aplique descontos, divida o pagamento em múltiplas formas e finalize a venda.
 
-**Caixa** — Controle o dinheiro do PDV. Abra e feche o caixa, registre sangrias e reforços, confira o saldo no fim do expediente.
+**Caixa** - Controle o dinheiro do PDV. Abra e feche o caixa, registre sangrias e reforços, confira o saldo no fim do expediente.
 
-**Devoluções e trocas** — Gerencie solicitações de troca, reembolso ou crédito. Acompanhe o status de cada solicitação até a resolução.
+**Devoluções e trocas** - Gerencie solicitações de troca, reembolso ou crédito. Acompanhe o status de cada solicitação até a resolução.
 
-**Expedição e entregas** — Organize a logística: cadastre entregadores, crie rotas inteligentes agrupando pedidos por região e acompanhe a entrega até a confirmação.
+**Expedição e entregas** - Organize a logística: cadastre entregadores, crie rotas inteligentes agrupando pedidos por região e acompanhe a entrega até a confirmação.
 
-**Metas de vendas** — Defina objetivos para a equipe, acompanhe o progresso em tempo real e veja rankings de desempenho por vendedor.
+**Metas de vendas** - Defina objetivos para a equipe, acompanhe o progresso em tempo real e veja rankings de desempenho por vendedor.
 
 ## Dicas importantes
 
-- Comece organizando seus **produtos** e **clientes** antes de usar o módulo de vendas — isso agiliza o atendimento.
+- Comece organizando seus **produtos** e **clientes** antes de usar o módulo de vendas - isso agiliza o atendimento.
 - Os status de pagamento e entrega ajudam a filtrar pedidos pendentes. Mantenha-os atualizados para não perder prazos.
 - O **caixa** precisa estar aberto para finalizar vendas no PDV. Crie o hábito de abrir e fechar o caixa todos os dias.
 - Todas as operações de vendas (PDV e pedidos manuais) geram movimentação de estoque automaticamente.
@@ -1177,7 +1177,7 @@ Sim. Para vender no PDV, é obrigatório ter uma sessão de caixa aberta. Ao fin
                 slug: "criando-gerenciando-pedidos",
                 category: "vendas",
                 content: `
-A seção de **Pedidos** é onde você acompanha todas as vendas da sua loja, independentemente de como foram feitas — PDV, loja online, WhatsApp ou manualmente.
+A seção de **Pedidos** é onde você acompanha todas as vendas da sua loja, independentemente de como foram feitas - PDV, loja online, WhatsApp ou manualmente.
 
 Cada pedido reúne as informações completas da venda: itens, cliente, valores, forma de pagamento, endereço de entrega e status.
 
@@ -1199,26 +1199,26 @@ Legenda: A tela principal mostra todos os pedidos organizados por data.
 [IMAGEM: Botão "Novo pedido" destacado no topo da listagem]
 Legenda: O botão fica no canto superior direito da tela.
 
-3. **Selecione o cliente** — Busque por nome, email ou telefone. Se o cliente ainda não estiver cadastrado, você pode criá-lo na hora.
-4. **Adicione os itens** — Busque produtos ou serviços. Para cada item, informe a quantidade. Você também pode aplicar desconto por item se necessário.
-5. **Ajuste os valores** — Configure frete, outros custos e desconto geral (valor fixo ou percentual).
+3. **Selecione o cliente** - Busque por nome, email ou telefone. Se o cliente ainda não estiver cadastrado, você pode criá-lo na hora.
+4. **Adicione os itens** - Busque produtos ou serviços. Para cada item, informe a quantidade. Você também pode aplicar desconto por item se necessário.
+5. **Ajuste os valores** - Configure frete, outros custos e desconto geral (valor fixo ou percentual).
 
 [IMAGEM: Tela de criação de pedido com itens e valores]
 Legenda: Preencha as informações principais antes de salvar o pedido.
 
-6. **Defina a forma de pagamento** — Escolha o método e, se aplicável, divida o pagamento entre múltiplas formas (ex: parte no dinheiro, parte no cartão).
-7. **Configure a entrega** — Escolha entre **Entrega** (com endereço) ou **Retirada** no balcão.
+6. **Defina a forma de pagamento** - Escolha o método e, se aplicável, divida o pagamento entre múltiplas formas (ex: parte no dinheiro, parte no cartão).
+7. **Configure a entrega** - Escolha entre **Entrega** (com endereço) ou **Retirada** no balcão.
 8. Clique em **Salvar pedido**.
 
 ## Como visualizar detalhes do pedido
 
 Clique em qualquer pedido da lista para abrir a tela de detalhes. Lá você encontra:
 
-- **Itens do pedido** — Lista completa com quantidades e preços.
-- **Informações do cliente** — Nome, contato e endereço de entrega.
-- **Financeiro** — Valores, descontos, forma de pagamento e status (pago, parcial, pendente).
-- **Entrega** — Status atual e data prevista.
-- **Histórico** — Linha do tempo com todas as alterações feitas no pedido.
+- **Itens do pedido** - Lista completa com quantidades e preços.
+- **Informações do cliente** - Nome, contato e endereço de entrega.
+- **Financeiro** - Valores, descontos, forma de pagamento e status (pago, parcial, pendente).
+- **Entrega** - Status atual e data prevista.
+- **Histórico** - Linha do tempo com todas as alterações feitas no pedido.
 
 [IMAGEM: Tela de detalhes do pedido com abas]
 Legenda: As abas organizam as informações para fácil consulta.
@@ -1234,31 +1234,31 @@ Na tela de detalhes do pedido, clique em **Imprimir recibo**. Você pode escolhe
 
 Na tela de detalhes, você pode atualizar o status de pagamento:
 
-- **Pago** — O cliente já pagou o valor total.
-- **Parcialmente pago** — O cliente pagou parte do valor.
-- **Pendente** — Aguardando pagamento.
+- **Pago** - O cliente já pagou o valor total.
+- **Parcialmente pago** - O cliente pagou parte do valor.
+- **Pendente** - Aguardando pagamento.
 
 ## Como alterar o status de entrega
 
 Da mesma forma, você pode informar em que etapa a entrega se encontra:
 
-- **Não enviado** — Pedido pronto, aguardando envio.
-- **Em preparação** — Está sendo separado ou produzido.
-- **Enviado** — Saiu para entrega.
-- **Entregue** — Foi entregue ao cliente.
-- **Pronto para retirada** — Disponível para o cliente buscar.
+- **Não enviado** - Pedido pronto, aguardando envio.
+- **Em preparação** - Está sendo separado ou produzido.
+- **Enviado** - Saiu para entrega.
+- **Entregue** - Foi entregue ao cliente.
+- **Pronto para retirada** - Disponível para o cliente buscar.
 
 ## Dicas importantes
 
 - Pedidos criados no **PDV** aparecem automaticamente na listagem de pedidos. Não é preciso criá-los novamente.
-- Mantenha os status atualizados — isso ajuda a filtrar pedidos pendentes e evita atrasos.
+- Mantenha os status atualizados - isso ajuda a filtrar pedidos pendentes e evita atrasos.
 - O desconto geral é aplicado sobre o subtotal. Já o desconto por item é aplicado individualmente. Os dois podem ser usados juntos.
 - Para pedidos com entrega, o sistema usa o endereço informado no cadastro do cliente. Você pode alterar o endereço na hora da criação.
 
 ## Problemas comuns
 
 **"Não consigo criar um pedido porque o cliente não aparece na busca."**
-Você pode cadastrar um novo cliente no momento da criação do pedido — basta clicar em "Adicionar cliente".
+Você pode cadastrar um novo cliente no momento da criação do pedido - basta clicar em "Adicionar cliente".
 
 **"O recibo não está saindo no formato correto."**
 Verifique se selecionou o tipo correto (térmico ou A4) antes de imprimir.
@@ -1329,7 +1329,7 @@ Após confirmar:
 
 - O status do pedido muda para **Cancelado**.
 - O **estoque** dos itens é restaurado automaticamente.
-- O valor pago (se houver) não é estornado automaticamente — você precisa processar o reembolso manualmente pela seção de Devoluções e trocas.
+- O valor pago (se houver) não é estornado automaticamente - você precisa processar o reembolso manualmente pela seção de Devoluções e trocas.
 
 ## O que acontece com o estoque
 
@@ -1346,7 +1346,7 @@ Isso vale para pedidos que já tiveram o estoque baixado (pedidos com status "Pa
 ## Problemas comuns
 
 **"Cancelei o pedido mas o produto ainda aparece no estoque."**
-Verifique se o pedido já tinha o estoque baixado. Pedidos com status "Pendente" ou "Não pago" geralmente não baixam o estoque — nesse caso não há o que restaurar.
+Verifique se o pedido já tinha o estoque baixado. Pedidos com status "Pendente" ou "Não pago" geralmente não baixam o estoque - nesse caso não há o que restaurar.
 
 **"Preciso desfazer um cancelamento."**
 Não é possível reverter um cancelamento. Você precisará criar um novo pedido com os mesmos itens.
@@ -1370,7 +1370,7 @@ Usuários com permissão de gestão (proprietário, administrador ou gerente). O
                 slug: "criando-enviando-orcamentos",
                 category: "vendas",
                 content: `
-O **orçamento** é uma proposta comercial que você envia para o cliente antes da venda. Ele lista os produtos ou serviços, quantidades, preços e condições — tudo formatado de forma profissional.
+O **orçamento** é uma proposta comercial que você envia para o cliente antes da venda. Ele lista os produtos ou serviços, quantidades, preços e condições - tudo formatado de forma profissional.
 
 O cliente pode visualizar o orçamento online, aprovar ou rejeitar, e você pode convertê-lo em pedido com um clique.
 
@@ -1392,19 +1392,19 @@ Legenda: Enquanto você monta o orçamento, a prévia é atualizada em tempo rea
 [IMAGEM: Botão "Novo orçamento" na listagem]
 Legenda: O botão fica no topo da tela.
 
-3. **Selecione o cliente** — Busque por nome. Se não encontrar, cadastre um novo cliente na hora.
-4. **Adicione produtos ou serviços** — Busque pelo nome. Você pode misturar produtos físicos e serviços no mesmo orçamento.
-5. **Ajuste quantidades e preços** — Para cada item, você pode alterar a quantidade e o preço unitário.
+3. **Selecione o cliente** - Busque por nome. Se não encontrar, cadastre um novo cliente na hora.
+4. **Adicione produtos ou serviços** - Busque pelo nome. Você pode misturar produtos físicos e serviços no mesmo orçamento.
+5. **Ajuste quantidades e preços** - Para cada item, você pode alterar a quantidade e o preço unitário.
 
 [IMAGEM: Seção de itens do orçamento com campos de quantidade e preço]
 Legenda: Adicione quantos itens precisar.
 
-6. **Configure as condições** — Defina:
+6. **Configure as condições** - Defina:
    - **Data do orçamento** (geralmente a data de hoje).
    - **Data de validade** (prazo para o cliente aceitar a proposta).
    - **Descontos** (por item ou geral, em valor fixo ou percentual).
    - **Frete** e **outros custos**, se aplicável.
-7. **Personalize a aparência** — Escolha as cores do tema, o título (ex: "Orçamento", "Proposta Comercial") e decida se quer exibir a decoração visual.
+7. **Personalize a aparência** - Escolha as cores do tema, o título (ex: "Orçamento", "Proposta Comercial") e decida se quer exibir a decoração visual.
 
 [IMAGEM: Opções de personalização do orçamento]
 Legenda: Deixe o orçamento com a cara da sua loja.
@@ -1415,9 +1415,9 @@ Legenda: Deixe o orçamento com a cara da sua loja.
 
 Após salvar, você pode:
 
-- **Visualizar a prévia** — Veja exatamente como o cliente vai receber o orçamento.
-- **Baixar em PDF** — Gere um arquivo PDF para enviar por email ou WhatsApp.
-- **Compartilhar link** — O sistema gera um link único. Envie para o cliente. Ele pode abrir no navegador, visualizar e responder.
+- **Visualizar a prévia** - Veja exatamente como o cliente vai receber o orçamento.
+- **Baixar em PDF** - Gere um arquivo PDF para enviar por email ou WhatsApp.
+- **Compartilhar link** - O sistema gera um link único. Envie para o cliente. Ele pode abrir no navegador, visualizar e responder.
 
 [IMAGEM: Opções de compartilhamento na tela de detalhes do orçamento]
 Legenda: Compartilhe por link, PDF ou WhatsApp.
@@ -1425,7 +1425,7 @@ Legenda: Compartilhe por link, PDF ou WhatsApp.
 ## Dicas importantes
 
 - Defina uma **data de validade** sempre. Isso cria um senso de urgência e evita que o cliente tente usar um preço antigo.
-- Revise os valores antes de enviar. O orçamento é um documento comercial — erros passam uma imagem negativa.
+- Revise os valores antes de enviar. O orçamento é um documento comercial - erros passam uma imagem negativa.
 - Use a **personalização de cores** para manter a identidade visual da sua marca.
 - Para orçamentos com muitos itens, organize por categoria ou tipo de produto para facilitar a leitura.
 
@@ -1456,7 +1456,7 @@ Sim, você pode editar itens, valores e condições. O link compartilhado sempre
                 slug: "acompanhando-convertendo-orcamentos",
                 category: "vendas",
                 content: `
-Depois que você envia um orçamento, o cliente pode interagir com ele online. Você acompanha cada etapa — desde o envio até a aprovação ou rejeição — e, quando chega a hora, converte o orçamento em pedido com um clique.
+Depois que você envia um orçamento, o cliente pode interagir com ele online. Você acompanha cada etapa - desde o envio até a aprovação ou rejeição - e, quando chega a hora, converte o orçamento em pedido com um clique.
 
 [IMAGEM: Listagem de orçamentos com indicadores de status]
 Legenda: Cada orçamento mostra seu status atual com cores diferentes.
@@ -1492,8 +1492,8 @@ Legenda: Todas as ações ficam registradas para consulta.
 Se o cliente acessar o link do orçamento, ele pode:
 
 - **Visualizar** todos os itens, quantidades e valores.
-- **Aprovar** o orçamento — indicando que aceita a proposta.
-- **Rejeitar** o orçamento — opcionalmente informando o motivo.
+- **Aprovar** o orçamento - indicando que aceita a proposta.
+- **Rejeitar** o orçamento - opcionalmente informando o motivo.
 
 Quando o cliente aprova ou rejeita, você recebe a notificação no sistema e o status é atualizado automaticamente.
 
@@ -1565,7 +1565,7 @@ Legenda: Quando o caixa está aberto, você vê o saldo atual e as movimentaçõ
 ## Quando utilizar
 
 - Todo dia útil, antes de começar as vendas presenciais.
-- Quando precisar retirar dinheiro do caixa (sangria) — por exemplo, para pagar um fornecedor.
+- Quando precisar retirar dinheiro do caixa (sangria) - por exemplo, para pagar um fornecedor.
 - Quando precisar colocar mais dinheiro no caixa (reforço/suprimento).
 - No fim do expediente, para fechar o caixa e conferir o movimento do dia.
 
@@ -1577,7 +1577,7 @@ Legenda: Quando o caixa está aberto, você vê o saldo atual e as movimentaçõ
 [IMAGEM: Tela de abertura de caixa com campo de valor inicial]
 Legenda: Informe o valor em dinheiro que está no caixa no início do dia.
 
-3. Informe o **valor inicial** (troco) — é o dinheiro que você está colocando no caixa para começar o dia.
+3. Informe o **valor inicial** (troco) - é o dinheiro que você está colocando no caixa para começar o dia.
 4. Opcionalmente, adicione uma **observação** (ex: "Abertura com R$ 200,00 de troco").
 5. Clique em **Abrir caixa**.
 
@@ -1587,9 +1587,9 @@ Pronto. Agora o PDV está liberado para vendas.
 
 Durante o expediente, pode ser necessário movimentar o dinheiro do caixa:
 
-**Sangria (retirada):** Use quando precisar tirar dinheiro do caixa — por exemplo, para pagar um fornecedor ou depositar no banco.
+**Sangria (retirada):** Use quando precisar tirar dinheiro do caixa - por exemplo, para pagar um fornecedor ou depositar no banco.
 
-**Reforço (depósito):** Use quando colocar mais dinheiro no caixa — por exemplo, troco extra que foi buscar no banco.
+**Reforço (depósito):** Use quando colocar mais dinheiro no caixa - por exemplo, troco extra que foi buscar no banco.
 
 Para registrar:
 
@@ -1609,7 +1609,7 @@ A movimentação aparece automaticamente na lista e o saldo do caixa é atualiza
    - Total de vendas agrupadas por forma de pagamento.
    - Valor calculado (o que o sistema espera que tenha no caixa).
    - Movimentações (sangrias e reforços).
-3. **Informe a contagem do dinheiro** — Digite quanto tem em cada forma de pagamento (ex: R$ 500,00 em dinheiro, R$ 800,00 em cartão).
+3. **Informe a contagem do dinheiro** - Digite quanto tem em cada forma de pagamento (ex: R$ 500,00 em dinheiro, R$ 800,00 em cartão).
 
 [IMAGEM: Tela de fechamento com contagem por método]
 Legenda: Confira cada método de pagamento e informe o valor contado.
@@ -1687,10 +1687,10 @@ Legenda: O PDV é dividido em carrinho (esquerda) e resumo (direita).
 
 ### 1. Adicione itens ao carrinho
 
-- **Busque por nome** — Digite o nome do produto. Conforme você digita, o sistema sugere resultados.
-- **Selecione variações** — Se o produto tem variações (cor, tamanho), uma janela abre para você escolher a opção correta.
-- **Adicione serviços** — Serviços também aparecem na busca e podem ser misturados com produtos no mesmo carrinho.
-- **Ajuste a quantidade** — Use os botões + e - ou digite o número diretamente.
+- **Busque por nome** - Digite o nome do produto. Conforme você digita, o sistema sugere resultados.
+- **Selecione variações** - Se o produto tem variações (cor, tamanho), uma janela abre para você escolher a opção correta.
+- **Adicione serviços** - Serviços também aparecem na busca e podem ser misturados com produtos no mesmo carrinho.
+- **Ajuste a quantidade** - Use os botões + e - ou digite o número diretamente.
 
 [IMAGEM: Busca de produtos no PDV com sugestões]
 Legenda: A busca encontra produtos e serviços cadastrados.
@@ -1699,8 +1699,8 @@ Legenda: A busca encontra produtos e serviços cadastrados.
 
 Você pode conceder descontos de duas formas:
 
-- **Desconto por item** — Clique no item do carrinho e aplique um desconto fixo ou percentual naquele item específico.
-- **Desconto geral** — Aplique um desconto sobre o total do carrinho (valor fixo ou percentual).
+- **Desconto por item** - Clique no item do carrinho e aplique um desconto fixo ou percentual naquele item específico.
+- **Desconto geral** - Aplique um desconto sobre o total do carrinho (valor fixo ou percentual).
 
 Se o cliente tem um **cupom de desconto**, informe o código no campo apropriado. O sistema valida se o cupom é válido e aplica automaticamente.
 
@@ -1815,7 +1815,7 @@ Se o cliente pede um produto que ainda não existe no sistema:
 3. Informe:
    - **Nome do produto** (obrigatório).
    - **Preço** (obrigatório).
-   - **Quantidade em estoque** (opcional — se não informar, fica como 0).
+   - **Quantidade em estoque** (opcional - se não informar, fica como 0).
 
 [IMAGEM: Modal de criação rápida de produto]
 Legenda: Apenas o essencial para não atrasar o atendimento.
@@ -1866,7 +1866,7 @@ Ao adicionar itens ao carrinho:
 - Brindes aparecem no carrinho com valor zero e a tag **[BRINDE]**.
 - Descontos promocionais são aplicados automaticamente no item.
 
-Você não precisa fazer nada — as promoções são calculadas em tempo real. Se quiser conferir, veja o resumo do carrinho antes de finalizar.
+Você não precisa fazer nada - as promoções são calculadas em tempo real. Se quiser conferir, veja o resumo do carrinho antes de finalizar.
 
 [IMAGEM: Carrinho com brinde aplicado automaticamente]
 Legenda: Brindes aparecem identificados e com valor zero.
@@ -1928,26 +1928,26 @@ Legenda: Selecione os itens do pedido que serão devolvidos.
 [IMAGEM: Botão "Nova solicitação" na listagem]
 Legenda: O botão inicia o processo de devolução.
 
-3. **Selecione o pedido** — Busque pelo número do pedido ou localize na lista de pedidos pagos.
+3. **Selecione o pedido** - Busque pelo número do pedido ou localize na lista de pedidos pagos.
 
 [IMAGEM: Busca de pedido para devolução]
 Legenda: Somente pedidos pagos aparecem como elegíveis.
 
-4. **Escolha os itens** — Selecione quais itens do pedido serão devolvidos. Você pode devolver todos ou apenas alguns.
+4. **Escolha os itens** - Selecione quais itens do pedido serão devolvidos. Você pode devolver todos ou apenas alguns.
 5. Para cada item, informe:
    - **Quantidade** a ser devolvida.
    - **Motivo** (ex: "Produto com defeito", "Arrependimento", "Avaria no transporte").
    - **Condição** do produto: **Lacrado** (sem uso), **Aberto** (usado mas íntegro) ou **Avariado** (com danos).
 
 6. **Defina a resolução desejada**:
-   - **Troca** — O cliente quer outro produto no lugar. É permitida apenas para pedidos já entregues.
-   - **Reembolso** — Você vai devolver o valor pago (PIX, cartão ou manual).
-   - **Crédito na loja** — O valor vira crédito para o cliente usar em compras futuras.
+   - **Troca** - O cliente quer outro produto no lugar. É permitida apenas para pedidos já entregues.
+   - **Reembolso** - Você vai devolver o valor pago (PIX, cartão ou manual).
+   - **Crédito na loja** - O valor vira crédito para o cliente usar em compras futuras.
 
 [IMAGEM: Escolha do tipo de resolução]
 Legenda: Cada tipo de resolução segue um fluxo diferente.
 
-7. **Anexe evidências** (opcional) — Faça upload de fotos que comprovem o estado do produto. Útil para produtos com defeito ou avariados.
+7. **Anexe evidências** (opcional) - Faça upload de fotos que comprovem o estado do produto. Útil para produtos com defeito ou avariados.
 8. Adicione uma **mensagem** com detalhes sobre a solicitação (opcional).
 9. Clique em **Criar solicitação**.
 
@@ -1972,7 +1972,7 @@ Legenda: Cada solicitação mostra seu estágio atual.
 - **Troca** só é permitida para pedidos com status de entrega **Entregue**. Para pedidos que ainda não saíram, prefira cancelar e criar um novo pedido.
 - **Serviços** não podem ser trocados. Para serviços, as opções são reembolso ou crédito.
 - Anexar **fotos do produto** acelera a análise, especialmente em casos de defeito ou avaria.
-- A solicitação pode ser criada **parcialmente** — você não precisa devolver todos os itens do pedido.
+- A solicitação pode ser criada **parcialmente** - você não precisa devolver todos os itens do pedido.
 
 ## Problemas comuns
 
@@ -2021,10 +2021,10 @@ Legenda: Todas as informações da solicitação em um só lugar.
 
 Na tela de detalhes você encontra:
 
-- **Itens devolvidos** — Lista com quantidades, motivo e condição de cada item.
-- **Evidências** — Fotos enviadas pelo cliente (se houver).
-- **Resolução desejada** — O que o cliente espera (troca, reembolso, crédito).
-- **Histórico** — Linha do tempo com eventos da solicitação.
+- **Itens devolvidos** - Lista com quantidades, motivo e condição de cada item.
+- **Evidências** - Fotos enviadas pelo cliente (se houver).
+- **Resolução desejada** - O que o cliente espera (troca, reembolso, crédito).
+- **Histórico** - Linha do tempo com eventos da solicitação.
 
 [IMAGEM: Aba de histórico com eventos registrados]
 Legenda: Acompanhe cada etapa do processamento.
@@ -2039,7 +2039,7 @@ Legenda: Acompanhe cada etapa do processamento.
    - **Próximo status:** "Aprovado" ou "Em processamento".
    - **Valor do reembolso** (se aplicável).
    - **Valor do crédito na loja** (se aplicável).
-   - **Itens de troca** (se for troca — veja abaixo).
+   - **Itens de troca** (se for troca - veja abaixo).
    - **Restituir ao estoque:** marque se os produtos devolvidos devem voltar ao estoque.
 3. Clique em **Confirmar**.
 
@@ -2096,8 +2096,8 @@ Se a resolução for **Crédito na loja**:
 
 Ao processar uma devolução, você decide se os itens devolvidos voltam ao estoque:
 
-- **Sim** — Os produtos são adicionados de volta ao estoque automaticamente.
-- **Não** — O estoque não é alterado (útil para itens danificados que serão descartados).
+- **Sim** - Os produtos são adicionados de volta ao estoque automaticamente.
+- **Não** - O estoque não é alterado (útil para itens danificados que serão descartados).
 
 ## Dicas importantes
 
@@ -2161,22 +2161,22 @@ Legenda: Informe os dados básicos e o status ativo.
 4. Preencha:
    - **Nome** do entregador.
    - **Telefone** para contato (opcional).
-   - **Observações** (opcional — ex: "Disponível apenas à tarde").
+   - **Observações** (opcional - ex: "Disponível apenas à tarde").
 5. Clique em **Salvar**.
 
 ### Editar ou desativar entregador
 
 Na lista de entregadores, você pode:
 
-- **Editar** — Alterar nome, telefone ou observações.
-- **Ativar/Desativar** — Um entregador desativado não aparece nas opções ao criar novas entregas. As entregas antigas continuam registradas.
+- **Editar** - Alterar nome, telefone ou observações.
+- **Ativar/Desativar** - Um entregador desativado não aparece nas opções ao criar novas entregas. As entregas antigas continuam registradas.
 
 ### Estatísticas do entregador
 
 Para cada entregador, o sistema mostra:
 
-- **Entregas ativas** — Quantas estão em andamento no momento.
-- **Entregas concluídas** — Total já finalizado.
+- **Entregas ativas** - Quantas estão em andamento no momento.
+- **Entregas concluídas** - Total já finalizado.
 - **Tempo médio** por entrega.
 
 ## Como criar uma entrega
@@ -2200,14 +2200,14 @@ Legenda: Cada sugestão mostra os pedidos, distância total e tempo estimado.
 Se preferir montar a rota você mesmo:
 
 1. Clique em **Nova entrega**.
-2. **Selecione os pedidos** — Busque pelos pedidos com entrega pendente. Eles aparecem com endereço e valor do frete.
+2. **Selecione os pedidos** - Busque pelos pedidos com entrega pendente. Eles aparecem com endereço e valor do frete.
 
 [IMAGEM: Seleção de pedidos para compor a entrega]
 Legenda: Selecione um ou mais pedidos para a mesma rota.
 
-3. **Atribua um entregador** (opcional) — Se não atribuir agora, pode fazer depois.
+3. **Atribua um entregador** (opcional) - Se não atribuir agora, pode fazer depois.
 4. Informe a **data e hora de saída**.
-5. Adicione **observações** (opcional — ex: "Entregar após as 14h").
+5. Adicione **observações** (opcional - ex: "Entregar após as 14h").
 6. Clique em **Criar entrega**.
 
 Após criar, a entrega aparece na listagem com status **Pendente**. O entregador designado consegue visualizar os detalhes no sistema (se tiver perfil de acesso).
@@ -2292,10 +2292,10 @@ Cada **pedido dentro da entrega** também tem seu próprio status (Pendente, Sai
 1. Abra a entrega que deseja atualizar.
 2. Clique no botão de status atual.
 3. Escolha o novo status:
-   - **Em preparação** — Os pedidos estão sendo separados.
-   - **Saiu para entrega** — O entregador saiu para a rota.
-   - **Entregue** — Todos os pedidos foram entregues (disponível apenas quando todos estiverem concluídos).
-   - **Cancelada** — A entrega não será realizada.
+   - **Em preparação** - Os pedidos estão sendo separados.
+   - **Saiu para entrega** - O entregador saiu para a rota.
+   - **Entregue** - Todos os pedidos foram entregues (disponível apenas quando todos estiverem concluídos).
+   - **Cancelada** - A entrega não será realizada.
 
 [IMAGEM: Opções de atualização de status da entrega]
 Legenda: O sistema mostra apenas os status disponíveis para a etapa atual.
@@ -2335,7 +2335,7 @@ Na seção de entregas, você encontra um painel com métricas:
 - **Tempo médio** por entrega.
 - **Distância total percorrida**.
 - **Média de pedidos por entrega**.
-- **Ranking de entregadores** — Quem entregou mais e o tempo médio de cada um.
+- **Ranking de entregadores** - Quem entregou mais e o tempo médio de cada um.
 
 [IMAGEM: Painel de métricas de entregas]
 Legenda: Acompanhe o desempenho da sua operação logística.
@@ -2344,7 +2344,7 @@ Legenda: Acompanhe o desempenho da sua operação logística.
 
 - Atualizar o status **por pedido** dá mais visibilidade do que está acontecendo na rota.
 - Quando um pedido é marcado como **Entregue**, o frete é automaticamente contabilizado como comissão para o entregador (se configurado).
-- Se o entregador usa o sistema pelo celular, ele mesmo pode atualizar os status — você só acompanha.
+- Se o entregador usa o sistema pelo celular, ele mesmo pode atualizar os status - você só acompanha.
 - Pedidos com **Falha na entrega** podem ser reagendados e incluídos em uma nova rota.
 
 ## Problemas comuns
@@ -2399,19 +2399,19 @@ Legenda: Inicie o cadastro de uma nova meta.
 3. Preencha as informações:
 
 **Configurações básicas:**
-- **Nome da meta** — Ex: "Meta de julho", "Desafio de vendas".
-- **Período** — **Semanal** (seg a domingo) ou **Mensal** (do dia 1 ao último dia do mês).
-- **Datas de início e fim** — Defina o intervalo da meta.
-- **Tipo de meta** — **Vendas** (valor de produtos), **Ordens de serviço** ou **Ambos**.
+- **Nome da meta** - Ex: "Meta de julho", "Desafio de vendas".
+- **Período** - **Semanal** (seg a domingo) ou **Mensal** (do dia 1 ao último dia do mês).
+- **Datas de início e fim** - Defina o intervalo da meta.
+- **Tipo de meta** - **Vendas** (valor de produtos), **Ordens de serviço** ou **Ambos**.
 
 **A quem se aplica:**
-- **Todos os vendedores** — A meta vale para a equipe toda, e o progresso é coletivo.
-- **Vendedor específico** — Você escolhe um ou mais vendedores. Cada um tem seu próprio progresso.
+- **Todos os vendedores** - A meta vale para a equipe toda, e o progresso é coletivo.
+- **Vendedor específico** - Você escolhe um ou mais vendedores. Cada um tem seu próprio progresso.
 
 **Valor e bônus:**
-- **Valor da meta** — Quanto a equipe/vendedor precisa vender para atingir.
-- **Tipo de bônus** — **Valor fixo** (ex: R$ 500,00) ou **Percentual** (ex: 5% do valor vendido).
-- **Lançamento automático** — Se ativado, quando a meta é atingida o sistema lança o bônus como despesa automaticamente. Você precisa selecionar a **conta financeira** para o lançamento.
+- **Valor da meta** - Quanto a equipe/vendedor precisa vender para atingir.
+- **Tipo de bônus** - **Valor fixo** (ex: R$ 500,00) ou **Percentual** (ex: 5% do valor vendido).
+- **Lançamento automático** - Se ativado, quando a meta é atingida o sistema lança o bônus como despesa automaticamente. Você precisa selecionar a **conta financeira** para o lançamento.
 
 [IMAGEM: Formulário de criação de meta completo]
 Legenda: Defina período, valor e bônus da meta.
@@ -2532,7 +2532,7 @@ Sim. O orçamento é vinculado a um cliente. Se ele não existir, cadastre na ho
 Não. Você precisa clicar em **Converter em pedido**. A conversão leva todos os itens e dados do cliente para o novo pedido.
 
 **Posso duplicar um orçamento?**
-Sim. Você pode duplicar para criar uma cópia e ajustar o que precisar — útil para orçamentos recorrentes.
+Sim. Você pode duplicar para criar uma cópia e ajustar o que precisar - útil para orçamentos recorrentes.
 
 ---
 

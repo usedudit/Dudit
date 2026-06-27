@@ -80,13 +80,13 @@ function MappingRow({
                         value={col.field || ""}
                         setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
                         options={[
-                            { value: "", label: "— Não importar —" },
+                            { value: "", label: "- Não importar -" },
                             ...availableFields.map((f) => ({
                                 value: f.name,
                                 label: `${f.label}${f.required ? " *" : ""}`,
                             })),
                         ]}
-                        placeholder="— Não importar —"
+                        placeholder="- Não importar -"
                     />
                 </div>
             </td>
@@ -156,13 +156,13 @@ function MappingMobileItem({
                     value={col.field || ""}
                     setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
                     options={[
-                        { value: "", label: "— Não importar —" },
+                        { value: "", label: "- Não importar -" },
                         ...availableFields.map((f) => ({
                             value: f.name,
                             label: `${f.label}${f.required ? " *" : ""}`,
                         })),
                     ]}
-                    placeholder="— Não importar —"
+                    placeholder="- Não importar -"
                 />
             </div>
         </div>
@@ -201,19 +201,19 @@ function ServicePreviewRow({
             </td>
             <td className="py-4 px-3 align-middle">
                 <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">
-                    {service.category || "—"}
+                    {service.category || "-"}
                 </span>
             </td>
             <td className="py-4 px-3 align-middle">
                 <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">
-                    {service.sku || "—"}
+                    {service.sku || "-"}
                 </span>
             </td>
             <td className="py-4 px-3 align-middle font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                {service.duration_minutes ? `${service.duration_minutes} min` : "—"}
+                {service.duration_minutes ? `${service.duration_minutes} min` : "-"}
             </td>
             <td className="py-4 px-3 align-middle font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                {service.price ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price) : "—"}
+                {service.price ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price) : "-"}
             </td>
             <td className="py-4 px-3 align-middle text-center">
                 <Badge variant="green">Ativo</Badge>
@@ -433,7 +433,7 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                                         {step === "upload"
                                             ? "Faça upload de uma planilha .xlsx, .xls ou .csv com serviços."
                                             : step === "mapping"
-                                                ? `${totalRows} serviço(s) encontrados — ${mappedCount} de ${headers.length} colunas mapeadas`
+                                                ? `${totalRows} serviço(s) encontrados - ${mappedCount} de ${headers.length} colunas mapeadas`
                                                 : `${totalRows} serviço(s) encontrados`}
                                     </div>
                                 </div>

@@ -226,7 +226,7 @@ export async function addPurchasableServiceToCartAction(
 
   const booking: ServiceBookingMetadata = {
     staffId: "",
-    staffName: "—",
+    staffName: "-",
     date: new Date().toISOString().slice(0, 10),
     time: "00:00",
     serviceName: service.name,

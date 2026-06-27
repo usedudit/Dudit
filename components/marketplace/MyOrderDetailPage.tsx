@@ -1044,7 +1044,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         )}
                         {activeReturnRequest.sla_status && (
                             <div><span className="font-bold">SLA:</span> {getSlaStatusLabel(activeReturnRequest.sla_status)}
-                                {activeReturnRequest.sla_due_at && ` — prazo ${formatDate(activeReturnRequest.sla_due_at)}`}
+                                {activeReturnRequest.sla_due_at && ` - prazo ${formatDate(activeReturnRequest.sla_due_at)}`}
                             </div>
                         )}
                         {(activeReturnRequest.policy_snapshot || order.return_policy_snapshot) && (

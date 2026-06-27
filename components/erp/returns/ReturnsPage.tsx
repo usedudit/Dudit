@@ -9,6 +9,8 @@ import { PlusIcon, ExportFileIcon, ReturnIcon, XIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useToast } from "@/hooks/use-toast"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ReturnListRow, { getReturnStatusMeta } from "./ReturnListRow"
 import ReturnGridCard from "./ReturnGridCard"
 import CreateReturnPage from "./CreateReturnPage"
@@ -84,6 +86,7 @@ function mapLegacyReason(reason: unknown) {
 export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPageProps) {
     const { toast } = useToast()
     const { openPlanUpgrade } = usePlanUpgrade()
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
@@ -306,6 +309,15 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
     const paginatedReturns = filteredReturns.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
     const hasActiveFilters = debouncedSearch.length > 0 || activeTab !== "Todos"
 
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "returns",
+            format: "xlsx",
+            filters: { search: debouncedSearch, activeTab },
+        })
+    }, [exportData, partnerId, debouncedSearch, activeTab])
+
     if (planGate) {
         return (
             <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -379,8 +391,8 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" leftIcon={<ExportFileIcon size={18} />} onClick={() => toast({ title: "Exportacao", description: "Use os filtros atuais para revisar a lista antes de exportar." })}>
-                                        Exportar
+                                    <Button variant="outline" leftIcon={<ExportFileIcon size={18} />} onClick={handleExport} disabled={isExporting}>
+                                        {isExporting ? "Exportando..." : "Exportar"}
                                     </Button>
                                     {canManage && (
                                         <Button onClick={() => openEntity("create")} leftIcon={<PlusIcon size={18} />}>
@@ -570,6 +582,15 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                     </div>
                 </div>
             </DefaultModal>
+
+            <ExportSelectionModal
+                isOpen={selectionModal.isOpen}
+                selectedCount={selectionModal.selectedCount}
+                totalCount={selectionModal.totalCount}
+                onExportSelected={handleExportSelected}
+                onExportAll={handleExportAll}
+                onClose={closeSelectionModal}
+            />
         </>
     )
 }

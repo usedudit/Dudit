@@ -80,7 +80,7 @@ export async function uploadPlanilhaAction(
     // Verify session was stored
     const verifySession = await getImportSession(partnerId, sessionId)
     if (!verifySession) {
-      console.error(`[uploadPlanilhaAction] Session verification FAILED — session was not persisted for ID ${sessionId}`)
+      console.error(`[uploadPlanilhaAction] Session verification FAILED - session was not persisted for ID ${sessionId}`)
       return { success: false, error: "Erro ao persistir sessão de importação. Verifique a conexão com Redis." }
     }
 
@@ -206,7 +206,7 @@ export async function confirmImportAction(
         })
         await deleteImportSession(partnerId, sessionId)
       }
-    } catch {}
+    } catch { }
 
     return { success: false, error: err.message || "Erro ao importar dados." }
   }

@@ -88,7 +88,7 @@ describe("Refund Capping Logic Simulating User Scenarios", () => {
         return Math.min(requestedRefundAmount, mpPaidAmount)
     }
 
-    it("Reembolso total Mercado Pago — single payment MP", () => {
+    it("Reembolso total Mercado Pago - single payment MP", () => {
         const order = {
             amount_paid: 150.00,
             payment_provider: "Mercado Pago",
@@ -99,7 +99,7 @@ describe("Refund Capping Logic Simulating User Scenarios", () => {
         expect(calculateCappedMpRefund(requestedRefund, order, hasMercadoPago)).toBe(150.00)
     })
 
-    it("Reembolso parcial Mercado Pago — single payment MP", () => {
+    it("Reembolso parcial Mercado Pago - single payment MP", () => {
         const order = {
             amount_paid: 150.00,
             payment_provider: "Mercado Pago",

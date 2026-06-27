@@ -190,7 +190,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                 </div>
                             )}
 
-                            {/* Left — options */}
+                            {/* Left - options */}
                             <div
                                 className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${activeTab === "Visualização" ? "hidden lg:flex" : "flex"
                                     }`}
@@ -261,7 +261,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                 </div>
                             </div>
 
-                            {/* Right — preview */}
+                            {/* Right - preview */}
                             <div
                                 className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
                                     }`}

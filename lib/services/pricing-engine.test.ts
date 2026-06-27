@@ -261,7 +261,7 @@ describe("calculateOrderPricing", () => {
     expect(r.itemDiscountSource).toBe("campaign")
   })
 
-  it("allowCombination=false: NEVER acumula — campanha 20% (80) vence cupom R$10 (90)", () => {
+  it("allowCombination=false: NEVER acumula - campanha 20% (80) vence cupom R$10 (90)", () => {
     // Produto R$100, Campanha 20% → R$80, Cupom R$10 fixo → R$90
     // Comparação limpa: Cenário A (campanha)=80, Cenário B (cupom sobre 100)=90
     // MENOR = 80 → campanha vence, cupom descartado
@@ -281,7 +281,7 @@ describe("calculateOrderPricing", () => {
     expect(r.subtotal).toBe(80)
   })
 
-  it("allowCombination=false: NEVER acumula — cupom R$20 (80) vence campanha 5% (95)", () => {
+  it("allowCombination=false: NEVER acumula - cupom R$20 (80) vence campanha 5% (95)", () => {
     // Produto R$100, Campanha 5% → R$95, Cupom R$20 fixo → R$80
     // Comparação limpa: Cenário A (campanha)=95, Cenário B (cupom sobre 100)=80
     // MENOR = 80 → cupom vence, campanhas revertidas

@@ -1,5 +1,5 @@
 -- ============================================================================
--- OPCIONAL — rodar manualmente em produção APÓS revisar o preview.
+-- OPCIONAL - rodar manualmente em produção APÓS revisar o preview.
 -- Não faz parte do deploy automático da migration principal.
 -- ============================================================================
 
@@ -26,7 +26,7 @@ WHERE o.return_policy_snapshot IS NULL
 ORDER BY o.created_at DESC
 LIMIT 10;
 
--- 3) Backfill (usa política ATUAL do parceiro — não a histórica real).
+-- 3) Backfill (usa política ATUAL do parceiro - não a histórica real).
 --    Pedidos antigos sem snapshot continuarão elegíveis via fallback em create_return_request.
 --    ATENÇÃO: captured_at no JSON será NOW(), não a data da venda.
 BEGIN;

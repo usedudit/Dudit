@@ -9,6 +9,13 @@ export type ErpExportModule =
   | "services"
   | "appointments"
   | "subscriptions"
+  | "returns"
+  | "stock-movements"
+  | "transactions"
+  | "suppliers"
+  | "service-orders"
+  | "cash-register"
+  | "xml-import"
 
 export type ErpExportFormat = "xlsx" | "csv"
 
@@ -60,6 +67,58 @@ export type SubscriptionsExportFilters = {
   search?: string
 }
 
+export type ReturnsExportFilters = {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  source?: string[]
+}
+
+export type StockMovementsExportFilters = {
+  search?: string
+  activeTab?: string
+  movementType?: string[]
+  datePeriod?: DatePeriodFilterValue
+  selectedIds?: string[]
+}
+
+export type TransactionsExportFilters = {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  category?: string[]
+  paymentType?: string[]
+  datePeriod?: DatePeriodFilterValue
+  selectedIds?: string[]
+}
+
+export type SuppliersExportFilters = {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  selectedIds?: string[]
+}
+
+export type ServiceOrdersExportFilters = {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  selectedIds?: string[]
+}
+
+export type CashRegisterExportFilters = {
+  search?: string
+  status?: string[]
+  datePeriod?: DatePeriodFilterValue
+}
+
+export type XmlImportExportFilters = {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  selectedIds?: string[]
+}
+
 export type ErpExportFilters =
   | OrdersExportFilters
   | ProductsExportFilters
@@ -67,6 +126,13 @@ export type ErpExportFilters =
   | ServicesExportFilters
   | AppointmentsExportFilters
   | SubscriptionsExportFilters
+  | ReturnsExportFilters
+  | StockMovementsExportFilters
+  | TransactionsExportFilters
+  | SuppliersExportFilters
+  | ServiceOrdersExportFilters
+  | CashRegisterExportFilters
+  | XmlImportExportFilters
 
 export type ExportColumnDef = {
   header: string

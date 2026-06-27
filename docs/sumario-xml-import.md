@@ -1,4 +1,4 @@
-# NF-e Import System — Resumo Completo
+# NF-e Import System - Resumo Completo
 
 ## Visão Geral
 
@@ -13,7 +13,7 @@ Sistema completo de importação de XML de NF-e que funciona como entrada de doc
 | Arquivo | Descrição |
 |---|---|
 | `migrations/20260617_create_xml_import_system.sql` | Cria tabelas `xml_imports` e `xml_import_items` com RLS, índices, unique constraint `(partner_id, access_key)` |
-| `migrations/20260617_create_xml_import_rpc.sql` | Cria RPC `execute_xml_import()` — transacional, `FOR UPDATE`, criação de produtos, atualização de estoque/custo, audit trail |
+| `migrations/20260617_create_xml_import_rpc.sql` | Cria RPC `execute_xml_import()` - transacional, `FOR UPDATE`, criação de produtos, atualização de estoque/custo, audit trail |
 | `migrations/20260618_expand_xml_import_system.sql` | Expande schema: JSONB columns + modelo, protocolo, ambiente, finalidade, tipo_operacao, data_saida, inf_cpl, inf_ad_fisco, xml_hash, xml_size, duplicatas, raw_fiscal_detail |
 
 ### Server Actions
@@ -34,7 +34,7 @@ Sistema completo de importação de XML de NF-e que funciona como entrada de doc
 
 | Arquivo | Descrição |
 |---|---|
-| `lib/xml-parser.ts` | `parseNFeFull()` — extrai todos os blocos da NF-e |
+| `lib/xml-parser.ts` | `parseNFeFull()` - extrai todos os blocos da NF-e |
 
 ---
 
@@ -80,7 +80,7 @@ Sistema completo de importação de XML de NF-e que funciona como entrada de doc
 | `created_by` | UUID FK → auth.users | |
 | `created_by_ip` | TEXT | IP do uploader |
 
-**Unique**: `(partner_id, access_key)` — garante idempotência.
+**Unique**: `(partner_id, access_key)` - garante idempotência.
 
 ### xml_import_items
 
@@ -142,7 +142,7 @@ Carrega `xml_imports` + `xml_import_items` já salvos, retorna preview completo.
 ### 3. Confirmação (`confirmImportAction`)
 
 1. Valida se status ainda é `preview`
-2. Chama RPC `execute_xml_import()` — transação única:
+2. Chama RPC `execute_xml_import()` - transação única:
    - `FOR UPDATE` nos produtos
    - Atualiza/cria produtos conforme decisões do usuário
    - Atualiza estoque via `stock_movements` + `stock_movement_items`
@@ -169,7 +169,7 @@ Ordem de precedência:
 4. **NCM + GTIN** → `NCM` + `EAN`
 5. **Similaridade** → nome + NCM (nunca por nome sozinho)
 
-Nunca atualiza produtos automaticamente — sempre mostra conflitos para o usuário decidir: Manter / Atualizar campos / Criar novo / Ignorar.
+Nunca atualiza produtos automaticamente - sempre mostra conflitos para o usuário decidir: Manter / Atualizar campos / Criar novo / Ignorar.
 
 ---
 
@@ -239,9 +239,9 @@ Após importação bem-sucedida, se checkbox "Criar contas a pagar" estiver ativ
 
 ## Observações Técnicas Importantes
 
-1. **JSONB + JSON.stringify**: Nunca usar `JSON.stringify()` ao passar valores para colunas JSONB no Supabase — o cliente serializa automaticamente. Passar `JSON.stringify(obj)` resulta em string JSON dentro do JSONB.
+1. **JSONB + JSON.stringify**: Nunca usar `JSON.stringify()` ao passar valores para colunas JSONB no Supabase - o cliente serializa automaticamente. Passar `JSON.stringify(obj)` resulta em string JSON dentro do JSONB.
 2. **Decrypt**: `partner.cpf` é AES-256-GCM (`v1:base64...`). Sempre usar `decryptCPF()` para comparar com texto plano do XML.
-3. **React error #300**: Nunca usar `return` condicional antes de hooks em componente — usar sub-componentes nomeados com `{condition && <Componente />}`.
+3. **React error #300**: Nunca usar `return` condicional antes de hooks em componente - usar sub-componentes nomeados com `{condition && <Componente />}`.
 4. **stock_movements**: Colunas `product_id`, `quantity`, `previous_quantity`, `new_quantity` foram removidas pela migration 061. Usar `stock_movement_items` para quantidades por produto.
 5. **Sem tabelas cost_history ou transportadora**: Não existem no schema atual. Custos são rastreados via audit trail na RPC.
-6. **Array.isArray()**: O campo `conflicts` pode ser string ou array ao ser lido — sempre verificar com `Array.isArray()` antes de `.map()`.
+6. **Array.isArray()**: O campo `conflicts` pode ser string ou array ao ser lido - sempre verificar com `Array.isArray()` antes de `.map()`.

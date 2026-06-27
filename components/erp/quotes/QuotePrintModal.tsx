@@ -165,7 +165,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                                 </div>
                             )}
 
-                            {/* Left — options (simplificado, sem opções extras) */}
+                            {/* Left - options (simplificado, sem opções extras) */}
                             <div
                                 className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${activeTab === "Visualização" ? "hidden lg:flex" : "flex"
                                     }`}
@@ -196,7 +196,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                                 </div>
                             </div>
 
-                            {/* Right — preview */}
+                            {/* Right - preview */}
                             <div
                                 className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
                                     }`}

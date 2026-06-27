@@ -20,7 +20,8 @@ import {
     ListItem,
     RadioButton,
     FormTextarea,
-    UnsavedChangesDialog
+    UnsavedChangesDialog,
+    FormSection
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
@@ -439,8 +440,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                         <TabsContent value="general" className="mt-0">
                                             <FadeIn key="general" className="space-y-10">
                                                 {/* Identificação */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
+                                                <FormSection title="Identificação">
                                                     <div className="grid grid-cols-12 gap-5">
                                                         <div className="col-span-12 md:col-span-6">
                                                             <Input
@@ -473,13 +473,13 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             />
                                                         </div>
                                                     </div>
-                                                </section>
-
-                                                <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+                                                </FormSection>
 
                                                 {/* Dados Tributários */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Dados tributários</h3>
+                                                <FormSection
+                                                    title="Dados tributários"
+                                                    hasSeparator
+                                                >
                                                     <div className="space-y-6">
                                                         <div>
                                                             <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
@@ -576,13 +576,13 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             </motion.div>
                                                         )}
                                                     </div>
-                                                </section>
-
-                                                <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+                                                </FormSection>
 
                                                 {/* Contato */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Contato</h3>
+                                                <FormSection
+                                                    title="Contato"
+                                                    hasSeparator
+                                                >
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                         <EmailInput
                                                             label="E-mail"
@@ -641,14 +641,13 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             errorMessage={fieldErrors.has("website") ? "Website inválido" : undefined}
                                                         />
                                                     </div>
-                                                </section>
+                                                </FormSection>
                                             </FadeIn>
                                         </TabsContent>
 
                                         <TabsContent value="address" className="mt-0">
                                             <FadeIn key="address" className="space-y-10">
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço principal</h3>
+                                                <FormSection title="Endereço principal">
                                                     <div className="space-y-4">
                                                         <CepInput
                                                             label="CEP"
@@ -698,7 +697,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             />
                                                         </div>
                                                     </div>
-                                                </section>
+                                                </FormSection>
 
                                                 <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
 
@@ -711,52 +710,53 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                     />
                                                     {hasDifferentBillingAddress && (
                                                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-8 space-y-5">
-                                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de cobrança</h3>
-                                                            <div className="space-y-4">
-                                                                <CepInput
-                                                                    value={billingCep}
-                                                                    onChange={(val) => {
-                                                                        setBillingCep(val)
-                                                                        setFieldErrors(prev => {
-                                                                            const next = new Set(prev)
-                                                                            next.delete("billingCep")
-                                                                            return next
-                                                                        })
-                                                                    }}
-                                                                    name="billingCep"
-                                                                    onAddressFetched={(data) => {
-                                                                        setBillingStreet(data.street)
-                                                                        setBillingNeighborhood(data.neighborhood)
-                                                                        setBillingCity(data.city)
-                                                                        setBillingUf(data.state || "SP")
-                                                                        setBillingNumber(data.number || "")
-                                                                        setBillingNoNumber(data.number === "S/N")
-                                                                    }}
-                                                                    error={fieldErrors.has("billingCep")}
-                                                                    errorMessage={fieldErrors.has("billingCep") ? "CEP inválido" : undefined}
-                                                                />
-                                                                <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
-                                                                <div className="grid grid-cols-2 gap-3 flex-row items-center">
-                                                                    <NumberInputWithCheckbox
-                                                                        label="Número"
-                                                                        number={billingNumber}
-                                                                        noNumber={billingNoNumber}
-                                                                        onNumberChange={val => setBillingNumber(val)}
-                                                                        onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
-                                                                        placeholder="123"
+                                                            <FormSection title="Endereço de cobrança" hasSeparator>
+                                                                <div className="space-y-4">
+                                                                    <CepInput
+                                                                        value={billingCep}
+                                                                        onChange={(val) => {
+                                                                            setBillingCep(val)
+                                                                            setFieldErrors(prev => {
+                                                                                const next = new Set(prev)
+                                                                                next.delete("billingCep")
+                                                                                return next
+                                                                            })
+                                                                        }}
+                                                                        name="billingCep"
+                                                                        onAddressFetched={(data) => {
+                                                                            setBillingStreet(data.street)
+                                                                            setBillingNeighborhood(data.neighborhood)
+                                                                            setBillingCity(data.city)
+                                                                            setBillingUf(data.state || "SP")
+                                                                            setBillingNumber(data.number || "")
+                                                                            setBillingNoNumber(data.number === "S/N")
+                                                                        }}
+                                                                        error={fieldErrors.has("billingCep")}
+                                                                        errorMessage={fieldErrors.has("billingCep") ? "CEP inválido" : undefined}
                                                                     />
-                                                                    <Input label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
+                                                                    <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
+                                                                    <div className="grid grid-cols-2 gap-3 flex-row items-center">
+                                                                        <NumberInputWithCheckbox
+                                                                            label="Número"
+                                                                            number={billingNumber}
+                                                                            noNumber={billingNoNumber}
+                                                                            onNumberChange={val => setBillingNumber(val)}
+                                                                            onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
+                                                                            placeholder="123"
+                                                                        />
+                                                                        <Input label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
+                                                                    </div>
+                                                                    <Input label="Bairro" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
+                                                                    <div className="grid grid-cols-2 gap-3 items-end">
+                                                                        <Input label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
+                                                                        <StateComboBox
+                                                                            value={billingUf}
+                                                                            onChange={setBillingUf}
+                                                                            className="w-full"
+                                                                        />
+                                                                    </div>
                                                                 </div>
-                                                                <Input label="Bairro" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
-                                                                <div className="grid grid-cols-2 gap-3 items-end">
-                                                                    <Input label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
-                                                                    <StateComboBox
-                                                                        value={billingUf}
-                                                                        onChange={setBillingUf}
-                                                                        className="w-full"
-                                                                    />
-                                                                </div>
-                                                            </div>
+                                                            </FormSection>
                                                         </motion.div>
                                                     )}
                                                 </section>
@@ -765,7 +765,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
 
                                         <TabsContent value="notes" className="mt-0">
                                             <FadeIn key="notes">
-                                                <section>
+                                                <FormSection title="Observações">
                                                     <FormTextarea
                                                         label="Observações"
                                                         value={observacoes}
@@ -773,7 +773,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         placeholder="Adicione observações internas sobre este cliente..."
                                                         name="observacoes"
                                                     />
-                                                </section>
+                                                </FormSection>
                                             </FadeIn>
                                         </TabsContent>
                                     </AnimatePresence>
@@ -910,14 +910,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                             {isSaving ? "Salvando..." : "Salvar"}
                         </Button>
                     </div>
-                </Tabs>
+                </Tabs >
 
                 {/* Modals */}
-                <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
+                < UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
 
                 <SavingStatusModal isOpen={isSaving} text={customerId ? "Salvando cliente..." : "Criando cliente..."} />
-            </div>
-        </FadeIn>
+            </div >
+        </FadeIn >
     )
 }
 

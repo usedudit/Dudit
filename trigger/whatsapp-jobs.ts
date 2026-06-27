@@ -2,7 +2,7 @@
  * Trigger.dev jobs for WhatsApp automation.
  *
  * Trigger.dev is the ONLY async execution layer for WhatsApp jobs.
- * TRIGGER_SECRET_KEY must be configured — there is no fallback.
+ * TRIGGER_SECRET_KEY must be configured - there is no fallback.
  */
 
 import { randomUUID } from "crypto"
@@ -22,7 +22,7 @@ export type WhatsappScheduledJobPayload = {
  * Enqueue a scheduled WhatsApp job via Trigger.dev.
  *
  * TRIGGER_SECRET_KEY is required. If not set, throws an explicit error.
- * No silent fallbacks — the system must be properly configured.
+ * No silent fallbacks - the system must be properly configured.
  */
 export async function triggerWhatsappScheduledJob(payload: WhatsappScheduledJobPayload): Promise<void> {
   if (!process.env.TRIGGER_SECRET_KEY) {

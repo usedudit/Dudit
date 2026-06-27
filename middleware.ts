@@ -17,7 +17,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public assets (svg, png, jpg, jpeg, gif, webp, etc.)
-     * - ajuda/* (static help pages — no auth/CSP needed)
+     * - ajuda/* (static help pages - no auth/CSP needed)
      * - institucional/* (static institutional pages)
      * - ~offline (PWA offline page)
      * - manifest.webmanifest (PWA manifest)

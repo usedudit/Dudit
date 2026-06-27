@@ -4,7 +4,7 @@
  */
 import { normalizeSearchQuery } from "./normalize"
 
-/** Returns the normalized token only — DB expands synonyms at query time. */
+/** Returns the normalized token only - DB expands synonyms at query time. */
 export function expandSynonyms(token: string): string[] {
   const normalized = normalizeSearchQuery(token)
   return normalized ? [normalized] : []

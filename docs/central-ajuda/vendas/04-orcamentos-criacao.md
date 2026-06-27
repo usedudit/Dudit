@@ -1,6 +1,6 @@
 # Criando e enviando orçamentos
 
-O **orçamento** é uma proposta comercial que você envia para o cliente antes da venda. Ele lista os produtos ou serviços, quantidades, preços e condições — tudo formatado de forma profissional.
+O **orçamento** é uma proposta comercial que você envia para o cliente antes da venda. Ele lista os produtos ou serviços, quantidades, preços e condições - tudo formatado de forma profissional.
 
 O cliente pode visualizar o orçamento online, aprovar ou rejeitar, e você pode convertê-lo em pedido com um clique.
 
@@ -22,19 +22,19 @@ Legenda: Enquanto você monta o orçamento, a prévia é atualizada em tempo rea
 [IMAGEM: Botão "Novo orçamento" na listagem]
 Legenda: O botão fica no topo da tela.
 
-3. **Selecione o cliente** — Busque por nome. Se não encontrar, cadastre um novo cliente na hora.
-4. **Adicione produtos ou serviços** — Busque pelo nome. Você pode misturar produtos físicos e serviços no mesmo orçamento.
-5. **Ajuste quantidades e preços** — Para cada item, você pode alterar a quantidade e o preço unitário.
+3. **Selecione o cliente** - Busque por nome. Se não encontrar, cadastre um novo cliente na hora.
+4. **Adicione produtos ou serviços** - Busque pelo nome. Você pode misturar produtos físicos e serviços no mesmo orçamento.
+5. **Ajuste quantidades e preços** - Para cada item, você pode alterar a quantidade e o preço unitário.
 
 [IMAGEM: Seção de itens do orçamento com campos de quantidade e preço]
 Legenda: Adicione quantos itens precisar.
 
-6. **Configure as condições** — Defina:
+6. **Configure as condições** - Defina:
    - **Data do orçamento** (geralmente a data de hoje).
    - **Data de validade** (prazo para o cliente aceitar a proposta).
    - **Descontos** (por item ou geral, em valor fixo ou percentual).
    - **Frete** e **outros custos**, se aplicável.
-7. **Personalize a aparência** — Escolha as cores do tema, o título (ex: "Orçamento", "Proposta Comercial") e decida se quer exibir a decoração visual.
+7. **Personalize a aparência** - Escolha as cores do tema, o título (ex: "Orçamento", "Proposta Comercial") e decida se quer exibir a decoração visual.
 
 [IMAGEM: Opções de personalização do orçamento]
 Legenda: Deixe o orçamento com a cara da sua loja.
@@ -45,9 +45,9 @@ Legenda: Deixe o orçamento com a cara da sua loja.
 
 Após salvar, você pode:
 
-- **Visualizar a prévia** — Veja exatamente como o cliente vai receber o orçamento.
-- **Baixar em PDF** — Gere um arquivo PDF para enviar por email ou WhatsApp.
-- **Compartilhar link** — O sistema gera um link único. Envie para o cliente. Ele pode abrir no navegador, visualizar e responder.
+- **Visualizar a prévia** - Veja exatamente como o cliente vai receber o orçamento.
+- **Baixar em PDF** - Gere um arquivo PDF para enviar por email ou WhatsApp.
+- **Compartilhar link** - O sistema gera um link único. Envie para o cliente. Ele pode abrir no navegador, visualizar e responder.
 
 [IMAGEM: Opções de compartilhamento na tela de detalhes do orçamento]
 Legenda: Compartilhe por link, PDF ou WhatsApp.
@@ -55,7 +55,7 @@ Legenda: Compartilhe por link, PDF ou WhatsApp.
 ## Dicas importantes
 
 - Defina uma **data de validade** sempre. Isso cria um senso de urgência e evita que o cliente tente usar um preço antigo.
-- Revise os valores antes de enviar. O orçamento é um documento comercial — erros passam uma imagem negativa.
+- Revise os valores antes de enviar. O orçamento é um documento comercial - erros passam uma imagem negativa.
 - Use a **personalização de cores** para manter a identidade visual da sua marca.
 - Para orçamentos com muitos itens, organize por categoria ou tipo de produto para facilitar a leitura.
 

@@ -9,7 +9,7 @@
 -- Block anonymous (anon) and any unauthenticated access
 REVOKE EXECUTE ON FUNCTION get_sales_goals_summary FROM PUBLIC;
 
--- Allow authenticated users — the server action
+-- Allow authenticated users - the server action
 -- getSalesGoalsSummaryAction calls this RPC via
 -- getSupabaseServerClient() (RLS client, authenticated role)
 -- after its own requireUser() + requirePermission() checks.

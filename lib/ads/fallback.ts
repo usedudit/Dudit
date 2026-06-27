@@ -3,7 +3,7 @@ import type { SponsoredAd } from "@/lib/ads/types"
 
 /**
  * Extension point for future Google AdSense fallback.
- * NOT implemented — returns null when no local ads are available.
+ * NOT implemented - returns null when no local ads are available.
  */
 export interface ExternalAdFallbackConfig {
     slot: AdSlot

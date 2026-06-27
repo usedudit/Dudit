@@ -12,7 +12,7 @@ SET permissions = jsonb_set(
 WHERE id = '__base_template'
   AND (permissions->'orders'->>'can_refund' IS NULL OR NOT (permissions->'orders' ? 'can_refund'));
 
--- 2. Owner já tem bypass no can() — não precisa de permissão explícita.
+-- 2. Owner já tem bypass no can() - não precisa de permissão explícita.
 
 -- 3. ADMIN: herda do template base, mas vamos garantir can_refund = true
 UPDATE roles

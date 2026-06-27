@@ -109,7 +109,7 @@ export function ServiceCheckoutSettingsSubPage({
             <div className="hidden md:flex items-start justify-between py-6">
               <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                 <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
-                  <span className="truncate">Serviços — Checkout</span>
+                  <span className="truncate">Serviços - Checkout</span>
                 </h1>
               </div>
             </div>
@@ -120,7 +120,7 @@ export function ServiceCheckoutSettingsSubPage({
             placeholderType="image"
             imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
             imageAlt="Recurso bloqueado"
-            title="Serviços — Checkout"
+            title="Serviços - Checkout"
             subtitle="Gerencie a cobrança de entrada (sinal) no checkout de agendamentos. Disponível nos planos Crescer e Escalar."
             itemButton={{
               text: "Fazer upgrade",
@@ -157,7 +157,7 @@ export function ServiceCheckoutSettingsSubPage({
             <div className="hidden md:flex items-start justify-between mb-4">
               <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                 <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                  <span className="truncate">Serviços — Checkout</span>
+                  <span className="truncate">Serviços - Checkout</span>
                 </h1>
                 <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                   Gerencie a cobrança de entrada (sinal) no checkout de agendamentos

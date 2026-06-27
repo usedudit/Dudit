@@ -80,7 +80,7 @@ function getPartnerId(item: RankableItem): string | null {
 
 /**
  * Lightweight seller diversity: avoid more than 2 consecutive items from same seller.
- * O(n) single pass — swaps in a different-seller item when needed.
+ * O(n) single pass - swaps in a different-seller item when needed.
  */
 export function applySellerDiversity<T extends RankableItem>(items: T[], maxConsecutive = 2): T[] {
   if (items.length <= maxConsecutive) return items

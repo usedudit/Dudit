@@ -848,16 +848,16 @@ export function ExplorarPageClient({
             return `Ainda não encontramos resultados para <strong class='text-brand-dark'>"${term}"</strong> em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Conhece alguém que vende? Convide pra Dudit!`
         }
         if (currentType === "produtos") {
-            return `Nenhum produto cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui — é gratuito e sem comissão!`
+            return `Nenhum produto cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui - é gratuito e sem comissão!`
         }
         if (currentType === "servicos") {
-            return `Nenhum serviço cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer seus serviços — é gratuito e sem comissão!`
+            return `Nenhum serviço cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer seus serviços - é gratuito e sem comissão!`
         }
         if (currentType === "planos") {
-            return `Nenhum plano recorrente cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer assinaturas — é gratuito e sem comissão!`
+            return `Nenhum plano recorrente cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer assinaturas - é gratuito e sem comissão!`
         }
         if (currentType === "vitrines") {
-            return `Nenhuma loja cadastrada em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Crie sua vitrine — é gratuito e sem comissão!`
+            return `Nenhuma loja cadastrada em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Crie sua vitrine - é gratuito e sem comissão!`
         }
         return `Nenhum vendedor cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro ou convide quem você conhece!`
     }, [currentType, selectedCitySlug, query, selectedCategories])

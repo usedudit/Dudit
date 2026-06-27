@@ -30,11 +30,11 @@ Legenda: Acesse a aba de variações para configurar as opções do produto.
 
 Clique em **Adicionar variação**. Você pode criar combinações simples ou múltiplas:
 
-**Exemplo 1 — Variação simples (apenas cor):**
+**Exemplo 1 - Variação simples (apenas cor):**
 - Tipo: "Cor"
 - Valores: "Azul", "Preto", "Branco"
 
-**Exemplo 2 — Variação combinada (cor + tamanho):**
+**Exemplo 2 - Variação combinada (cor + tamanho):**
 - Tipo: "Cor / Tamanho"
 - Valores: "Azul / P", "Azul / M", "Azul / G", "Preto / P", "Preto / M", "Preto / G"
 

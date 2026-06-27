@@ -53,7 +53,7 @@ describe("deriveAdjustmentType", () => {
 
 // --------------- computePaymentLine ---------------
 
-describe("computePaymentLine — single payment", () => {
+describe("computePaymentLine - single payment", () => {
   it("discount: received 98, effective 100, net 100, adjustment -2 (2%)", () => {
     const r = computePaymentLine({ amountReceived: 98, paymentMethod: discountPix })
     expect(r.amountReceived).toBe(98)
@@ -117,7 +117,7 @@ describe("computePaymentLine — single payment", () => {
 
 // --------------- computePaymentBreakdown ---------------
 
-describe("computePaymentBreakdown — split payments", () => {
+describe("computePaymentBreakdown - split payments", () => {
   it("single discount line: order total 100, pix 2% on 98", () => {
     const r = computePaymentBreakdown({
       orderTotal: 100,

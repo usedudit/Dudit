@@ -275,7 +275,7 @@ export function buildWhatsappMessage(
                 ``,
                 `Se você recebeu isso, sua integração com WhatsApp está funcionando perfeitamente! ✅`,
                 ``,
-                `— ${store}`,
+                `- ${store}`,
             ].join("\n")
 
         default:
@@ -434,7 +434,7 @@ export function buildNotificationContent(
             return {
                 title: "⚠️ Alerta: Estoque baixo!",
                 message: ctx.productName
-                    ? `Atenção! O produto "${ctx.productName}" está com estoque baixo (${ctx.stock || "0"} un.) — mínimo ${ctx.minStock || "0"} un. 📉`
+                    ? `Atenção! O produto "${ctx.productName}" está com estoque baixo (${ctx.stock || "0"} un.) - mínimo ${ctx.minStock || "0"} un. 📉`
                     : "Alguns produtos estão com estoque abaixo do mínimo.",
             }
         case "replenishment_suggested":

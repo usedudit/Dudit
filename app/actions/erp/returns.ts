@@ -1376,7 +1376,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                     .in("id", buyerIds)
                     ; (customersData || []).forEach((c: any) => customersMap.set(c.id, c))
             } catch (_) {
-                // customers join is optional — snapshot fields cover the essential data
+                // customers join is optional - snapshot fields cover the essential data
             }
         }
 

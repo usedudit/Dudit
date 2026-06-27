@@ -72,7 +72,7 @@ const SupplierGridCard = React.memo(
             </div>
 
             <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
-              <span>{supplier.cnpj || supplier.cpf || "—"}</span>
+              <span>{supplier.cnpj || supplier.cpf || "-"}</span>
             </div>
           </div>
         </div>
@@ -97,7 +97,7 @@ const SupplierGridCard = React.memo(
           <div className="flex items-end justify-between mt-1">
             <div className="flex flex-col">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Código</span>
-              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{supplier.supplier_code || "—"}</span>
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{supplier.supplier_code || "-"}</span>
             </div>
 
             <div

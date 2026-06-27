@@ -81,8 +81,8 @@ async function handler(request: NextRequest) {
 
       const methodAllowed = methodId === "pix" ? accepted.pix !== false
         : methodId === "bolbradesco" ? accepted.boleto !== false
-        : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
-        : true
+          : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
+            : true
 
       if (!methodAllowed) {
         return NextResponse.json({ error: "Método de pagamento não habilitado pelo vendedor" }, { status: 400 })
@@ -223,7 +223,7 @@ async function handler(request: NextRequest) {
 
     if (!mpPaymentId) {
       SecureLogger.error("MP returned no payment ID for ERP payment", { status: mpPaymentResponse.status })
-      return NextResponse.json({ error: "Erro ao processar pagamento — ID não retornado." }, { status: 500 })
+      return NextResponse.json({ error: "Erro ao processar pagamento - ID não retornado." }, { status: 500 })
     }
 
     // Extrair dados de Pix

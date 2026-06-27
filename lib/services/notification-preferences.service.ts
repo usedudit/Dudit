@@ -3,6 +3,7 @@ import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { NotificationType } from "@/lib/notifications/types"
 import type { NotificationPreference, NotificationPreferenceInput } from "@/lib/notifications/preferences-types"
+import type { WhatsappAutomationTrigger } from "@/lib/whatsapp/types"
 
 export async function getNotificationPreferences(userId: string): Promise<NotificationPreference[]> {
   const admin = getAdminClient()
@@ -30,6 +31,7 @@ export async function upsertNotificationPreference(
       type: input.type,
       enabled: input.enabled,
       push_enabled: input.push_enabled,
+      whatsapp_enabled: input.whatsapp_enabled,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id,type" },
@@ -50,6 +52,7 @@ export async function upsertNotificationPreferences(
     type: input.type,
     enabled: input.enabled,
     push_enabled: input.push_enabled,
+    whatsapp_enabled: input.whatsapp_enabled,
     updated_at: new Date().toISOString(),
   }))
 
@@ -78,6 +81,7 @@ export async function seedDefaultPreferences(userId: string): Promise<void> {
     type,
     enabled: true,
     push_enabled: true,
+    whatsapp_enabled: true,
     updated_at: new Date().toISOString(),
   }))
 
@@ -101,4 +105,47 @@ export async function shouldDeliverPush(
 
   if (error || !data) return true
   return data.enabled && data.push_enabled
+}
+
+export async function shouldDeliverWhatsapp(
+  userId: string,
+  trigger: WhatsappAutomationTrigger,
+): Promise<boolean> {
+  const typeMap: Record<WhatsappAutomationTrigger, NotificationType | null> = {
+    appointment_created: "appointment_created",
+    appointment_confirmed: "appointment_confirmed",
+    appointment_cancelled: "appointment_cancelled",
+    appointment_reminder_24h: "appointment_reminder",
+    appointment_reminder_2h: "appointment_reminder",
+    order_created: "order_created",
+    order_payment_approved: "order_paid",
+    order_preparing: "order_created",
+    order_ready_pickup: "order_shipped",
+    order_shipped: "order_shipped",
+    order_out_for_delivery: "order_shipped",
+    order_delivered: "order_delivered",
+    delivery_route_started: "order_shipped",
+    delivery_in_progress: "order_shipped",
+    delivery_delivered: "order_delivered",
+    delivery_failed: "order_shipped",
+    quote_shared: "order_created",
+    quote_reminder: "order_created",
+    payment_reminder: "order_paid",
+    test_message: null,
+    manual_resend: null,
+  }
+
+  const type = typeMap[trigger]
+  if (!type) return true
+
+  const admin = getAdminClient()
+  const { data, error } = await admin
+    .from("notification_preferences")
+    .select("enabled, whatsapp_enabled")
+    .eq("user_id", userId)
+    .eq("type", type)
+    .maybeSingle()
+
+  if (error || !data) return true
+  return data.enabled && (data.whatsapp_enabled !== false)
 }

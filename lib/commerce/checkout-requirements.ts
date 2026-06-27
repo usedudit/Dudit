@@ -23,7 +23,7 @@ export type CheckoutRequirements = {
   hasProductLines: boolean
   hasServiceLines: boolean
   hasSubscriptionLines: boolean
-  /** Cash / pay on delivery — products only, no services/subscriptions in cart */
+  /** Cash / pay on delivery - products only, no services/subscriptions in cart */
   allowPayOnDelivery: boolean
   hasPayOnService: boolean
   showDepositOption: boolean

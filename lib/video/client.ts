@@ -78,7 +78,7 @@ async function waitForVideoSeek(video: HTMLVideoElement) {
   })
 }
 
-/** Loads metadata from file — caller must revoke objectUrl when done. */
+/** Loads metadata from file - caller must revoke objectUrl when done. */
 export async function loadVideoMetadataFromFile(file: File) {
   const objectUrl = URL.createObjectURL(file)
   const video = document.createElement("video")

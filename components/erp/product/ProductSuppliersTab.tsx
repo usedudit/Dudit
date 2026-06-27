@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Checkbox, Button, IconPlaceholder, Input, Spinner, Badge } from "@/components/reusable"
-import { PlusIcon, TrashIcon, TagIcon, EditIcon, CheckIcon, XIcon, Package, FileTextIcon } from "@/lib/icons"
+import { Checkbox, Button, IconPlaceholder, Input, Spinner } from "@/components/reusable"
+import { PlusIcon, TrashIcon, TagIcon, EditIcon, CheckIcon, XIcon, Package } from "@/lib/icons"
 import { getProductSuppliersAction, linkProductSupplierAction, unlinkProductSupplierAction, updateProductSupplierAction, getProductPurchaseHistoryAction, getProductCostHistoryAction } from "@/app/actions/erp/products"
-import { SupplierSelectorSheet } from "./SupplierSelectorSheet"
+import SelectSupplierSheet from "../fornecedores/SelectSupplierSheet"
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
@@ -18,6 +18,278 @@ interface ProductSuppliersTabProps {
     partnerId?: string
 }
 
+interface ColumnDef {
+    id: string
+    align?: "left" | "center" | "right"
+    width?: string
+}
+
+const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {children}
+    </div>
+)
+
+const getJustifyClass = (align?: string) => {
+    if (align === "center") return "justify-center"
+    if (align === "right") return "justify-end"
+    return "justify-start"
+}
+
+const getAlignClass = (align?: string) => {
+    if (align === "center") return "text-center"
+    if (align === "right") return "text-right"
+    return "text-left"
+}
+
+const COLUMNS: ColumnDef[] = [
+    { id: "supplier", align: "left" },
+    { id: "sku", align: "left" },
+    { id: "cost", align: "right" },
+    { id: "lead", align: "center" },
+    { id: "last_purchase", align: "left" },
+    { id: "actions", align: "center" },
+]
+
+const HEADERS = [
+    { id: "supplier", label: "Fornecedor", align: "left" as const, width: "auto" },
+    { id: "sku", label: "SKU", align: "left" as const, width: "auto" },
+    { id: "cost", label: "Custo", align: "right" as const, width: "auto" },
+    { id: "lead", label: "Lead Time", align: "center" as const, width: "auto" },
+    { id: "last_purchase", label: "Última Compra", align: "left" as const, width: "auto" },
+    { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
+]
+
+const TimelineItem = React.memo(({ icon: Icon, time, title, subtitle }: { icon: any; time: string; title: string; subtitle?: string }) => (
+    <div className="flex relative z-10 w-full">
+        <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex-shrink-0 flex items-center justify-center mr-4 border-[3px] border-white dark:border-dark-surface shadow-[0_0_0_2px_#ffffff] dark:shadow-[0_0_0_2px_rgba(28,28,30,0.5)]">
+            <Icon size={14} className="text-brand-dark dark:text-dark-heading" />
+        </div>
+        <div className="flex flex-col justify-start -mt-0.5 min-w-0 flex-1">
+            <div className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">{time}</div>
+            <div className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading leading-snug">{title}</div>
+            {subtitle && <div className="text-[12px] text-brand-inactive-text mt-0.5">{subtitle}</div>}
+        </div>
+    </div>
+))
+TimelineItem.displayName = "TimelineItem"
+
+const SupplierRow = React.memo(({ supplier, columns, isSelected, isEditingThis, isSavingThis, editing, editSku, editCost, editLead, onSelect, onStartEdit, onCancelEdit, onSaveEdit, onRemove, onEditSkuChange, onEditCostChange, onEditLeadChange }: {
+    supplier: ProductSupplierWithDetails
+    columns: ColumnDef[]
+    isSelected: boolean
+    isEditingThis: boolean
+    isSavingThis: boolean
+    editing: boolean
+    editSku: string
+    editCost: string
+    editLead: string
+    onSelect: () => void
+    onStartEdit: () => void
+    onCancelEdit: () => void
+    onSaveEdit: () => void
+    onRemove: () => void
+    onEditSkuChange: (v: string) => void
+    onEditCostChange: (v: string) => void
+    onEditLeadChange: (v: string) => void
+}) => {
+    const renderCell = (colId: string) => {
+        switch (colId) {
+            case "supplier":
+                return (
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">
+                            {supplier.supplier_name?.charAt(0)?.toUpperCase() || "?"}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px]">{supplier.supplier_name || "-"}</span>
+                            {supplier.supplier_document && <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{supplier.supplier_document}</span>}
+                        </div>
+                    </div>
+                )
+            case "sku":
+                return isEditingThis ? (
+                    <Input value={editSku} onChange={(e) => onEditSkuChange(e.target.value)} className="w-28 h-8 text-xs" placeholder="SKU" />
+                ) : (
+                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{supplier.supplier_sku || "-"}</span>
+                )
+            case "cost":
+                return isEditingThis ? (
+                    <Input value={editCost} onChange={(e) => onEditCostChange(e.target.value)} className="w-24 h-8 text-xs" placeholder="0,00" inputMode="decimal" />
+                ) : (
+                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{supplier.cost_price != null ? formatCurrency(supplier.cost_price) : "-"}</span>
+                )
+            case "lead":
+                return isEditingThis ? (
+                    <Input value={editLead} onChange={(e) => onEditLeadChange(e.target.value)} className="w-16 h-8 text-xs" placeholder="dias" inputMode="numeric" />
+                ) : (
+                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{supplier.lead_time_days != null ? `${supplier.lead_time_days} dias` : "-"}</span>
+                )
+            case "last_purchase":
+                return (
+                    <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                            {supplier.last_purchase_date ? new Date(supplier.last_purchase_date).toLocaleDateString("pt-BR") : "-"}
+                        </span>
+                        {supplier.last_purchase_price != null && (
+                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{formatCurrency(supplier.last_purchase_price)}</span>
+                        )}
+                    </div>
+                )
+            case "actions":
+                return (
+                    <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+                        {isSavingThis ? (
+                            <Spinner size={16} />
+                        ) : isEditingThis ? (
+                            <div className="flex items-center gap-1">
+                                <button onClick={onSaveEdit} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-brand-green/10 text-brand-green"><CheckIcon size={14} /></button>
+                                <button onClick={onCancelEdit} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-50 text-brand-red"><XIcon size={14} /></button>
+                            </div>
+                        ) : editing ? (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={onStartEdit} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"><EditIcon size={14} /></button>
+                                <button onClick={onRemove} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 text-brand-inactive-text hover:text-brand-red"><TrashIcon size={14} /></button>
+                            </div>
+                        ) : null}
+                    </div>
+                )
+            default:
+                return null
+        }
+    }
+
+    return (
+        <motion.tr
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={`group transition-colors cursor-pointer ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : "hover:bg-brand-gray dark:hover:bg-gray-900/50"
+                }`}
+            onClick={onSelect}
+        >
+            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12" onClick={(e) => e.stopPropagation()}>
+                <Checkbox checked={isSelected} onChange={onSelect} />
+            </td>
+            {columns.map((col) => (
+                <td key={col.id} className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}>
+                    <div className={`flex items-center w-full min-w-0 ${getJustifyClass(col.align)}`}>
+                        {renderCell(col.id)}
+                    </div>
+                </td>
+            ))}
+        </motion.tr>
+    )
+})
+SupplierRow.displayName = "SupplierRow"
+
+const SupplierTableSection = React.memo(({ suppliers, totalCount, columns, headers, selectedSupplierId, editingId, savingId, isEditing, editSku, editCost, editLead, onSelectSupplier, onStartEdit, onCancelEdit, onSaveEdit, onRemoveSupplier, onEditSkuChange, onEditCostChange, onEditLeadChange, onAddClick, adding, suppliersPage, suppliersTotalPages, onSuppliersPageChange }: {
+    suppliers: ProductSupplierWithDetails[]
+    totalCount: number
+    columns: ColumnDef[]
+    headers: typeof HEADERS
+    selectedSupplierId: string | null
+    editingId: string | null
+    savingId: string | null
+    isEditing: boolean
+    editSku: string
+    editCost: string
+    editLead: string
+    onSelectSupplier: (id: string) => void
+    onStartEdit: (s: ProductSupplierWithDetails) => void
+    onCancelEdit: () => void
+    onSaveEdit: (s: ProductSupplierWithDetails) => void
+    onRemoveSupplier: (id: string) => void
+    onEditSkuChange: (v: string) => void
+    onEditCostChange: (v: string) => void
+    onEditLeadChange: (v: string) => void
+    onAddClick: () => void
+    adding: boolean
+    suppliersPage: number
+    suppliersTotalPages: number
+    onSuppliersPageChange: (page: number) => void
+}) => (
+    <div>
+        <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                Fornecedores Vinculados
+                <span className="ml-2 text-sm font-medium text-brand-inactive-text">({totalCount})</span>
+            </h3>
+            {isEditing && (
+                <Button variant="ghost" onClick={onAddClick} leftIcon={<PlusIcon size={18} />}>
+                    Adicionar
+                </Button>
+            )}
+        </div>
+
+        {suppliers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
+                <IconPlaceholder
+                    icon={TagIcon}
+                    title="Nenhum fornecedor vinculado"
+                    subtitle="Vincule fornecedores a este produto para gerenciar custos e reposições."
+                    itemButton={{
+                        text: "Adicionar fornecedor",
+                        action: onAddClick,
+                        variant: "outline",
+                        className: !isEditing ? "opacity-50 pointer-events-none" : ""
+                    }}
+                />
+            </div>
+        ) : (
+            <div className="w-full overflow-hidden bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl">
+                <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
+                        <thead>
+                            <tr className="bg-brand-slate dark:bg-dark-surface">
+                                <th className="py-2.5 px-4 pl-6 rounded-tl-xl border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body w-12"></th>
+                                {headers.map((h) => (
+                                    <th key={h.id} className={`py-2.5 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}>
+                                        {h.label}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <AnimatePresence initial={false}>
+                                {suppliers.map((s) => (
+                                    <SupplierRow
+                                        key={s.supplier_id}
+                                        supplier={s}
+                                        columns={columns}
+                                        isSelected={selectedSupplierId === s.supplier_id}
+                                        isEditingThis={editingId === s.supplier_id}
+                                        isSavingThis={savingId === s.supplier_id}
+                                        editing={isEditing}
+                                        editSku={editSku}
+                                        editCost={editCost}
+                                        editLead={editLead}
+                                        onSelect={() => onSelectSupplier(s.supplier_id)}
+                                        onStartEdit={() => onStartEdit(s)}
+                                        onCancelEdit={onCancelEdit}
+                                        onSaveEdit={() => onSaveEdit(s)}
+                                        onRemove={() => onRemoveSupplier(s.supplier_id)}
+                                        onEditSkuChange={onEditSkuChange}
+                                        onEditCostChange={onEditCostChange}
+                                        onEditLeadChange={onEditLeadChange}
+                                    />
+                                ))}
+                            </AnimatePresence>
+                        </tbody>
+                    </table>
+                </div>
+                {suppliersTotalPages > 1 && (
+                    <div className="px-6 py-3 border-t border-brand-border dark:border-dark-border">
+                        <Pagination currentPage={suppliersPage} totalPages={suppliersTotalPages} onPageChange={onSuppliersPageChange} />
+                    </div>
+                )}
+            </div>
+        )}
+    </div>
+))
+SupplierTableSection.displayName = "SupplierTableSection"
+
 export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     productData,
     isEditing,
@@ -28,7 +300,6 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     const productId = productData?.id
     const partnerId = propPartnerId || productData?.partner_id || ""
     const [suppliers, setSuppliers] = useState<ProductSupplierWithDetails[]>([])
-    const [loading, setLoading] = useState(true)
     const [showSelector, setShowSelector] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editSku, setEditSku] = useState("")
@@ -36,27 +307,32 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     const [editLead, setEditLead] = useState("")
     const [savingId, setSavingId] = useState<string | null>(null)
     const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null)
+    const [suppliersPage, setSuppliersPage] = useState(1)
 
-    // Purchase history state
     const [purchases, setPurchases] = useState<any[]>([])
     const [purchasesTotal, setPurchasesTotal] = useState(0)
     const [purchasesPage, setPurchasesPage] = useState(1)
     const [purchasesLoading, setPurchasesLoading] = useState(false)
     const [costHistory, setCostHistory] = useState<any[]>([])
     const [costHistoryLoading, setCostHistoryLoading] = useState(false)
+    const SUPPLIERS_PER_PAGE = 10
     const PURCHASES_PER_PAGE = 5
+    const mountedRef = useRef(true)
+
+    useEffect(() => {
+        return () => { mountedRef.current = false }
+    }, [])
 
     const loadSuppliers = useCallback(async () => {
-        if (!productId) { setLoading(false); return }
-        setLoading(true)
+        if (!productId) return
         const res = await getProductSuppliersAction(productId)
+        if (!mountedRef.current) return
         if (!res.error) {
             const list = res.suppliers || []
             setSuppliers(list)
             if (list.length > 0 && !selectedSupplierId) setSelectedSupplierId(list[0].supplier_id)
         }
-        setLoading(false)
-    }, [productId, selectedSupplierId])
+    }, [productId])
 
     useEffect(() => { loadSuppliers() }, [loadSuppliers])
 
@@ -67,6 +343,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         const res = await getProductPurchaseHistoryAction(productId, {
             limit: PURCHASES_PER_PAGE, offset, supplierId: supplierId || undefined,
         })
+        if (!mountedRef.current) return
         if (!res.error) {
             setPurchases(res.items || [])
             setPurchasesTotal(res.total || 0)
@@ -78,6 +355,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         if (!productId) return
         setCostHistoryLoading(true)
         const res = await getProductCostHistoryAction(productId, 5)
+        if (!mountedRef.current) return
         if (!res.error) {
             const items = res.items || []
             setCostHistory(supplierId ? items.filter((h: any) => h.supplier_id === supplierId) : items)
@@ -95,41 +373,48 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         loadCostHistory(selectedSupplierId)
     }, [productId, selectedSupplierId, loadCostHistory])
 
-    // Reset page when supplier changes
+    useEffect(() => { setSuppliersPage(1) }, [suppliers.length])
     useEffect(() => { setPurchasesPage(1) }, [selectedSupplierId])
 
-    const handleAddSupplier = async (supplier: any) => {
+    const handleAddSupplier = useCallback(async (supplier: any) => {
         if (!productId) return
+        if (suppliers.some(s => s.supplier_id === supplier.id)) return
         setSavingId(supplier.id)
         const res = await linkProductSupplierAction(productId, supplier.id)
-        if (res.error) { notifyError("Erro", res.error) }
-        else { notifySuccess("Fornecedor vinculado"); loadSuppliers() }
+        if (!mountedRef.current) return
         setSavingId(null)
-    }
+        if (res.error) { notifyError("Erro", res.error); return }
+        notifySuccess("Fornecedor vinculado")
+        loadSuppliers()
+    }, [productId, suppliers, notifyError, notifySuccess, loadSuppliers])
 
-    const handleRemoveSupplier = async (supplierId: string) => {
+    const handleRemoveSupplier = useCallback(async (supplierId: string) => {
         if (!productId) return
         setSavingId(supplierId)
         const res = await unlinkProductSupplierAction(productId, supplierId)
-        if (res.error) { notifyError("Erro", res.error) }
-        else {
-            notifySuccess("Fornecedor removido")
-            if (selectedSupplierId === supplierId) setSelectedSupplierId(null)
-            loadSuppliers()
-        }
+        if (!mountedRef.current) return
         setSavingId(null)
-    }
+        if (res.error) { notifyError("Erro", res.error); return }
+        notifySuccess("Fornecedor removido")
+        if (selectedSupplierId === supplierId) setSelectedSupplierId(null)
+        loadSuppliers()
+    }, [productId, selectedSupplierId, notifyError, notifySuccess, loadSuppliers])
 
-    const startEdit = (s: ProductSupplierWithDetails) => {
+    const handleStartEdit = useCallback((s: ProductSupplierWithDetails) => {
         setEditingId(s.supplier_id)
         setEditSku(s.supplier_sku || "")
         setEditCost(s.cost_price != null ? String(s.cost_price) : "")
         setEditLead(s.lead_time_days != null ? String(s.lead_time_days) : "")
-    }
+    }, [])
 
-    const cancelEdit = () => { setEditingId(null); setEditSku(""); setEditCost(""); setEditLead("") }
+    const handleCancelEdit = useCallback(() => {
+        setEditingId(null)
+        setEditSku("")
+        setEditCost("")
+        setEditLead("")
+    }, [])
 
-    const saveEdit = async (s: ProductSupplierWithDetails) => {
+    const handleSaveEdit = useCallback(async (s: ProductSupplierWithDetails) => {
         if (!productId) return
         setSavingId(s.supplier_id)
         const res = await updateProductSupplierAction(productId, s.supplier_id, {
@@ -137,15 +422,43 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
             costPrice: editCost ? Number(editCost) : null,
             leadTimeDays: editLead ? Number(editLead) : null,
         })
-        if (res.error) { notifyError("Erro", res.error) }
-        else { notifySuccess("Atualizado"); loadSuppliers() }
+        if (!mountedRef.current) return
         setSavingId(null)
-        cancelEdit()
-    }
+        if (res.error) { notifyError("Erro", res.error); return }
+        notifySuccess("Atualizado")
+        loadSuppliers()
+        handleCancelEdit()
+    }, [productId, editSku, editCost, editLead, notifyError, notifySuccess, loadSuppliers, handleCancelEdit])
 
-    const activeSuppliers = suppliers.filter(s => s.supplier_name)
-    const selectedSupplier = activeSuppliers.find(s => s.supplier_id === selectedSupplierId)
-    const purchasesTotalPages = Math.ceil(purchasesTotal / PURCHASES_PER_PAGE)
+    const handleSelectSupplier = useCallback((id: string) => {
+        setSelectedSupplierId(id)
+    }, [])
+
+    const handleOpenSelector = useCallback(() => {
+        setShowSelector(true)
+    }, [])
+
+    const handleCloseSelector = useCallback(() => {
+        setShowSelector(false)
+    }, [])
+
+    const activeSuppliers = useMemo(() => suppliers.filter(s => s.supplier_name), [suppliers])
+    const selectedSupplier = useMemo(
+        () => activeSuppliers.find(s => s.supplier_id === selectedSupplierId),
+        [activeSuppliers, selectedSupplierId]
+    )
+    const purchasesTotalPages = useMemo(
+        () => Math.ceil(purchasesTotal / PURCHASES_PER_PAGE),
+        [purchasesTotal]
+    )
+    const suppliersTotalPages = useMemo(
+        () => Math.ceil(activeSuppliers.length / SUPPLIERS_PER_PAGE),
+        [activeSuppliers.length]
+    )
+    const paginatedSuppliers = useMemo(
+        () => activeSuppliers.slice((suppliersPage - 1) * SUPPLIERS_PER_PAGE, suppliersPage * SUPPLIERS_PER_PAGE),
+        [activeSuppliers, suppliersPage, SUPPLIERS_PER_PAGE]
+    )
 
     if (!productId) {
         return (
@@ -155,285 +468,141 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         )
     }
 
-    const renderSupplierTable = () => (
-        <div>
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                    Fornecedores Vinculados
-                    <span className="ml-2 text-sm font-medium text-brand-inactive-text">({activeSuppliers.length})</span>
-                </h3>
-                {isEditing && (
-                    <Button variant="ghost" onClick={() => setShowSelector(true)} leftIcon={<PlusIcon size={18} />}>
-                        Adicionar
-                    </Button>
-                )}
+    return (
+        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+            <div className={`col-span-12 ${isTablet ? "" : "xl:col-span-8 pr-0 xl:pr-12"}`}>
+                <SupplierTableSection
+                    suppliers={paginatedSuppliers}
+                    totalCount={activeSuppliers.length}
+                    columns={COLUMNS}
+                    headers={HEADERS}
+                    selectedSupplierId={selectedSupplierId}
+                    editingId={editingId}
+                    savingId={savingId}
+                    isEditing={isEditing}
+                    editSku={editSku}
+                    editCost={editCost}
+                    editLead={editLead}
+                    onSelectSupplier={handleSelectSupplier}
+                    onStartEdit={handleStartEdit}
+                    onCancelEdit={handleCancelEdit}
+                    onSaveEdit={handleSaveEdit}
+                    onRemoveSupplier={handleRemoveSupplier}
+                    onEditSkuChange={setEditSku}
+                    onEditCostChange={setEditCost}
+                    onEditLeadChange={setEditLead}
+                    onAddClick={handleOpenSelector}
+                    adding={savingId !== null}
+                    suppliersPage={suppliersPage}
+                    suppliersTotalPages={suppliersTotalPages}
+                    onSuppliersPageChange={setSuppliersPage}
+                />
             </div>
 
-            {activeSuppliers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
-                    <IconPlaceholder
-                        icon={TagIcon}
-                        title="Nenhum fornecedor vinculado"
-                        subtitle="Vincule fornecedores a este produto para gerenciar custos e reposições."
-                        itemButton={{
-                            text: "Adicionar fornecedor",
-                            action: () => setShowSelector(true),
-                            variant: "outline",
-                            className: !isEditing ? "opacity-50 pointer-events-none" : ""
-                        }}
-                    />
-                </div>
-            ) : (
-                <div className="w-full overflow-hidden bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl">
-                    <div className="overflow-x-auto custom-scrollbar">
-                        <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
-                            <thead>
-                                <tr className="bg-brand-slate dark:bg-dark-surface">
-                                    <th className="py-2.5 px-4 pl-6 rounded-tl-xl border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                        Fornecedor
-                                    </th>
-                                    <th className="py-2.5 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                        SKU
-                                    </th>
-                                    <th className="py-2.5 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                        Custo
-                                    </th>
-                                    <th className="py-2.5 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                        Lead Time
-                                    </th>
-                                    <th className="py-2.5 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                        Última Compra
-                                    </th>
-                                    <th className="py-2.5 px-4 pr-6 rounded-tr-xl border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-center w-20">
-                                        Ações
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <AnimatePresence initial={false}>
-                                    {activeSuppliers.map((s) => {
-                                        const isSelected = selectedSupplierId === s.supplier_id
-                                        const isEditingThis = editingId === s.supplier_id
-                                        const isSavingThis = savingId === s.supplier_id
-                                        return (
-                                            <motion.tr
-                                                key={s.supplier_id}
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                className={`group transition-colors cursor-pointer ${
-                                                    isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : "hover:bg-brand-gray dark:hover:bg-gray-900/50"
-                                                }`}
-                                                onClick={() => setSelectedSupplierId(s.supplier_id)}
-                                            >
-                                                <td className="p-4 pl-6 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center text-xs font-bold text-brand-dark dark:text-dark-heading shrink-0">
-                                                            {s.supplier_name.charAt(0).toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading block">{s.supplier_name}</span>
-                                                            {s.supplier_document && <span className="text-[11px] text-brand-inactive-text">{s.supplier_document}</span>}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 border-b border-brand-border dark:border-dark-border">
-                                                    {isEditingThis ? (
-                                                        <Input value={editSku} onChange={(e) => setEditSku(e.target.value)} className="w-28 h-8 text-xs" placeholder="SKU" />
-                                                    ) : (
-                                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{s.supplier_sku || "-"}</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-4 border-b border-brand-border dark:border-dark-border">
-                                                    {isEditingThis ? (
-                                                        <Input value={editCost} onChange={(e) => setEditCost(e.target.value)} className="w-24 h-8 text-xs" placeholder="0,00" inputMode="decimal" />
-                                                    ) : (
-                                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{s.cost_price != null ? formatCurrency(s.cost_price) : "-"}</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-4 border-b border-brand-border dark:border-dark-border">
-                                                    {isEditingThis ? (
-                                                        <Input value={editLead} onChange={(e) => setEditLead(e.target.value)} className="w-16 h-8 text-xs" placeholder="dias" inputMode="numeric" />
-                                                    ) : (
-                                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{s.lead_time_days != null ? `${s.lead_time_days} dias` : "-"}</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-4 border-b border-brand-border dark:border-dark-border">
-                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                                        {s.last_purchase_date ? new Date(s.last_purchase_date).toLocaleDateString("pt-BR") : "-"}
-                                                    </span>
-                                                    {s.last_purchase_price != null && (
-                                                        <span className="text-[11px] text-brand-inactive-text block">{formatCurrency(s.last_purchase_price)}</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-4 text-center border-b border-brand-border dark:border-dark-border">
-                                                    {isSavingThis ? (
-                                                        <Spinner size={16} />
-                                                    ) : isEditingThis ? (
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <button onClick={() => saveEdit(s)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-brand-green/10 text-brand-green"><CheckIcon size={14} /></button>
-                                                            <button onClick={cancelEdit} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-50 text-brand-red"><XIcon size={14} /></button>
-                                                        </div>
-                                                    ) : isEditing ? (
-                                                        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={(e) => { e.stopPropagation(); startEdit(s) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"><EditIcon size={14} /></button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleRemoveSupplier(s.supplier_id) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 text-brand-inactive-text hover:text-brand-red"><TrashIcon size={14} /></button>
-                                                        </div>
-                                                    ) : null}
-                                                </td>
-                                            </motion.tr>
-                                        )
-                                    })}
-                                </AnimatePresence>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-
-    const renderPurchaseHistorySidebar = () => {
-        if (activeSuppliers.length === 0) return null
-
-        return (
-            <div className="space-y-6">
-                {/* Última Compra Card */}
-                {selectedSupplier && (
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                        <div className="px-5 pt-5 pb-3">
-                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide">Última Compra</h3>
-                        </div>
-                        <div className="px-5 pb-5 space-y-3">
-                            <div className="flex items-center gap-3 pb-3 border-b border-brand-border dark:border-dark-border">
-                                <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center">
-                                    <Package size={18} className="text-brand-green" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedSupplier.supplier_name}</p>
-                                    <p className="text-xs text-brand-inactive-text">
-                                        {selectedSupplier.last_purchase_date
-                                            ? new Date(selectedSupplier.last_purchase_date).toLocaleDateString("pt-BR")
-                                            : "Nenhuma compra registrada"}
-                                    </p>
-                                </div>
+            {!isTablet && selectedSupplier && (
+                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                    {/* Última Compra */}
+                    <SidebarCard>
+                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide mb-4">Última Compra</h3>
+                        <div className="flex items-center gap-3 pb-3 border-b border-brand-border dark:border-dark-border">
+                            <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center">
+                                <Package size={18} className="text-brand-green" />
                             </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <p className="text-xs text-brand-inactive-text font-medium">Último Custo</p>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        {selectedSupplier.last_purchase_price != null
-                                            ? formatCurrency(selectedSupplier.last_purchase_price)
-                                            : selectedSupplier.cost_price != null
-                                                ? formatCurrency(selectedSupplier.cost_price)
-                                                : "-"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-brand-inactive-text font-medium">Custo Atual</p>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        {selectedSupplier.cost_price != null ? formatCurrency(selectedSupplier.cost_price) : "-"}
-                                    </p>
-                                </div>
+                            <div>
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedSupplier.supplier_name}</p>
+                                <p className="text-xs text-brand-inactive-text">
+                                    {selectedSupplier.last_purchase_date
+                                        ? new Date(selectedSupplier.last_purchase_date).toLocaleDateString("pt-BR")
+                                        : "Nenhuma compra registrada"}
+                                </p>
                             </div>
-
-                            {selectedSupplier.lead_time_days != null && (
-                                <div className="flex justify-between items-center pt-1">
-                                    <span className="text-xs text-brand-inactive-text font-medium">Lead Time</span>
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedSupplier.lead_time_days} dias</span>
-                                </div>
-                            )}
                         </div>
-                    </div>
-                )}
+                        <div className="grid grid-cols-2 gap-3 mt-3">
+                            <div>
+                                <p className="text-xs text-brand-inactive-text font-medium">Último Custo</p>
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    {selectedSupplier.last_purchase_price != null
+                                        ? formatCurrency(selectedSupplier.last_purchase_price)
+                                        : selectedSupplier.cost_price != null
+                                            ? formatCurrency(selectedSupplier.cost_price)
+                                            : "-"}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-brand-inactive-text font-medium">Custo Atual</p>
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    {selectedSupplier.cost_price != null ? formatCurrency(selectedSupplier.cost_price) : "-"}
+                                </p>
+                            </div>
+                        </div>
+                        {selectedSupplier.lead_time_days != null && (
+                            <div className="flex justify-between items-center pt-3">
+                                <span className="text-xs text-brand-inactive-text font-medium">Lead Time</span>
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedSupplier.lead_time_days} dias</span>
+                            </div>
+                        )}
+                    </SidebarCard>
 
-                {/* Histórico de Custos */}
-                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                    <div className="px-5 pt-5 pb-3">
-                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide">Histórico de Custos</h3>
-                    </div>
-                    <div className="px-5 pb-5">
+                    {/* Histórico de Custos */}
+                    <SidebarCard>
+                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide mb-4">Histórico de Custos</h3>
                         {costHistoryLoading ? (
                             <div className="flex justify-center py-4"><Spinner size={20} /></div>
                         ) : costHistory.length === 0 ? (
                             <p className="text-sm text-brand-inactive-text text-center py-4">Nenhum histórico disponível</p>
                         ) : (
-                            <div className="space-y-2">
-                                {costHistory.map((h: any) => (
-                                    <div key={h.id} className="flex items-center justify-between py-1.5 border-b border-brand-border/50 dark:border-dark-border/50 last:border-0">
-                                        <div>
-                                            <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(h.new_cost)}
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text">{h.supplier_name}</p>
-                                        </div>
-                                        <span className="text-xs text-brand-inactive-text">{new Date(h.changed_at).toLocaleDateString("pt-BR")}</span>
-                                    </div>
+                            <div className="space-y-6 relative">
+                                {costHistory.length > 1 && (
+                                    <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                                )}
+                                {costHistory.map((h: any, idx: number) => (
+                                    <TimelineItem
+                                        key={h.id}
+                                        icon={TagIcon}
+                                        time={new Date(h.changed_at).toLocaleDateString("pt-BR")}
+                                        title={formatCurrency(h.new_cost)}
+                                        subtitle={h.supplier_name}
+                                    />
                                 ))}
                             </div>
                         )}
-                    </div>
-                </div>
+                    </SidebarCard>
 
-                {/* Compras Recentes */}
-                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                    <div className="px-5 pt-5 pb-3">
-                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide">Compras Recentes</h3>
-                    </div>
-                    <div className="px-5 pb-3">
+                    {/* Compras Recentes */}
+                    <SidebarCard>
+                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide mb-4">Compras Recentes</h3>
                         {purchasesLoading ? (
                             <div className="flex justify-center py-4"><Spinner size={20} /></div>
                         ) : purchases.length === 0 ? (
                             <p className="text-sm text-brand-inactive-text text-center py-4">Nenhuma compra encontrada</p>
                         ) : (
-                            <div className="space-y-2">
-                                {purchases.map((p: any) => (
-                                    <div key={p.id} className="flex items-center justify-between py-2 border-b border-brand-border/50 dark:border-dark-border/50 last:border-0">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                                                {p.supplier_name}
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text">
-                                                {Number(p.quantity).toFixed(2)} {productData.unit || "un"} x {formatCurrency(p.unit_cost)}
-                                            </p>
-                                        </div>
-                                        <div className="text-right ml-3 shrink-0">
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(p.total_cost)}</p>
-                                            <p className="text-xs text-brand-inactive-text">{new Date(p.date).toLocaleDateString("pt-BR")}</p>
-                                        </div>
-                                    </div>
+                            <div className="space-y-6 relative">
+                                {purchases.length > 1 && (
+                                    <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                                )}
+                                {purchases.map((p: any, idx: number) => (
+                                    <TimelineItem
+                                        key={p.id}
+                                        icon={Package}
+                                        time={new Date(p.date).toLocaleDateString("pt-BR")}
+                                        title={p.supplier_name}
+                                        subtitle={`${Number(p.quantity).toFixed(2)} ${productData.unit || "un"} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
+                                    />
                                 ))}
                             </div>
                         )}
-                    </div>
-                    {purchasesTotalPages > 1 && (
-                        <div className="px-5 pb-4">
-                            <Pagination currentPage={purchasesPage} totalPages={purchasesTotalPages} onPageChange={setPurchasesPage} />
-                        </div>
-                    )}
-                </div>
-            </div>
-        )
-    }
-
-    return (
-        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-            {/* Main Column */}
-            <div className={`col-span-12 ${isTablet ? "" : "xl:col-span-8 pr-0 xl:pr-12"}`}>
-                {renderSupplierTable()}
-            </div>
-
-            {/* Sidebar */}
-            {!isTablet && (
-                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                    {renderPurchaseHistorySidebar()}
+                        {purchasesTotalPages > 1 && (
+                            <div className="mt-4">
+                                <Pagination currentPage={purchasesPage} totalPages={purchasesTotalPages} onPageChange={setPurchasesPage} />
+                            </div>
+                        )}
+                    </SidebarCard>
                 </div>
             )}
 
-            <SupplierSelectorSheet
+            <SelectSupplierSheet
                 isOpen={showSelector}
-                onClose={() => setShowSelector(false)}
+                onClose={handleCloseSelector}
                 onSelect={handleAddSupplier}
                 partnerId={partnerId}
                 selectedSupplierIds={suppliers.map(s => s.supplier_id)}

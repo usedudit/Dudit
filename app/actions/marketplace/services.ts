@@ -14,7 +14,7 @@ const SLOT_INCREMENT_MINUTES = 15
 /**
  * Fetch a single service for the marketplace detail page.
  * Includes partner info (store name, address, avatar, payment methods).
- * No auth required — public data only.
+ * No auth required - public data only.
  */
 async function _getMarketplaceService(serviceId: string) {
   if (!serviceId) return null
@@ -118,7 +118,7 @@ export async function getServiceReviews(serviceId: string) {
 /**
  * Fetch staff members (partner_users) for a given partner.
  * Used to let the customer pick a professional when booking.
- * No ERP auth — public data only (names and IDs).
+ * No ERP auth - public data only (names and IDs).
  */
 export async function getServiceStaffMembers(partnerId: string) {
   if (!partnerId) return []

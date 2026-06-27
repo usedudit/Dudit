@@ -28,22 +28,22 @@ Legenda: Informe os dados básicos e o status ativo.
 4. Preencha:
    - **Nome** do entregador.
    - **Telefone** para contato (opcional).
-   - **Observações** (opcional — ex: "Disponível apenas à tarde").
+   - **Observações** (opcional - ex: "Disponível apenas à tarde").
 5. Clique em **Salvar**.
 
 ### Editar ou desativar entregador
 
 Na lista de entregadores, você pode:
 
-- **Editar** — Alterar nome, telefone ou observações.
-- **Ativar/Desativar** — Um entregador desativado não aparece nas opções ao criar novas entregas. As entregas antigas continuam registradas.
+- **Editar** - Alterar nome, telefone ou observações.
+- **Ativar/Desativar** - Um entregador desativado não aparece nas opções ao criar novas entregas. As entregas antigas continuam registradas.
 
 ### Estatísticas do entregador
 
 Para cada entregador, o sistema mostra:
 
-- **Entregas ativas** — Quantas estão em andamento no momento.
-- **Entregas concluídas** — Total já finalizado.
+- **Entregas ativas** - Quantas estão em andamento no momento.
+- **Entregas concluídas** - Total já finalizado.
 - **Tempo médio** por entrega.
 
 ## Como criar uma entrega
@@ -67,14 +67,14 @@ Legenda: Cada sugestão mostra os pedidos, distância total e tempo estimado.
 Se preferir montar a rota você mesmo:
 
 1. Clique em **Nova entrega**.
-2. **Selecione os pedidos** — Busque pelos pedidos com entrega pendente. Eles aparecem com endereço e valor do frete.
+2. **Selecione os pedidos** - Busque pelos pedidos com entrega pendente. Eles aparecem com endereço e valor do frete.
 
 [IMAGEM: Seleção de pedidos para compor a entrega]
 Legenda: Selecione um ou mais pedidos para a mesma rota.
 
-3. **Atribua um entregador** (opcional) — Se não atribuir agora, pode fazer depois.
+3. **Atribua um entregador** (opcional) - Se não atribuir agora, pode fazer depois.
 4. Informe a **data e hora de saída**.
-5. Adicione **observações** (opcional — ex: "Entregar após as 14h").
+5. Adicione **observações** (opcional - ex: "Entregar após as 14h").
 6. Clique em **Criar entrega**.
 
 Após criar, a entrega aparece na listagem com status **Pendente**. O entregador designado consegue visualizar os detalhes no sistema (se tiver perfil de acesso).

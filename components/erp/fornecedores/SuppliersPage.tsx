@@ -29,9 +29,12 @@ import {
   BlockedIcon,
   CheckCircleIcon,
   FileTextIcon,
+  ExportFileIcon,
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 
 interface Supplier {
   id: string
@@ -136,6 +139,7 @@ export default function SuppliersPage({
 
   const observerTarget = useRef<HTMLDivElement>(null)
 
+  const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
   const isLoading = isQueryLoading
   const itemsPerPage = 8
 
@@ -272,6 +276,15 @@ export default function SuppliersPage({
     })
   }
 
+  const handleExport = useCallback(() => {
+    void exportData({
+      partnerId,
+      module: "suppliers",
+      format: "xlsx",
+      filters: { search: debouncedSearch, activeTab, status: filters.status },
+    }, { selectedIds: selection.ids, totalCount: filteredSuppliers.length })
+  }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, selection.ids, filteredSuppliers.length])
+
   const handleClearFilters = () => {
     setSearch("")
     setFilters(INITIAL_FILTERS)
@@ -404,6 +417,9 @@ export default function SuppliersPage({
                 </div>
 
                 <div className="flex items-center gap-3">
+                  <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                    {isExporting ? "Exportando..." : "Exportar"}
+                  </Button>
                   <Button onClick={handleAddSupplier} leftIcon={<PlusIcon size={18} />}>
                     Novo fornecedor
                   </Button>
@@ -639,6 +655,15 @@ export default function SuppliersPage({
       />
 
       <SavingStatusModal isOpen={isDeletingSupplier || isProcessingBulk} text={isDeletingSupplier ? "Excluindo fornecedor..." : "Processando..."} />
+
+      <ExportSelectionModal
+        isOpen={selectionModal.isOpen}
+        selectedCount={selectionModal.selectedCount}
+        totalCount={selectionModal.totalCount}
+        onExportSelected={handleExportSelected}
+        onExportAll={handleExportAll}
+        onClose={closeSelectionModal}
+      />
 
       <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection(p => ({ ...p, ids: new Set() }))}>
         <Button

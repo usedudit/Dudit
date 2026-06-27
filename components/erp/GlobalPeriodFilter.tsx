@@ -47,7 +47,7 @@ export function GlobalPeriodFilter() {
   const compareLabel = compare === "none"
     ? "Comparar"
     : compare === "custom"
-      ? `${compareFrom || "..."} — ${compareTo || "..."}`
+      ? `${compareFrom || "..."} - ${compareTo || "..."}`
       : COMPARE_PRESET_LABELS[compare] || "Comparar"
 
   return (

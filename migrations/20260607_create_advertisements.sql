@@ -91,7 +91,7 @@ CREATE INDEX IF NOT EXISTS idx_advertisements_radius_coords
 
 ALTER TABLE public.advertisements ENABLE ROW LEVEL SECURITY;
 
--- No policies for anon/authenticated — all access via service-role server actions.
+-- No policies for anon/authenticated - all access via service-role server actions.
 
 -- ─── Analytics RPCs (atomic increments) ────────────────────────────────────
 

@@ -24,6 +24,8 @@ import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { useEntityPage } from '@/hooks/use-entity-page';
+import { useErpExport } from '@/hooks/use-erp-export';
+import ExportSelectionModal from '@/components/erp/export/ExportSelectionModal';
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -121,6 +123,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     const [isUndoing, setIsUndoing] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
     const [selection, setSelection] = useState({ ids: new Set<string>() });
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport();
 
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ left: false, right: false });
@@ -376,6 +379,19 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     });
 
 
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "stock-movements",
+            format: "xlsx",
+            filters: {
+                search: debouncedSearch,
+                activeTab,
+                movementType: filters.movement_type,
+            },
+        }, { selectedIds: selection.ids, totalCount: filteredMovements.length })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters.movement_type, selection.ids, filteredMovements.length])
+
     const handleClearFilters = () => {
         setSearchTerm("");
         setFilters({ movement_type: [], datePeriod: { ...EMPTY_DATE_PERIOD } });
@@ -438,8 +454,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <Button variant="outline" onClick={() => { }} leftIcon={<ExportFileIcon size={18} />}>
-                                    Exportar
+                                <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                    {isExporting ? "Exportando..." : "Exportar"}
                                 </Button>
 
                                 <Button onClick={() => openEntity('create')} leftIcon={<PlusIcon size={18} />}>
@@ -677,6 +693,15 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                         confirmText={isUndoing ? "Desfazendo..." : "Desfazer Todos"}
                         variant="warning"
                         isLoading={isUndoing}
+                    />
+
+                    <ExportSelectionModal
+                        isOpen={selectionModal.isOpen}
+                        selectedCount={selectionModal.selectedCount}
+                        totalCount={selectionModal.totalCount}
+                        onExportSelected={handleExportSelected}
+                        onExportAll={handleExportAll}
+                        onClose={closeSelectionModal}
                     />
 
                     {/* Floating Action Bar */}

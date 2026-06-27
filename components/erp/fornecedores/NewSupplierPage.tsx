@@ -19,7 +19,8 @@ import {
     ListItem,
     RadioButton,
     FormTextarea,
-    UnsavedChangesDialog
+    UnsavedChangesDialog,
+    FormSection
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
@@ -379,11 +380,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                     </div>
                                                 </section>
 
-                                                <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
-
                                                 {/* Dados Tributários */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Dados tributários</h3>
+                                                <FormSection title="Dados tributários" hasSeparator>
                                                     <div className="space-y-6">
                                                         <div>
                                                             <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
@@ -479,13 +477,10 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                             </motion.div>
                                                         )}
                                                     </div>
-                                                </section>
-
-                                                <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+                                                </FormSection>
 
                                                 {/* Contato */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Contato</h3>
+                                                <FormSection title="Contato" hasSeparator>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                         <EmailInput
                                                             label="E-mail"
@@ -544,14 +539,13 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                             errorMessage={fieldErrors.has("website") ? "Website inválido" : undefined}
                                                         />
                                                     </div>
-                                                </section>
+                                                </FormSection>
                                             </FadeIn>
                                         </TabsContent>
 
                                         <TabsContent value="address" className="mt-0">
                                             <FadeIn key="address" className="space-y-10">
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço principal</h3>
+                                                <FormSection title="Endereço principal">
                                                     <div className="space-y-4">
                                                         <CepInput
                                                             label="CEP"
@@ -601,13 +595,13 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                             />
                                                         </div>
                                                     </div>
-                                                </section>
+                                                </FormSection>
                                             </FadeIn>
                                         </TabsContent>
 
                                         <TabsContent value="notes" className="mt-0">
                                             <FadeIn key="notes">
-                                                <section>
+                                                <FormSection title="Observações">
                                                     <FormTextarea
                                                         label="Observações"
                                                         value={observacoes}
@@ -615,7 +609,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                         placeholder="Adicione observações internas sobre este fornecedor..."
                                                         name="observacoes"
                                                     />
-                                                </section>
+                                                </FormSection>
                                             </FadeIn>
                                         </TabsContent>
                                     </AnimatePresence>

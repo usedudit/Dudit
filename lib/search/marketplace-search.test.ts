@@ -43,7 +43,7 @@ describe("exact matching", () => {
 })
 
 describe("synonym expansion (delegated to DB)", () => {
-  it("returns normalized token only — no hardcoded dictionary", () => {
+  it("returns normalized token only - no hardcoded dictionary", () => {
     expect(expandSynonyms("roupas")).toEqual(["roupas"])
     expect(expandSynonyms("Roupas")).toEqual(["roupas"])
   })

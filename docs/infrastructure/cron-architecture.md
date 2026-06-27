@@ -1,4 +1,4 @@
-# WhatsApp Automation — Cron Architecture
+# WhatsApp Automation - Cron Architecture
 
 ## Overview
 
@@ -117,11 +117,11 @@ For each endpoint, create a cron job at [cron-job.org](https://cron-job.org):
 | Status | Body | Meaning |
 |--------|------|---------|
 | `200` | `{ success: true, enqueued: N }` | Jobs enqueued successfully |
-| `200` | `{ success: true, skipped: true, reason: "lock_active" }` | Previous execution still running — safe skip |
+| `200` | `{ success: true, skipped: true, reason: "lock_active" }` | Previous execution still running - safe skip |
 | `401` | `{ error: "Unauthorized" }` | Missing or invalid Bearer token |
 | `405` | `{ error: "Method not allowed" }` | Must use POST |
 | `429` | `{ error: "Rate limited" }` | Too many requests from this IP |
-| `500` | `{ error: "..." }` | Server error — check logs |
+| `500` | `{ error: "..." }` | Server error - check logs |
 
 ---
 
@@ -187,9 +187,9 @@ To reprocess dead-letter messages manually, update their status back to `pending
 
 | Old (Railway) | New (Serverless) |
 |---------------|------------------|
-| `scripts/whatsapp-cron.mjs` | **Deleted** — cron-job.org calls API directly |
-| `/api/cron/whatsapp-process` | **Deleted** — replaced by 3 internal endpoints |
-| `npm run cron:whatsapp` | **Deleted** — no npm cron script |
+| `scripts/whatsapp-cron.mjs` | **Deleted** - cron-job.org calls API directly |
+| `/api/cron/whatsapp-process` | **Deleted** - replaced by 3 internal endpoints |
+| `npm run cron:whatsapp` | **Deleted** - no npm cron script |
 | `CRON_SECRET` (for WhatsApp) | `INTERNAL_CRON_SECRET` (new, separate) |
 | Railway cron container | cron-job.org free tier |
 | Inline processing | Trigger.dev async tasks |

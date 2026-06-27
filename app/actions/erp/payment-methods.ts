@@ -133,11 +133,11 @@ export async function getPaymentMethodsAction(partnerId: string) {
     const { data: methods, error } = await supabase
         .from("payment_methods")
         .select(
-            "id, name, payment_type, type, is_active, is_default, is_online_default, " +
+            "id, name, payment_type, type, is_active, " +
+            "is_default, is_online_default, " +
             "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
-            "supports_installments, max_installments, card_brand, " +
-            "receiving_days, default_finance_account_id, priority, " +
-            "percentage_rate, fixed_amount, created_at, updated_at"
+            "max_installments, card_brand, priority, " +
+            "percentage_rate, fixed_amount, created_at"
         )
         .eq("partner_id", partnerId)
         .order("is_default", { ascending: false })
@@ -155,7 +155,6 @@ export async function getPaymentMethodsAction(partnerId: string) {
             fee_percent: method.fee_percent ?? method.percentage_rate ?? null,
             fee_fixed: method.fee_fixed ?? method.fixed_amount ?? null,
             fee_bearer: method.fee_bearer || "merchant",
-            supports_installments: Boolean(method.supports_installments ?? ((method.max_installments || 1) > 1)),
         })),
     }
 }
@@ -197,6 +196,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
     paymentMethodId: string
     installmentNumber?: number
     feeBearer?: "merchant" | "customer"
+    includeInstallmentOptions?: boolean
 }) {
     await requireUser()
     const supabase = createAdminClient()
@@ -239,7 +239,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
     const maxInst = Math.max(1, Number(method.max_installments || 1))
     const installmentOptions = []
 
-    if (chosenType === "credit_card" && maxInst > 1) {
+    if (input.includeInstallmentOptions !== false && chosenType === "credit_card" && maxInst > 1) {
         for (let i = 1; i <= maxInst; i++) {
             const instFee = (pmConfig.installmentFees || []).find((f: any) => f.installmentNumber === i)
             const instConfig = instFee

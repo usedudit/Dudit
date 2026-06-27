@@ -65,7 +65,7 @@ async function step2_backfill() {
   `);
   console.log(`  Before: ${before[0].pending_backfill} pending, ${before[0].already_filled} already filled, ${before[0].no_buyer_id} without buyer_id`);
 
-  // Step 2A: Vitrine Online orders — match by customers.user_id
+  // Step 2A: Vitrine Online orders - match by customers.user_id
   const r2a = await query(`
     UPDATE orders o
     SET customer_id = c.id
@@ -76,7 +76,7 @@ async function step2_backfill() {
   `);
   console.log(`  Step 2A (Vitrine → user_id match): ${r2a.rowCount} orders updated`);
 
-  // Step 2B: ERP orders — buyer_id IS customers.id
+  // Step 2B: ERP orders - buyer_id IS customers.id
   const r2b = await query(`
     UPDATE orders o
     SET customer_id = o.buyer_id
@@ -86,7 +86,7 @@ async function step2_backfill() {
   `);
   console.log(`  Step 2B (ERP → customers.id match): ${r2b.rowCount} orders updated`);
 
-  // Step 2C: Remaining Vitrine Online — match by email via auth.users lookup
+  // Step 2C: Remaining Vitrine Online - match by email via auth.users lookup
   const r2c = await query(`
     WITH unmatched AS (
       SELECT o.id AS order_id, o.buyer_id
@@ -129,7 +129,7 @@ async function step2_backfill() {
 async function step3_report(stats) {
   console.log('\n=== STEP 3: RELATORIO FINAL ===');
   console.log('========================================');
-  console.log('MIGRATION 1000 — add_customer_id_to_orders');
+  console.log('MIGRATION 1000 - add_customer_id_to_orders');
   console.log('========================================');
   console.log('');
   console.log(`Total de orders:              ${stats.after.total}`);

@@ -23,26 +23,26 @@ Legenda: Selecione os itens do pedido que serão devolvidos.
 [IMAGEM: Botão "Nova solicitação" na listagem]
 Legenda: O botão inicia o processo de devolução.
 
-3. **Selecione o pedido** — Busque pelo número do pedido ou localize na lista de pedidos pagos.
+3. **Selecione o pedido** - Busque pelo número do pedido ou localize na lista de pedidos pagos.
 
 [IMAGEM: Busca de pedido para devolução]
 Legenda: Somente pedidos pagos aparecem como elegíveis.
 
-4. **Escolha os itens** — Selecione quais itens do pedido serão devolvidos. Você pode devolver todos ou apenas alguns.
+4. **Escolha os itens** - Selecione quais itens do pedido serão devolvidos. Você pode devolver todos ou apenas alguns.
 5. Para cada item, informe:
    - **Quantidade** a ser devolvida.
    - **Motivo** (ex: "Produto com defeito", "Arrependimento", "Avaria no transporte").
    - **Condição** do produto: **Lacrado** (sem uso), **Aberto** (usado mas íntegro) ou **Avariado** (com danos).
 
 6. **Defina a resolução desejada**:
-   - **Troca** — O cliente quer outro produto no lugar. É permitida apenas para pedidos já entregues.
-   - **Reembolso** — Você vai devolver o valor pago (PIX, cartão ou manual).
-   - **Crédito na loja** — O valor vira crédito para o cliente usar em compras futuras.
+   - **Troca** - O cliente quer outro produto no lugar. É permitida apenas para pedidos já entregues.
+   - **Reembolso** - Você vai devolver o valor pago (PIX, cartão ou manual).
+   - **Crédito na loja** - O valor vira crédito para o cliente usar em compras futuras.
 
 [IMAGEM: Escolha do tipo de resolução]
 Legenda: Cada tipo de resolução segue um fluxo diferente.
 
-7. **Anexe evidências** (opcional) — Faça upload de fotos que comprovem o estado do produto. Útil para produtos com defeito ou avariados.
+7. **Anexe evidências** (opcional) - Faça upload de fotos que comprovem o estado do produto. Útil para produtos com defeito ou avariados.
 8. Adicione uma **mensagem** com detalhes sobre a solicitação (opcional).
 9. Clique em **Criar solicitação**.
 
@@ -69,7 +69,7 @@ Legenda: Cada solicitação mostra seu estágio atual.
 - **Troca** só é permitida para pedidos com status de entrega **Entregue**. Para pedidos que ainda não saíram, prefira cancelar e criar um novo pedido.
 - **Serviços** não podem ser trocados. Para serviços, as opções são reembolso ou crédito.
 - Anexar **fotos do produto** acelera a análise, especialmente em casos de defeito ou avaria.
-- A solicitação pode ser criada **parcialmente** — você não precisa devolver todos os itens do pedido.
+- A solicitação pode ser criada **parcialmente** - você não precisa devolver todos os itens do pedido.
 
 ## Problemas comuns
 

@@ -68,7 +68,7 @@ export default function LabelsPageClient({ isFree }: LabelsPageClientProps) {
             <h3 className="font-semibold text-lg">Modelos Pimaco</h3>
             <ul className="text-sm text-muted-foreground mt-2 space-y-1">
               {LABEL_PRESETS.map((p) => (
-                <li key={p.id}>✓ {p.name} — {p.description}</li>
+                <li key={p.id}>✓ {p.name} - {p.description}</li>
               ))}
               <li>✓ Customizado</li>
             </ul>

@@ -87,7 +87,7 @@ export function WhatsAppIntegrationPage({
   const [isLoading, setIsLoading] = useState(false)
   const [testPhone, setTestPhone] = useState("")
 
-  // Evolution-specific state (simplified — no manual config)
+  // Evolution-specific state (simplified - no manual config)
   const [evoStatus, setEvoStatus] = useState<string>("disconnected")
   const [evoQrCode, setEvoQrCode] = useState<string | null>(null)
   const [evoPhoneNumber, setEvoPhoneNumber] = useState<string | null>(null)
@@ -221,7 +221,7 @@ export function WhatsAppIntegrationPage({
     await refresh()
   }
 
-  // ─── Evolution actions (simplified — zero config) ───────────────────
+  // ─── Evolution actions (simplified - zero config) ───────────────────
 
   const handleEvoConnect = async () => {
     setEvoIsLoading(true)
@@ -395,11 +395,11 @@ export function WhatsAppIntegrationPage({
                       </div>
                     )}
 
-                    {/* Configured — not connected */}
+                    {/* Configured - not connected */}
                     {evoConfigured === true && (!evoConnection || evoStatus === "disconnected" || evoStatus === "error") && !evoQrCode && (
                       <div className="space-y-4">
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                          Conecte seu WhatsApp escaneando o QR Code. A conexão é automática — basta clicar no botão abaixo.
+                          Conecte seu WhatsApp escaneando o QR Code. A conexão é automática - basta clicar no botão abaixo.
                         </p>
                         <Button
                           onClick={handleEvoConnect}
@@ -443,7 +443,7 @@ export function WhatsAppIntegrationPage({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Telefone</span>
-                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{evoPhoneNumber || evoConnection.phoneNumber || "—"}</span>
+                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{evoPhoneNumber || evoConnection.phoneNumber || "-"}</span>
                           </div>
                           <div>
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Status</span>
@@ -527,7 +527,7 @@ export function WhatsAppIntegrationPage({
                     </div>
 
                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4 leading-relaxed">
-                      Conecte o número oficial do seu negócio com um clique. Você será redirecionado para autorizar na Meta — sem precisar copiar tokens ou configurar webhooks.
+                      Conecte o número oficial do seu negócio com um clique. Você será redirecionado para autorizar na Meta - sem precisar copiar tokens ou configurar webhooks.
                     </p>
 
                     {!isMetaConnected ? (
@@ -617,7 +617,7 @@ export function WhatsAppIntegrationPage({
                                   t.approvalStatus === "APPROVED" ? "green" : t.approvalStatus === "REJECTED" ? "red" : "gray"
                                 }
                               >
-                                {TEMPLATE_STATUS_LABELS[t.approvalStatus || ""] || t.approvalStatus || "—"}
+                                {TEMPLATE_STATUS_LABELS[t.approvalStatus || ""] || t.approvalStatus || "-"}
                               </Badge>
                             </li>
                           ))}

@@ -230,7 +230,7 @@ export function CheckoutPageClient() {
                     setSessionData(updated)
                     sessionStorage.setItem("checkout_session", JSON.stringify(updated))
                 } catch {
-                    // Legacy session without cart line — checkout context stays disabled
+                    // Legacy session without cart line - checkout context stays disabled
                 }
             })()
 

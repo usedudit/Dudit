@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     // 4. Claim due scheduled jobs using the existing DB RPC
     // The RPC atomically sets status to 'processing' and returns claimed rows
-    // Uses run_at <= NOW() — never exact time matching
+    // Uses run_at <= NOW() - never exact time matching
     const admin = getAdminClient()
     const { data: jobs, error } = await admin.rpc("claim_whatsapp_scheduled_jobs", {
       p_limit: BATCH_SIZE,

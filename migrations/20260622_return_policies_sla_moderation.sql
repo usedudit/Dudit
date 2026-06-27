@@ -10,7 +10,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.partner_return_policies (
   partner_id UUID PRIMARY KEY REFERENCES public.partners(id) ON DELETE CASCADE,
-  -- Legal reference (informational only — never blocks eligibility)
+  -- Legal reference (informational only - never blocks eligibility)
   legal_online_regret_days INTEGER NOT NULL DEFAULT 7 CHECK (legal_online_regret_days >= 0),
   legal_durable_product_days INTEGER NOT NULL DEFAULT 90 CHECK (legal_durable_product_days >= 0),
   legal_non_durable_product_days INTEGER NOT NULL DEFAULT 30 CHECK (legal_non_durable_product_days >= 0),
@@ -111,7 +111,7 @@ LANGUAGE sql
 IMMUTABLE
 AS $$
   SELECT format(
-    E'Política de Trocas e Devoluções — %s\n\n'
+    E'Política de Trocas e Devoluções - %s\n\n'
     || E'1. Prazo comercial: consulte o prazo informado no momento da compra.\n'
     || E'2. Trocas por tamanho ou cor: conforme disponibilidade de estoque.\n'
     || E'3. Devoluções: produto deve estar em condições de revenda, com embalagem e acessórios.\n'
@@ -950,13 +950,13 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.mp_partner_risk_rank_multiplier IS
-  'Penalização conservadora no ranking. Score 75–99 não oculta — apenas rebaixa; revisão manual é responsabilidade do admin.';
+  'Penalização conservadora no ranking. Score 75–99 não oculta - apenas rebaixa; revisão manual é responsabilidade do admin.';
 
 COMMENT ON FUNCTION public.mp_partner_risk_is_hidden IS
   'Ocultação automática na busca somente com risk_score = 100.';
 
 -- Patch search_marketplace: v2 (20260610) + penalização de risk_score apenas no rank.
--- NÃO alterar diversified/paginação/cursor — copiados da versão canônica.
+-- NÃO alterar diversified/paginação/cursor - copiados da versão canônica.
 DROP FUNCTION IF EXISTS public.search_marketplace(TEXT, TEXT, INT, REAL, UUID, UUID[]);
 
 CREATE OR REPLACE FUNCTION public.search_marketplace(

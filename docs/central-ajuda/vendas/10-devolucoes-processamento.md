@@ -20,10 +20,10 @@ Legenda: Todas as informações da solicitação em um só lugar.
 
 Na tela de detalhes você encontra:
 
-- **Itens devolvidos** — Lista com quantidades, motivo e condição de cada item.
-- **Evidências** — Fotos enviadas pelo cliente (se houver).
-- **Resolução desejada** — O que o cliente espera (troca, reembolso, crédito).
-- **Histórico** — Linha do tempo com eventos da solicitação.
+- **Itens devolvidos** - Lista com quantidades, motivo e condição de cada item.
+- **Evidências** - Fotos enviadas pelo cliente (se houver).
+- **Resolução desejada** - O que o cliente espera (troca, reembolso, crédito).
+- **Histórico** - Linha do tempo com eventos da solicitação.
 
 [IMAGEM: Aba de histórico com eventos registrados]
 Legenda: Acompanhe cada etapa do processamento.
@@ -38,7 +38,7 @@ Legenda: Acompanhe cada etapa do processamento.
    - **Próximo status:** "Aprovado" ou "Em processamento".
    - **Valor do reembolso** (se aplicável).
    - **Valor do crédito na loja** (se aplicável).
-   - **Itens de troca** (se for troca — veja abaixo).
+   - **Itens de troca** (se for troca - veja abaixo).
    - **Restituir ao estoque:** marque se os produtos devolvidos devem voltar ao estoque.
 
 3. Clique em **Confirmar**.
@@ -96,8 +96,8 @@ Se a resolução for **Crédito na loja**:
 
 Ao processar uma devolução, você decide se os itens devolvidos voltam ao estoque:
 
-- **Sim** — Os produtos são adicionados de volta ao estoque automaticamente.
-- **Não** — O estoque não é alterado (útil para itens danificados que serão descartados).
+- **Sim** - Os produtos são adicionados de volta ao estoque automaticamente.
+- **Não** - O estoque não é alterado (útil para itens danificados que serão descartados).
 
 ## Dicas importantes
 

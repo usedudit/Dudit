@@ -97,13 +97,13 @@ function MappingRow({
                         value={col.field || ""}
                         setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
                         options={[
-                            { value: "", label: "— Não importar —" },
+                            { value: "", label: "- Não importar -" },
                             ...availableFields.map((f) => ({
                                 value: f.name,
                                 label: `${f.label}${f.required ? " *" : ""}`,
                             })),
                         ]}
-                        placeholder="— Não importar —"
+                        placeholder="- Não importar -"
                     />
                 </div>
             </td>
@@ -173,13 +173,13 @@ function MappingMobileItem({
                     value={col.field || ""}
                     setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
                     options={[
-                        { value: "", label: "— Não importar —" },
+                        { value: "", label: "- Não importar -" },
                         ...availableFields.map((f) => ({
                             value: f.name,
                             label: `${f.label}${f.required ? " *" : ""}`,
                         })),
                     ]}
-                    placeholder="— Não importar —"
+                    placeholder="- Não importar -"
                 />
             </div>
         </div>
@@ -400,7 +400,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                         {step === "upload"
                                             ? "Faça upload de uma planilha .xlsx, .xls ou .csv com produtos."
                                             : step === "mapping"
-                                                ? `${totalRows} produto(s) encontrados — ${mappedCount} de ${headers.length} colunas mapeadas`
+                                                ? `${totalRows} produto(s) encontrados - ${mappedCount} de ${headers.length} colunas mapeadas`
                                                 : `${totalRows} produto(s) encontrados`}
                                     </div>
                                 </div>

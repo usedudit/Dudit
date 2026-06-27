@@ -176,7 +176,7 @@ const QuotePreview = ({
                             key={pageIndex}
                             className={`w-[650px] min-w-[650px] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[1050px] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm"}`}
                         >
-                            {/* ✅ HEADER — relative z-10 agora está DENTRO desta div */}
+                            {/* ✅ HEADER - relative z-10 agora está DENTRO desta div */}
                             <div
                                 className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
                                 style={{ backgroundColor: resolvedColors.primary }}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     XIcon,
     ChevronLeftIcon,
@@ -23,33 +23,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
-import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
+import { calculatePaymentMethodAmountsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 import { getMercadoPagoStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
+import { usePaymentMethods } from '@/hooks/use-payment-methods';
 
 
-const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
-
-const paymentMethodsCache = new Map<string, {
-    methods: PartnerPaymentMethod[];
-    signature: string;
-}>();
-
-const buildMethodsSignature = (methods: PartnerPaymentMethod[]) =>
-    JSON.stringify(
-        (methods || []).map((method: any) => ({
-            id: method.id,
-            name: method.name,
-            type: method.type,
-            is_active: method.is_active,
-            updated_at: method.updated_at || null,
-        }))
-    );
 
 const normalizePaymentMethodLabel = (value?: string | null) => {
     const normalized = String(value || '').trim().toLowerCase();
@@ -77,7 +61,7 @@ const getFormattedMethodLabel = (name: string, type?: string | null) => {
 
 // --- HELPER COMPONENTS ---
 
-const CompactPaymentStatusAlert = ({ totalPaid, totalNeed }: { totalPaid: number, totalNeed: number }) => {
+const CompactPaymentStatusAlert = React.memo(({ totalPaid, totalNeed }: { totalPaid: number, totalNeed: number }) => {
     const diff = totalPaid - totalNeed;
     const absDiff = Math.abs(diff);
 
@@ -111,10 +95,10 @@ const CompactPaymentStatusAlert = ({ totalPaid, totalNeed }: { totalPaid: number
             </span>
         </div>
     );
-};
+});
 
 // Success Action Card
-const SuccessActionCard = ({ icon: Icon, label, onClick }: { icon: any, label: string, onClick?: () => void }) => (
+const SuccessActionCard = React.memo(({ icon: Icon, label, onClick }: { icon: any, label: string, onClick?: () => void }) => (
     <div
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
         onClick={onClick}
@@ -127,9 +111,9 @@ const SuccessActionCard = ({ icon: Icon, label, onClick }: { icon: any, label: s
         </div>
         <ChevronRightIcon size={16} className="text-brand-inactive-text" />
     </div>
-);
+));
 
-function PaymentPricingDetailBadge({ calculation, baseAllocated }: { calculation: any; baseAllocated: number }) {
+const PaymentPricingDetailBadge = React.memo(({ calculation, baseAllocated }: { calculation: any; baseAllocated: number }) => {
     if (!calculation?.success) return null;
     const base = Math.max(0, Number(baseAllocated || 0));
     const disc = Number(calculation.paymentMethodDiscountAmount || 0);
@@ -151,9 +135,9 @@ function PaymentPricingDetailBadge({ calculation, baseAllocated }: { calculation
             </div>
         </div>
     );
-}
+});
 
-function PaymentPricingTooltipBadge({ calculation, baseAllocated }: { calculation: any; baseAllocated: number }) {
+const PaymentPricingTooltipBadge = React.memo(({ calculation, baseAllocated }: { calculation: any; baseAllocated: number }) => {
     if (!calculation?.success) return null;
     const base = Math.max(0, Number(baseAllocated || 0));
     const disc = Number(calculation.paymentMethodDiscountAmount || 0);
@@ -201,9 +185,9 @@ function PaymentPricingTooltipBadge({ calculation, baseAllocated }: { calculatio
             </span>
         </Tooltip>
     );
-}
+});
 
-function PaymentAmountLabel({
+const PaymentAmountLabel = React.memo(({
     label,
     calculation,
     baseAllocated,
@@ -211,7 +195,7 @@ function PaymentAmountLabel({
     label: string;
     calculation: any;
     baseAllocated: number;
-}) {
+}) => {
     return (
         <div className="mb-2 flex items-center gap-2">
             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{label}</span>
@@ -220,7 +204,7 @@ function PaymentAmountLabel({
             ) : null}
         </div>
     );
-}
+});
 
 // --- MAIN COMPONENT ---
 
@@ -366,6 +350,10 @@ const PaymentModal = ({
     const [feeBearerOverride, setFeeBearerOverride] = useState<"merchant" | "customer" | null>(null);
     const [isPaymentCalculationLoading, setIsPaymentCalculationLoading] = useState(false);
     const [isSplitPreviewLoading, setIsSplitPreviewLoading] = useState(false);
+    const lastOptionsConfigRef = useRef<{ methodId: string | null; feeBearer: string | null }>({ methodId: null, feeBearer: null });
+    // CSS animation state matching DefaultModal/AlertModal
+    const [isAnimating, setIsAnimating] = useState(false);
+    const [isVisible, setIsVisible] = useState(false);
     const [splitPreview, setSplitPreview] = useState<
         { success: true; finalTotal: number; rows: any[] } | { success: false; error: string } | null
     >(null);
@@ -424,69 +412,42 @@ const PaymentModal = ({
         return digits ? Number(digits) / 100 : 0;
     };
 
-    // Fetch Partner Payment Methods
-    const [availableMethods, setAvailableMethods] = useState<PartnerPaymentMethod[]>([]);
+    // Fetch Partner Payment Methods via React Query (shared cache, deduplicated)
+    const { methods: availableMethods, isLoading: isLoadingMethods, invalidate } = usePaymentMethods(isOpen ? partnerId : '');
+
     const activeMethods = useMemo(
-        () => (availableMethods || []).filter((method) => method?.is_active !== false),
+        () => (availableMethods || []).filter((method: PartnerPaymentMethod) => method?.is_active !== false),
         [availableMethods],
     );
 
     const availableMethodTypes = useMemo(() => {
-        const types = new Set(activeMethods.map((m) => normalizeMethodType(m.type)));
+        const types = new Set(activeMethods.map((m: PartnerPaymentMethod) => normalizeMethodType(m.type)));
         types.add("cash"); // Always allow cash
         return types;
     }, [activeMethods]);
 
-    useEffect(() => {
-        if (!isOpen || !partnerId) return;
-
-        const cacheKey = String(partnerId);
-        const versionKey = `${PAYMENT_METHODS_VERSION_PREFIX}${cacheKey}`;
-        const cached = paymentMethodsCache.get(cacheKey);
-        if (cached?.methods?.length) {
-            setAvailableMethods(cached.methods);
-        }
-
-        const storedVersion = typeof window !== "undefined" ? window.localStorage.getItem(versionKey) : null;
-        const hasVersionChange = Boolean(storedVersion && storedVersion !== cached?.signature);
-
-        if (cached && !hasVersionChange) return;
-
-        getPaymentMethodsAction(partnerId).then(res => {
-            if (!res.methods) return;
-            const methods = res.methods as PartnerPaymentMethod[];
-            setAvailableMethods(methods);
-            const signature = buildMethodsSignature(methods);
-            paymentMethodsCache.set(cacheKey, { methods, signature });
-            if (typeof window !== "undefined") {
-                window.localStorage.setItem(versionKey, signature);
-            }
-        });
-    }, [isOpen, partnerId]);
-
+    // Listen for payment methods updates from settings page (create/update/delete)
     useEffect(() => {
         if (!partnerId || typeof window === "undefined") return;
-        const cacheKey = String(partnerId);
-        const versionKey = `${PAYMENT_METHODS_VERSION_PREFIX}${cacheKey}`;
 
-        const refreshOnChange = () => {
-            const expectedSignature = window.localStorage.getItem(versionKey);
-            const cached = paymentMethodsCache.get(cacheKey);
-            if (!expectedSignature || cached?.signature === expectedSignature) return;
-
-            getPaymentMethodsAction(partnerId).then((res) => {
-                if (!res.methods) return;
-                const methods = res.methods as PartnerPaymentMethod[];
-                setAvailableMethods(methods);
-                const signature = buildMethodsSignature(methods);
-                paymentMethodsCache.set(cacheKey, { methods, signature });
-                window.localStorage.setItem(versionKey, signature);
-            });
-        };
+        const refreshOnChange = () => { invalidate(); };
 
         window.addEventListener(PAYMENT_METHODS_UPDATED_EVENT, refreshOnChange);
         return () => window.removeEventListener(PAYMENT_METHODS_UPDATED_EVENT, refreshOnChange);
-    }, [partnerId]);
+    }, [partnerId, invalidate]);
+
+    // CSS animation two-phase mount/unmount (matching DefaultModal/AlertModal)
+    useEffect(() => {
+        if (isOpen) {
+            setIsVisible(true);
+            const id = setTimeout(() => setIsAnimating(true), 50);
+            return () => clearTimeout(id);
+        } else {
+            setIsAnimating(false);
+            const id = setTimeout(() => setIsVisible(false), 200);
+            return () => clearTimeout(id);
+        }
+    }, [isOpen]);
 
     // Reset when opening
     useEffect(() => {
@@ -729,7 +690,7 @@ const PaymentModal = ({
             const paymentMethod = responseData.paymentMethod;
 
             if (status === "approved") {
-                // Payment approved — register the sale via onConfirm
+                // Payment approved - register the sale via onConfirm
                 handleStartProcessing({
                     paymentMethod: responseData.paymentMethodDisplayName || "Mercado Pago",
                     paymentProvider: "Mercado Pago",
@@ -779,7 +740,7 @@ const PaymentModal = ({
                     setMpBrickError("Dados do Boleto não retornados pelo provedor.");
                 }
             } else if (status === "in_process" || status === "pending") {
-                // Payment in analysis — register as pending
+                // Payment in analysis - register as pending
                 handleStartProcessing({
                     paymentMethod: responseData.paymentMethodDisplayName || "Mercado Pago",
                     paymentProvider: "Mercado Pago",
@@ -868,7 +829,7 @@ const PaymentModal = ({
                 }
                 setIsSplitPreviewLoading(false);
             });
-        }, 200);
+        }, 500);
         return () => {
             active = false;
             clearTimeout(t);
@@ -906,7 +867,7 @@ const PaymentModal = ({
     useEffect(() => {
         const handler = setTimeout(() => {
             setCalcBaseAmount(paymentBaseAmount);
-        }, 200);
+        }, 500);
         return () => clearTimeout(handler);
     }, [paymentBaseAmount]);
 
@@ -937,17 +898,27 @@ const PaymentModal = ({
         const base = editingPaymentIndex !== null
             ? Math.max(0, Number(calcBaseAmount || 0))
             : chargeTarget;
+
+        // Only compute full installment options when method or fee bearer changes
+        const shouldComputeOptions = selectedMethodId !== lastOptionsConfigRef.current.methodId
+            || feeBearerOverride !== lastOptionsConfigRef.current.feeBearer;
+        if (shouldComputeOptions) {
+            lastOptionsConfigRef.current = { methodId: selectedMethodId, feeBearer: feeBearerOverride };
+        }
+
         setIsPaymentCalculationLoading(true);
         calculatePaymentMethodAmountsAction({
             originalAmount: base,
             paymentMethodId: selectedMethodId,
             installmentNumber,
             ...(feeBearerOverride ? { feeBearer: feeBearerOverride } : {}),
+            includeInstallmentOptions: shouldComputeOptions,
         }).then((res: any) => {
             if (!active) return;
             if (res?.success) {
                 setPaymentCalculation(res);
-                if (res.installmentOptions) {
+                // Only overwrite installment options when server computed fresh ones
+                if (res.installmentOptions && res.installmentOptions.length > 0) {
                     setInstallmentOptions(res.installmentOptions);
                 }
                 // Only override paymentBaseAmount in single-payment mode, not split legs
@@ -1516,7 +1487,7 @@ const PaymentModal = ({
     };
 
     // --- STANDARD ANIMATION CONFIGURATION ---
-    const standardTransition = { duration: 0.5, ease: [0.4, 0, 0.2, 1] as const };
+    const standardTransition = { duration: 0.15, ease: [0.4, 0, 0.2, 1] as const };
 
     const contentVariants = {
         initial: { opacity: 0, x: 20 },
@@ -1532,7 +1503,7 @@ const PaymentModal = ({
 
     const footerMobileTotal = displayTransactionTotal;
 
-    if (!isOpen) return null;
+    if (!isVisible) return null;
     const isCloseLocked = paymentStatus === 'processing';
     const handleSafeClose = () => {
         if (isCloseLocked) return;
@@ -1588,14 +1559,13 @@ const PaymentModal = ({
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleSafeClose} />
+            <div
+                className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"}`}
+                onClick={handleSafeClose}
+            />
 
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={standardTransition}
-                className="relative bg-white dark:bg-dark-surface w-full h-full md:h-[85vh] md:max-w-[1100px] md:rounded-3xl flex flex-col md:flex-row overflow-hidden z-10"
+            <div
+                className={`relative bg-white dark:bg-dark-surface w-full h-full md:h-[85vh] md:max-w-[1100px] md:rounded-3xl flex flex-col md:flex-row overflow-hidden z-10 transition-all duration-200 ease-out ${isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
             >
                 {/* --- LEFT COLUMN: RECEIPT (Desktop Only) --- */}
                 <div className="hidden md:flex w-[40%] bg-white dark:bg-dark-surface p-8 flex-col relative z-20 border-r border-brand-border dark:border-dark-border">
@@ -1707,73 +1677,83 @@ const PaymentModal = ({
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
-                                                {availableMethodTypes.has("cash") && (
-                                                    <PaymentMethodCard
-                                                        icon={MoneyIcon}
-                                                        label="Dinheiro"
-                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Dinheiro'}
-                                                        onClick={() => openMethodTypeSelection("cash")}
-                                                    />
-                                                )}
-                                                {availableMethodTypes.has("pix") && (
-                                                    <PaymentMethodCard
-                                                        icon={QRCodeIcon}
-                                                        label="Pix"
-                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Pix'}
-                                                        onClick={() => openMethodTypeSelection("pix")}
-                                                    />
-                                                )}
-                                                {availableMethodTypes.has("credit_card") && (
-                                                    <PaymentMethodCard
-                                                        icon={CreditCardIcon}
-                                                        label="Cartão de Crédito"
-                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Crédito'}
-                                                        onClick={() => openMethodTypeSelection("credit_card")}
-                                                    />
-                                                )}
-                                                {availableMethodTypes.has("debit_card") && (
-                                                    <PaymentMethodCard
-                                                        icon={CreditCardIcon}
-                                                        label="Cartão de Débito"
-                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Débito'}
-                                                        onClick={() => openMethodTypeSelection("debit_card")}
-                                                    />
-                                                )}
-                                                {availableMethodTypes.has("bank_transfer") && (
-                                                    <PaymentMethodCard
-                                                        icon={FileIcon}
-                                                        label="Transferência"
-                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Transferência'}
-                                                        onClick={() => openMethodTypeSelection("bank_transfer")}
-                                                    />
-                                                )}
-                                                {availableMethodTypes.has("other") && (
-                                                    <PaymentMethodCard
-                                                        icon={TagIcon}
-                                                        label="Outros"
-                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Outros'}
-                                                        onClick={() => openMethodTypeSelection("other")}
-                                                    />
-                                                )}
-                                                <PaymentMethodCard
-                                                    icon={SplitIcon}
-                                                    label="Dividir"
-                                                    disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin'}
-                                                    onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
-                                                />
-                                                {mpConnected && (
-                                                    <button
-                                                        onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
-                                                        className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
-                                                    >
-                                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#00b1ea]/10 flex items-center justify-center transition-colors group-hover:bg-white dark:group-hover:bg-dark-surface overflow-hidden">
-                                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-6 h-6 md:w-7 md:h-7 object-contain" />
+                                            {isLoadingMethods && activeMethods.length === 0 ? (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                                                        <div key={i} className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border bg-gray-50 dark:bg-dark-border/10 animate-pulse">
+                                                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-200 dark:bg-dark-border/50" />
+                                                            <div className="h-3 w-20 bg-gray-200 dark:bg-dark-border/50 rounded" />
                                                         </div>
-                                                        <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">Mercado Pago</span>
-                                                    </button>
-                                                )}
-                                            </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {availableMethodTypes.has("cash") && (
+                                                        <PaymentMethodCard
+                                                            icon={MoneyIcon}
+                                                            label="Dinheiro"
+                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Dinheiro'}
+                                                            onClick={() => openMethodTypeSelection("cash")}
+                                                        />
+                                                    )}
+                                                    {availableMethodTypes.has("pix") && (
+                                                        <PaymentMethodCard
+                                                            icon={QRCodeIcon}
+                                                            label="Pix"
+                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Pix'}
+                                                            onClick={() => openMethodTypeSelection("pix")}
+                                                        />
+                                                    )}
+                                                    {availableMethodTypes.has("credit_card") && (
+                                                        <PaymentMethodCard
+                                                            icon={CreditCardIcon}
+                                                            label="Cartão de Crédito"
+                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Crédito'}
+                                                            onClick={() => openMethodTypeSelection("credit_card")}
+                                                        />
+                                                    )}
+                                                    {availableMethodTypes.has("debit_card") && (
+                                                        <PaymentMethodCard
+                                                            icon={CreditCardIcon}
+                                                            label="Cartão de Débito"
+                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Débito'}
+                                                            onClick={() => openMethodTypeSelection("debit_card")}
+                                                        />
+                                                    )}
+                                                    {availableMethodTypes.has("bank_transfer") && (
+                                                        <PaymentMethodCard
+                                                            icon={FileIcon}
+                                                            label="Transferência"
+                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Transferência'}
+                                                            onClick={() => openMethodTypeSelection("bank_transfer")}
+                                                        />
+                                                    )}
+                                                    {availableMethodTypes.has("other") && (
+                                                        <PaymentMethodCard
+                                                            icon={TagIcon}
+                                                            label="Outros"
+                                                            disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Outros'}
+                                                            onClick={() => openMethodTypeSelection("other")}
+                                                        />
+                                                    )}
+                                                    <PaymentMethodCard
+                                                        icon={SplitIcon}
+                                                        label="Dividir"
+                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin'}
+                                                        onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
+                                                    />
+                                                    {mpConnected && (
+                                                        <button
+                                                            onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
+                                                            className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
+                                                        >
+                                                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#00b1ea]/10 flex items-center justify-center transition-colors group-hover:bg-white dark:group-hover:bg-dark-surface overflow-hidden">
+                                                                <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-6 h-6 md:w-7 md:h-7 object-contain" />
+                                                            </div>
+                                                            <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">Mercado Pago</span>
+                                                        </button>
+                                                    )}
+                                                </div>)}
 
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
 
@@ -2555,7 +2535,7 @@ const PaymentModal = ({
                         </>
                     )}
                 </AnimatePresence>
-            </motion.div>
+            </div>
 
             {printOrderId && (
                 <SaleReceiptPrintModal

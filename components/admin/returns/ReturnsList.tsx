@@ -363,7 +363,7 @@ function ReturnDetailsSheet({ request, isOpen, onClose }: ReturnDetailsSheetProp
                                                 {item.product_name_snapshot || "Item"}
                                             </span>
                                             <span className="text-[11px] text-brand-inactive-text">
-                                                Qtd: {item.quantity || 1} — {item.reason || item.condition || "-"}
+                                                Qtd: {item.quantity || 1} - {item.reason || item.condition || "-"}
                                             </span>
                                         </div>
                                         {item.net_item_value_snapshot && (

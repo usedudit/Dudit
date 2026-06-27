@@ -67,9 +67,9 @@ interface Props {
         paymentMethods: PaymentMethodOption[]
     }
     initialActiveSession: any | null
-    /** SSR-loaded promotions — avoids a client-side Server Action POST on mount */
+    /** SSR-loaded promotions - avoids a client-side Server Action POST on mount */
     initialPromotions?: any[]
-    /** SSR-loaded team members — avoids a client-side Server Action POST on mount */
+    /** SSR-loaded team members - avoids a client-side Server Action POST on mount */
     initialTeam?: {
         members: { id: string; fullName?: string | null; userId?: string; avatarUrl?: string | null }[]
         currentUserId?: string

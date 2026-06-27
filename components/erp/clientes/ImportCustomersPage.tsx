@@ -79,13 +79,13 @@ function MappingRow({
                         value={col.field || ""}
                         setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
                         options={[
-                            { value: "", label: "— Não importar —" },
+                            { value: "", label: "- Não importar -" },
                             ...availableFields.map((f) => ({
                                 value: f.name,
                                 label: `${f.label}${f.required ? " *" : ""}`,
                             })),
                         ]}
-                        placeholder="— Não importar —"
+                        placeholder="- Não importar -"
                     />
                 </div>
             </td>
@@ -155,13 +155,13 @@ function MappingMobileItem({
                     value={col.field || ""}
                     setValue={(newVal) => onMappingChange(col.headerIndex, newVal || null)}
                     options={[
-                        { value: "", label: "— Não importar —" },
+                        { value: "", label: "- Não importar -" },
                         ...availableFields.map((f) => ({
                             value: f.name,
                             label: `${f.label}${f.required ? " *" : ""}`,
                         })),
                     ]}
-                    placeholder="— Não importar —"
+                    placeholder="- Não importar -"
                 />
             </div>
         </div>
@@ -205,17 +205,17 @@ function CustomerPreviewRow({
             </td>
             <td className="py-4 px-3 align-middle">
                 <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">
-                    {customer.phone || "—"}
+                    {customer.phone || "-"}
                 </span>
             </td>
             <td className="py-4 px-3 align-middle">
                 <span className="text-[13px] text-brand-dark dark:text-dark-heading font-medium">
-                    {customer.cpf || customer.cnpj || "—"}
+                    {customer.cpf || customer.cnpj || "-"}
                 </span>
             </td>
             <td className="py-4 px-3 align-middle">
                 <span className="text-[13px] text-brand-inactive-text dark:text-dark-body">
-                    {customer.city ? `${customer.city}${customer.state ? ` / ${customer.state}` : ""}` : "—"}
+                    {customer.city ? `${customer.city}${customer.state ? ` / ${customer.state}` : ""}` : "-"}
                 </span>
             </td>
             <td className="py-4 px-3 align-middle text-center">
@@ -436,7 +436,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                         {step === "upload"
                                             ? "Faça upload de uma planilha .xlsx, .xls ou .csv com clientes."
                                             : step === "mapping"
-                                                ? `${totalRows} cliente(s) encontrados — ${mappedCount} de ${headers.length} colunas mapeadas`
+                                                ? `${totalRows} cliente(s) encontrados - ${mappedCount} de ${headers.length} colunas mapeadas`
                                                 : `${totalRows} cliente(s) encontrados`}
                                     </div>
                                 </div>

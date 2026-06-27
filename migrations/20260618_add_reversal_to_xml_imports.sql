@@ -1,7 +1,7 @@
 -- ============================================================================
 -- MIGRATION: Add reversal support to xml_imports
 -- Description: Columns for safe transactional reversal of XML NF-e imports.
--- No data is ever deleted — all reversals are auditable.
+-- No data is ever deleted - all reversals are auditable.
 -- ============================================================================
 
 -- 1. Add reversal columns to xml_imports

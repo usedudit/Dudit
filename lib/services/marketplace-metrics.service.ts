@@ -94,7 +94,7 @@ export async function incrementMarketplaceView(
 
 /**
  * Called after order is paid and fulfillment completes (or in parallel).
- * Safe to call from webhook, sync, ERP — DB ensures idempotency.
+ * Safe to call from webhook, sync, ERP - DB ensures idempotency.
  */
 export async function onMarketplaceOrderPaid(
   supabase: SupabaseClient,

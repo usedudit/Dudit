@@ -1,23 +1,37 @@
 import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/server"
-import { MODULE_SHEET_NAMES } from "./constants"
+import { MODULE_SHEET_NAMES, formatExportFilename } from "./constants"
 import { fetchOrdersExport, fetchSalesExport } from "./fetchers/orders"
 import { fetchProductsExport } from "./fetchers/products"
 import { fetchCustomersExport } from "./fetchers/customers"
 import { fetchServicesExport } from "./fetchers/services"
 import { fetchAppointmentsExport } from "./fetchers/appointments"
 import { fetchSubscriptionsExport } from "./fetchers/subscriptions"
+import { fetchReturnsExport } from "./fetchers/returns"
+import { fetchStockMovementsExport } from "./fetchers/stock-movements"
+import { fetchTransactionsExport } from "./fetchers/transactions"
+import { fetchSuppliersExport } from "./fetchers/suppliers"
+import { fetchServiceOrdersExport } from "./fetchers/service-orders"
+import { fetchCashRegisterExport } from "./fetchers/cash-register"
+import { fetchXmlImportExport } from "./fetchers/xml-import"
 import { buildExportFile } from "./workbook"
 import type {
   AppointmentsExportFilters,
+  CashRegisterExportFilters,
   CustomersExportFilters,
   ErpExportFormat,
   ErpExportModule,
   OrdersExportFilters,
   ProductsExportFilters,
+  ReturnsExportFilters,
+  ServiceOrdersExportFilters,
   ServicesExportFilters,
+  StockMovementsExportFilters,
   SubscriptionsExportFilters,
+  SuppliersExportFilters,
+  TransactionsExportFilters,
+  XmlImportExportFilters,
 } from "./types"
 
 export async function generateErpExport(params: {
@@ -53,6 +67,27 @@ export async function generateErpExport(params: {
     case "subscriptions":
       result = await fetchSubscriptionsExport(supabase, partnerId, filters as SubscriptionsExportFilters)
       break
+    case "returns":
+      result = await fetchReturnsExport(supabase, partnerId, filters as ReturnsExportFilters)
+      break
+    case "stock-movements":
+      result = await fetchStockMovementsExport(supabase, partnerId, filters as StockMovementsExportFilters)
+      break
+    case "transactions":
+      result = await fetchTransactionsExport(supabase, partnerId, filters as TransactionsExportFilters)
+      break
+    case "suppliers":
+      result = await fetchSuppliersExport(supabase, partnerId, filters as SuppliersExportFilters)
+      break
+    case "service-orders":
+      result = await fetchServiceOrdersExport(supabase, partnerId, filters as ServiceOrdersExportFilters)
+      break
+    case "cash-register":
+      result = await fetchCashRegisterExport(supabase, partnerId, filters as CashRegisterExportFilters)
+      break
+    case "xml-import":
+      result = await fetchXmlImportExport(supabase, partnerId, filters as XmlImportExportFilters)
+      break
     default:
       throw new Error("Módulo de exportação inválido")
   }
@@ -65,8 +100,7 @@ export async function generateErpExport(params: {
     format,
   })
 
-  const dateStamp = new Date().toISOString().slice(0, 10)
-  const filename = `dudit-${module}-${dateStamp}.${file.extension}`
+  const filename = formatExportFilename(module, file.extension)
 
   return {
     filename,

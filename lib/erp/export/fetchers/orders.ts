@@ -36,7 +36,7 @@ async function resolveSellerNames(supabase: SupabaseClient, partnerId: string, u
     .in("user_id", unique)
 
   for (const row of data || []) {
-    if (row.user_id) map.set(String(row.user_id), row.full_name || "—")
+    if (row.user_id) map.set(String(row.user_id), row.full_name || "-")
   }
   return map
 }
@@ -53,7 +53,8 @@ function applyOrderFilters(query: any, filters: OrdersExportFilters, partnerId: 
 
   if (filters.customerId) query = query.eq("buyer_id", filters.customerId)
 
-  if (filters.channels?.length) query = query.in("order_source", filters.channels)
+  const channels = (filters.channels || []).filter(Boolean)
+  if (channels.length > 0) query = query.in("order_source", channels)
 
   if (filters.paymentMethods?.length) {
     const methods = filters.paymentMethods.map((m) => m.trim()).filter(Boolean)
@@ -78,7 +79,7 @@ function applySaleFilters(query: any, filters: OrdersExportFilters, partnerId: s
     const paymentStatuses = situations.filter((s) =>
       ["paid", "pending", "partially_paid", "cancelled"].includes(s),
     )
-    if (paymentStatuses.length) query = query.in("payment_status", paymentStatuses)
+    if (paymentStatuses.length > 0) query = query.in("payment_status", paymentStatuses)
   }
 
   const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)

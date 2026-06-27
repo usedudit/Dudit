@@ -76,4 +76,4 @@ WHERE adjustment_type IS NULL;
 COMMENT ON COLUMN public.transaction_payments.adjustment_type IS 'discount | fee | interest | none';
 COMMENT ON COLUMN public.transaction_payments.adjustment_percent IS 'The percentage that generated the adjustment';
 COMMENT ON COLUMN public.transaction_payments.net_amount IS 'What the merchant effectively receives after fees';
-COMMENT ON COLUMN public.transaction_payments.fee_bearer IS 'merchant | customer — who bears the fee';
+COMMENT ON COLUMN public.transaction_payments.fee_bearer IS 'merchant | customer - who bears the fee';

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { exportERPAction, type ExportERPInput } from "@/app/actions/erp/export"
 import { useToast } from "@/hooks/use-toast"
 
@@ -17,11 +17,23 @@ function downloadBase64File(base64: string, filename: string, mimeType: string) 
   URL.revokeObjectURL(url)
 }
 
+export interface UseErpExportOptions {
+  selectedIds?: Set<string>
+  totalCount?: number
+}
+
 export function useErpExport() {
   const { toast } = useToast()
   const [isExporting, setIsExporting] = useState(false)
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean
+    selectedCount: number
+    totalCount: number
+    selectedIds: string[]
+    baseInput: ExportERPInput
+  } | null>(null)
 
-  const exportData = useCallback(
+  const doExport = useCallback(
     async (input: ExportERPInput) => {
       if (isExporting) return
       setIsExporting(true)
@@ -35,7 +47,6 @@ export function useErpExport() {
           })
           return
         }
-
         downloadBase64File(res.base64, res.filename, res.mimeType)
         toast({
           title: "Exportação concluída",
@@ -54,5 +65,60 @@ export function useErpExport() {
     [isExporting, toast],
   )
 
-  return { exportData, isExporting }
+  const exportData = useCallback(
+    (input: ExportERPInput, opts?: UseErpExportOptions) => {
+      const selectedIds = opts?.selectedIds
+      const totalCount = opts?.totalCount ?? 0
+      const selectedCount = selectedIds?.size ?? 0
+
+      if (selectedCount > 0 && selectedCount < totalCount) {
+        setModalState({
+          isOpen: true,
+          selectedCount,
+          totalCount,
+          selectedIds: Array.from(selectedIds!),
+          baseInput: input,
+        })
+      } else {
+        void doExport(input)
+      }
+    },
+    [doExport],
+  )
+
+  const closeModal = useCallback(() => {
+    setModalState(null)
+  }, [])
+
+  const handleExportSelected = useCallback(() => {
+    if (!modalState) return
+    const { baseInput, selectedIds } = modalState
+    void doExport({
+      ...baseInput,
+      filters: { ...baseInput.filters, selectedIds },
+    })
+  }, [modalState, doExport])
+
+  const handleExportAll = useCallback(() => {
+    if (!modalState) return
+    void doExport(modalState.baseInput)
+  }, [modalState, doExport])
+
+  const selectionModal = useMemo(
+    () => ({
+      isOpen: modalState?.isOpen ?? false,
+      selectedCount: modalState?.selectedCount ?? 0,
+      totalCount: modalState?.totalCount ?? 0,
+    }),
+    [modalState],
+  )
+
+  return {
+    exportData,
+    isExporting,
+    selectionModal,
+    closeSelectionModal: closeModal,
+    handleExportSelected,
+    handleExportAll,
+  }
 }

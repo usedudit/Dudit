@@ -13,30 +13,41 @@ import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
-    title: "Dudit | Achou, anunciou, resolveu",
-    description: "Descubra produtos, serviços e até itens para aluguel perto de você. Explore negócios locais, fale direto com vendedores e encontre tudo na sua cidade em um só lugar.",
+    title: "Produtos e serviços perto de você",
+    description: "Descubra produtos, serviços e negócios perto de você. Compre direto de quem vende na sua cidade, sem taxa. Milhares de opções na sua região.",
     openGraph: {
-        title: "Dudit | Achou, anunciou, resolveu",
-        description: "Encontre produtos e serviços na sua cidade. Explore negócios locais e fale direto com quem vende.",
+        title: "Produtos e serviços perto de você | Dudit",
+        description: "Descubra produtos, serviços e negócios perto de você.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/Icon.png",
-                width: 512,
-                height: 512,
+                url: "https://img.dudit.com.br/static/og-image.png",
+                width: 1200,
+                height: 630,
             },
         ],
         locale: "pt_BR",
         type: "website",
+    },
+    twitter: {
+        card: "summary_large_image",
+        site: "@dudit",
+        creator: "@dudit",
+        title: "Produtos e serviços perto de você | Dudit",
+        description: "Descubra produtos, serviços e negócios perto de você.",
+        images: ["https://img.dudit.com.br/static/og-image.png"],
+    },
+    alternates: {
+        canonical: "https://dudit.com.br",
     },
     keywords: [
         "produtos perto de mim",
         "serviços na minha cidade",
         "comprar local",
         "negócios locais",
-        "marketplace local brasil"
-    ]
+        "marketplace local brasil",
+    ],
 }
 
 async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName }: any) {

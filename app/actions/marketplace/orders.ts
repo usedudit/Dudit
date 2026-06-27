@@ -18,7 +18,7 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 const revalidateOrdersCache = async () => await revalidateOrders("")
 
 /**
- * @deprecated Prefer checkoutCartAction. Kept for buy-now session compatibility — delegates to unified cart checkout.
+ * @deprecated Prefer checkoutCartAction. Kept for buy-now session compatibility - delegates to unified cart checkout.
  */
 export async function createOrderAction(data: {
   itemId: string

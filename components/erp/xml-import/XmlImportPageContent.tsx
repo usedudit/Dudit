@@ -18,8 +18,10 @@ import {
     UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
     SearchIcon, PlusIcon, ClockIcon, GridIcon, ListIcon,
     PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon,
-    ReloadIcon
+    ReloadIcon, ExportFileIcon
 } from "@/lib/icons"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 
 type TabType = "all" | "pending" | "completed" | "failed"
 
@@ -68,6 +70,7 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
     const storeId = selectedStore?.id || ""
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { openPlanUpgrade } = usePlanUpgrade()
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const router = useRouter()
 
@@ -195,6 +198,15 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
         if (selection.size === paginated.length) setSelection(new Set())
         else setSelection(new Set(paginated.map((i) => i.id)))
     }, [selection.size, paginated])
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "xml-import",
+            format: "xlsx",
+            filters: { search, activeTab, status: [] },
+        }, { selectedIds: selection, totalCount: filtered.length })
+    }, [exportData, partnerId, search, activeTab, selection, filtered.length])
+
     const handleClearFilters = useCallback(() => { setSearch(""); setActiveTab("all") }, [])
     const handleOpenDetail = useCallback((imp: ImportItem) => setViewingImportId(imp.id), [])
     const [reimportedFlag, setReimportedFlag] = useState(false)
@@ -256,6 +268,8 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
                     storeId={storeId}
                     sortConfig={sortConfig}
                     handleSort={handleSort}
+                    onExport={handleExport}
+                    isExporting={isExporting}
                 />
             )}
             {isPreviewView && (
@@ -269,6 +283,15 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
                     reimported={reimportedFlag}
                 />
             )}
+
+            <ExportSelectionModal
+                isOpen={selectionModal.isOpen}
+                selectedCount={selectionModal.selectedCount}
+                totalCount={selectionModal.totalCount}
+                onExportSelected={handleExportSelected}
+                onExportAll={handleExportAll}
+                onClose={closeSelectionModal}
+            />
         </div>
     )
 }
@@ -281,6 +304,7 @@ function ListContent({
     viewMode, setViewMode, selection, handleSelect, handleSelectAll,
     handleClearFilters, handleOpenDetail, showUploadModal, setShowUploadModal,
     handleUploadModalSuccess, partnerId, storeId, sortConfig, handleSort,
+    onExport, isExporting,
 }: {
     imports: ImportItem[]; search: string; setSearch: (v: string) => void;
     page: number; setPage: (v: number) => void;
@@ -296,6 +320,8 @@ function ListContent({
     partnerId: string; storeId: string;
     sortConfig: { key: string; direction: "asc" | "desc" } | null;
     handleSort: (key: string) => void;
+    onExport: () => void;
+    isExporting: boolean;
 }) {
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -335,6 +361,9 @@ function ListContent({
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Importe produtos de notas fiscais eletrônicas.</p>
                     </div>
                     <div className="flex items-center gap-3">
+                        <Button variant="outline" onClick={onExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                            {isExporting ? "Exportando..." : "Exportar"}
+                        </Button>
                         <Button onClick={() => setShowUploadModal(true)} leftIcon={<UploadIcon size={18} />} >
                             Importar XML
                         </Button>
@@ -515,7 +544,7 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
                             NF-e {item.invoice_number || "Sem número"}
                         </span>
                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[200px]">
-                            Chave: {item.access_key?.slice(-8) || "—"}
+                            Chave: {item.access_key?.slice(-8) || "-"}
                         </span>
                     </div>
                 </div>
@@ -560,7 +589,7 @@ function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportIte
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="flex items-center gap-2 min-w-0 pr-1">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0">NF-e {item.invoice_number || "—"}</h3>
+                            <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0">NF-e {item.invoice_number || "-"}</h3>
                         </div>
                         <div className="flex items-center gap-1">
                             <div onClick={(e) => e.stopPropagation()}>
@@ -811,7 +840,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     }
 
     const safeDate = (d: string) => {
-        if (!d) return "—"
+        if (!d) return "-"
         try {
             const dt = new Date(d)
             if (isNaN(dt.getTime())) return d
@@ -820,7 +849,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     }
 
     const safeDateTime = (d: string) => {
-        if (!d) return "—"
+        if (!d) return "-"
         try {
             const dt = new Date(d)
             if (isNaN(dt.getTime())) return d
@@ -851,7 +880,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                 <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">NF-e {preview.invoice.numero || "—"}</span>
+                                            <span className="truncate">NF-e {preview.invoice.numero || "-"}</span>
                                             {isPreview && <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">Preview</Badge>}
                                             {isFailed && <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">Erro</Badge>}
                                             {isCompleted && !isReversed && <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">Importado</Badge>}
@@ -902,7 +931,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                 <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
-                                                            Série {preview.invoice.serie || "—"} | N° {preview.invoice.numero || "—"}
+                                                            Série {preview.invoice.serie || "-"} | N° {preview.invoice.numero || "-"}
                                                         </div>
                                                         {preview.invoice.valor_total > 0 && (
                                                             <div className="text-right">

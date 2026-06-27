@@ -18,7 +18,7 @@ export interface WhatsappProvider {
   sendTemplate(input: SendTemplateInput): Promise<ProviderSendResult>
   sendText(input: SendTextInput): Promise<ProviderSendResult>
 
-  // ─── Media messaging (optional — provider-specific) ─────────────────────────
+  // ─── Media messaging (optional - provider-specific) ─────────────────────────
   sendImage?(input: SendImageInput): Promise<ProviderSendResult>
   sendDocument?(input: SendDocumentInput): Promise<ProviderSendResult>
   sendAudio?(input: SendAudioInput): Promise<ProviderSendResult>

@@ -1116,7 +1116,7 @@ export async function checkoutCartAction(
       })),
     })
     await supabase.from("orders").delete().eq("id", order.id)
-    return { error: `Erro ao adicionar itens ao pedido: ${itemsError.message}${itemsError.details ? ` (${itemsError.details})` : ""}${itemsError.hint ? ` — ${itemsError.hint}` : ""}` }
+    return { error: `Erro ao adicionar itens ao pedido: ${itemsError.message}${itemsError.details ? ` (${itemsError.details})` : ""}${itemsError.hint ? ` - ${itemsError.hint}` : ""}` }
   }
 
   // ATOMIC STOCK DECREMENT (MED-04) - Paralelizado para performance

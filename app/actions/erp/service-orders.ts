@@ -787,7 +787,7 @@ export async function getServiceOrderByTokenAction(
 
     let { data: row, error } = await admin
       .from("service_orders")
-      .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, token_revoked_at, customer_snapshot, created_at, sale_id, specifications")
+      .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, customer_snapshot, created_at, sale_id, specifications")
       .eq("public_token", token)
       .single()
 
@@ -795,7 +795,7 @@ export async function getServiceOrderByTokenAction(
       // Fallback: try lookup by id for legacy OSs without public_token
       const { data: byId } = await admin
         .from("service_orders")
-        .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, token_revoked_at, customer_snapshot, created_at, sale_id, specifications")
+        .select("id, order_number, status, title, description, expected_completion_date, completed_at, total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at, customer_snapshot, created_at, sale_id, specifications")
         .eq("id", token)
         .single()
       if (byId) {
@@ -808,9 +808,6 @@ export async function getServiceOrderByTokenAction(
         throw new Error("Ordem de serviço não encontrada")
       }
     }
-
-    if (row.token_revoked_at) throw new Error("Link expirado ou revogado")
-    if (row.token_revoked_at) throw new Error("Link expirado ou revogado")
 
     const [services, products, attachments, historyRes, statusHistoryRes, saleRes] = await Promise.all([
       admin.from("service_order_services").select("*").eq("service_order_id", row.id).order("sort_order"),

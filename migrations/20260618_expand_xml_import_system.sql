@@ -1,5 +1,5 @@
 -- ============================================================================
--- MIGRATION: Expand XML Import System — NF-e Complete Data
+-- MIGRATION: Expand XML Import System - NF-e Complete Data
 -- Description: Adds columns to xml_imports and xml_import_items to store
 -- full NF-e data: fiscal totals, transport, duplicatas, document metadata,
 -- per-item fiscal details, XML validation, and audit data.
@@ -38,7 +38,7 @@ ALTER TABLE public.xml_imports
   ADD COLUMN IF NOT EXISTS duplicatas JSONB;
   -- [{ numero, vencimento, valor }]
 
--- 2. Expand xml_import_items — per-item fiscal detail
+-- 2. Expand xml_import_items - per-item fiscal detail
 ALTER TABLE public.xml_import_items
   ADD COLUMN IF NOT EXISTS raw_fiscal_detail JSONB;
   -- { icms_cst, icms_vbc, icms_vicms, icms_picms, icms_vbcst, icms_vst,

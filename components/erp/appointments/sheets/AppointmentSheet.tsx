@@ -689,6 +689,7 @@ export const AppointmentSheet = ({
                     staffName: staff ? staff.name : 'Profissional',
                     serviceId: svcs[0]?.id || null,
                     categoryId: svcs[0]?.category_id || null,
+                    services: svcs.map(s => ({ id: s.id, name: s.name, price: Number(s.price || 0), categoryId: s.category_id })),
                 };
             });
 
@@ -745,6 +746,7 @@ export const AppointmentSheet = ({
                         staffName: staff ? staff.name : 'Profissional',
                         serviceId: svcs[0]?.id || null,
                         categoryId: svcs[0]?.category_id || null,
+                        services: svcs.map(s => ({ id: s.id, name: s.name, price: Number(s.price || 0), categoryId: s.category_id })),
                         recurrenceGroupId,
                         recurrenceRule: recurrenceFreq === 'Diário' ? 'daily' : 'weekly'
                     });
@@ -847,6 +849,7 @@ export const AppointmentSheet = ({
             time: timeStr,
             serviceId: selectedServices[0]?.id || null,
             categoryId: selectedServices[0]?.category_id || null,
+            services: selectedServices.map(s => ({ id: s.id, name: s.name, price: Number(s.price || 0), categoryId: s.category_id })),
         };
         onSave(updatedApp);
     };
@@ -1721,7 +1724,7 @@ export const AppointmentSheet = ({
                                                     #{displayOrderNumber}
                                                 </button>
                                             ) : (
-                                                <p className="font-semibold text-brand-dark dark:text-dark-heading">—</p>
+                                                <p className="font-semibold text-brand-dark dark:text-dark-heading">-</p>
                                             )}
                                         </div>
                                         {appointment.needsReschedule && (

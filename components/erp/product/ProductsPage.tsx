@@ -18,6 +18,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 
 // Actions
 import {
@@ -295,7 +296,7 @@ export default function ProductsPage({
     })
     const [modals, setModals] = useState({ filter: false, import: false })
     const [showReplenishment, setShowReplenishment] = useState(false)
-    const { exportData, isExporting } = useErpExport()
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [isCameraOpen, setIsCameraOpen] = useState(false)
 
@@ -354,8 +355,8 @@ export default function ProductsPage({
                 categories: filters.categories,
                 stockStatus: filters.stocks,
             },
-        })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
+        }, { selectedIds: selection.ids, totalCount: products.length })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, products.length])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -1150,6 +1151,15 @@ export default function ProductsPage({
                     allProducts={products}
                 />
             )}
+
+            <ExportSelectionModal
+                isOpen={selectionModal.isOpen}
+                selectedCount={selectionModal.selectedCount}
+                totalCount={selectionModal.totalCount}
+                onExportSelected={handleExportSelected}
+                onExportAll={handleExportAll}
+                onClose={closeSelectionModal}
+            />
         </>
     )
 }

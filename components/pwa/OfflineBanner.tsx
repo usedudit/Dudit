@@ -26,14 +26,14 @@ export function OfflineBanner({ variant = "marketplace" }: { variant?: "erp" | "
           <path d="M8 6V9.33333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           <circle cx="8" cy="11.6667" r="0.6667" fill="currentColor" />
         </svg>
-        <span>Sem conexão — Dados do ERP não estão disponíveis offline. Reconecte para continuar.</span>
+        <span>Sem conexão - Dados do ERP não estão disponíveis offline. Reconecte para continuar.</span>
       </div>
     )
   }
 
   return (
     <div className="w-full bg-brand-orange/90 px-4 py-1.5 text-white text-center text-xs font-medium z-50 shrink-0">
-      Você está offline — Mostrando conteúdo salvo anteriormente.
+      Você está offline - Mostrando conteúdo salvo anteriormente.
     </div>
   )
 }

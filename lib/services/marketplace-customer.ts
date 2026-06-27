@@ -7,7 +7,7 @@ export interface ExistingCustomerMatch {
 }
 
 /**
- * Pure lookup — never creates or alters records.
+ * Pure lookup - never creates or alters records.
  * Searches for an existing customer by email first, then by CPF.
  */
 export async function findExistingCustomer(params: {

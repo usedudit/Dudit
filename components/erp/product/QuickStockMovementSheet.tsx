@@ -1,17 +1,16 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Button, Input, FormDropdown, ThreeDotsLoader } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { XIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { createStockMovementAction } from "@/app/actions/erp/stock-movements"
+import { createBatchStockMovementAction } from "@/app/actions/erp/stock-movements"
 import { useNotification } from "@/hooks/use-notification"
 
-const sheetTransition = { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const }
 const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
 type Props = {
@@ -99,13 +98,15 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
         setIsSaving(true)
         try {
             const finalReason = reason === 'Outro' ? customReason : reason
-            const res = await createStockMovementAction({
-                productId: product.id,
-                variantId: variant?.id || null,
+            const res = await createBatchStockMovementAction({
                 type,
-                quantity,
                 reason: finalReason,
-                notes
+                notes,
+                items: [{
+                    productId: product.id,
+                    variantId: variant?.id || null,
+                    quantity,
+                }],
             })
 
             if (res && res.success) {
@@ -302,29 +303,17 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
 
     return (
         <Portal>
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={sheetTransition}
-                        className="fixed inset-0 z-50 bg-black/50"
-                        onClick={onClose}
-                    >
-                        <motion.div
-                            initial={{ opacity: 0, x: 80 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 80 }}
-                            transition={sheetTransition}
-                            className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {content}
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <div
+                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
         </Portal>
     )
 }

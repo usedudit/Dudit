@@ -362,10 +362,10 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 icon={WrenchIcon}
                                 title={serviceCheckoutPlanBlocked ? (
                                   <span className="inline-flex items-center gap-2">
-                                    Serviços — Checkout
+                                    Serviços - Checkout
                                     <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
                                   </span>
-                                ) : "Serviços — Checkout"}
+                                ) : "Serviços - Checkout"}
                                 description="Entrada (sinal) e opções de pagamento na vitrine."
                                 onClick={() => setActivePage("service-checkout")}
                                 showChevron

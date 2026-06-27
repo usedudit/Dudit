@@ -50,7 +50,7 @@ export async function getMarketplaceAutocompleteAction(
 }
 
 /**
- * Legacy bucket for offline fallback — kept for first-focus warm cache.
+ * Legacy bucket for offline fallback - kept for first-focus warm cache.
  * @deprecated Prefer getMarketplaceAutocompleteAction for typed queries.
  */
 export const getSearchSuggestionsBucket = async () => {

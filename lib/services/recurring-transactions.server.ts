@@ -3,7 +3,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 
 /**
  * Processes due recurring transactions by calling the RPC.
- * Called exclusively by the cron route — NOT exposed as a server action.
+ * Called exclusively by the cron route - NOT exposed as a server action.
  */
 export async function runDueRecurringTransactions(limit = 200) {
   try {

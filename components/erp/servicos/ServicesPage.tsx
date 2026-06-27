@@ -14,6 +14,7 @@ import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 
 // Actions
 import {
@@ -154,7 +155,7 @@ export default function ServicesPage({
 }: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; partner?: any; }) {
     const router = useRouter()
     const { toast } = useToast()
-    const { exportData, isExporting } = useErpExport()
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
@@ -291,8 +292,8 @@ export default function ServicesPage({
                 status: filters.status,
                 categories: filters.categories,
             },
-        })
-    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
+        }, { selectedIds: selection.ids, totalCount: services.length })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, services.length])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -892,6 +893,15 @@ export default function ServicesPage({
                     </div>
                 </div>
             )}
+
+            <ExportSelectionModal
+                isOpen={selectionModal.isOpen}
+                selectedCount={selectionModal.selectedCount}
+                totalCount={selectionModal.totalCount}
+                onExportSelected={handleExportSelected}
+                onExportAll={handleExportAll}
+                onClose={closeSelectionModal}
+            />
         </>
     )
 }

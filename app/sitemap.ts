@@ -2,73 +2,148 @@ import { MetadataRoute } from 'next'
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
 
-// 86400 = Cache por 24 horas (em segundos)
-// Evita consultas repetitivas ao banco
 export const revalidate = 86400
 
-// Regra de Ouro SEO Marketplace Novo: Limite seguro indexáveis
-const MAX_SITEMAP_URLS = 130
+const CATEGORY_SLUGS = [
+    "casa-e-utilidades", "moda-e-beleza", "saude-e-bem-estar",
+    "tecnologia-e-eletronicos", "auto-e-moto", "pets",
+    "construcao-e-ferramentas", "agro-e-jardim", "infantil-e-brinquedos",
+    "alimentacao", "outros",
+]
+
+const ESTADOS = [
+    "ac", "al", "ap", "am", "ba", "ce", "df", "es", "go", "ma",
+    "mt", "ms", "mg", "pa", "pb", "pr", "pe", "pi", "rj", "rn",
+    "rs", "ro", "rr", "sc", "sp", "se", "to",
+]
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const supabase = await getSupabaseServerClient()
-    // URLs base irremovíveis (Institucional/Index)
+
+    const now = new Date()
+
+    // --- Static pages ---
     const staticUrls: MetadataRoute.Sitemap = [
-        { url: 'https://dudit.com.br', lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
-        { url: 'https://dudit.com.br/explorar', lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
-        { url: 'https://dudit.com.br/institucional/inicio', lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-        { url: 'https://dudit.com.br/institucional/sobre', lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-        { url: 'https://dudit.com.br/institucional/planos', lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-        { url: 'https://dudit.com.br/institucional/segmentos', lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
+        { url: "https://dudit.com.br", lastModified: now, changeFrequency: "daily", priority: 1 },
+        { url: "https://dudit.com.br/explorar", lastModified: now, changeFrequency: "daily", priority: 0.9 },
+        { url: "https://dudit.com.br/institucional/inicio", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+        { url: "https://dudit.com.br/institucional/sobre", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+        { url: "https://dudit.com.br/institucional/planos", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+        { url: "https://dudit.com.br/institucional/segmentos", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+        { url: "https://dudit.com.br/institucional/termos", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
+        { url: "https://dudit.com.br/institucional/privacidade", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
+        { url: "https://dudit.com.br/mapa", lastModified: now, changeFrequency: "weekly", priority: 0.6 },
     ]
 
-    if (!supabase) return staticUrls
+    // --- State pages: /explorar/estado-{uf} ---
+    const stateUrls: MetadataRoute.Sitemap = ESTADOS.map((uf) => ({
+        url: `https://dudit.com.br/explorar/estado-${uf}`,
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.7,
+    }))
+
+    // --- Brazil category pages: /explorar/brasil/{categoria} ---
+    const categoryUrls: MetadataRoute.Sitemap = CATEGORY_SLUGS.map((cat) => ({
+        url: `https://dudit.com.br/explorar/brasil/${cat}`,
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.6,
+    }))
+
+    // Base sitemap before dynamic content
+    const baseUrls = [...staticUrls, ...stateUrls, ...categoryUrls]
+
+    if (!supabase) return baseUrls
 
     try {
-        const [partnersResponse, productsResponse] = await Promise.all([
-            // 40 vendedores mais ativos
+        const [partnersResponse, productsResponse, citiesResponse] = await Promise.all([
+            // Top 200 partners
             supabase
-                .from('partners')
-                .select('id, store_name, created_at, addresses(city, state)')
-                .eq('is_active', true)
-                .order('rating', { ascending: false })
-                .limit(40),
+                .from("partners")
+                .select("id, store_name, updated_at, created_at, addresses(city, state)")
+                .eq("is_active", true)
+                .order("rating", { ascending: false })
+                .limit(200),
 
-            // 80 produtos mais recentes ativos
+            // Top 500 most recent products in marketplace
             supabase
-                .from('products')
-                .select('id, name, created_at, partners(id, store_name, addresses(city, state))')
-                .eq('is_active', true)
-                .eq('show_in_marketplace', true)
-                .order('created_at', { ascending: false })
-                .limit(80)
+                .from("products")
+                .select("id, name, updated_at, created_at, partners(id, store_name, addresses(city, state))")
+                .eq("is_active", true)
+                .eq("show_in_marketplace", true)
+                .order("created_at", { ascending: false })
+                .limit(500),
+
+            // Distinct cities from active partners
+            supabase
+                .from("partners")
+                .select("addresses(city, state)")
+                .eq("is_active", true)
+                .not("addresses", "is", null)
+                .limit(200),
         ])
 
-        if (partnersResponse.error) console.error("Sitemap: Erro buscando partners", partnersResponse.error)
-        if (productsResponse.error) console.error("Sitemap: Erro buscando products", productsResponse.error)
+        if (partnersResponse.error) console.error("Sitemap partners error:", partnersResponse.error)
+        if (productsResponse.error) console.error("Sitemap products error:", productsResponse.error)
+        if (citiesResponse.error) console.error("Sitemap cities error:", citiesResponse.error)
 
-        const partners = partnersResponse.data || []
+        // --- Products ---
         const products = productsResponse.data || []
-
         const productsSitemap: MetadataRoute.Sitemap = products.map((prod: any) => ({
             url: `https://dudit.com.br${getProductUrl(prod, prod.partners)}`,
             lastModified: new Date(prod.updated_at || prod.created_at),
-            changeFrequency: 'daily',
-            priority: 0.9,
-        }))
-
-        const partnersSitemap: MetadataRoute.Sitemap = partners.map((p: any) => ({
-            url: `https://dudit.com.br${getPartnerUrl(p)}`,
-            lastModified: new Date(p.updated_at || p.created_at),
-            changeFrequency: 'weekly',
+            changeFrequency: "daily",
             priority: 0.8,
         }))
 
-        // Juntamos e limitamos para validar o conceito: Crescimento Orgânico Simples sem Indexação Lixo
-        const completeSitemap = [...staticUrls, ...productsSitemap, ...partnersSitemap]
+        // --- Partners ---
+        const partners = partnersResponse.data || []
+        const partnersSitemap: MetadataRoute.Sitemap = partners.map((p: any) => ({
+            url: `https://dudit.com.br${getPartnerUrl(p)}`,
+            lastModified: new Date(p.updated_at || p.created_at),
+            changeFrequency: "weekly",
+            priority: 0.7,
+        }))
 
-        return completeSitemap.slice(0, MAX_SITEMAP_URLS)
+        // --- City pages from DB: /explorar/{cidade-uf} ---
+        const seenCities = new Set<string>()
+        const citiesSitemap: MetadataRoute.Sitemap = []
+
+        const citiesData = citiesResponse.data || []
+        for (const partner of citiesData) {
+            const addr = partner.addresses?.[0]
+            if (addr?.city && addr?.state) {
+                const normalizedCity = addr.city
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/\s+/g, "-")
+                const stateCode = addr.state.toLowerCase()
+                const citySlug = `${normalizedCity}-${stateCode}`
+
+                if (!seenCities.has(citySlug)) {
+                    seenCities.add(citySlug)
+                    citiesSitemap.push({
+                        url: `https://dudit.com.br/explorar/${citySlug}`,
+                        lastModified: now,
+                        changeFrequency: "daily",
+                        priority: 0.8,
+                    })
+                }
+            }
+        }
+
+        const completeSitemap: MetadataRoute.Sitemap = [
+            ...baseUrls,
+            ...productsSitemap,
+            ...partnersSitemap,
+            ...citiesSitemap,
+        ]
+
+        return completeSitemap
     } catch (error) {
-        console.error("Erro gerando Sitemap orgânico", error)
-        return staticUrls
+        console.error("Erro gerando sitemap:", error)
+        return baseUrls
     }
 }

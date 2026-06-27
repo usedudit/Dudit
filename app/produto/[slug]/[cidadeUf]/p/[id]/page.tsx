@@ -55,7 +55,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const productUrl = `https://dudit.com.br${getProductUrl(product)}`
 
   // Título mais "chamativo" com o preço
-  const title = `${product.name} - ${priceFormatted} | Dudit ${city}`
+  const title = `${product.name} - ${priceFormatted} em ${city}`
+  const ogTitle = `${product.name} - ${priceFormatted} | Dudit ${city}`
 
   // Descrição com gatilho de "Conexão Direta" e Localização
   const description = `Oferta em ${city}: ${product.name} por apenas ${priceFormatted}. Compre direto do vendedor pela Dudit e economize!`
@@ -65,7 +66,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description: description,
     alternates: { canonical: productUrl },
     openGraph: {
-      title: title,
+      title: ogTitle,
       description: description,
       url: productUrl,
       siteName: 'Dudit',
@@ -82,7 +83,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     },
     twitter: {
       card: 'summary_large_image', // FOTO GRANDE NO TWITTER/X
-      title: title,
+      title: ogTitle,
       description: description,
       images: [product.image_url || 'https://img.dudit.com.br/static/Logo.png'],
     },
@@ -143,6 +144,17 @@ export default async function ProductDetailsPage({
   const avgRating = reviewCount > 0
     ? (reviews.reduce((acc: number, cur: any) => acc + cur.rating, 0) / reviewCount).toFixed(1)
     : 5.0; // rating neutro padrão
+
+  // BreadcrumbList Schema
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
+      { '@type': 'ListItem', position: 2, name: city, item: `https://dudit.com.br/explorar/${cidadeUf}` },
+      { '@type': 'ListItem', position: 3, name: product.name, item: productUrl },
+    ],
+  }
 
   // Schema Orgânico Focado para Produtos
   const schemaJsonLd = {

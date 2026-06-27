@@ -79,7 +79,7 @@ export const DEFAULT_POLICY: Omit<PartnerReturnPolicy, "partnerId"> = {
 export function buildDefaultPolicyText(storeName?: string | null): string {
   const name = storeName?.trim() || "nossa loja"
   return (
-    `Política de Trocas e Devoluções — ${name}\n\n` +
+    `Política de Trocas e Devoluções - ${name}\n\n` +
     "1. Prazo comercial: consulte o prazo informado no momento da compra.\n" +
     "2. Trocas por tamanho ou cor: conforme disponibilidade de estoque.\n" +
     "3. Devoluções: produto deve estar em condições de revenda, com embalagem e acessórios.\n" +
