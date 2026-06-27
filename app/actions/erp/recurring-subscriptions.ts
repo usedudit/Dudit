@@ -5,6 +5,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { revalidateTag } from "next/cache"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { processDueRecurringExecutions } from "@/lib/services/recurring-execution.service"
 import type { RecurringListCursor, RecurringSubscriptionStatus } from "@/lib/types/recurring"
@@ -146,11 +147,10 @@ export async function createRecurringSubscriptionAction(input: {
 
     if (error) throw error
 
-    import("@/lib/services/marketplace-metrics.service")
-      .then(({ recordSubscriptionSignupMetrics }) =>
-        recordSubscriptionSignupMetrics(supabase, data.id as string),
-      )
-      .catch(console.error)
+    const { recordSubscriptionSignupMetrics } = await import("@/lib/services/marketplace-metrics.service")
+    await recordSubscriptionSignupMetrics(supabase, data.id as string)
+    // @ts-ignore
+    revalidateTag(`partner-stats-${input.partnerId}`, "max")
 
     await logAuditEvent({
       partnerId: input.partnerId,

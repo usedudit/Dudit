@@ -457,28 +457,6 @@ export async function createReturnRequestAction(input: unknown) {
             source: "manual",
         })
 
-        // If status is provided and is not PENDING_REVIEW, process the state change internally
-        if (data.status && data.status !== "PENDING_REVIEW") {
-            const processRes = await processReturnRequestAction({
-                partnerId: data.partnerId,
-                requestId,
-                action: "updated",
-                nextStatus: data.status,
-                refundAmount: data.refundValue || 0,
-                refundStatus: (data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
-                refundPaymentMethod: data.resolution === "refund" ? "MANUAL" : null,
-                returnToInventory: data.returnToInventory || false,
-                storeCreditAmount: data.storeCreditValue || 0,
-                exchangeItems: data.exchangeItems || [],
-                exchangeBalanceResolution: data.exchangeBalanceResolution || null,
-                notes: data.message || "",
-                idempotencyKey: `erp-init-process:${requestId}:${Date.now()}`,
-            })
-            if (!processRes.success) {
-                throw new Error(`Criou devolução, mas falhou ao processar status: ${processRes.error}`)
-            }
-        }
-
         await revalidateReturns(data.partnerId, data.orderId, requestId)
         return successResponse({ id: requestId })
     } catch (e: any) {

@@ -156,8 +156,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                         sku: item.sku || null,
                     })),
                     evidence: data.evidence || [],
-                    idempotencyKey: `erp:${partnerId}:${data.orderId}:${Date.now()}`,
-                    status: data.status,
+                    idempotencyKey: `erp:${partnerId}:${data.orderId}`,
                     refundValue: Number(data.refundValue || 0),
                     storeCreditValue: Number(data.storeCreditValue || 0),
                     exchangeItems: data.exchangeItems || [],
@@ -165,6 +164,49 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                     returnToInventory: Boolean(data.returnToInventory),
                 })
                 if (!response.success) throw new Error(response.error)
+                const requestId = response.data?.id
+                if (data.status && data.status !== "PENDING_REVIEW" && requestId) {
+                    const processRes = await processReturnRequestAction({
+                        partnerId,
+                        requestId,
+                        action: "updated",
+                        nextStatus: data.status,
+                        refundAmount: Number(data.refundValue || 0),
+                        refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
+                        refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")) ? data.refundPaymentMethod || null : null,
+                        returnToInventory: Boolean(data.returnToInventory),
+                        returnToInventoryItems: data.returnToInventoryItems || null,
+                        customerId: data.customerId || null,
+                        storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
+                        exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
+                        exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                        notes: data.observations || "",
+                        idempotencyKey: `erp-init-process:${requestId}`,
+                    })
+                    if (!processRes.success) throw new Error(processRes.error)
+                    if (processRes.success && (processRes as any).data?.mpPaymentNotFound) {
+                        setPendingProcessData({
+                            partnerId,
+                            requestId,
+                            action: "updated",
+                            nextStatus: data.status,
+                            refundAmount: Number(data.refundValue || 0),
+                            refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
+                            refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")) ? data.refundPaymentMethod || null : null,
+                            returnToInventory: Boolean(data.returnToInventory),
+                            returnToInventoryItems: data.returnToInventoryItems || null,
+                            customerId: data.customerId || null,
+                            storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
+                            exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
+                            exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                            notes: data.observations || "",
+                            idempotencyKey: `erp-init-process:${requestId}`,
+                        })
+                        setMpPaymentNotFoundChecked(false)
+                        setShowMpPaymentNotFoundModal(true)
+                        return
+                    }
+                }
                 toast({ title: "Sucesso", description: "Solicitação criada com sucesso." })
             } else if (entityState.action === "edit" && entityState.entityId) {
                 const processPayload: Record<string, any> = {

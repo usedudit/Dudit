@@ -44,12 +44,7 @@ export async function recordAppointmentBookingMetrics(
       return false
     }
     if (data === true) {
-      const { data: appt } = await supabase
-        .from("appointments")
-        .select("partner_id")
-        .eq("id", appointmentId)
-        .maybeSingle()
-      if (appt?.partner_id) revalidateTag(`${PARTNER_STATS_TAG}-${appt.partner_id}`, "max")
+      // Revalidation handled by caller (server action)
     }
     return data === true
   } catch (e) {
@@ -72,12 +67,7 @@ export async function recordSubscriptionSignupMetrics(
       return false
     }
     if (data === true) {
-      const { data: sub } = await supabase
-        .from("recurring_subscriptions")
-        .select("partner_id")
-        .eq("id", subscriptionId)
-        .maybeSingle()
-      if (sub?.partner_id) revalidateTag(`${PARTNER_STATS_TAG}-${sub.partner_id}`, "max")
+      // Revalidation handled by caller (server action)
     }
     return data === true
   } catch (e) {

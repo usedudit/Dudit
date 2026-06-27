@@ -1056,6 +1056,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    safeRevalidateTag(`partner-stats-${partnerId}`)
     revalidatePath("/erp/dashboard")
     revalidatePath("/erp/servicos")
 
