@@ -22,7 +22,7 @@ import { ShowcaseSubPage } from "./ShowcaseSubPage"
 import { IntegrationsSubPage } from "./IntegrationsSubPage"
 import { TeamSubPage } from "./TeamSubPage"
 import { SubscriptionSubPage } from "./SubscriptionSubPage"
-import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
+import { PaymentsPage } from "./PaymentsPage"
 import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { ReturnPolicySubPage } from "./ReturnPolicySubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -422,11 +422,11 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           )}
 
           {activePage === "payment-methods" && (
-            <PaymentMethodsSubPage
+            <PaymentsPage
               key="payment-methods"
               partner={partner}
               paymentMethods={paymentMethods}
-              handleBack={() => setActivePage("home")}
+              onBack={() => setActivePage("home")}
               planGate={paymentsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined}
             />
           )}

@@ -207,7 +207,6 @@ export function getWebhookUrl(provider: WhatsappProviderId = "meta", connectionI
  */
 export const EVOLUTION_WEBHOOK_EVENTS = [
   "QRCODE_UPDATED",
-  "MESSAGES_UPSERT",
   "MESSAGES_UPDATE",
   "SEND_MESSAGE",
   "CONNECTION_UPDATE",

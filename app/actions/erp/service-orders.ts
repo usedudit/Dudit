@@ -7,7 +7,6 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import { R2_PREFIXES, ALLOWED_MIME_TYPES, ALLOWED_EXTENSIONS, MAX_FILE_SIZE } from "@/lib/r2/config"
 import { createNotification } from "@/lib/services/notification.service"
@@ -272,7 +271,7 @@ export async function createServiceOrderAction(
 
     try {
       await increment_usage_counter(partnerId, "service_orders_month_count")
-    } catch {}
+    } catch { }
 
     if (input.assigned_user_id) {
       try {
@@ -286,7 +285,7 @@ export async function createServiceOrderAction(
           data: { partnerId, orderNumber },
           idempotencyKey: `os-assigned-${data.id}-${input.assigned_user_id}`,
         })
-      } catch {}
+      } catch { }
     }
 
     revalidatePath("/erp/service-orders")
@@ -538,7 +537,7 @@ export async function assignServiceOrderAction(
           data: { partnerId, orderNumber: data.order_number },
           idempotencyKey: `os-assigned-${serviceOrderId}-${assignedUserId}`,
         })
-      } catch {}
+      } catch { }
     }
 
     revalidatePath("/erp/service-orders")
@@ -679,7 +678,7 @@ export async function deleteAttachmentAction(
 
     if (attachment?.file_key) {
       const { deleteFileFromR2 } = await import("@/lib/r2/server")
-      try { await deleteFileFromR2(attachment.file_key) } catch {}
+      try { await deleteFileFromR2(attachment.file_key) } catch { }
     }
 
     await admin.from("service_order_attachments").delete().eq("id", attachmentId)
@@ -791,7 +790,7 @@ export async function ensurePublicTokenAction(partnerId: string, serviceOrderId:
 
 export async function getServiceOrderByTokenAction(
   token: string,
-  ): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; statusHistory: any[]; sale: any } } | { success: false; error: string }> {
+): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; statusHistory: any[]; sale: any } } | { success: false; error: string }> {
   try {
     const admin = getAdminClient()
 
@@ -802,7 +801,7 @@ export async function getServiceOrderByTokenAction(
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
         customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id,
         partners (
-          id, store_name, store_image_url, plan_tier
+          id, store_name, store_image_url
         )
       `)
       .eq("public_token", token)
@@ -817,7 +816,7 @@ export async function getServiceOrderByTokenAction(
           total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
           customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id,
           partners (
-            id, store_name, store_image_url, plan_tier
+            id, store_name, store_image_url
           )
         `)
         .eq("id", token)
@@ -853,6 +852,10 @@ export async function getServiceOrderByTokenAction(
       }
     }
 
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+    const plan = await getPartnerPlan(row.partner_id)
+    const planTier = plan?.slug || "free"
+
     const serviceOrder = {
       id: row.id,
       partner_id: row.partner_id,
@@ -873,7 +876,10 @@ export async function getServiceOrderByTokenAction(
       specifications,
       metadata: row.metadata,
       lockout_until: row.lockout_until,
-      partners: Array.isArray(row.partners) ? row.partners[0] : (row.partners || null),
+      partners: row.partners ? {
+        ...(Array.isArray(row.partners) ? row.partners[0] : row.partners),
+        plan_tier: planTier,
+      } : null,
     }
 
     return {
@@ -1520,7 +1526,7 @@ export async function getPublicPresignedUploadUrlAction(
 > {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    
+
     // 1. Fetch OS by token to get partner and assigned user details
     const admin = getAdminClient()
     const { data: order, error } = await admin

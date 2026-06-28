@@ -77,7 +77,7 @@ async function notifyCustomer(params: {
   })
 }
 
-async function getOrderMixType(orderId: string): Promise<"product" | "service" | "both" | null> {
+export async function getOrderMixType(orderId: string): Promise<"product" | "service" | "both" | null> {
   const admin = getAdminClient()
   const { data: items } = await admin
     .from("order_items")
@@ -487,19 +487,21 @@ export async function onOrderStatusChanged(
 
       const serviceName = (serviceItem as any)?.services?.name || "serviço"
 
-      await notifyPartnerTeam({
-        partnerId,
-        type: "order_created",
-        entityType: "order",
-        entityId: orderId,
-        ctx: {
-          ...ctx,
-          serviceName,
-          mixType,
-        },
-        variant: mixType,
-        origin,
-      })
+      if (mixType !== "service") {
+        await notifyPartnerTeam({
+          partnerId,
+          type: "order_created",
+          entityType: "order",
+          entityId: orderId,
+          ctx: {
+            ...ctx,
+            serviceName,
+            mixType,
+          },
+          variant: mixType,
+          origin,
+        })
+      }
     } else {
       await notifyPartnerTeam({
         partnerId,
@@ -516,25 +518,34 @@ export async function onOrderStatusChanged(
   if (situation && CUSTOMER_SITUATION_TYPES[situation]) {
     const type = CUSTOMER_SITUATION_TYPES[situation]
     const buyerId = order.buyer_id as string | null
+    const mixType = await getOrderMixType(orderId)
+
     if (buyerId) {
-      await notifyCustomer({
-        userId: buyerId,
-        type,
-        entityType: "order",
-        entityId: orderId,
-        ctx: { ...ctx, orderNumber },
-        origin,
-      })
+      const skipForCustomer = mixType === "service" && (situation === "paid" || situation === "cancelled")
+      if (!skipForCustomer) {
+        await notifyCustomer({
+          userId: buyerId,
+          type,
+          entityType: "order",
+          entityId: orderId,
+          ctx: { ...ctx, orderNumber },
+          origin,
+        })
+      }
     }
+
     if (situation === "paid" || situation === "cancelled" || situation === "refunded") {
-      await notifyPartnerTeam({
-        partnerId,
-        type,
-        entityType: "order",
-        entityId: orderId,
-        ctx,
-        origin,
-      })
+      const skipForPartner = mixType === "service" && situation === "cancelled"
+      if (!skipForPartner) {
+        await notifyPartnerTeam({
+          partnerId,
+          type,
+          entityType: "order",
+          entityId: orderId,
+          ctx,
+          origin,
+        })
+      }
     }
     return
   }

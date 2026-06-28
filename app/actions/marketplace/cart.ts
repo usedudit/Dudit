@@ -687,7 +687,7 @@ export async function checkoutCartAction(
 
   // Resolve customer_id for promotion tracking (must exist in customers table)
   let customerIdForPromo: string | null = null
-  { const { data: existingCust } = await adminClient.from("customers").select("id").eq("id", user.id).eq("partner_id", partnerId).maybeSingle(); if (existingCust) customerIdForPromo = existingCust.id }
+  { const { data: existingCust } = await adminClient.from("customers").select("id").eq("marketplace_user_id", user.id).eq("partner_id", partnerId).maybeSingle(); if (existingCust) customerIdForPromo = existingCust.id }
 
   const lineContexts = (
     await import("@/lib/commerce/marketplace-checkout-lines")
@@ -791,7 +791,7 @@ export async function checkoutCartAction(
     const couponResult = await validateCoupon({
       partnerId,
       code: couponCode,
-      customerId: user.id,
+      customerId: customerIdForPromo,
       subtotal: totalAmount,
       shippingCost: deliveryFee,
       items: couponItems,
@@ -805,7 +805,7 @@ export async function checkoutCartAction(
   } else {
     const autoResult = await findBestAutomaticCoupon({
       partnerId,
-      customerId: user.id,
+      customerId: customerIdForPromo,
       subtotal: totalAmount,
       shippingCost: deliveryFee,
       items: couponItems,
@@ -1175,10 +1175,10 @@ export async function checkoutCartAction(
   }
 
   if (couponIdToSave) {
-    await supabase.from("coupon_usages").upsert(
+    await adminClient.from("coupon_usages").upsert(
       {
         coupon_id: couponIdToSave,
-        customer_id: customerIdForPromo,
+        customer_id: customerIdForPromo || resolvedCustomerId,
         order_id: order.id,
       },
       { onConflict: "coupon_id,order_id", ignoreDuplicates: true }

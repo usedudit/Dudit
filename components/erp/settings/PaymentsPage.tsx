@@ -1,0 +1,366 @@
+"use client"
+
+import React, { useState, useCallback, useRef, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Button, Tabs, TabsList, TabsTrigger, TabsContent, FormSection, FormDropdown, IconPlaceholder, SavingStatusModal } from "@/components/reusable"
+import { Switch } from "@/components/reusable/Switch"
+import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
+import { getPickupPaymentPolicyAction, updatePickupPaymentPolicyAction } from "@/app/actions/partners/pickup-payment"
+import { getServiceCheckoutSettingsAction, updateServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
+import { useNotification } from "@/hooks/use-notification"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+
+const DEPOSIT_OPTIONS = [
+    { value: "10", label: "10%" },
+    { value: "20", label: "20%" },
+    { value: "30", label: "30%" },
+    { value: "50", label: "50%" },
+]
+
+export function PaymentsPage({
+    partner,
+    paymentMethods,
+    onBack,
+    planGate,
+}: {
+    partner: any
+    paymentMethods: any[]
+    onBack: () => void
+    planGate?: { requiredPlanSlug: "crescer" | "escalar" }
+}) {
+    const { openPlanUpgrade } = usePlanUpgrade()
+    const { success: notifySuccess, error: notifyError } = useNotification()
+    const [activeTab, setActiveTab] = useState("formas")
+    const [isScrolled, setIsScrolled] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+    }, [])
+
+    // Pickup payment state
+    const [pickupPaymentPolicy, setPickupPaymentPolicy] = useState<"require_online_payment" | "allow_pickup_payment">("require_online_payment")
+
+    // Service checkout state
+    const [depositFeatureAllowed, setDepositFeatureAllowed] = useState(false)
+    const [depositEnabled, setDepositEnabled] = useState(false)
+    const [depositPercentage, setDepositPercentage] = useState("50")
+    const [depositManualEnabled, setDepositManualEnabled] = useState(false)
+    const [depositMpEnabled, setDepositMpEnabled] = useState(false)
+    const [mpConnected, setMpConnected] = useState(!!partner.mp_user_id)
+    const [isLoading, setIsLoading] = useState(true)
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const pickupRes = await getPickupPaymentPolicyAction()
+                if (pickupRes.pickupPaymentPolicy) {
+                    setPickupPaymentPolicy(pickupRes.pickupPaymentPolicy as "require_online_payment" | "allow_pickup_payment")
+                }
+
+                const svcRes = await getServiceCheckoutSettingsAction(partner.id)
+                if (svcRes.success && svcRes.settings) {
+                    setDepositFeatureAllowed(svcRes.depositFeatureAllowed)
+                    setDepositEnabled(svcRes.settings.depositEnabled)
+                    setDepositPercentage(String(svcRes.settings.depositPercentage))
+                    setDepositManualEnabled(svcRes.settings.depositManualEnabled)
+                    setDepositMpEnabled(svcRes.settings.depositMpEnabled)
+                    setMpConnected(svcRes.settings.mpConnected)
+                }
+            } catch {
+                // silently fail
+            }
+            setIsLoading(false)
+        }
+        load()
+    }, [partner.id])
+
+    const handleSaveSettings = async () => {
+        if (!depositFeatureAllowed && depositEnabled) {
+            notifyError("Entrada (sinal) disponível apenas nos planos Crescer e Escalar.")
+            return
+        }
+
+        if (depositEnabled) {
+            if (!depositManualEnabled && !depositMpEnabled) {
+                notifyError("Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual).")
+                return
+            }
+            if (!mpConnected && !depositManualEnabled) {
+                notifyError("O sinal manual é obrigatório já que a loja não possui conexão com o Mercado Pago.")
+                return
+            }
+        }
+
+        setIsSaving(true)
+        try {
+            const pickupRes = await updatePickupPaymentPolicyAction(pickupPaymentPolicy)
+            if (!pickupRes.success) {
+                notifyError("Erro ao salvar", pickupRes.error || "Erro ao salvar política de pagamento na retirada.")
+                setIsSaving(false)
+                return
+            }
+
+            const svcRes = await updateServiceCheckoutSettingsAction({
+                partnerId: partner.id,
+                depositEnabled: depositFeatureAllowed ? depositEnabled : false,
+                depositPercentage: Number(depositPercentage) as 10 | 20 | 30 | 50,
+                depositManualEnabled: depositEnabled ? depositManualEnabled : false,
+                depositMpEnabled: depositEnabled ? depositMpEnabled : false,
+            })
+
+            if (!svcRes.success) {
+                notifyError("Erro ao salvar", svcRes.error || "Erro ao salvar configurações de sinal.")
+                setIsSaving(false)
+                return
+            }
+
+            notifySuccess("Configurações salvas com sucesso!")
+        } catch {
+            notifyError("Erro ao salvar configurações")
+        }
+        setIsSaving(false)
+    }
+
+    if (planGate) {
+        return (
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                    <div className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                                <div className="hidden md:flex items-start justify-between py-6">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
+                                            <span className="truncate">Formas de Pagamento</span>
+                                        </h1>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                            <IconPlaceholder
+                                placeholderType="image"
+                                imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                imageAlt="Recurso bloqueado"
+                                title="Formas de Pagamento"
+                                subtitle="Configure os métodos de pagamento aceitos no seu negócio. Disponível nos planos Crescer e Escalar."
+                                itemButton={{
+                                    text: "Fazer upgrade",
+                                    action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </FadeIn>
+        )
+    }
+
+    return (
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">Formas de Pagamento</span>
+                                        </h1>
+
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            Gerencie os métodos de pagamento e configurações de recebimento
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={onBack} disabled={isSaving}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleSaveSettings} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
+                                            {isSaving ? "Salvando..." : "Salvar"}
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="formas">Formas de Pagamento</TabsTrigger>
+                                        <TabsTrigger value="configuracoes">Configurações de Pagamento</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content Body */}
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            <AnimatePresence mode="wait">
+                                <TabsContent value="formas" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                        <PaymentMethodsSubPage
+                                            partner={partner}
+                                            paymentMethods={paymentMethods}
+                                            handleBack={onBack}
+                                            embedded
+                                        />
+                                    </motion.div>
+                                </TabsContent>
+
+                                <TabsContent value="configuracoes" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
+                                            {/* Pagamento na retirada */}
+                                            <FormSection title="Pagamento na retirada / entrega">
+                                                <div className="flex items-center justify-between py-3">
+                                                    <div>
+                                                        <p className="font-medium text-brand-dark dark:text-dark-heading">Permitir pagamento na retirada</p>
+                                                        <p className="text-xs text-brand-inactive-text">Cliente pode pagar ao retirar o pedido</p>
+                                                    </div>
+                                                    <Switch
+                                                        checked={pickupPaymentPolicy === "allow_pickup_payment"}
+                                                        onCheckedChange={(checked) => {
+                                                            setPickupPaymentPolicy(checked ? "allow_pickup_payment" : "require_online_payment")
+                                                        }}
+                                                    />
+                                                </div>
+                                            </FormSection>
+
+                                            {/* Entrada (sinal) */}
+                                            <FormSection title="Entrada (down payment)">
+                                                <div className="space-y-6">
+                                                    <div className="flex items-center justify-between py-3">
+                                                        <div>
+                                                            <p className="font-medium text-brand-dark dark:text-dark-heading">Permitir entrada</p>
+                                                            <p className="text-xs text-brand-inactive-text">Cliente pode pagar apenas o sinal no checkout</p>
+                                                        </div>
+                                                        <Switch
+                                                            checked={depositEnabled && depositFeatureAllowed}
+                                                            onCheckedChange={(v) => {
+                                                                if (depositFeatureAllowed) {
+                                                                    setDepositEnabled(v)
+                                                                    if (v) {
+                                                                        if (!depositManualEnabled && !depositMpEnabled) {
+                                                                            setDepositManualEnabled(true)
+                                                                            if (mpConnected) setDepositMpEnabled(true)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }}
+                                                            disabled={!depositFeatureAllowed}
+                                                        />
+                                                    </div>
+
+                                                    {depositEnabled && (
+                                                        <FormDropdown
+                                                            label="Percentual da entrada"
+                                                            value={depositPercentage}
+                                                            setValue={setDepositPercentage}
+                                                            options={DEPOSIT_OPTIONS}
+                                                            disabled={!depositEnabled || !depositFeatureAllowed}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </FormSection>
+                                        </div>
+
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                            {/* Meios de recebimento */}
+                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Meios de recebimento</h3>
+                                                <p className="text-xs text-brand-inactive-text mb-6">
+                                                    Selecione as formas de pagamento disponíveis para o sinal dos agendamentos.
+                                                </p>
+
+                                                <div className="space-y-6">
+                                                    {/* Mercado Pago (Online) */}
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Online (Mercado Pago)</p>
+                                                            {mpConnected ? (
+                                                                <p className="text-xs text-brand-green font-medium">Conectado</p>
+                                                            ) : (
+                                                                <p className="text-xs text-amber-500 font-medium">Requer conexão nas integrações</p>
+                                                            )}
+                                                        </div>
+                                                        <Switch
+                                                            checked={depositMpEnabled && mpConnected && depositEnabled}
+                                                            onCheckedChange={(v) => {
+                                                                if (mpConnected && depositEnabled) {
+                                                                    setDepositMpEnabled(v)
+                                                                    if (!v && !depositManualEnabled) {
+                                                                        setDepositManualEnabled(true)
+                                                                    }
+                                                                }
+                                                            }}
+                                                            disabled={!mpConnected || !depositEnabled}
+                                                        />
+                                                    </div>
+
+                                                    {/* Sinal Manual (Pix) */}
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Manual (Pix)</p>
+                                                            <p className="text-xs text-brand-inactive-text">Gera QR Code Pix com chave padrão do parceiro</p>
+                                                        </div>
+                                                        <Switch
+                                                            checked={depositManualEnabled && depositEnabled}
+                                                            onCheckedChange={(v) => {
+                                                                if (depositEnabled) {
+                                                                    if (!mpConnected && !v) {
+                                                                        notifyError("O Sinal Manual é obrigatório pois a loja não está conectada ao Mercado Pago.")
+                                                                        return
+                                                                    }
+                                                                    if (!v && !depositMpEnabled) {
+                                                                        notifyError("Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual).")
+                                                                        return
+                                                                    }
+                                                                    setDepositManualEnabled(v)
+                                                                }
+                                                            }}
+                                                            disabled={!depositEnabled}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </TabsContent>
+                            </AnimatePresence>
+                        </div>
+                    </div>
+                </Tabs>
+
+                {/* Mobile Bottom Action Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                    <Button variant="outline" onClick={onBack} className="flex-1 h-12" disabled={isSaving}>
+                        Cancelar
+                    </Button>
+                    <Button onClick={handleSaveSettings} className="flex-1 h-12" disabled={isSaving}>
+                        Salvar
+                    </Button>
+                </div>
+
+                <SavingStatusModal isOpen={isSaving} text="Salvando configurações..." />
+            </div>
+        </FadeIn>
+    )
+}

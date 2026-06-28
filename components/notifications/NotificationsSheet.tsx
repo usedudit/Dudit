@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useEffect } from "react"
 import { XIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
 import Portal from "@/components/Portal"
@@ -22,7 +22,14 @@ export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps)
     hasMore,
     fetchMore,
     registerVisible,
+    setPanelOpen,
+    markAllAsRead,
+    unreadCount,
   } = useNotifications()
+
+  useEffect(() => {
+    setPanelOpen(isOpen)
+  }, [isOpen, setPanelOpen])
 
   const isMobile = useMediaQuery("(max-width: 768px)")
 
@@ -41,7 +48,7 @@ export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps)
         </Button>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         <NotificationPanel
           grouped={grouped}
           isLoading={isLoading && isOpen}
@@ -50,6 +57,8 @@ export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps)
           onLoadMore={() => fetchMore()}
           onVisible={registerVisible}
           onNavigate={handleNavigate}
+          onMarkAllAsRead={markAllAsRead}
+          unreadCount={unreadCount}
         />
       </div>
     </div>

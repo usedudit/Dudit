@@ -161,6 +161,13 @@ export function useNotifications() {
     }
   }, [panelOpen, markAsRead])
 
+  const markAllAsRead = useCallback(async () => {
+    const unreadIds = allItems.filter((n) => !n.is_read).map((n) => n.id)
+    if (unreadIds.length > 0) {
+      await markAsRead(unreadIds)
+    }
+  }, [allItems, markAsRead])
+
   return {
     user,
     panelOpen,
@@ -174,5 +181,6 @@ export function useNotifications() {
     fetchMore: () => listQuery.fetchNextPage(),
     registerVisible,
     invalidate,
+    markAllAsRead,
   }
 }

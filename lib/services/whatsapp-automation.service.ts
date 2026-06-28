@@ -466,6 +466,10 @@ export async function onOrderStatusChanged(order: Record<string, unknown>, situa
   const partnerId = String(order.partner_id)
   const orderId = String(order.id)
 
+  const { getOrderMixType } = await import("./notification-automation.service")
+  const mixType = await getOrderMixType(orderId)
+  if (mixType === "service") return
+
   let trigger: WhatsappAutomationTrigger | null = null
   if (situation && ORDER_TRIGGER_MAP[situation]) {
     trigger = ORDER_TRIGGER_MAP[situation]

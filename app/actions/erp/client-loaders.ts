@@ -270,6 +270,7 @@ export type PartnerServiceBucketItem = {
   bufferMinutes: number
   category: string | null
   billingUnit: string
+  image?: string | null
 }
 
 export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucketItem[]> {
@@ -284,7 +285,7 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
 
   const { data, error } = await supabase
     .from("services")
-    .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active")
+    .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, images")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("name")
@@ -305,5 +306,6 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
     bufferMinutes: Number(s.buffer_minutes || 0),
     category: null,
     billingUnit: String(s.billing_unit || "per_service"),
+    image: s.images && s.images.length > 0 ? s.images[0] : null,
   }))
 }

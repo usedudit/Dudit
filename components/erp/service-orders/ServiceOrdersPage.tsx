@@ -12,6 +12,7 @@ import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSh
 import Pagination from "@/components/reusable/Pagination"
 import { FadeIn } from "@/components/animations/FadeIn"
 import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import ServiceOrderListRow from "./ServiceOrderListRow"
@@ -74,6 +75,8 @@ export default function ServiceOrdersPage({
   partnerId,
 }: ServiceOrdersPageProps) {
   const { toast } = useToast()
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
   const [filters, setFilters] = useState<any>({
     status: [],
@@ -224,26 +227,36 @@ export default function ServiceOrdersPage({
   }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, selection, sortedOrders.length])
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    const { updateServiceOrderStatusAction } = await import("@/app/actions/erp/service-orders")
-    const res = await updateServiceOrderStatusAction(partnerId, id, newStatus)
-    if (res.success) {
-      toast({ description: "Status alterado" })
-      handleMutation()
-    } else {
-      toast({ description: res.error || "Erro ao alterar status" })
+    setIsUpdatingStatus(true)
+    try {
+      const { updateServiceOrderStatusAction } = await import("@/app/actions/erp/service-orders")
+      const res = await updateServiceOrderStatusAction(partnerId, id, newStatus)
+      if (res.success) {
+        toast({ description: "Status alterado" })
+        handleMutation()
+      } else {
+        toast({ description: res.error || "Erro ao alterar status" })
+      }
+    } finally {
+      setIsUpdatingStatus(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    const { deleteServiceOrderAction } = await import("@/app/actions/erp/service-orders")
-    const res = await deleteServiceOrderAction(partnerId, id)
-    if (res.success) {
-      toast({ description: "OS deletada" })
-      handleMutation()
-    } else {
-      toast({ description: res.error || "Erro ao deletar" })
+    setIsDeleting(true)
+    try {
+      const { deleteServiceOrderAction } = await import("@/app/actions/erp/service-orders")
+      const res = await deleteServiceOrderAction(partnerId, id)
+      if (res.success) {
+        toast({ description: "OS deletada" })
+        handleMutation()
+      } else {
+        toast({ description: res.error || "Erro ao deletar" })
+      }
+    } finally {
+      setIsDeleting(false)
+      setConfirmDelete(null)
     }
-    setConfirmDelete(null)
   }
 
   const observerRef = useRef<HTMLDivElement>(null)
@@ -763,6 +776,9 @@ export default function ServiceOrdersPage({
           label="Link da OS"
         />
       )}
+
+      <SavingStatusModal isOpen={isDeleting} text="Excluindo ordem de serviço..." />
+      <SavingStatusModal isOpen={isUpdatingStatus} text="Atualizando status..." />
     </>
   )
 }

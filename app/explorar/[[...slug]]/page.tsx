@@ -364,8 +364,62 @@ export default async function ExplorarPage({
         query ? getSponsoredAdsForSlot("search", adLocation) : Promise.resolve([] as SponsoredAd[]),
     ])
 
+    // BreadcrumbList Schema
+    const breadcrumbItems: { name: string; item: string }[] = [
+        { name: "Home", item: "https://dudit.com.br" },
+        { name: "Explorar", item: "https://dudit.com.br/explorar" },
+    ]
+
+    if (isStateRoute && stateSlug) {
+        const uf = stateSlug.replace("estado-", "").toLowerCase()
+        const estadoNome = ESTADO_MAP[uf] || uf.toUpperCase()
+        breadcrumbItems.push({
+            name: estadoNome,
+            item: `https://dudit.com.br/explorar/${stateSlug}`,
+        })
+    } else if (cidade) {
+        const cidadeNome = cidade
+            .split("-")
+            .slice(0, -1)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ")
+        const uf = cidade.split("-").pop()?.toUpperCase() || ""
+        breadcrumbItems.push({
+            name: `${cidadeNome}, ${uf}`,
+            item: `https://dudit.com.br/explorar/${cidade}`,
+        })
+    } else if (cidade === "" && !isStateRoute) {
+        // brasil
+        breadcrumbItems.push({
+            name: "Brasil",
+            item: "https://dudit.com.br/explorar/brasil",
+        })
+    }
+
+    if (categoria) {
+        breadcrumbItems.push({
+            name: categoria,
+            item: `https://dudit.com.br/explorar/${slug.join("/")}`,
+        })
+    }
+
+    const breadcrumbLd = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: breadcrumbItems.map((item, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            name: item.name,
+            item: item.item,
+        })),
+    }
+
     return (
         <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+            />
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
             <Suspense>

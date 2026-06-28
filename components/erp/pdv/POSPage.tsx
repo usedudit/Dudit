@@ -199,6 +199,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
     const [isSelectCustomerOpen, setIsSelectCustomerOpen] = useState(false)
     const [isSelectSellerOpen, setIsSelectSellerOpen] = useState(false)
     const [isResetAlertOpen, setIsResetAlertOpen] = useState(false)
+    const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: any; variantId?: string | null; quantity?: number; callback?: () => void } | null>(null)
+    const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
     const [isPreSaleSheetOpen, setIsPreSaleSheetOpen] = useState(false)
     const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false)
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
@@ -513,7 +515,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
     const hasUnsavedOrderChanges = currentOrderSignature !== lastSavedOrderSignature
     const percentagePresets = [5, 10, 15, 20]
 
-    const addToCart = useCallback((product: Product, variantId?: string | null, quantity: number = 1) => {
+    const addToCart = useCallback((product: Product, variantId?: string | null, quantity: number = 1, force?: boolean) => {
         const normalizedQty = Math.max(1, Number(quantity || 1))
         const selectedVariant = variantId
             ? product.product_variants?.find((variant) => variant.id === variantId)
@@ -528,48 +530,61 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             ? Number(selectedVariant.stock_available || 0)
             : Number(product.stock_available || 0)
 
-        if (!product.allow_sell_without_stock && availableStock <= 0) {
-            notifyError(`"${product.name}" está sem estoque.`)
+        const proceedAddToCart = (forceBypass?: boolean) => {
+            setCart((prev) => {
+                const found = prev.find((item) => item.productId === product.id && item.variantId === (variantId || null))
+                if (!found) {
+                    const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
+                    const prodAny = product as any
+                    const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
+                    const effectiveUnit = computeItemDisplayPrice(listUnit, promoPrice > 0 && promoPrice < listUnit ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category?.id || undefined }).bestPrice
+                    if (!product.allow_sell_without_stock && !forceBypass && normalizedQty > availableStock) {
+                        notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
+                        return prev
+                    }
+                    return [
+                        ...prev,
+                        {
+                            id: crypto.randomUUID(),
+                            productId: product.id,
+                            variantId: variantId || null,
+                            name: product.name,
+                            variantName: selectedVariant?.variant_name || null,
+                            listUnitPrice: listUnit,
+                            lineDiscountType: null,
+                            lineDiscountValue: null,
+                            price: effectiveUnit,
+                            qty: normalizedQty,
+                            image: (selectedVariant?.variant_options?.image as string | undefined) || product.images?.[0] || null,
+                            allowSellWithoutStock: forceBypass ? true : Boolean(product.allow_sell_without_stock)
+                        },
+                    ]
+                }
+
+                const nextQty = found.qty + normalizedQty
+                if (!product.allow_sell_without_stock && !forceBypass && !found.allowSellWithoutStock && nextQty > availableStock) {
+                    notifyError(`Estoque insuficiente para o item ${found.name}${found.variantName ? ` - ${found.variantName}` : ""}`)
+                    return prev
+                }
+
+                return prev.map((item) => (item.id === found.id ? { 
+                    ...item, 
+                    qty: nextQty,
+                    allowSellWithoutStock: forceBypass ? true : Boolean(item.allowSellWithoutStock)
+                } : item))
+            })
+        }
+
+        if (!force && !product.allow_sell_without_stock && availableStock <= 0) {
+            setPendingZeroStockItem({ 
+                product: { ...product, name: selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name }, 
+                callback: () => addToCart(product, variantId, quantity, true) 
+            })
+            setShowZeroStockAlert(true)
             return
         }
 
-        setCart((prev) => {
-            const found = prev.find((item) => item.productId === product.id && item.variantId === (variantId || null))
-            if (!found) {
-                const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
-                const prodAny = product as any
-                const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
-                const effectiveUnit = computeItemDisplayPrice(listUnit, promoPrice > 0 && promoPrice < listUnit ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category?.id || undefined }).bestPrice
-                if (!product.allow_sell_without_stock && normalizedQty > availableStock) {
-                    notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
-                    return prev
-                }
-                return [
-                    ...prev,
-                    {
-                        id: crypto.randomUUID(),
-                        productId: product.id,
-                        variantId: variantId || null,
-                        name: product.name,
-                        variantName: selectedVariant?.variant_name || null,
-                        listUnitPrice: listUnit,
-                        lineDiscountType: null,
-                        lineDiscountValue: null,
-                        price: effectiveUnit,
-                        qty: normalizedQty,
-                        image: (selectedVariant?.variant_options?.image as string | undefined) || product.images?.[0] || null,
-                    },
-                ]
-            }
-
-            const nextQty = found.qty + normalizedQty
-            if (!product.allow_sell_without_stock && nextQty > availableStock) {
-                notifyError(`Estoque insuficiente para o item ${found.name}${found.variantName ? ` - ${found.variantName}` : ""}`)
-                return prev
-            }
-
-            return prev.map((item) => (item.id === found.id ? { ...item, qty: nextQty } : item))
-        })
+        proceedAddToCart(force)
     }, [notifyError, pdvPromotions])
 
     const handleScanBarcode = useCallback(async (code: string) => {
@@ -2157,6 +2172,20 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                             </div>
                         </DefaultModal>
                     )}
+
+                    <AlertModal
+                        isOpen={showZeroStockAlert}
+                        onClose={() => setShowZeroStockAlert(false)}
+                        onConfirm={() => {
+                            setShowZeroStockAlert(false)
+                            pendingZeroStockItem?.callback?.()
+                            setPendingZeroStockItem(null)
+                        }}
+                        title="Produto sem estoque"
+                        message={`O produto "${pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
+                        confirmText="Adicionar"
+                        variant="warning"
+                    />
 
                     <CameraScannerModal
                         isOpen={isCameraOpen}

@@ -337,6 +337,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false)
     const [selectedProductForVariant, setSelectedProductForVariant] = useState<any>(null)
     const [showAlertModal, setShowAlertModal] = useState(false)
+    const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: any; isVariant?: boolean; force?: boolean; callback?: () => void } | null>(null)
+    const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
     const [showValidationModal, setShowValidationModal] = useState(false)
     const [validationMessage, setValidationMessage] = useState("")
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
@@ -758,83 +760,95 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return null
     }, [inventoryAlreadyDeducted])
 
+    const proceedAddProduct = (product: any, forceBypass?: boolean) => {
+        const pricing = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
+        const newItem = {
+            id: Math.random().toString(36).substr(2, 9),
+            productId: product.id,
+            name: product.name,
+            unitPrice: pricing.bestPrice,
+            originalPrice: Number(product.price || 0),
+            hasDiscount: pricing.hasDiscount,
+            quantity: 1,
+            sortOrder: items.length,
+            image: product.image,
+            sku: product.sku,
+            stock: Number(product.stock || 0),
+            allowSellWithoutStock: forceBypass ? true : Boolean(product.allow_sell_without_stock),
+            unit: product.unit || null,
+            isEditing: false,
+            isManual: false
+        }
+        setItems([...items, newItem])
+        setFieldErrors(prev => {
+            const next = new Set(prev)
+            next.delete("productSearch")
+            return next
+        })
+        productBucket.setSearchQuery("")
+    }
+
     const addProductToOrder = (product: any) => {
         if (product.has_variants) {
             setSelectedProductForVariant(product)
             setIsVariantSheetOpen(true)
         } else {
             if (!product.allow_sell_without_stock && Number(product.stock || 0) < 1) {
-                notifyError(`"${product.name}" está sem estoque disponível.`)
+                setPendingZeroStockItem({ product, callback: () => proceedAddProduct(product, true) })
+                setShowZeroStockAlert(true)
                 return
             }
-            const pricing = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
-            const newItem = {
-                id: Math.random().toString(36).substr(2, 9),
-                productId: product.id,
-                name: product.name,
-                unitPrice: pricing.bestPrice,
-                originalPrice: Number(product.price || 0),
-                hasDiscount: pricing.hasDiscount,
-                quantity: 1,
-                sortOrder: items.length,
-                image: product.image,
-                sku: product.sku,
-                stock: Number(product.stock || 0),
-                allowSellWithoutStock: Boolean(product.allow_sell_without_stock),
-                unit: product.unit || null,
-                isEditing: false,
-                isManual: false
-            }
-            setItems([...items, newItem])
-            setFieldErrors(prev => {
-                const next = new Set(prev)
-                next.delete("productSearch")
-                return next
-            })
-            productBucket.setSearchQuery("")
+            proceedAddProduct(product, false)
         }
     }
 
     const handleVariantsConfirm = (selections: Array<{ variantId: string; qty: number }>) => {
-        const newItems: any[] = []
         selections.forEach(sel => {
             const variant = selectedProductForVariant?.variants?.find((v: any) => String(v.id) === String(sel.variantId))
             if (!variant) return
             if (sel.qty > 0) {
-                if (!selectedProductForVariant.allow_sell_without_stock && sel.qty > Number(variant.stock || 0)) {
-                    return
+                const cannotSell = !selectedProductForVariant.allow_sell_without_stock && sel.qty > Number(variant.stock || 0)
+
+                const add = (forceBypass?: boolean) => {
+                    const newItem = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        productId: selectedProductForVariant.id,
+                        variantId: variant.id,
+                        name: `${selectedProductForVariant.name} - ${variant.name}`,
+                        unitPrice: variant.price || selectedProductForVariant.price,
+                        originalPrice: variant.price || selectedProductForVariant.price,
+                        hasDiscount: false,
+                        quantity: sel.qty,
+                        sortOrder: items.length,
+                        image: variant.image || selectedProductForVariant.image,
+                        sku: variant.sku || selectedProductForVariant.sku,
+                        stock: Number(variant.stock || 0),
+                        allowSellWithoutStock: forceBypass ? true : Boolean(selectedProductForVariant.allow_sell_without_stock),
+                        unit: selectedProductForVariant.unit || null,
+                        isEditing: false,
+                        isManual: false
+                    }
+                    setItems(prev => [...prev, newItem])
+                    setFieldErrors(prev => {
+                        const next = new Set(prev)
+                        next.delete("productSearch")
+                        return next
+                    })
                 }
-                const newItem = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    productId: selectedProductForVariant.id,
-                    variantId: variant.id,
-                    name: `${selectedProductForVariant.name} - ${variant.name}`,
-                    unitPrice: variant.price || selectedProductForVariant.price,
-                    originalPrice: variant.price || selectedProductForVariant.price,
-                    hasDiscount: false,
-                    quantity: sel.qty,
-                    sortOrder: items.length + newItems.length,
-                    image: variant.image || selectedProductForVariant.image,
-                    sku: variant.sku || selectedProductForVariant.sku,
-                    stock: Number(variant.stock || 0),
-                    allowSellWithoutStock: Boolean(selectedProductForVariant.allow_sell_without_stock),
-                    unit: selectedProductForVariant.unit || null,
-                    isEditing: false,
-                    isManual: false
+
+                if (cannotSell) {
+                    setPendingZeroStockItem({
+                        product: { ...selectedProductForVariant, name: `${selectedProductForVariant.name} - ${variant.name}` },
+                        isVariant: true,
+                        callback: () => add(true)
+                    })
+                    setShowZeroStockAlert(true)
+                } else {
+                    add(false)
                 }
-                newItems.push(newItem)
             }
         })
-        if (newItems.length > 0) {
-            setItems([...items, ...newItems])
-            setFieldErrors(prev => {
-                const next = new Set(prev)
-                next.delete("productSearch")
-                return next
-            })
-        }
         setIsVariantSheetOpen(false)
-        productBucket.setSearchQuery("")
     }
 
     const updateItemField = (index: number, field: string, value: any) => {
@@ -2161,6 +2175,20 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     </Button>
                 </div>
             </div>
+
+            <AlertModal
+                isOpen={showZeroStockAlert}
+                onClose={() => setShowZeroStockAlert(false)}
+                onConfirm={() => {
+                    setShowZeroStockAlert(false)
+                    pendingZeroStockItem?.callback?.()
+                    setPendingZeroStockItem(null)
+                }}
+                title="Produto sem estoque"
+                message={`O produto "${pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
+                confirmText="Adicionar"
+                variant="warning"
+            />
         </FadeIn>
     )
 }

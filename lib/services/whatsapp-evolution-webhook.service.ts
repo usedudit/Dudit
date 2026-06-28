@@ -1,9 +1,8 @@
 import "server-only"
 
-import { createHash, createHmac, timingSafeEqual } from "crypto"
+import { timingSafeEqual } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { SecureLogger } from "@/lib/secure-logger"
-import { logAuditEvent } from "./timeline.service"
 import { updateConnectionStatus } from "./whatsapp-connection.service"
 import type { WhatsappConnectionStatus } from "@/lib/whatsapp/types"
 
@@ -95,45 +94,6 @@ async function getConnectionByInstanceName(
 
   if (error) throw new Error(`Failed to resolve Evolution connection: ${error.message}`)
   return (data as EvolutionWebhookConnection | null) || null
-}
-
-// ─── Process message events ──────────────────────────────────────────────────
-
-async function processEvolutionMessageEvent(params: {
-  data: Record<string, unknown>
-  instanceName: string
-  partnerId: string
-  requestId?: string | null
-}): Promise<"processed" | "duplicate"> {
-  const messageId = String(
-    (params.data.key as Record<string, unknown>)?.id ||
-    params.data.messageId ||
-    params.data.id ||
-    "",
-  )
-  if (!messageId) return "processed"
-
-  const claimed = await claimEvolutionEvent({
-    idempotencyKey: buildEvolutionEventKey(params.instanceName, "message", messageId),
-    resourceId: messageId,
-    action: "message.received",
-    partnerId: params.partnerId,
-    requestId: params.requestId,
-  })
-  if (!claimed) return "duplicate"
-
-  // Log the received message for audit
-  await logAuditEvent({
-    partnerId: params.partnerId,
-    actorUserId: null,
-    entityType: "customer" as const,
-    entityId: params.partnerId,
-    actionType: "whatsapp_message_received",
-    changeLines: ["Mensagem recebida via WhatsApp (Evolution)"],
-    source: "webhook",
-  })
-
-  return "processed"
 }
 
 // ─── Process status update events ────────────────────────────────────────────
@@ -339,19 +299,6 @@ export async function handleEvolutionWebhookPayload(
 
   try {
     switch (event) {
-      case "messages.upsert":
-      case "message": {
-        const outcome = await processEvolutionMessageEvent({
-          data,
-          instanceName,
-          partnerId: connection.partner_id,
-          requestId: options.requestId,
-        })
-        if (outcome === "duplicate") result.duplicates++
-        if (outcome === "processed") result.processed++
-        break
-      }
-
       case "messages.update":
       case "message.update":
       case "send.message": {

@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const url = `https://dudit.com.br${getPartnerUrl(partner)}`
 
   return {
-    title: `${storeName} | Dudit em ${city} - ${state}`,
+    title: `${storeName} em ${city} - ${state}`,
     description: storeDescription,
     alternates: {
       canonical: url,
@@ -165,6 +165,20 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     count: reviews?.filter((r: any) => Math.round(r.rating) === star).length || 0
   }))
 
+  const url = `https://dudit.com.br${getPartnerUrl(partner)}`
+  const partnerCity = partner.addresses?.[0]?.city || "Brasil"
+  const partnerState = partner.addresses?.[0]?.state || "BR"
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
+      { '@type': 'ListItem', position: 2, name: `${partnerCity} - ${partnerState}`, item: `https://dudit.com.br/explorar/${currentCidadeUf}` },
+      { '@type': 'ListItem', position: 3, name: partner.store_name, item: url },
+    ],
+  }
+
   const schemaJsonLd = {
     '@context': 'https://schema.org',
     '@type': ['Store', 'LocalBusiness', 'Organization'],
@@ -239,6 +253,10 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
 
   return (
     <div className="min-h-screen bg-white w-full max-w-[100vw] overflow-x-hidden flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}

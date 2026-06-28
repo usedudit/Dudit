@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge } from '@/components/reusable';
-import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
+import { getAvailableTimeSlotsAction, getMarketplaceOrderDetailsAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
@@ -162,6 +162,25 @@ export const AppointmentSheet = ({
             if (Array.isArray(res)) setAptPromotions(res)
         }).catch(() => { })
     }, [partnerId])
+
+    const [marketplaceOrderData, setMarketplaceOrderData] = useState<{
+        totalAmount: number
+        paymentMethod: string
+        paidAmount: number
+        situation: string
+    } | null>(null)
+
+    useEffect(() => {
+        const orderId = appointment?.marketplaceOrderId
+        const partner = partnerId
+        if (!orderId || !partner || mode !== 'view') {
+            setMarketplaceOrderData(null)
+            return
+        }
+        getMarketplaceOrderDetailsAction(orderId, partner).then(data => {
+            setMarketplaceOrderData(data)
+        }).catch(() => setMarketplaceOrderData(null))
+    }, [appointment?.marketplaceOrderId, partnerId, mode])
 
     // Status & Notes State
     const [status, setStatus] = useState(appointment?.status || 'Reservado');
@@ -1892,8 +1911,10 @@ export const AppointmentSheet = ({
                                         <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatDuration(calculatedDuration)}</span>
                                     </div>
                                     <div className="flex flex-col text-right">
-                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor Total</span>
-                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedPrice)}</span>
+                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                            {marketplaceOrderData ? 'Total Final (Marketplace)' : 'Valor Total'}
+                                        </span>
+                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(marketplaceOrderData?.totalAmount ?? calculatedPrice)}</span>
                                     </div>
                                 </div>
 
@@ -2852,17 +2873,19 @@ export const AppointmentSheet = ({
                                 qty: 1,
                                 quantity: 1,
                                 productId: s.id || null,
-                                unitPrice: finalPrice,
-                                price: finalPrice,
+                                unitPrice: marketplaceOrderData ? marketplaceOrderData.totalAmount / Math.max(1, selectedServices.length) : finalPrice,
+                                price: marketplaceOrderData ? marketplaceOrderData.totalAmount / Math.max(1, selectedServices.length) : finalPrice,
                                 name: s.name,
                             };
                         })}
-                        amountDue={calculatedPrice}
+                        amountDue={marketplaceOrderData?.totalAmount ?? calculatedPrice}
                         existingPaidAmount={Number(appointment?.paidAmount ?? 0)}
                         existingPaymentBreakdown={[]}
                         customer={{ id: selectedClient?.id, name: selectedClient?.name }}
                         headerSubtitle="Agendamento de Serviço"
                         hidePendingDelivery
+                        isMarketplaceOrder={!!marketplaceOrderData}
+                        originalPaymentMethod={marketplaceOrderData?.paymentMethod}
                     />
                 )}
             </AnimatePresence>

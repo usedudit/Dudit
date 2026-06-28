@@ -18,6 +18,8 @@ export function NotificationPanel({
   onLoadMore,
   onVisible,
   onNavigate,
+  onMarkAllAsRead,
+  unreadCount,
 }: {
   grouped: Group[]
   isLoading: boolean
@@ -26,6 +28,8 @@ export function NotificationPanel({
   onLoadMore: () => void
   onVisible: (id: string, visible: boolean) => void
   onNavigate?: () => void
+  onMarkAllAsRead?: () => void
+  unreadCount?: number
 }) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -64,7 +68,18 @@ export function NotificationPanel({
   }
 
   return (
-    <div className="max-h-[min(70vh,420px)] overflow-y-auto overscroll-contain">
+    <>
+      {unreadCount && unreadCount > 0 && onMarkAllAsRead && (
+        <div className="sticky top-0 z-10 bg-white dark:bg-dark-surface px-4 py-2 border-b border-brand-border dark:border-dark-border">
+          <button
+            type="button"
+            onClick={onMarkAllAsRead}
+            className="text-xs font-medium text-brand-green hover:text-brand-green/80 transition-colors"
+          >
+            Marcar todas como lidas
+          </button>
+        </div>
+      )}
       {grouped.map((group) => (
         <div key={group.label} className="px-2 py-1">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-inactive-text dark:text-dark-body px-2 py-1.5">
@@ -85,6 +100,6 @@ export function NotificationPanel({
       <div ref={sentinelRef} className="h-6 flex items-center justify-center">
         {isFetchingMore && <Loader2 className="w-4 h-4 animate-spin text-brand-inactive-text" />}
       </div>
-    </div>
+    </>
   )
 }

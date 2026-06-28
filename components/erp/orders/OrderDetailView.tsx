@@ -321,7 +321,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         return (
             <div className="flex items-center gap-2 flex-wrap text-sm">
                 <div className="flex items-center gap-2">
-                    <div className={`${isMercadoPago ? "w-auto px-1.5" : "w-8"} h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border`}>
+                    <div className={`${isMercadoPago ? "w-auto px-1.5" : "w-4"} h-4 flex items-center justify-center overflow-hidden shrink-0`}>
                         {getPaymentIcon()}
                     </div>
                     <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">

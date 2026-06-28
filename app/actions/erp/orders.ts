@@ -1588,7 +1588,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     await increment_usage_counter(partnerId, "orders_month_count")
 
     if (couponIdToSave) {
-        await supabase.from("coupon_usages").upsert(
+        const adminClient = createAdminClient()
+        await adminClient.from("coupon_usages").upsert(
             {
                 coupon_id: couponIdToSave,
                 customer_id: data.customerId || null,

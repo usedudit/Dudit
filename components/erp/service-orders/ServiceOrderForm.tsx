@@ -40,6 +40,11 @@ import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import { calculateOrderPricing, computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import AlertModal from "@/components/reusable/AlertModal"
+import { Package } from "@/lib/icons"
 
 interface ServiceOrderFormProps {
     partnerId: string
@@ -228,6 +233,21 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     const [showCustomerSheet, setShowCustomerSheet] = useState(false)
     const [showServiceSheet, setShowServiceSheet] = useState(false)
     const [showProductSheet, setShowProductSheet] = useState(false)
+
+    const [selectedProductForVariant, setSelectedProductForVariant] = useState<any>(null)
+    const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false)
+    const [activePromotions, setActivePromotions] = useState<any[]>([])
+    
+    // Zero-stock confirm modal states
+    const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: any; isVariant?: boolean; force?: boolean; callback?: () => void } | null>(null)
+    const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
+
+    useEffect(() => {
+        if (!partnerId) return
+        listActivePromotionsForMarketplaceAction(partnerId).then(res => {
+            if (Array.isArray(res)) setActivePromotions(res)
+        }).catch(() => { })
+    }, [partnerId])
 
     const [servicesPage, setServicesPage] = useState(1)
     const servicesItemsPerPage = 5
@@ -673,11 +693,19 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         setServices((prev) => {
             if (prev.some((s) => (s.service_id || s.id) === svc.id)) return prev
             setServicesPage(1)
+            
+            const pricing = computeItemDisplayPrice(
+                Number(svc.price || 0),
+                svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null,
+                activePromotions,
+                { serviceId: svc.id, categoryId: svc.category_id || undefined }
+            )
+
             return [...prev, {
                 ...svc,
                 service_id: svc.id,
                 quantity: 1,
-                service_price: svc.price,
+                service_price: pricing.bestPrice,
                 service_name: svc.name,
                 isManual: false
             }]
@@ -695,19 +723,93 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         })
     }
 
-    const handleAddProduct = (prod: any) => {
+    const proceedAddProduct = (product: any, force?: boolean) => {
         setProducts((prev) => {
-            if (prev.some((p) => (p.product_id || p.id) === prod.id)) return prev
+            const prodId = product.id
+            if (prev.some((p) => (p.product_id || p.id) === prodId)) return prev
             setProductsPage(1)
+
+            const pricing = computeItemDisplayPrice(
+                Number(product.price || 0),
+                product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null,
+                activePromotions,
+                { productId: product.id, categoryId: product.category_id || undefined }
+            )
+
             return [...prev, {
-                ...prod,
-                product_id: prod.id,
+                ...product,
+                product_id: product.id,
                 quantity: 1,
-                unit_price: prod.price,
-                product_name: prod.name,
-                isManual: false
+                unit_price: pricing.bestPrice,
+                product_name: product.name,
+                isManual: false,
+                allowSellWithoutStock: force ? true : Boolean(product.allow_sell_without_stock),
             }]
         })
+    }
+
+    const handleAddProduct = (prod: any, force?: boolean) => {
+        if (prod.has_variants || (prod.variants && prod.variants.length > 0)) {
+            setSelectedProductForVariant(prod)
+            setIsVariantSheetOpen(true)
+        } else {
+            if (!force && !prod.allow_sell_without_stock && Number(prod.stock || 0) < 1) {
+                setPendingZeroStockItem({ product: prod, callback: () => proceedAddProduct(prod, true) })
+                setShowZeroStockAlert(true)
+                return
+            }
+            proceedAddProduct(prod, force)
+        }
+    }
+
+    const handleVariantsConfirm = (selections: Array<{ variantId: string; qty: number }>) => {
+        const newProducts: any[] = []
+        selections.forEach(sel => {
+            const variant = selectedProductForVariant?.variants?.find((v: any) => String(v.id) === String(sel.variantId))
+            if (!variant) return
+            if (sel.qty > 0) {
+                const cannotSell = !selectedProductForVariant.allow_sell_without_stock && sel.qty > Number(variant.stock || 0)
+
+                const add = (forceBypass?: boolean) => {
+                    setProducts(prev => {
+                        if (prev.some(p => p.product_id === selectedProductForVariant.id && p.variant_id === variant.id)) return prev
+                        
+                        const pricing = computeItemDisplayPrice(
+                            Number(variant.price || 0),
+                            null,
+                            activePromotions,
+                            { productId: selectedProductForVariant.id, categoryId: selectedProductForVariant.category_id || undefined }
+                        )
+
+                        return [...prev, {
+                            ...selectedProductForVariant,
+                            product_id: selectedProductForVariant.id,
+                            variant_id: variant.id,
+                            product_name: `${selectedProductForVariant.name} - ${variant.name}`,
+                            quantity: sel.qty,
+                            unit_price: pricing.bestPrice,
+                            isManual: false,
+                            image: variant.image || selectedProductForVariant.image,
+                            sku: variant.sku || selectedProductForVariant.sku,
+                            stock: Number(variant.stock || 0),
+                            allowSellWithoutStock: forceBypass ? true : Boolean(selectedProductForVariant.allow_sell_without_stock),
+                        }]
+                    })
+                }
+
+                if (cannotSell) {
+                    setPendingZeroStockItem({ 
+                        product: { ...selectedProductForVariant, name: `${selectedProductForVariant.name} - ${variant.name}` }, 
+                        isVariant: true,
+                        callback: () => add(true) 
+                    })
+                    setShowZeroStockAlert(true)
+                } else {
+                    add(false)
+                }
+            }
+        })
+        setIsVariantSheetOpen(false)
     }
 
     const handleRemoveProduct = (id: string) => {
@@ -1107,14 +1209,24 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                     }}
                                                                     className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
                                                                 >
-                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 border border-brand-border dark:border-dark-border">
-                                                                        <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                        {svc.image ? (
+                                                                            <img
+                                                                                src={getR2ImageUrl(svc.image, "thumbnail")}
+                                                                                alt=""
+                                                                                className="w-full h-full object-cover"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-full h-full flex items-center justify-center">
+                                                                                <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex-1 min-w-0">
                                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{svc.name}</div>
                                                                     </div>
                                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, [], { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
+                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, activePromotions, { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
                                                                     </div>
                                                                 </div>
                                                             ))
@@ -1163,8 +1275,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                     <tr key={svc.service_id || svc.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                                         <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                                             <div className="flex items-center gap-3">
-                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                    <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                                    {svc.image ? (
+                                                                                        <img
+                                                                                            src={getR2ImageUrl(svc.image, "thumbnail")}
+                                                                                            alt=""
+                                                                                            className="w-full h-full object-cover"
+                                                                                        />
+                                                                                    ) : (
+                                                                                        <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                    )}
                                                                                 </div>
                                                                                 {svc.isEditing ? (
                                                                                     <div className="mb-0 flex-1">
@@ -1254,8 +1374,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         return (
                                                             <div key={svc.service_id || svc.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
                                                                 <div className="flex items-start gap-4">
-                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                        <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                        {svc.image ? (
+                                                                            <img
+                                                                                src={getR2ImageUrl(svc.image, "thumbnail")}
+                                                                                alt=""
+                                                                                className="w-full h-full object-cover"
+                                                                            />
+                                                                        ) : (
+                                                                            <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex-1 min-w-0 text-left space-y-2">
                                                                         {svc.isEditing ? (
@@ -1458,8 +1586,20 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                     <tr key={prod.product_id || prod.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                                         <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                                             <div className="flex items-center gap-3">
-                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                    <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                                    {(() => {
+                                                                                        const img = prod.image || (prod.images && prod.images.length > 0 ? prod.images[0] : null)
+                                                                                        if (img) {
+                                                                                            return (
+                                                                                                <img
+                                                                                                    src={getR2ImageUrl(img, "thumbnail")}
+                                                                                                    alt=""
+                                                                                                    className="w-full h-full object-cover"
+                                                                                                />
+                                                                                            )
+                                                                                        }
+                                                                                        return <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                    })()}
                                                                                 </div>
                                                                                 {prod.isEditing ? (
                                                                                     <div className="mb-0 flex-1">
@@ -1489,12 +1629,20 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                             </div>
                                                                         </td>
                                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            <div className="flex justify-center">
+                                                                            <div className="flex justify-center items-center gap-1.5">
                                                                                 <QuantitySelector
                                                                                     value={qty}
                                                                                     onChange={(val) => updateProductField(index, "quantity", val)}
                                                                                     size="md"
                                                                                 />
+                                                                                {!prod.isManual && Number(prod.stock || 0) <= 0 && (
+                                                                                    <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                                        <Badge
+                                                                                            variant="orange"
+                                                                                            icon={<Package size={14} />}
+                                                                                        />
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         </td>
                                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
@@ -1549,8 +1697,20 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         return (
                                                             <div key={prod.product_id || prod.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
                                                                 <div className="flex items-start gap-4">
-                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                        <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                        {(() => {
+                                                                            const img = prod.image || (prod.images && prod.images.length > 0 ? prod.images[0] : null)
+                                                                            if (img) {
+                                                                                return (
+                                                                                    <img
+                                                                                        src={getR2ImageUrl(img, "thumbnail")}
+                                                                                        alt=""
+                                                                                        className="w-full h-full object-cover"
+                                                                                    />
+                                                                                )
+                                                                            }
+                                                                            return <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                        })()}
                                                                     </div>
                                                                     <div className="flex-1 min-w-0 text-left space-y-2">
                                                                         {prod.isEditing ? (
@@ -1570,11 +1730,21 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                             </div>
                                                                         )}
                                                                         <div className="flex items-center gap-4 mt-2">
-                                                                            <QuantitySelector
-                                                                                value={qty}
-                                                                                onChange={(val) => updateProductField(index, "quantity", val)}
-                                                                                size="sm"
-                                                                            />
+                                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                                                <QuantitySelector
+                                                                                    value={qty}
+                                                                                    onChange={(val) => updateProductField(index, "quantity", val)}
+                                                                                    size="sm"
+                                                                                />
+                                                                                {!prod.isManual && Number(prod.stock || 0) <= 0 && (
+                                                                                    <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                                        <Badge
+                                                                                            variant="orange"
+                                                                                            icon={<Package size={12} />}
+                                                                                        />
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                             <div className="flex-1 max-w-[140px]">
                                                                                 <MoneyInput
                                                                                     value={unitPrice}
@@ -1906,6 +2076,29 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 onConfirm={confirmNavigation}
                 onCancel={cancelNavigation}
             />
+
+            <SelectProductVariantSheet
+                isOpen={isVariantSheetOpen}
+                onClose={() => setIsVariantSheetOpen(false)}
+                product={selectedProductForVariant}
+                onConfirm={handleVariantsConfirm}
+            />
+
+            <AlertModal
+                isOpen={showZeroStockAlert}
+                onClose={() => setShowZeroStockAlert(false)}
+                onConfirm={() => {
+                    setShowZeroStockAlert(false)
+                    pendingZeroStockItem?.callback?.()
+                    setPendingZeroStockItem(null)
+                }}
+                title="Produto sem estoque"
+                message={`O produto "${pendingZeroStockItem?.product?.product_name || pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
+                confirmText="Adicionar"
+                variant="warning"
+            />
+
+            <SavingStatusModal isOpen={saving} text="Salvando ordem de serviço..." />
         </FadeIn>
     )
 }

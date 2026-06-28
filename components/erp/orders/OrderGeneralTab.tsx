@@ -17,7 +17,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
     CheckCircleIcon, EditIcon, UserIcon,
-    TruckIcon
+    TruckIcon, Package
 } from "@/lib/icons"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -312,12 +312,32 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
+                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
+                                                                {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
+                                                            </div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                {(() => {
+                                                                    if (product.variants && product.variants.length > 0) {
+                                                                        const prices = product.variants.map((v: any) => Number(v.price || 0))
+                                                                        const minP = Math.min(...prices)
+                                                                        const maxP = Math.max(...prices)
+                                                                        return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
+                                                                    }
+                                                                    const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined });
+                                                                    return (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
+                                                                            <span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>
+                                                                            {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                            {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                        </div>
+                                                                    )
+                                                                })()}
+                                                            </div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                {product.isService ? "Serviço" : `${product.stock} em estoque`}
+                                                                {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -406,7 +426,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             </div>
                                                         </td>
                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex justify-center">
+                                                             <div className="flex justify-center items-center gap-1.5">
                                                                 <QuantitySelector
                                                                     value={item.quantity}
                                                                     disabled={isMarketplaceLocked}
@@ -414,6 +434,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                     max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
                                                                     size="md"
                                                                 />
+                                                                {!item.isService && Number(item.stock || 0) <= 0 && (
+                                                                    <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                        <Badge
+                                                                            variant="orange"
+                                                                            icon={<Package size={14} />}
+                                                                        />
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
@@ -546,13 +574,23 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     </div>
 
                                                     <div className="flex items-center gap-4 mt-2">
-                                                        <QuantitySelector
-                                                            value={item.quantity}
-                                                            disabled={isMarketplaceLocked}
-                                                            onChange={(val) => updateItemQty(index, val)}
-                                                            max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
-                                                            size="sm"
-                                                        />
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <QuantitySelector
+                                                                value={item.quantity}
+                                                                disabled={isMarketplaceLocked}
+                                                                onChange={(val) => updateItemQty(index, val)}
+                                                                max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
+                                                                size="sm"
+                                                            />
+                                                            {!item.isService && Number(item.stock || 0) <= 0 && (
+                                                                <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                    <Badge
+                                                                        variant="orange"
+                                                                        icon={<Package size={12} />}
+                                                                    />
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <div className="flex-1 max-w-[140px]">
                                                             <MoneyInput
                                                                 name={`item-price-mobile-${index}`}
@@ -1033,12 +1071,32 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         </div>
                                                         <div className="flex-1 min-w-0 text-left">
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
+                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
+                                                                {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
+                                                            </div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                {(() => {
+                                                                    if (product.variants && product.variants.length > 0) {
+                                                                        const prices = product.variants.map((v: any) => Number(v.price || 0))
+                                                                        const minP = Math.min(...prices)
+                                                                        const maxP = Math.max(...prices)
+                                                                        return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
+                                                                    }
+                                                                    const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined });
+                                                                    return (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
+                                                                            <span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>
+                                                                            {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                            {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                        </div>
+                                                                    )
+                                                                })()}
+                                                            </div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                {product.isService ? "Serviço" : `${product.stock} em estoque`}
+                                                                {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1133,13 +1191,23 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     </div>
 
                                                     <div className="flex items-center gap-4 mt-2">
-                                                        <QuantitySelector
-                                                            value={item.quantity}
-                                                            disabled={isMarketplaceLocked}
-                                                            onChange={(val) => updateItemQty(index, val)}
-                                                            max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
-                                                            size="sm"
-                                                        />
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <QuantitySelector
+                                                                value={item.quantity}
+                                                                disabled={isMarketplaceLocked}
+                                                                onChange={(val) => updateItemQty(index, val)}
+                                                                max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
+                                                                size="sm"
+                                                            />
+                                                            {!item.isService && Number(item.stock || 0) <= 0 && (
+                                                                <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                    <Badge
+                                                                        variant="orange"
+                                                                        icon={<Package size={12} />}
+                                                                    />
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <div className="flex-1 max-w-[140px]">
                                                             <MoneyInput
                                                                 name={`item-price-mobile-general-${index}`}

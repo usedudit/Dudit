@@ -79,10 +79,20 @@ export default function SelectProductSheet({ open, onOpenChange, onSelect, partn
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">{prod.name}</p>
-                  {prod.sku && <p className="text-[11px] text-brand-inactive-text">{prod.sku}</p>}
+                  <p className="text-[11px] text-brand-inactive-text">
+                    {(prod.variants && prod.variants.length > 0) ? "Múltiplos SKUs" : (prod.sku || "N/A")}
+                  </p>
                 </div>
                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading shrink-0">
-                  {formatCurrency(prod.price || 0)}
+                  {(() => {
+                    if (prod.variants && prod.variants.length > 0) {
+                      const prices = prod.variants.map((v: any) => Number(v.price || 0))
+                      const minP = Math.min(...prices)
+                      const maxP = Math.max(...prices)
+                      return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
+                    }
+                    return formatCurrency(prod.price || 0)
+                  })()}
                 </span>
               </button>
             ))}

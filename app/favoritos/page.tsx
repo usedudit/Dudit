@@ -7,7 +7,7 @@ import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const metadata: Metadata = {
-    title: "Favoritos | Dudit",
+    title: "Favoritos",
     description: "Seus produtos e serviços favoritos no marketplace Dudit. Encontre rapidamente tudo que você salvou.",
 }
 

@@ -164,6 +164,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
     const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false);
     const [productToSelectVariant, setProductToSelectVariant] = useState<any | null>(null);
+    const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: any; isVariant?: boolean; force?: boolean; callback?: () => void } | null>(null)
+    const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
 
     // Quote State
     const [quoteItems, setQuoteItems] = useState<any[]>([]);
@@ -202,12 +204,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [validationMessage, setValidationMessage] = useState('');
 
     const getItemMaxQuantity = useCallback((item: any) => {
-        if (!item || item.isBlank || item.isService) return undefined;
+        if (!item || item.isBlank || item.isService || item.allowSellWithoutStock) return undefined;
         return Math.max(0, Number(item.stock ?? 0));
     }, []);
 
     const validateQuoteStock = useCallback((targetItems: any[]) => {
-        const stockMap = new Map<string, { name: string; quantity: number; stock: number }>();
+        const stockMap = new Map<string, { name: string; quantity: number; stock: number; allowSellWithoutStock: boolean }>();
 
         for (const item of targetItems) {
             if (item.isBlank || item.isService || !item.id) continue;
@@ -223,10 +225,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 name: item.name || "Produto",
                 quantity: Number(item.qty || 0),
                 stock: Number(item.stock ?? 0),
+                allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
             });
         }
 
         for (const entry of stockMap.values()) {
+            if (entry.allowSellWithoutStock) continue;
             if (entry.quantity > entry.stock) {
                 return `A quantidade de "${entry.name}" está maior que o estoque disponível.`;
             }
@@ -426,17 +430,30 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
 
     // 1. Handle Product Click
+    const proceedAddProduct = (product: any, forceBypass?: boolean) => {
+        addItem(product, undefined, undefined, 1, (() => { const p = product.promotional_price ? Number(product.promotional_price) : 0; return p > 0 && p < Number(product.price || 0) ? p : Number(product.price || 0) })());
+        if (forceBypass) {
+            setQuoteItems(prev => {
+                const copy = [...prev]
+                if (copy.length > 0) {
+                    copy[copy.length - 1].allowSellWithoutStock = true
+                }
+                return copy
+            })
+        }
+        setIsProductSearchOpen(false);
+    }
+
     const handleProductClick = (product: any) => {
-        // If product has no variants, add it directly
         const variants = product.variants || [];
 
         if (variants.length === 0) {
             if (!product.isService && Number(product.stock || 0) < 1) {
-                notifyError("Estoque insuficiente", `"${product.name}" está sem estoque disponível.`);
+                setPendingZeroStockItem({ product, callback: () => proceedAddProduct(product, true) })
+                setShowZeroStockAlert(true)
                 return;
             }
-            addItem(product, undefined, undefined, 1, (() => { const p = product.promotional_price ? Number(product.promotional_price) : 0; return p > 0 && p < Number(product.price || 0) ? p : Number(product.price || 0) })());
-            setIsProductSearchOpen(false);
+            proceedAddProduct(product, false);
             return;
         }
 
@@ -529,42 +546,57 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const handleConfirmVariants = (selections: Array<{ variantId: string; qty: number }>) => {
         if (!productToSelectVariant) return;
 
-        setQuoteItems(prevItems => {
-            const newItems = [...prevItems];
-            selections.forEach((sel: any) => {
-                const v = productToSelectVariant.variants?.find((x: any) => String(x.id) === String(sel.variantId));
-                if (!v) return;
-                if (sel.qty > 0) {
-                    const variantName = v.name;
-                    const variantNameForCheck = variantName;
+        selections.forEach((sel: any) => {
+            const v = productToSelectVariant.variants?.find((x: any) => String(x.id) === String(sel.variantId));
+            if (!v) return;
+            if (sel.qty > 0) {
+                const variantName = v.name;
+                const variantNameForCheck = variantName;
 
-                    const existingIndex = newItems.findIndex(i => i.id === productToSelectVariant.id && i.variant === variantNameForCheck);
-                    if (existingIndex >= 0) {
-                        const nextQty = newItems[existingIndex].qty + sel.qty;
-                        if (nextQty > Number(newItems[existingIndex].stock ?? 0)) {
-                            return;
+                const add = (forceBypass?: boolean) => {
+                    setQuoteItems(prevItems => {
+                        const newItems = [...prevItems];
+                        const existingIndex = newItems.findIndex(i => i.id === productToSelectVariant.id && i.variant === variantNameForCheck);
+                        if (existingIndex >= 0) {
+                            newItems[existingIndex] = { 
+                                ...newItems[existingIndex], 
+                                qty: newItems[existingIndex].qty + sel.qty,
+                                allowSellWithoutStock: forceBypass ? true : Boolean(newItems[existingIndex].allowSellWithoutStock)
+                            };
+                        } else {
+                            const finalName = variantName === productToSelectVariant.name ? productToSelectVariant.name : `${productToSelectVariant.name} - ${v.name}`;
+                            newItems.push({
+                                ...productToSelectVariant,
+                                rowId: `item-${Date.now()}-${Math.random()}-${v.id}`,
+                                name: finalName,
+                                sku: v.sku,
+                                price: v.price,
+                                variant: variantNameForCheck,
+                                variantId: v.id,
+                                stock: v.stock,
+                                qty: sel.qty,
+                                isEditing: false,
+                                isManual: false,
+                                allowSellWithoutStock: forceBypass || false
+                            });
                         }
-                        newItems[existingIndex] = { ...newItems[existingIndex], qty: nextQty };
-                    } else {
-                        const finalName = variantName === productToSelectVariant.name ? productToSelectVariant.name : `${productToSelectVariant.name} - ${v.name}`;
-                        newItems.push({
-                            ...productToSelectVariant,
-                            rowId: `item-${Date.now()}-${Math.random()}-${v.id}`,
-                            name: finalName,
-                            sku: v.sku,
-                            price: v.price,
-                            variant: variantNameForCheck,
-                            variantId: v.id,
-                            stock: v.stock,
-                            qty: sel.qty,
-                            isEditing: false,
-                            isManual: false
-                        });
-                    }
+                        return newItems;
+                    });
+                };
+
+                if (sel.qty > Number(v.stock ?? 0)) {
+                    setPendingZeroStockItem({
+                        product: { ...productToSelectVariant, name: `${productToSelectVariant.name} - ${v.name}` },
+                        isVariant: true,
+                        callback: () => add(true)
+                    });
+                    setShowZeroStockAlert(true);
+                } else {
+                    add(false);
                 }
-            });
-            return newItems;
+            }
         });
+
         setProductToSelectVariant(null);
         setIsVariantSheetOpen(false);
         setFieldErrors(prev => {
@@ -1246,6 +1278,20 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 />
 
                 <SavingStatusModal isOpen={isSaving} text={mode === "edit" ? "Salvando orçamento..." : "Criando orçamento..."} />
+
+                <AlertModal
+                    isOpen={showZeroStockAlert}
+                    onClose={() => setShowZeroStockAlert(false)}
+                    onConfirm={() => {
+                        setShowZeroStockAlert(false)
+                        pendingZeroStockItem?.callback?.()
+                        setPendingZeroStockItem(null)
+                    }}
+                    title="Produto sem estoque"
+                    message={`O produto "${pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
+                    confirmText="Adicionar"
+                    variant="warning"
+                />
             </div>
         </FadeIn>
     );

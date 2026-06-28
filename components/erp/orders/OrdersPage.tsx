@@ -815,7 +815,40 @@ export default function OrdersPage({
                                 })
                             }}
                             onUpdatePaymentStatus={(order: any) => {
-                                openEntity('edit', order.id)
+                                const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
+                                if (isMarketplace) {
+                                    // Marketplace orders: show simple payment status modal (value input only)
+                                    openPaymentStatusModal({
+                                        originalId: order.id,
+                                        displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
+                                        customer_name: order.customer_name || "Consumidor final",
+                                        customer_id: order.buyer_id || "-",
+                                        total_amount: Number(order.total_amount || 0),
+                                        statusLabel: "",
+                                        statusColor: "gray",
+                                        deliveryStatusLabel: "",
+                                        deliveryStatusColor: "gray",
+                                        isUnfulfilled: false,
+                                        formattedDate: "",
+                                        formattedTime: "",
+                                        store_name: "",
+                                        order_source: order.order_source || "Manual",
+                                        items_count: Number(order.order_items?.length || 0),
+                                        created_at_time: new Date(order.created_at || Date.now()).getTime(),
+                                        situation: order.situation || "pending",
+                                        delivery_status: order.delivery_status || "not_sent",
+                                        delivery_type: order.delivery_type || "delivery",
+                                        notes: order.notes || "",
+                                        previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                        returnCount: Number(order.return_count || order.return_requests?.length || 0),
+                                        canEdit: order.situation !== "cancelled",
+                                        paidAmount: Number(order.paid_amount || 0),
+                                        payment_method: order.payment_method || "",
+                                        payment_breakdown: order.payment_breakdown || [],
+                                    })
+                                } else {
+                                    openEntity('edit', order.id)
+                                }
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
                             onOpenNotes={(order: any) => openNotesSheet(order)}

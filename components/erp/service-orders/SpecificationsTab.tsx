@@ -74,7 +74,7 @@ export default function SpecificationsTab({
             } catch {}
         }
         setLocalSpecs(specsArray.map((s, i) => ({ ...s, id: i + Date.now() })))
-    }, [specifications])
+    }, [serviceOrderId])
 
     const addAttribute = () => {
         if (localSpecs.length >= 25) return

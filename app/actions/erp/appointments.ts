@@ -1410,3 +1410,27 @@ export async function getAppointmentHistoryAction(appointmentId: string) {
     return { success: false, history: [], error: error?.message || "Erro ao buscar histórico" }
   }
 }
+
+export async function getMarketplaceOrderDetailsAction(orderId: string, partnerId: string) {
+  try {
+    const user = await requireUser()
+    if (!user) return null
+    await requirePermission(partnerId, "orders", "view")
+    const supabase = await getSupabaseServerClient()
+    const { data } = await supabase
+      .from("orders")
+      .select("total_amount, payment_method, paid_amount, situation")
+      .eq("id", orderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!data) return null
+    return {
+      totalAmount: Number(data.total_amount || 0),
+      paymentMethod: data.payment_method || '',
+      paidAmount: Number(data.paid_amount || 0),
+      situation: data.situation || 'pending',
+    }
+  } catch {
+    return null
+  }
+}

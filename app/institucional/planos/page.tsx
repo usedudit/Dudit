@@ -434,6 +434,53 @@ const FAQ = () => {
    )
 }
 
+const faqLd = {
+   "@context": "https://schema.org",
+   "@type": "FAQPage",
+   mainEntity: [
+      {
+         "@type": "Question",
+         name: "Preciso pagar pra começar?",
+         acceptedAnswer: {
+            "@type": "Answer",
+            text: "Não. Você pode começar no plano gratuito e usar o básico sem pagar nada.",
+         },
+      },
+      {
+         "@type": "Question",
+         name: "Tem taxa ou comissão sobre vendas?",
+         acceptedAnswer: {
+            "@type": "Answer",
+            text: "Não. Você vende direto e fica com o valor das suas vendas.",
+         },
+      },
+      {
+         "@type": "Question",
+         name: "Posso usar sem ter empresa?",
+         acceptedAnswer: {
+            "@type": "Answer",
+            text: "Sim. Você pode usar pra vender, divulgar serviços ou anunciar algo na sua cidade.",
+         },
+      },
+      {
+         "@type": "Question",
+         name: "Funciona na minha cidade?",
+         acceptedAnswer: {
+            "@type": "Answer",
+            text: "Sim. A Dudit é feita pra funcionar em qualquer cidade.",
+         },
+      },
+      {
+         "@type": "Question",
+         name: "Posso cancelar quando quiser?",
+         acceptedAnswer: {
+            "@type": "Answer",
+            text: "Sim. Sem contrato ou fidelidade.",
+         },
+      },
+   ],
+}
+
 export default function PricingPage() {
    const router = useRouter();
 
@@ -447,6 +494,10 @@ export default function PricingPage() {
 
    return (
       <div className="min-h-screen bg-white">
+         <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+         />
          <Navbar onNavigate={onNavigate} />
          <main>
             <PricingHero />

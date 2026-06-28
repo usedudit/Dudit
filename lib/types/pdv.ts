@@ -87,4 +87,5 @@ export type PDVCartItem = {
   qty: number
   image: string | null
   isGift?: boolean
+  allowSellWithoutStock?: boolean
 }

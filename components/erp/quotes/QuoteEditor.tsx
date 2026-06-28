@@ -262,12 +262,31 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
+                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
+                                                            {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
+                                                        </div>
                                                     </div>
                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                        {(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}
+                                                        {(() => {
+                                                            if (product.variants && product.variants.length > 0) {
+                                                                const prices = product.variants.map((v: any) => Number(v.price || 0))
+                                                                const minP = Math.min(...prices)
+                                                                const maxP = Math.max(...prices)
+                                                                const priceText = minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
+                                                                return <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{priceText}</span>
+                                                            }
+                                                            const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined });
+                                                            return (
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>
+                                                                    {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                    {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                </div>
+                                                            )
+                                                        })()}
                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                            {product.isService ? "Serviço" : `${product.stock} em estoque`}
+                                                            {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
                                                         </div>
                                                     </div>
                                                     {product.variants && product.variants.length > 0 && (

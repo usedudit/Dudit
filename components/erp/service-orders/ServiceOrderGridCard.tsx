@@ -38,7 +38,7 @@ const ServiceOrderGridCard = React.memo(
     }
 
     const assignedMember = teamMembers.find(m => m.userId === order.assigned_user_id)
-    const assignedName = assignedMember ? assignedMember.name : "-"
+    const assignedName = assignedMember ? (assignedMember.fullName || assignedMember.name) : "-"
 
     return (
       <motion.div

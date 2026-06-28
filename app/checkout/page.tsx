@@ -2,7 +2,7 @@ import { CheckoutPageClient } from "@/components/marketplace/CheckoutPageClient"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Finalizar Compra - Dudit",
+  title: "Finalizar Compra",
   description: "Conclua seu pedido na Dudit.",
   robots: {
     index: false,

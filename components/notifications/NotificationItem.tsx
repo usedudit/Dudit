@@ -55,23 +55,24 @@ export function NotificationItem({
       onClick={onNavigate}
       className={cn(
         "block px-3 py-2.5 rounded-lg transition-colors hover:bg-brand-gray/60 dark:hover:bg-dark-border/60",
-        !notification.is_read && "bg-brand-green/5 dark:bg-brand-green/10",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium text-brand-dark dark:text-dark-heading line-clamp-1">
           {notification.title}
         </p>
-        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body shrink-0">
-          {formatTime(notification.created_at)}
-        </span>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <span className="text-[10px] text-brand-inactive-text dark:text-dark-body">
+            {formatTime(notification.created_at)}
+          </span>
+          {!notification.is_read && (
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-green" />
+          )}
+        </div>
       </div>
       <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 line-clamp-2">
         {notification.message}
       </p>
-      {!notification.is_read && (
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-green mt-1.5" />
-      )}
     </Link>
   )
 }
