@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useMemo, useState, useEffect } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon } from "@/lib/icons"
 import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
 import Portal from "@/components/Portal"
@@ -25,7 +25,7 @@ interface SelectCouponProductsSheetProps {
   onClose: () => void
   products: ScopeItem[]
   selectedIds: string[]
-  onToggle: (id: string) => void
+  onSave: (ids: string[]) => void
   isLoading?: boolean
 }
 
@@ -46,11 +46,19 @@ export default function SelectCouponProductsSheet({
   onClose,
   products,
   selectedIds,
-  onToggle,
+  onSave,
   isLoading = false,
 }: SelectCouponProductsSheetProps) {
   const [search, setSearch] = useState("")
+  const [tempSelected, setTempSelected] = useState<Set<string>>(new Set())
   const isMobile = useMediaQuery("(max-width: 768px)")
+
+  useEffect(() => {
+    if (isOpen) {
+      setTempSelected(new Set(selectedIds))
+      setSearch("")
+    }
+  }, [isOpen, selectedIds])
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -71,6 +79,20 @@ export default function SelectCouponProductsSheet({
       )
     })
   }, [products, search])
+
+  const toggleProduct = (id: string) => {
+    setTempSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSave = () => {
+    onSave(Array.from(tempSelected))
+    onClose()
+  }
 
   const content = (
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -105,7 +127,7 @@ export default function SelectCouponProductsSheet({
           <Div className="flex flex-col px-2 pb-2">
             {filteredProducts.map((product) => {
               const disabled = product.isActive === false
-              const isSelected = selectedIds.includes(product.id)
+              const isSelected = tempSelected.has(product.id)
               const imageUrl = getR2ImageUrl(product.image || null, "thumbnail") || PLACEHOLDER_IMAGE
 
               return (
@@ -113,14 +135,14 @@ export default function SelectCouponProductsSheet({
                   key={product.id}
                   role={disabled ? undefined : "button"}
                   tabIndex={disabled ? undefined : 0}
-                  onClick={disabled ? undefined : () => onToggle(product.id)}
+                  onClick={disabled ? undefined : () => toggleProduct(product.id)}
                   onKeyDown={
                     disabled
                       ? undefined
                       : (e: React.KeyboardEvent) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
-                          onToggle(product.id)
+                          toggleProduct(product.id)
                         }
                       }
                   }
@@ -179,13 +201,16 @@ export default function SelectCouponProductsSheet({
         )}
       </Div>
 
-      <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+      <Footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
         <div className="flex items-center gap-4">
           <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
-            Fechar
+            Cancelar
+          </Button>
+          <Button className="h-12 flex-1" onClick={handleSave}>
+            Salvar ({tempSelected.size})
           </Button>
         </div>
-      </footer>
+      </Footer>
     </Div>
   )
 

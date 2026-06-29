@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useMemo, useState, useEffect } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, TagIcon } from "@/lib/icons"
 import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
 import Portal from "@/components/Portal"
@@ -20,7 +20,7 @@ interface SelectCouponCategoriesSheetProps {
   onClose: () => void
   categories: ScopeCategory[]
   selectedIds: string[]
-  onToggle: (id: string) => void
+  onSave: (ids: string[]) => void
   isLoading?: boolean
 }
 
@@ -41,11 +41,19 @@ export default function SelectCouponCategoriesSheet({
   onClose,
   categories,
   selectedIds,
-  onToggle,
+  onSave,
   isLoading = false,
 }: SelectCouponCategoriesSheetProps) {
   const [search, setSearch] = useState("")
+  const [tempSelected, setTempSelected] = useState<Set<string>>(new Set())
   const isMobile = useMediaQuery("(max-width: 768px)")
+
+  useEffect(() => {
+    if (isOpen) {
+      setTempSelected(new Set(selectedIds))
+      setSearch("")
+    }
+  }, [isOpen, selectedIds])
 
   const filteredCategories = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -59,6 +67,20 @@ export default function SelectCouponCategoriesSheet({
     if (!term) return sorted
     return sorted.filter((item) => item.name.toLowerCase().includes(term))
   }, [categories, search])
+
+  const toggleCategory = (id: string) => {
+    setTempSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSave = () => {
+    onSave(Array.from(tempSelected))
+    onClose()
+  }
 
   const content = (
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -93,20 +115,20 @@ export default function SelectCouponCategoriesSheet({
           <Div className="flex flex-col px-2 pb-2">
             {filteredCategories.map((category) => {
               const disabled = category.isActive === false
-              const isSelected = selectedIds.includes(category.id)
+              const isSelected = tempSelected.has(category.id)
               return (
                 <Div
                   key={category.id}
                   role={disabled ? undefined : "button"}
                   tabIndex={disabled ? undefined : 0}
-                  onClick={disabled ? undefined : () => onToggle(category.id)}
+                  onClick={disabled ? undefined : () => toggleCategory(category.id)}
                   onKeyDown={
                     disabled
                       ? undefined
                       : (e: React.KeyboardEvent) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
-                          onToggle(category.id)
+                          toggleCategory(category.id)
                         }
                       }
                   }
@@ -135,7 +157,7 @@ export default function SelectCouponCategoriesSheet({
                       )}
                     </Div>
                     <P className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                      {category.isActive === false ? "Categoria inativa" : "Categoria disponivel para uso"}
+                      {category.isActive === false ? "Categoria inativa" : "Categoria disponível para uso"}
                     </P>
                   </Div>
                   <Div className="flex shrink-0 items-center gap-2">
@@ -164,14 +186,17 @@ export default function SelectCouponCategoriesSheet({
         )}
       </Div>
 
-      <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+      <Footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
         <div className="flex items-center gap-4">
           <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
-            Fechar
+            Cancelar
+          </Button>
+          <Button className="h-12 flex-1" onClick={handleSave}>
+            Salvar ({tempSelected.size})
           </Button>
         </div>
-      </footer >
-    </Div >
+      </Footer>
+    </Div>
   )
 
   if (isMobile) {

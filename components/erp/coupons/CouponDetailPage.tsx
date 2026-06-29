@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ActionsDropdown, Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { ActionsDropdown, Badge, Button, FormSection, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { ChevronLeftIcon, EditIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
@@ -116,8 +116,7 @@ export default function CouponDetailPage({
                                 <TabsContent value="summary" className="mt-0" key="summary">
                                     <FadeIn className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                         <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                            <section>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do cupom</h3>
+                                            <FormSection title="Detalhes do cupom">
                                                 <div className="space-y-3">
                                                     <KeyValueRow label="Tipo de desconto" value={getCouponPrimaryMeta(coupon)} />
                                                     <KeyValueRow label="Aplicar a" value={getCouponApplyScopeLabel(coupon.apply_scope)} />
@@ -125,12 +124,9 @@ export default function CouponDetailPage({
                                                     <KeyValueRow label="Validade" value={getCouponValiditySummary(coupon)} />
                                                     <KeyValueRow label="Uso" value={getCouponUsageSummary(coupon)} />
                                                 </div>
-                                            </section>
+                                            </FormSection>
 
-                                            <div className="border-t border-brand-border dark:border-dark-border my-8 w-full" />
-
-                                            <section>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Regras configuradas</h3>
+                                            <FormSection hasSeparator title="Regras configuradas">
                                                 <div className="space-y-3">
                                                     <KeyValueRow label="Valor mínimo do pedido" value={`R$ ${Number(coupon.min_cart_value || 0).toFixed(2)}`} />
                                                     <KeyValueRow label="Combinação" value={coupon.allow_combination ? "Permitida" : "Bloqueada"} />
@@ -138,7 +134,7 @@ export default function CouponDetailPage({
                                                     <KeyValueRow label="Limite total" value={coupon.usage_limit != null ? coupon.usage_limit : "Ilimitado"} />
                                                     <KeyValueRow label="Por cliente" value={coupon.usage_per_customer != null ? coupon.usage_per_customer : coupon.first_purchase_only ? "Primeira compra" : "Livre"} />
                                                 </div>
-                                            </section>
+                                            </FormSection>
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
@@ -194,31 +190,21 @@ export default function CouponDetailPage({
                                                 </div>
                                             ) : (
                                                 <div className="space-y-8">
-                                                    <section>
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Categorias vinculadas</h3>
+                                                    <FormSection title="Categorias vinculadas">
                                                         <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.categories.length > 0 ? relations.categories.map((item) => item.name).join(", ") : "Nenhuma categoria específica vinculada."}</p>
-                                                    </section>
+                                                    </FormSection>
 
-                                                    <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                                    <section>
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Produtos vinculados</h3>
+                                                    <FormSection hasSeparator title="Produtos vinculados">
                                                         <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.products.length > 0 ? relations.products.map((item) => item.name).join(", ") : "Nenhum produto específico vinculado."}</p>
-                                                    </section>
+                                                    </FormSection>
 
-                                                    <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                                    <section>
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Serviços vinculados</h3>
+                                                    <FormSection hasSeparator title="Serviços vinculados">
                                                         <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.services.length > 0 ? relations.services.map((item) => item.name).join(", ") : "Nenhum serviço específico vinculado."}</p>
-                                                    </section>
+                                                    </FormSection>
 
-                                                    <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                                    <section>
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Clientes vinculados</h3>
+                                                    <FormSection hasSeparator title="Clientes vinculados">
                                                         <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.customers.length > 0 ? relations.customers.map((item) => item.name).join(", ") : "O cupom vale para toda a base de clientes."}</p>
-                                                    </section>
+                                                    </FormSection>
                                                 </div>
                                             )}
                                         </div>
@@ -254,7 +240,7 @@ export default function CouponDetailPage({
                         onShare={onShare ? () => onShare(coupon) : undefined}
                         trigger={
                             <Button variant="outline" className="flex-1">
-                                Opcoes
+                                Opções
                             </Button>
                         }
                     />

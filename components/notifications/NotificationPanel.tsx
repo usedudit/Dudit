@@ -69,7 +69,7 @@ export function NotificationPanel({
 
   return (
     <>
-      {unreadCount && unreadCount > 0 && onMarkAllAsRead && (
+      {unreadCount > 0 && onMarkAllAsRead && (
         <div className="sticky top-0 z-10 bg-white dark:bg-dark-surface px-4 py-2 border-b border-brand-border dark:border-dark-border">
           <button
             type="button"
@@ -82,10 +82,10 @@ export function NotificationPanel({
       )}
       {grouped.map((group) => (
         <div key={group.label} className="px-2 py-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-inactive-text dark:text-dark-body px-2 py-1.5">
+          <p className="text-xs font-medium text-brand-dark dark:text-dark-heading px-2 py-2">
             {group.label}
           </p>
-          <div className="space-y-0.5">
+          <div className="space-y-2">
             {group.items.map((item) => (
               <NotificationItem
                 key={item.id}

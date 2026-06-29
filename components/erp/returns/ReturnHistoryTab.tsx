@@ -3,6 +3,7 @@
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import type { ReturnEvent } from "./types"
+import { ThreeDotsLoader } from "@/components/reusable"
 
 interface ReturnHistoryTabProps {
     events: ReturnEvent[]
@@ -36,8 +37,8 @@ function mapReturnEventToHistoryEntry(event: ReturnEvent): HistoryEntry {
 export function ReturnHistoryTab({ events, loading = false }: ReturnHistoryTabProps) {
     if (loading) {
         return (
-            <div className="rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-6 text-sm text-brand-inactive-text dark:text-dark-body">
-                Carregando histórico...
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
             </div>
         )
     }

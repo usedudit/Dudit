@@ -351,11 +351,45 @@ export function getSaoPauloOffsetMinutes(date: Date = new Date()): number {
 
 /**
  * Creates a Date object representing the given calendar date/time in America/Sao_Paulo.
+ * Handles DST correctly via Intl.
  */
 export function createSaoPauloDate(year: number, month: number, day: number, hour: number, minute: number): Date {
   const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute))
   const offsetMinutes = getSaoPauloOffsetMinutes(utcDate)
   return new Date(utcDate.getTime() - offsetMinutes * 60000)
+}
+
+/**
+ * Retorna o timezone IANA padrão da aplicação.
+ * Lê de APP_DEFAULT_TIMEZONE (env) se definido, senão usa America/Sao_Paulo.
+ * Isso permite trocar o timezone globalmente sem alterar código,
+ * e futuramente pode ser sobrescrito por parceiro.
+ */
+export function getDefaultTimezone(): string {
+  return process.env.APP_DEFAULT_TIMEZONE || "America/Sao_Paulo"
+}
+
+/**
+ * Interpreta uma data e hora no formato YYYY-MM-DD e HH:mm como horário
+ * civil em um timezone IANA específico (padrão: getDefaultTimezone()).
+ *
+ * Retorna um objeto Date UTC equivalente.
+ *
+ * Ex: parseDateInTimezone("2026-06-29", "14:00", "America/Sao_Paulo")
+ *     → Date representando 2026-06-29 17:00 UTC (14:00 BRT = UTC-3)
+ *
+ * Funciona para QUALQUER timezone IANA (America/New_York, Europe/Lisbon, etc.)
+ * e respeita horário de verão automaticamente via Intl.
+ */
+export function parseDateInTimezone(dateStr: string, timeStr: string, timezone?: string): Date {
+  const tz = timezone || getDefaultTimezone()
+  const [y, m, d] = dateStr.split("-").map(Number)
+  const [h, min] = timeStr.split(":").map(Number)
+  const utcDate = new Date(Date.UTC(y, m - 1, d, h, min))
+  const tzString = utcDate.toLocaleString("en-US", { timeZone: tz })
+  const localDate = new Date(tzString)
+  const diffMs = localDate.getTime() - utcDate.getTime()
+  return new Date(utcDate.getTime() - diffMs)
 }
 
 

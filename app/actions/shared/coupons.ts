@@ -5,6 +5,7 @@ import { requireUser, requireMinimumPlan } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCoupons } from "@/lib/utils/revalidation"
+import { getErrorMessage } from "@/lib/utils/error-handlers"
 import { validateCoupon, findBestAutomaticCoupon, validateCouponRow } from "@/lib/services/coupons"
 
 const CouponSchema = z.object({
@@ -34,6 +35,30 @@ const CouponSchema = z.object({
     categoryIds: z.array(z.string().uuid()).optional().default([]),
     serviceIds: z.array(z.string().uuid()).optional().default([]),
     customerIds: z.array(z.string().uuid()).optional().default([]),
+}).superRefine((data, ctx) => {
+    if (data.discountType === "free_shipping" && data.discountValue !== null) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "O valor do desconto deve estar vazio para entrega grátis.",
+            path: ["discountValue"],
+        })
+    }
+    if (data.discountType !== "free_shipping" && (data.discountValue === null || data.discountValue <= 0)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: data.discountType === "percentage"
+                ? "O percentual de desconto deve ser maior que zero."
+                : "O valor do desconto deve ser maior que zero.",
+            path: ["discountValue"],
+        })
+    }
+    if (data.discountType === "percentage" && data.discountValue !== null && data.discountValue > 100) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "O percentual de desconto não pode ultrapassar 100%.",
+            path: ["discountValue"],
+        })
+    }
 })
 
 export async function listCouponsAction(partnerId: string, params?: { search?: string; isActive?: string; type?: string; page?: number; limit?: number }) {
@@ -59,7 +84,7 @@ export async function listCouponsAction(partnerId: string, params?: { search?: s
     if (params?.type && ["percentage", "fixed", "free_shipping"].includes(params.type)) query = query.eq("discount_type", params.type)
 
     const { data, error, count } = await query
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: getErrorMessage(error) }
     return { success: true, data: data || [], total: Number(count || 0), page, limit }
 }
 
@@ -95,7 +120,7 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
         .select("id")
         .single()
 
-    if (error || !inserted) return { success: false, error: error?.message || "Falha ao criar cupom." }
+    if (error || !inserted) return { success: false, error: getErrorMessage(error) || "Falha ao criar cupom." }
     const couponId = inserted.id
 
     if (data.productIds.length > 0) {
@@ -153,7 +178,7 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
         })
         .eq("id", couponId)
         .eq("partner_id", data.partnerId)
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: getErrorMessage(error) }
 
     await Promise.all([
         supabase.from("coupon_products").delete().eq("coupon_id", couponId),
@@ -187,7 +212,7 @@ export async function toggleCouponStatusAction(partnerId: string, couponId: stri
         .update({ is_active: isActive })
         .eq("id", couponId)
         .eq("partner_id", partnerId)
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: getErrorMessage(error) }
     await revalidateCoupons(partnerId)
     return { success: true }
 }
@@ -198,7 +223,7 @@ export async function deleteCouponAction(partnerId: string, couponId: string) {
     await requirePermission(partnerId, "coupons", "delete")
     const supabase = await getSupabaseServerClient()
     const { error } = await supabase.from("coupons").delete().eq("id", couponId).eq("partner_id", partnerId)
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: getErrorMessage(error) }
     await revalidateCoupons(partnerId)
     return { success: true }
 }
@@ -236,7 +261,7 @@ export async function getCouponCustomersAction(partnerId: string, couponId: stri
         .from("coupon_customers")
         .select("customer_id")
         .eq("coupon_id", couponId)
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: getErrorMessage(error) }
     return { success: true, data: (data || []).map((r: any) => r.customer_id) }
 }
 
@@ -297,7 +322,7 @@ export async function listApplicableMarketplaceCouponsAction(input: {
         .order("code")
 
     if (error) {
-        return { success: false, error: error.message, coupons: [] }
+        return { success: false, error: getErrorMessage(error), coupons: [] }
     }
 
     const validationPromises = (coupons || []).map(async (coupon: any) => {
@@ -363,7 +388,7 @@ export async function getCouponScopeDataAction(partnerId: string) {
             .limit(200),
         supabase
             .from("services")
-            .select("id, name, price, is_active")
+            .select("id, name, price, images, is_active")
             .eq("partner_id", partnerId)
             .order("name")
             .limit(200),
@@ -397,6 +422,7 @@ export async function getCouponScopeDataAction(partnerId: string) {
             id: s.id,
             name: s.name,
             price: s.price,
+            image: Array.isArray(s.images) ? s.images[0] || null : null,
             isActive: Boolean(s.is_active),
         })),
         categories: (categories || []).map((c: any) => ({

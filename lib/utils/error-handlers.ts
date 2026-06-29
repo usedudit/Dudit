@@ -49,6 +49,12 @@ export function getErrorMessage(error: any): string {
     "23505": "Este registro já existe.", // Unique violation
     "42501": "Você não tem permissão para realizar esta ação.", // Permission denied
 
+    // Check constraint violations (substring-matched below)
+    "coupons_discount_value_valid": "O valor do desconto deve ser maior que zero para cupons percentuais ou de valor fixo.",
+    "coupons_percentage_max": "O percentual de desconto não pode ultrapassar 100%.",
+    "coupons_dates_valid": "A data de início deve ser anterior ou igual à data de fim.",
+    "coupons_partner_code_unique": "Já existe um cupom com este código. Escolha um código diferente.",
+
     // Generic API Errors
     "429": "Muitas tentativas. Tente novamente em breve.",
     "500": "Erro interno no servidor. Tente novamente mais tarde.",
@@ -66,6 +72,12 @@ export function getErrorMessage(error: any): string {
   if (message.includes("rate limit") || message.includes("too many requests")) return "Muitas tentativas. Tente novamente em breve."
   if (message.includes("confirm your email")) return "Por favor, confirme seu e-mail antes de entrar."
   if (message.includes("NetworkError") || message.includes("Failed to fetch")) return "Erro de conexão. Verifique sua internet."
+
+  // Coupon/discount constraint violations
+  if (message.includes("coupons_discount_value_valid")) return "O valor do desconto deve ser maior que zero para cupons percentuais ou de valor fixo."
+  if (message.includes("coupons_percentage_max")) return "O percentual de desconto não pode ultrapassar 100%."
+  if (message.includes("coupons_dates_valid")) return "A data de início deve ser anterior ou igual à data de fim."
+  if (message.includes("coupons_partner_code_unique")) return "Já existe um cupom com este código. Escolha um código diferente."
 
   // Return original message if no mapping found (fallback to something readable if possible)
   return message

@@ -15,6 +15,7 @@ import {
     PercentageInput,
     ListItem,
     IconPlaceholder,
+    ThreeDotsLoader,
 } from "@/components/reusable"
 import {
     CpfCnpjInput,
@@ -269,190 +270,248 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
 
     if (isLoadingDetails) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px]">
-                <div className="w-10 h-10 border-4 border-brand-green border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-brand-inactive-text animate-pulse">Carregando detalhes...</p>
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
             </div>
         )
     }
 
     if (embedded) {
         return (
-            <div className="bg-white dark:bg-dark-background">
-                <div className="max-w-[1300px] mx-auto px-3 md:px-6 py-6 min-h-[400px]">
+            <>
+                <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                     <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                        <FormSection title="Informações Gerais">
-                            <div className="grid grid-cols-1 gap-6">
-                                <Input
-                                    label="Nome do método"
-                                    placeholder="Ex: Cartão de Crédito - Loja"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    error={!!fieldErrors.name}
-                                    errorMessage={fieldErrors.name}
-                                />
-                                <FormDropdown
-                                    label="Tipo"
-                                    value={formData.type}
-                                    setValue={(value) => setFormData({ ...formData, type: value })}
-                                    options={[
-                                        { value: "credit_card", label: "Cartão de Crédito" },
-                                        { value: "debit_card", label: "Cartão de Débito" },
-                                        { value: "pix", label: "PIX" },
-                                        { value: "cash", label: "Dinheiro" },
-                                        { value: "billet", label: "Boleto" },
-                                        { value: "other", label: "Outros" },
-                                    ]}
-                                />
-                            </div>
-                        </FormSection>
-
-                        {isCard && (
-                            <FormSection title="Bandeiras e Parcelamento">
-                                <div className="space-y-6">
-                                    <div>
-                                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeira</label>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {AVAILABLE_BRANDS.map((brand) => (
-                                                <button
-                                                    key={brand.id}
-                                                    type="button"
-                                                    onClick={() => setFormData({ ...formData, card_brand: formData.card_brand === brand.id ? null : brand.id })}
-                                                    className={`p-3 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${formData.card_brand === brand.id ? "border-brand-green bg-brand-green/5" : "border-brand-border dark:border-dark-border hover:border-brand-green/50"}`}
-                                                >
-                                                    <img src={brand.image} alt={brand.name} className="w-10 h-7 object-contain" />
-                                                    <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading leading-tight text-center">{brand.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {isCredit && (
-                                        <>
-                                            <FormDropdown
-                                                label="Máximo de parcelas"
-                                                value={String(formData.max_installments)}
-                                                setValue={(value) => setFormData({ ...formData, max_installments: Number(value) })}
-                                                options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}x` }))}
-                                            />
-                                            {formData.max_installments > 1 && (
-                                                <div className="flex items-center justify-between">
-                                                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Taxas por parcela</label>
-                                                    <Button variant="link" onClick={() => setIsInstallmentModalOpen(true)}>Configurar</Button>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            </FormSection>
-                        )}
-
-                        {isPix && (
-                            <FormSection title="Chave PIX">
+                        {/* Left Column */}
+                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
+                            <FormSection title="Informações Gerais">
                                 <div className="grid grid-cols-1 gap-6">
-                                    <FormDropdown
-                                        label="Tipo de chave"
-                                        value={formData.pix_key_type}
-                                        setValue={(value) => setFormData({ ...formData, pix_key_type: value as any })}
-                                        options={PIX_KEY_TYPES.map(t => ({ value: t.id, label: t.name }))}
+                                    <Input
+                                        label="Nome do método"
+                                        placeholder="Ex: Cartão de Crédito - Loja"
+                                        value={formData.name}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, name: e.target.value })
+                                            if (fieldErrors.name) setFieldErrors(p => { const n = { ...p }; delete n.name; return n })
+                                        }}
+                                        error={!!fieldErrors.name}
+                                        errorMessage={fieldErrors.name}
                                     />
-                                    {!formData.use_partner_pix_data && (
-                                        <>
-                                            {formData.pix_key_type === "cpf" && (
-                                                <CpfCnpjInput
-                                                    label="Chave PIX (CPF)"
-                                                    placeholder="000.000.000-00"
-                                                    value={formData.pix_key}
-                                                    onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
-                                                    name="pix_key"
-                                                    error={!!fieldErrors.pix_key}
-                                                    errorMessage={fieldErrors.pix_key}
-                                                />
-                                            )}
-                                            {formData.pix_key_type === "cnpj" && (
-                                                <CpfCnpjInput
-                                                    label="Chave PIX (CNPJ)"
-                                                    placeholder="00.000.000/0000-00"
-                                                    value={formData.pix_key}
-                                                    onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
-                                                    name="pix_key_cnpj"
-                                                    error={!!fieldErrors.pix_key}
-                                                    errorMessage={fieldErrors.pix_key}
-                                                />
-                                            )}
-                                            {formData.pix_key_type === "email" && (
-                                                <EmailInput
-                                                    label="Chave PIX (E-mail)"
-                                                    placeholder="exemplo@email.com"
-                                                    value={formData.pix_key}
-                                                    onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
-                                                    error={!!fieldErrors.pix_key}
-                                                    errorMessage={fieldErrors.pix_key}
-                                                />
-                                            )}
-                                            {formData.pix_key_type === "phone" && (
-                                                <PhoneInput
-                                                    label="Chave PIX (Celular)"
-                                                    placeholder="(00) 00000-0000"
-                                                    value={formData.pix_key}
-                                                    onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
-                                                    error={!!fieldErrors.pix_key}
-                                                    errorMessage={fieldErrors.pix_key}
-                                                />
-                                            )}
-                                            {formData.pix_key_type === "random" && (
-                                                <Input
-                                                    label="Chave PIX (Aleatória)"
-                                                    placeholder="123e4567-e89b-12d3-a456-426614174000"
-                                                    value={formData.pix_key}
-                                                    onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
-                                                    error={!!fieldErrors.pix_key}
-                                                    errorMessage={fieldErrors.pix_key}
-                                                />
-                                            )}
-                                        </>
-                                    )}
-                                    {formData.use_partner_pix_data && (
-                                        <div className="bg-brand-gray/20 dark:bg-dark-border/20 p-4 rounded-xl border border-dashed border-brand-border dark:border-dark-border">
-                                            <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Usando dados PIX padrão do parceiro</p>
-                                            <p className="text-xs text-brand-inactive-text mt-1">A chave PIX cadastrada nos dados do negócio será utilizada.</p>
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-3">
-                                        <Checkbox
-                                            checked={formData.use_partner_pix_data}
-                                            onChange={(checked) => setFormData({ ...formData, use_partner_pix_data: checked })}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <FormDropdown
+                                            label="Tipo de método"
+                                            placeholder="Selecione o tipo"
+                                            value={formData.type}
+                                            setValue={(val) => {
+                                                const updates: any = { type: val }
+                                                if (val === "credit_card") updates.supports_installments = true
+                                                else {
+                                                    updates.supports_installments = false
+                                                    updates.max_installments = 1
+                                                }
+                                                if (!editingMethod) {
+                                                    const hasDefault = existingMethods.some(m => (m.type === val || m.payment_type === val) && m.is_online_default)
+                                                    updates.is_online_default = !hasDefault
+                                                }
+                                                setFormData({ ...formData, ...updates })
+                                            }}
+                                            options={[
+                                                { value: "credit_card", label: "Crédito" },
+                                                { value: "debit_card", label: "Débito" },
+                                                { value: "pix", label: "Pix" },
+                                                { value: "bank_transfer", label: "Transferência Bancária" },
+                                            ]}
                                         />
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Usar chave PIX do parceiro</span>
+
+                                        <FormDropdown
+                                            label="Conta Financeira (Opcional)"
+                                            placeholder="Selecione uma conta"
+                                            value={formData.default_finance_account_id}
+                                            setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
+                                            options={[
+                                                { value: "", label: "Nenhuma (não vincular)" },
+                                                ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
+                                            ]}
+                                        />
                                     </div>
-                                    <p className="text-[11px] text-brand-inactive-text mt-1 bg-brand-gray/20 dark:bg-dark-border/20 p-3 rounded-lg border border-dashed border-brand-border dark:border-dark-border">
-                                        Sua chave é armazenada com criptografia de ponta a ponta para sua segurança.
-                                    </p>
                                 </div>
                             </FormSection>
-                        )}
 
-                        <div className="col-span-12">
-                            <FormSection title="Conta Financeira (opcional)">
-                                <FormDropdown
-                                    label="Conta padrão"
-                                    value={formData.default_finance_account_id}
-                                    setValue={(value) => setFormData({ ...formData, default_finance_account_id: value })}
-                                    options={[
-                                        { value: "", label: "Nenhuma" },
-                                        ...financeAccounts.map((acc: any) => ({
-                                            value: acc.id,
-                                            label: acc.name,
-                                        })),
-                                    ]}
-                                />
-                            </FormSection>
+                            {isCard && (
+                                <FormSection hasSeparator title="Configurações do Cartão">
+                                    <div className="grid grid-cols-1 gap-6">
+                                        {isCredit && (
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <FormDropdown
+                                                        label="Modo de Pagamento"
+                                                        placeholder="Selecione o modo"
+                                                        value={formData.supports_installments ? "installments" : "single"}
+                                                        setValue={(val) => {
+                                                            const isInstallments = val === "installments"
+                                                            setFormData({
+                                                                ...formData,
+                                                                supports_installments: isInstallments,
+                                                                max_installments: isInstallments ? formData.max_installments : 1
+                                                            })
+                                                        }}
+                                                        options={[
+                                                            { value: "single", label: "Pagamento Único" },
+                                                            { value: "installments", label: "Permitir Parcelamento" },
+                                                        ]} />
+
+                                                    {formData.supports_installments && (
+                                                        <FormDropdown
+                                                            label="Parcelamento Máximo"
+                                                            placeholder="Selecione o limite"
+                                                            value={String(formData.max_installments)}
+                                                            setValue={(val) => {
+                                                                const n = Number(val)
+                                                                setFormData(prev => {
+                                                                    const newFees = [...prev.installment_fees].filter(f => f.installmentNumber <= n)
+                                                                    for (let i = 1; i <= n; i++) {
+                                                                        if (!newFees.find(f => f.installmentNumber === i)) {
+                                                                            newFees.push({ installmentNumber: i, feePercent: 0 })
+                                                                        }
+                                                                    }
+                                                                    newFees.sort((a, b) => a.installmentNumber - b.installmentNumber)
+                                                                    return { ...prev, max_installments: n, installment_fees: newFees }
+                                                                })
+                                                            }}
+                                                            options={[
+                                                                { value: "1", label: "1x" },
+                                                                { value: "2", label: "2x" },
+                                                                { value: "3", label: "3x" },
+                                                                { value: "4", label: "4x" },
+                                                                { value: "6", label: "6x" },
+                                                                { value: "10", label: "10x" },
+                                                                { value: "12", label: "12x" },
+                                                            ]}
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                {formData.supports_installments && formData.max_installments > 1 && (
+                                                    <div className="flex items-center justify-between py-2">
+                                                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Taxas por parcela</label>
+                                                        <Button variant="link" onClick={() => setIsInstallmentModalOpen(true)}>Configurar</Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</label>
+                                            <div className="flex flex-wrap gap-3">
+                                                {AVAILABLE_BRANDS.map((brand) => (
+                                                    <button
+                                                        key={brand.id}
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, card_brand: formData.card_brand === brand.id ? null : brand.id })}
+                                                        className={`p-3 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${formData.card_brand === brand.id ? "border-brand-green bg-brand-green/5" : "border-brand-border dark:border-dark-border hover:border-brand-green/50"}`}
+                                                    >
+                                                        <img src={brand.image} alt={brand.name} className="w-10 h-7 object-contain" />
+                                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading leading-tight text-center">{brand.name}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </FormSection>
+                            )}
+
+                            {isPix && (
+                                <FormSection hasSeparator title="Chave PIX">
+                                    <div className="grid grid-cols-1 gap-6">
+                                        <FormDropdown
+                                            label="Tipo de chave"
+                                            placeholder="Selecione o tipo"
+                                            value={formData.pix_key_type}
+                                            setValue={(val) => setFormData({ ...formData, pix_key_type: val as any })}
+                                            options={PIX_KEY_TYPES.map(t => ({ value: t.id, label: t.name }))}
+                                        />
+                                        {!formData.use_partner_pix_data && (
+                                            <>
+                                                {formData.pix_key_type === "cpf" && (
+                                                    <CpfCnpjInput
+                                                        label="Chave PIX (CPF)"
+                                                        placeholder="000.000.000-00"
+                                                        value={formData.pix_key}
+                                                        onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                        name="pix_key"
+                                                        error={!!fieldErrors.pix_key}
+                                                        errorMessage={fieldErrors.pix_key}
+                                                    />
+                                                )}
+                                                {formData.pix_key_type === "cnpj" && (
+                                                    <CpfCnpjInput
+                                                        label="Chave PIX (CNPJ)"
+                                                        placeholder="00.000.000/0000-00"
+                                                        value={formData.pix_key}
+                                                        onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                        name="pix_key_cnpj"
+                                                        error={!!fieldErrors.pix_key}
+                                                        errorMessage={fieldErrors.pix_key}
+                                                    />
+                                                )}
+                                                {formData.pix_key_type === "email" && (
+                                                    <EmailInput
+                                                        label="Chave PIX (E-mail)"
+                                                        placeholder="exemplo@email.com"
+                                                        value={formData.pix_key}
+                                                        onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                        error={!!fieldErrors.pix_key}
+                                                        errorMessage={fieldErrors.pix_key}
+                                                    />
+                                                )}
+                                                {formData.pix_key_type === "phone" && (
+                                                    <PhoneInput
+                                                        label="Chave PIX (Celular)"
+                                                        placeholder="(00) 00000-0000"
+                                                        value={formData.pix_key}
+                                                        onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                        error={!!fieldErrors.pix_key}
+                                                        errorMessage={fieldErrors.pix_key}
+                                                    />
+                                                )}
+                                                {formData.pix_key_type === "random" && (
+                                                    <Input
+                                                        label="Chave PIX (Aleatória)"
+                                                        placeholder="123e4567-e89b-12d3-a456-426614174000"
+                                                        value={formData.pix_key}
+                                                        onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                        error={!!fieldErrors.pix_key}
+                                                        errorMessage={fieldErrors.pix_key}
+                                                    />
+                                                )}
+                                            </>
+                                        )}
+                                        {formData.use_partner_pix_data && (
+                                            <div className="bg-brand-gray/20 dark:bg-dark-border/20 p-4 rounded-xl border border-dashed border-brand-border dark:border-dark-border">
+                                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Usando dados PIX padrão do parceiro</p>
+                                                <p className="text-xs text-brand-inactive-text mt-1">A chave PIX cadastrada nos dados do negócio será utilizada.</p>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-3">
+                                            <Checkbox
+                                                checked={formData.use_partner_pix_data}
+                                                onChange={(checked) => setFormData({ ...formData, use_partner_pix_data: checked })}
+                                            />
+                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Usar chave PIX do parceiro</span>
+                                        </div>
+                                        <p className="text-[11px] text-brand-inactive-text mt-2 bg-brand-gray/20 dark:bg-dark-border/20 p-3 rounded-lg border border-dashed border-brand-border dark:border-dark-border">
+                                            Sua chave é armazenada com criptografia de ponta a ponta para sua segurança.
+                                        </p>
+                                    </div>
+                                </FormSection>
+                            )}
                         </div>
 
-                        <div className="col-span-12">
-                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                        {/* Right Column */}
+                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                            <SidebarCard hasTopStrip>
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Taxas e Custos</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 gap-6">
                                     <PercentageInput
                                         label="Taxa Administrativa (%)"
                                         value={formData.fee_percent}
@@ -472,12 +531,9 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                         suffix="%"
                                     />
                                 </div>
-                            </div>
-                        </div>
+                            </SidebarCard>
 
-                        <div className="col-span-12">
-                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                            <SidebarCard>
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Preferências</h3>
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
@@ -491,6 +547,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                             onChange={(checked) => setFormData({ ...formData, is_active: checked })}
                                         />
                                     </div>
+
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Padrão Online</p>
@@ -502,7 +559,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                         />
                                     </div>
                                 </div>
-                            </div>
+                            </SidebarCard>
                         </div>
                     </div>
                 </div>
@@ -571,7 +628,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                         </div>
                     </div>
                 </DefaultModal>
-            </div>
+            </>
         )
     }
 

@@ -190,15 +190,15 @@ export function getCouponStatusVariant(coupon: Pick<CouponRow, "is_active">) {
 }
 
 export function getCouponApplyScopeLabel(scope: CouponApplyScope) {
-  if (scope === "categories") return "Categorias especificas"
-  if (scope === "products") return "Produtos especificos"
-  if (scope === "services") return "Servicos especificos"
-  if (scope === "subscriptions") return "Assinaturas especificas"
+  if (scope === "categories") return "Categorias específicas"
+  if (scope === "products") return "Produtos específicos"
+  if (scope === "services") return "Serviços específicos"
+  if (scope === "subscriptions") return "Assinaturas específicas"
   return "Todos os itens"
 }
 
 export function getCouponCustomerScopeLabel(scope: CouponCustomerScope | null | undefined) {
-  return scope === "specific" ? "Clientes especificos" : "Todos os clientes"
+  return scope === "specific" ? "Clientes específicos" : "Todos os clientes"
 }
 
 export function getCouponUsageCount(coupon: CouponRow) {
@@ -213,7 +213,7 @@ export function getCouponUsageSummary(coupon: CouponRow) {
 
 export function getCouponValiditySummary(coupon: CouponRow) {
   if (!coupon.starts_at && !coupon.ends_at) return "Sem limite de data"
-  const start = coupon.starts_at ? formatDate(coupon.starts_at) : "Sem inicio"
+  const start = coupon.starts_at ? formatDate(coupon.starts_at) : "Sem início"
   const end = coupon.ends_at ? formatDate(coupon.ends_at) : "Sem fim"
   return `${start} - ${end}`
 }

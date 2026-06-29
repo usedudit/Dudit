@@ -563,6 +563,17 @@ export default function OrdersPage({
         setPaidAmountValue(order.paidAmount ?? 0)
     }
 
+    const handlePaymentStatusClick = useCallback((order: Order) => {
+        if (!order.canEdit) return
+        const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
+        const hasMethod = Boolean(order.payment_method)
+        if (isMarketplace || hasMethod) {
+            openPaymentStatusModal(order)
+        } else {
+            openEntity('edit', order.originalId)
+        }
+    }, [openEntity, openPaymentStatusModal])
+
     const submitPaymentStatusChange = async () => {
         const targetOrder = paymentStatusModal.order
         if (!targetOrder) return
@@ -816,8 +827,8 @@ export default function OrdersPage({
                             }}
                             onUpdatePaymentStatus={(order: any) => {
                                 const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
-                                if (isMarketplace) {
-                                    // Marketplace orders: show simple payment status modal (value input only)
+                                const hasMethod = Boolean(order.payment_method)
+                                if (isMarketplace || hasMethod) {
                                     openPaymentStatusModal({
                                         originalId: order.id,
                                         displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
@@ -996,7 +1007,7 @@ export default function OrdersPage({
                                                                 canEdit={o.canEdit}
                                                                 cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                 onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
-                                                                onPaymentStatus={o.situation !== "cancelled" ? () => handleEditOrder(o) : undefined}
+                                                                onPaymentStatus={o.situation !== "cancelled" ? () => handlePaymentStatusClick(o) : undefined}
                                                                 onDeliveryStatus={o.situation !== "cancelled" && !o.hasOnlyServices ? () => openDeliveryStatusModal(o) : undefined}
                                                                 onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                 onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
@@ -1073,7 +1084,7 @@ export default function OrdersPage({
                                                                             cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                             onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                             onDetails={handleDetailsOrder}
-                                                                            onPaymentStatus={o.situation !== "cancelled" ? () => handleEditOrder(o) : undefined}
+                                                                            onPaymentStatus={o.situation !== "cancelled" ? () => handlePaymentStatusClick(o) : undefined}
                                                                             onDeliveryStatus={o.situation !== "cancelled" && !o.hasOnlyServices ? () => openDeliveryStatusModal(o) : undefined}
                                                                             onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                             onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}

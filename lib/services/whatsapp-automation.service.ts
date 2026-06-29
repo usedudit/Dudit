@@ -6,6 +6,7 @@ import { normalizePhoneToE164 } from "@/lib/whatsapp/phone"
 import { buildWhatsappMessage } from "@/lib/notifications/templates"
 import { resolveCustomerUserId } from "./notification.service"
 import { shouldDeliverWhatsapp } from "./notification-preferences.service"
+import { parseDateInTimezone } from "@/lib/utils/formatters"
 import type { WhatsappAutomationTrigger } from "@/lib/whatsapp/types"
 
 const APPOINTMENT_BUTTONS = [
@@ -192,7 +193,10 @@ export async function scheduleAppointmentReminders(params: {
   customerId?: string | null
   phone?: string | null
 }) {
-  const start = new Date(`${params.startDate}T${params.startTime}`)
+  // Interpreta startDate/startTime como horário civil brasileiro (America/Sao_Paulo).
+  // O timezone vem de APP_DEFAULT_TIMEZONE env var (se definido) ou America/Sao_Paulo.
+  // Futuramente pode ser sobrescrito por parceiro com timezone próprio.
+  const start = parseDateInTimezone(params.startDate, params.startTime)
   if (Number.isNaN(start.getTime())) return
 
   const reminder24h = new Date(start.getTime() - 24 * 60 * 60 * 1000)
@@ -574,7 +578,8 @@ export async function onQuoteShared(quote: Record<string, unknown>) {
     },
   })
 
-  const expiresAt = quote.valid_until ? new Date(String(quote.valid_until)) : null
+  // valid_until é YYYY-MM-DD (data civil brasileira), interpretar no timezone padrão
+  const expiresAt = quote.valid_until ? parseDateInTimezone(String(quote.valid_until), "23:59") : null
   if (expiresAt && expiresAt.getTime() > Date.now()) {
     const reminderAt = new Date(expiresAt.getTime() - 24 * 60 * 60 * 1000)
     if (reminderAt.getTime() > Date.now()) {

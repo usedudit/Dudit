@@ -20,7 +20,7 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown } from '@/components/reusable';
+import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { calculatePaymentMethodAmountsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
@@ -519,7 +519,7 @@ const PaymentModal = ({
             setFeeBearerOverride((matchingMethods[0].fee_bearer || 'merchant') as 'merchant' | 'customer');
         } else if (matchingMethods.length > 1) {
             // Try to find exact match by name
-            const exactMatch = matchingMethods.find((m: PartnerPaymentMethod) => 
+            const exactMatch = matchingMethods.find((m: PartnerPaymentMethod) =>
                 normalizePaymentMethodLabel(m.name) === normalizedOriginal
             );
             if (exactMatch) {
@@ -531,8 +531,8 @@ const PaymentModal = ({
             }
         }
 
-        // Navigate to simplified marketplace view
-        setView('marketplace_simple');
+        // Navigate directly to the correct view
+        setView(getTargetViewForMethodType(methodType));
     }, [isOpen, isMarketplaceOrder, originalPaymentMethod, isLoadingMethods, activeMethods, view]);
 
     // Fetch MP connection status
@@ -1113,9 +1113,7 @@ const PaymentModal = ({
             ? splitPreview.finalTotal
             : (view === 'money' || view === 'card' || view === 'pix')
                 ? finalTotalWithMethodPricing
-                : view === 'marketplace_simple'
-                    ? chargeTarget
-                    : total;
+                : total;
 
     const receiptPricingDetails = useMemo(() => {
         const source = paymentStatus === "success" && successSnapshot
@@ -1257,7 +1255,6 @@ const PaymentModal = ({
             case 'split': return 'Dividir Pagamento';
             case 'split_method_select': return 'Selecionar Método';
             case 'mercadopago': return mpStep === 'pix' ? 'Pix (Mercado Pago)' : mpStep === 'boleto' ? 'Boleto (Mercado Pago)' : 'Mercado Pago';
-            case 'marketplace_simple': return 'Confirmar Pagamento';
             default: return 'Pagamento';
         }
     };
@@ -1277,8 +1274,6 @@ const PaymentModal = ({
             setMpBoletoData(null);
             setMpPaymentId(null);
             setView('methods');
-        } else if (view === 'marketplace_simple') {
-            onClose();
         } else if (view === 'money' || view === 'card' || view === 'pix') {
             resetSelectedMethodPricing();
             if (editingPaymentIndex !== null) {
@@ -1403,7 +1398,7 @@ const PaymentModal = ({
                     })
                 : [{
                     method: (() => {
-                        if (view === 'marketplace_simple' && originalPaymentMethod) {
+                        if (isMarketplaceOrder && originalPaymentMethod) {
                             return formatPaymentMethodToFullLabel(originalPaymentMethod);
                         }
                         const selectedMethodObj = activeMethods.find((method: any) => method.id === selectedMethodId);
@@ -1844,6 +1839,11 @@ const PaymentModal = ({
 
                                     {view === 'money' && (
                                         <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("w-full h-full flex flex-col items-center px-2", isSinglePricingBusy && "opacity-60")}>
+                                            {isMarketplaceOrder && (
+                                                <div className="w-full max-w-sm mb-4">
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                </div>
+                                            )}
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="w-full max-w-sm space-y-3">
                                                 <div className="rounded-[28px] bg-white px-4 pt-2 pb-4 dark:bg-dark-surface">
@@ -1875,7 +1875,7 @@ const PaymentModal = ({
                                                     </button>
                                                 ))}
                                             </div>
-                                            {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && (
+                                            {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
                                                 <div className="w-full max-w-sm mt-4">
                                                     <FormDropdown
                                                         label="Quem paga a taxa?"
@@ -1901,6 +1901,9 @@ const PaymentModal = ({
                                     {view === 'pix' && (
                                         <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
+                                                {isMarketplaceOrder && (
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                                 <div className="min-w-0 flex-1">
                                                     <PaymentAmountLabel
@@ -1914,7 +1917,7 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
-                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && (
+                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
                                                     <FormDropdown
                                                         label="Quem paga a taxa?"
                                                         value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
@@ -1952,6 +1955,11 @@ const PaymentModal = ({
 
                                     {view === 'card' && (
                                         <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto", isSinglePricingBusy && "opacity-60")}>
+                                            {isMarketplaceOrder && (
+                                                <div className="w-full mb-4">
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                </div>
+                                            )}
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="mb-8 text-center">
                                                 <div className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-2">
@@ -1971,20 +1979,32 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
-                                                <FormDropdown
-                                                    label="Parcelas"
-                                                    value={String(installments)}
-                                                    setValue={(value) => setInstallments(value)}
-                                                    options={
-                                                        installmentOptions.length > 0
-                                                            ? installmentOptions.map(opt => ({
-                                                                value: String(opt.installments),
-                                                                label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
-                                                            }))
-                                                            : [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) }]
-                                                    }
-                                                />
-                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && (
+                                                {isMarketplaceOrder ? (
+                                                    <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
+                                                        <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
+                                                        <div className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {installmentOptions.length > 0
+                                                                ? (() => { const opt = installmentOptions.find(o => String(o.installments) === installments) || installmentOptions[0]; return `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}` })()
+                                                                : `1x de ${formatCurrency(paymentBaseAmount)}`
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <FormDropdown
+                                                        label="Parcelas"
+                                                        value={String(installments)}
+                                                        setValue={(value) => setInstallments(value)}
+                                                        options={
+                                                            installmentOptions.length > 0
+                                                                ? installmentOptions.map(opt => ({
+                                                                    value: String(opt.installments),
+                                                                    label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
+                                                                }))
+                                                                : [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) }]
+                                                        }
+                                                    />
+                                                )}
+                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
                                                     <FormDropdown
                                                         label="Quem paga a taxa?"
                                                         value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
@@ -2102,61 +2122,6 @@ const PaymentModal = ({
                                                         </div>
                                                     </div>
                                                 )}
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {view === 'marketplace_simple' && (
-                                        <motion.div key="marketplace_simple" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col items-center px-2">
-                                            <div className="w-full max-w-sm space-y-4">
-                                                <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 flex items-start gap-3">
-                                                    <InfoIcon size={18} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                                                    <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
-                                                        Pagamento via marketplace — método escolhido pelo cliente na vitrine
-                                                    </p>
-                                                </div>
-
-                                                <div className="rounded-2xl bg-gray-50 dark:bg-dark-border/20 p-4">
-                                                    <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Método de pagamento</div>
-                                                    <div className="font-bold text-brand-dark dark:text-dark-heading text-base">
-                                                        {formatPaymentMethodToFullLabel(originalPaymentMethod) || 'Método não definido'}
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-center py-4">
-                                                    <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Total a pagar</div>
-                                                    <div className="text-4xl font-black text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(chargeTarget)}
-                                                    </div>
-                                                </div>
-
-                                                <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
-
-                                                <div className="rounded-[28px] bg-white dark:bg-dark-surface px-4 pt-2 pb-4 border border-brand-border dark:border-dark-border">
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1">Valor recebido</div>
-                                                    <div className="flex justify-center mt-2">
-                                                        <MoneyInput
-                                                            value={paymentBaseAmount}
-                                                            onChange={handleMoneyInputSync}
-                                                            className="text-center text-[42px] font-black tracking-tight text-brand-dark dark:text-dark-heading border-none bg-transparent h-auto py-0 focus:ring-0 focus:border-none shadow-none"
-                                                            prefix=""
-                                                            autoFocus
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex flex-wrap justify-center gap-3 w-full">
-                                                    {[5, 10, 20, 50, 100, 200].map((amt) => (
-                                                        <button
-                                                            key={amt}
-                                                            type="button"
-                                                            onClick={() => handleQuickDenomination(amt)}
-                                                            className="px-5 py-3 bg-gray-100 dark:bg-dark-border/30 rounded-xl text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border flex-grow-0 min-w-[70px] h-auto"
-                                                        >
-                                                            R$ {amt}
-                                                        </button>
-                                                    ))}
-                                                </div>
                                             </div>
                                         </motion.div>
                                     )}
@@ -2567,24 +2532,12 @@ const PaymentModal = ({
                                 />
                             )}
 
-                            {/* 4. Marketplace Simple Footer */}
-                            {view === 'marketplace_simple' && (
-                                <ActionFooter
-                                    showConfirm={true}
-                                    confirmText={
-                                        isUnderpaid ? "Salvar Parcialmente" : "Confirmar Pagamento"
-                                    }
-                                    disabledText="Verifique os valores"
-                                    buttonVariant={isUnderpaid ? "outline" : "default"}
-                                />
-                            )}
-
-                            {/* 5. Split Method Select Footer */}
+                            {/* 4. Split Method Select Footer */}
                             {(view === 'split_method_select' || view === 'method_type_select') && (
                                 <ActionFooter showConfirm={false} />
                             )}
 
-                            {/* 6. Mercado Pago Footer (brick has its own button, pix/boleto have inline buttons) */}
+                            {/* 5. Mercado Pago Footer (brick has its own button, pix/boleto have inline buttons) */}
                             {view === 'mercadopago' && (
                                 <ActionFooter showConfirm={false} />
                             )}

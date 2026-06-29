@@ -442,7 +442,7 @@ export const AppointmentSheet = ({
                 // Restore draft services and client
                 setSelectedServices(initialDraft.services || []);
                 setSelectedClient(initialDraft.client || null);
-                
+
                 // Set the chosen date and time from calendar selection
                 if (selectedDate) {
                     setSelectedCalDate(selectedDate);
@@ -766,7 +766,7 @@ export const AppointmentSheet = ({
             const rows = Object.entries(staffGroups).map(([sId, svcs]) => {
                 const staff = staffSource.find(sm => sm.id === sId);
                 const combinedName = svcs.map(s => s.name).join(', ');
-                const combPrice = svcs.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
+                const combPrice = svcs.reduce((acc, curr) => acc + getEffectiveServicePrice(curr), 0);
                 const combDur = svcs.reduce((acc, curr) => acc + Number(curr.duration || 0), 0);
 
                 return {
@@ -778,7 +778,7 @@ export const AppointmentSheet = ({
                     staffName: staff ? staff.name : 'Profissional',
                     serviceId: svcs[0]?.id || null,
                     categoryId: svcs[0]?.category_id || null,
-                    services: svcs.map(s => ({ id: s.id, name: s.name, price: Number(s.price || 0), categoryId: s.category_id })),
+                    services: svcs.map(s => ({ id: s.id, name: s.name, price: getEffectiveServicePrice(s), categoryId: s.category_id })),
                 };
             });
 
@@ -822,7 +822,7 @@ export const AppointmentSheet = ({
                 Object.entries(staffGroups).forEach(([sId, svcs]) => {
                     const staff = staffSource.find(sm => sm.id === sId);
                     const combinedName = svcs.map(s => s.name).join(', ');
-                    const combPrice = svcs.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
+                    const combPrice = svcs.reduce((acc, curr) => acc + getEffectiveServicePrice(curr), 0);
                     const combDur = svcs.reduce((acc, curr) => acc + Number(curr.duration || 0), 0);
 
                     payloads.push({
@@ -835,7 +835,7 @@ export const AppointmentSheet = ({
                         staffName: staff ? staff.name : 'Profissional',
                         serviceId: svcs[0]?.id || null,
                         categoryId: svcs[0]?.category_id || null,
-                        services: svcs.map(s => ({ id: s.id, name: s.name, price: Number(s.price || 0), categoryId: s.category_id })),
+                        services: svcs.map(s => ({ id: s.id, name: s.name, price: getEffectiveServicePrice(s), categoryId: s.category_id })),
                         recurrenceGroupId,
                         recurrenceRule: recurrenceFreq === 'Diário' ? 'daily' : 'weekly'
                     });
@@ -938,7 +938,7 @@ export const AppointmentSheet = ({
             time: timeStr,
             serviceId: selectedServices[0]?.id || null,
             categoryId: selectedServices[0]?.category_id || null,
-            services: selectedServices.map(s => ({ id: s.id, name: s.name, price: Number(s.price || 0), categoryId: s.category_id })),
+            services: selectedServices.map(s => ({ id: s.id, name: s.name, price: getEffectiveServicePrice(s), categoryId: s.category_id })),
         };
         onSave(updatedApp);
     };
@@ -1757,6 +1757,7 @@ export const AppointmentSheet = ({
                                                         {!isLocked && <ChevronDownIcon size={14} className="text-brand-inactive-text" />}
                                                     </button>
                                                 }
+                                                showChevron={false}
                                             >
                                                 <div className="min-w-[140px]">
                                                     {statusOptions.map(opt => (

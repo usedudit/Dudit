@@ -5,6 +5,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import {
   getNotificationsAction,
   getUnreadNotificationCountAction,
+  markAllNotificationsReadAction,
   markNotificationsReadAction,
 } from "@/app/actions/notifications"
 import type { NotificationPageCursor, NotificationRecord } from "@/lib/notifications/types"
@@ -162,11 +163,13 @@ export function useNotifications() {
   }, [panelOpen, markAsRead])
 
   const markAllAsRead = useCallback(async () => {
-    const unreadIds = allItems.filter((n) => !n.is_read).map((n) => n.id)
-    if (unreadIds.length > 0) {
-      await markAsRead(unreadIds)
+    try {
+      await markAllNotificationsReadAction()
+      invalidate()
+    } catch (e) {
+      console.error("[notifications] markAllAsRead error:", e)
     }
-  }, [allItems, markAsRead])
+  }, [invalidate])
 
   return {
     user,

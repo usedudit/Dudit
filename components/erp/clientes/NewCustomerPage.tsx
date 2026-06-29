@@ -21,7 +21,8 @@ import {
     RadioButton,
     FormTextarea,
     UnsavedChangesDialog,
-    FormSection
+    FormSection,
+    ThreeDotsLoader
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
@@ -428,8 +429,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                         {/* Content Body */}
                         <div className={`px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px] relative ${isEditLoadingLocked ? "pointer-events-none" : ""}`}>
                             {isEditLoadingLocked && (
-                                <div className="absolute inset-0 z-20 bg-white/65 dark:bg-dark-background/65 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
-                                    <div className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Carregando dados do cliente...</div>
+                                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                                    <ThreeDotsLoader />
                                 </div>
                             )}
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">

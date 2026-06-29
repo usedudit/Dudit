@@ -62,7 +62,7 @@ export function NotificationItem({
           {notification.title}
         </p>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <span className="text-[10px] text-brand-inactive-text dark:text-dark-body">
+          <span className="text-xs text-brand-dark dark:text-dark-heading">
             {formatTime(notification.created_at)}
           </span>
           {!notification.is_read && (

@@ -13,7 +13,7 @@ import type {
 import { sendPushToUser } from "./fcm.service"
 import { shouldDeliverPush } from "./notification-preferences.service"
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 30
 
 export async function createNotification(
   input: CreateNotificationInput,
@@ -255,6 +255,22 @@ export async function markNotificationsReadForUser(
 
   if (error) {
     console.error("[notifications] mark read error", error.message)
+    return 0
+  }
+  return data?.length ?? 0
+}
+
+export async function markAllNotificationsReadForUser(userId: string): Promise<number> {
+  const admin = getAdminClient()
+  const { data, error } = await admin
+    .from("notifications")
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("is_read", false)
+    .select("id")
+
+  if (error) {
+    console.error("[notifications] mark all read error", error.message)
     return 0
   }
   return data?.length ?? 0

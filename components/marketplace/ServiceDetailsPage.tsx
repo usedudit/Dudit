@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useSupabase } from "@/providers/supabase-provider"
@@ -165,6 +165,12 @@ export function ServiceDetailsPageClient({
     const [isLightboxOpen, setIsLightboxOpen] = useState(false)
     const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
     const lightboxJustOpened = useRef(false)
+    const galleryContainerRef = useRef<HTMLDivElement>(null)
+    const zoomOriginX = useMotionValue(50)
+    const zoomOriginY = useMotionValue(50)
+    const zoomScale = useMotionValue(1)
+    const smoothScale = useSpring(zoomScale, { stiffness: 180, damping: 22 })
+    const transformOrigin = useTransform([zoomOriginX, zoomOriginY], ([x, y]) => `${x}% ${y}%`)
 
     useEffect(() => {
         if (service?.id) {
@@ -1879,8 +1885,16 @@ export function ServiceDetailsPageClient({
                                     <div className="relative flex-1 min-w-0">
                                         <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
                                             <div
+                                                ref={galleryContainerRef}
                                                 className="absolute inset-0 bg-brand-gray overflow-hidden rounded-2xl cursor-zoom-in"
                                                 onClick={() => openLightbox(activeImgIndex)}
+                                                onMouseMove={(e) => {
+                                                    const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
+                                                    zoomOriginX.set(((e.clientX - left) / width) * 100)
+                                                    zoomOriginY.set(((e.clientY - top) / height) * 100)
+                                                    zoomScale.set(2.2)
+                                                }}
+                                                onMouseLeave={() => zoomScale.set(1)}
                                             >
                                                 <AnimatePresence mode="popLayout" custom={slideDirection}>
                                                     <motion.img
@@ -1894,6 +1908,7 @@ export function ServiceDetailsPageClient({
                                                         animate="center"
                                                         exit="exit"
                                                         transition={{ duration: 0.2 }}
+                                                        style={{ transformOrigin, scale: smoothScale }}
                                                     />
                                                 </AnimatePresence>
                                             </div>

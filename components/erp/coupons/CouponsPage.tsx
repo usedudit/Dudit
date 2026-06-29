@@ -61,7 +61,7 @@ type FilterState = {
 
 type SortKey = "coupon" | "scope" | "usage" | "validity" | "status"
 type SortDirection = "asc" | "desc"
-type ActiveTab = "Todos" | "Ativos" | "Inativos" | "Automaticos"
+type ActiveTab = "Todos" | "Ativos" | "Inativos" | "Automáticos"
 type WrapperMode = "list" | "create" | "edit" | "view"
 
 const ITEMS_PER_PAGE = 8
@@ -172,15 +172,15 @@ export default function CouponsPage({
             if (coupon.apply_scope === "all") {
                 availableScopes.add("Todos os itens")
             } else if (coupon.apply_scope === "categories") {
-                availableScopes.add("Categorias especificas")
+                availableScopes.add("Categorias específicas")
             } else if (coupon.apply_scope === "products") {
-                availableScopes.add("Produtos especificos")
+                availableScopes.add("Produtos específicos")
             } else if (coupon.apply_scope === "services") {
-                availableScopes.add("Servicos especificos")
+                availableScopes.add("Serviços específicos")
             }
 
             if (coupon.customer_scope === "specific") {
-                availableCustomerScopes.add("Clientes especificos")
+                availableCustomerScopes.add("Clientes específicos")
             } else {
                 availableCustomerScopes.add("Todos os clientes")
             }
@@ -204,7 +204,7 @@ export default function CouponsPage({
             })
         }
 
-        const applyScopeOptions = ["Todos os itens", "Categorias especificas", "Produtos especificos", "Servicos especificos", "Assinaturas especificas"].filter((opt) =>
+        const applyScopeOptions = ["Todos os itens", "Categorias específicas", "Produtos específicos", "Serviços específicos", "Assinaturas específicas"].filter((opt) =>
             availableScopes.has(opt)
         )
         if (applyScopeOptions.length > 0) {
@@ -216,7 +216,7 @@ export default function CouponsPage({
             })
         }
 
-        const customerScopeOptions = ["Todos os clientes", "Clientes especificos"].filter((opt) =>
+        const customerScopeOptions = ["Todos os clientes", "Clientes específicos"].filter((opt) =>
             availableCustomerScopes.has(opt)
         )
         if (customerScopeOptions.length > 0) {
@@ -231,9 +231,9 @@ export default function CouponsPage({
         if (hasAutomatic) {
             sections.push({
                 id: "automaticOnly",
-                title: "Automacao",
+                title: "Automação",
                 type: "switch",
-                switchLabel: "Mostrar apenas cupons automaticos",
+                switchLabel: "Mostrar apenas cupons automáticos",
             })
         }
 
@@ -296,7 +296,7 @@ export default function CouponsPage({
         try {
             const result = await getCouponScopeDataAction(partnerId)
             if (!result.success) {
-                throw new Error("Nao foi possivel carregar os dados de escopo.")
+                throw new Error("Não foi possível carregar os dados de escopo.")
             }
 
             const nextScopeData: CouponScopeData = {
@@ -323,7 +323,7 @@ export default function CouponsPage({
                 ])
 
                 if (!linkedItemsResult.success || !customersResult.success) {
-                    throw new Error("Nao foi possivel carregar os vinculos do cupom.")
+                    throw new Error("Não foi possível carregar os vínculos do cupom.")
                 }
 
                 const categoryIds = (linkedItemsResult.categoryIds || []) as string[]
@@ -460,7 +460,7 @@ export default function CouponsPage({
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
                 return
             }
-            toast({ title: "Cupom excluido", description: `${couponToDelete.code} foi removido.` })
+            toast({ title: "Cupom excluído", description: `${couponToDelete.code} foi removido.` })
             if (selectedCouponId === couponToDelete.id) {
                 handleBackToList()
             }
@@ -592,52 +592,59 @@ export default function CouponsPage({
         }
 
         if (!payload.code) {
-            toast({ title: "Validacao", description: "Informe o codigo do cupom.", variant: "destructive" })
+            toast({ title: "Validação", description: "Informe o código do cupom.", variant: "destructive" })
             return
         }
 
         if (payload.code.length > 20) {
-            toast({ title: "Validacao", description: "O codigo do cupom deve ter no maximo 20 caracteres.", variant: "destructive" })
+            toast({ title: "Validação", description: "O código do cupom deve ter no máximo 20 caracteres.", variant: "destructive" })
             return
         }
 
         if (!/^[A-Z0-9]+$/.test(payload.code)) {
-            toast({ title: "Validacao", description: "O codigo do cupom deve conter apenas letras e numeros, sem acentos, espacos ou caracteres especiais.", variant: "destructive" })
+            toast({ title: "Validação", description: "O código do cupom deve conter apenas letras e números, sem acentos, espaços ou caracteres especiais.", variant: "destructive" })
             return
         }
 
-        if (payload.discountType === "percentage" && Number(payload.discountValue || 0) > 100) {
-            toast({ title: "Validacao", description: "O percentual maximo permitido e 100%.", variant: "destructive" })
-            return
+        if (payload.discountType === "percentage") {
+            const val = Number(payload.discountValue || 0)
+            if (val <= 0) {
+                toast({ title: "Validação", description: "O percentual de desconto deve ser maior que zero.", variant: "destructive" })
+                return
+            }
+            if (val > 100) {
+                toast({ title: "Validação", description: "O percentual máximo permitido é 100%.", variant: "destructive" })
+                return
+            }
         }
 
         if (payload.discountType === "fixed" && Number(payload.discountValue || 0) <= 0) {
-            toast({ title: "Validacao", description: "Informe um valor fixo maior que zero.", variant: "destructive" })
+            toast({ title: "Validação", description: "Informe um valor fixo maior que zero.", variant: "destructive" })
             return
         }
 
         if (payload.customerScope === "specific" && payload.customerIds.length === 0) {
-            toast({ title: "Validacao", description: "Selecione ao menos um cliente para esse publico.", variant: "destructive" })
+            toast({ title: "Validação", description: "Selecione ao menos um cliente para esse público.", variant: "destructive" })
             return
         }
 
         if (payload.applyScope === "categories" && payload.categoryIds.length === 0) {
-            toast({ title: "Validacao", description: "Selecione ao menos uma categoria.", variant: "destructive" })
+            toast({ title: "Validação", description: "Selecione ao menos uma categoria.", variant: "destructive" })
             return
         }
 
         if (payload.applyScope === "products" && payload.productIds.length === 0) {
-            toast({ title: "Validacao", description: "Selecione ao menos um produto.", variant: "destructive" })
+            toast({ title: "Validação", description: "Selecione ao menos um produto.", variant: "destructive" })
             return
         }
 
         if (payload.applyScope === "services" && payload.serviceIds.length === 0) {
-            toast({ title: "Validacao", description: "Selecione ao menos um servico.", variant: "destructive" })
+            toast({ title: "Validação", description: "Selecione ao menos um serviço.", variant: "destructive" })
             return
         }
 
         setIsSaving(true)
-        setActionModal({ open: true, text: selectedCouponId ? "Salvando alteracoes..." : "Criando cupom..." })
+        setActionModal({ open: true, text: selectedCouponId ? "Salvando alterações..." : "Criando cupom..." })
         try {
             const result = selectedCouponId
                 ? await updateCouponAction(selectedCouponId, payload)
@@ -677,7 +684,7 @@ export default function CouponsPage({
                 activeTab === "Todos" ||
                 (activeTab === "Ativos" && coupon.is_active) ||
                 (activeTab === "Inativos" && !coupon.is_active) ||
-                (activeTab === "Automaticos" && coupon.is_automatic)
+                (activeTab === "Automáticos" && coupon.is_automatic)
 
             const typeLabel = coupon.discount_type === "percentage"
                 ? "Percentual"
@@ -686,7 +693,7 @@ export default function CouponsPage({
                     : "Entrega grátis"
 
             const scopeLabel = getCouponApplyScopeLabel(coupon.apply_scope)
-            const customerLabel = coupon.customer_scope === "specific" ? "Clientes especificos" : "Todos os clientes"
+            const customerLabel = coupon.customer_scope === "specific" ? "Clientes específicos" : "Todos os clientes"
 
             const typeMatch = filters.discountType.length === 0 || filters.discountType.includes(typeLabel)
             const scopeMatch = filters.applyScope.length === 0 || filters.applyScope.includes(scopeLabel)

@@ -8,10 +8,11 @@ import {
     Checkbox,
     DatePicker,
     FormDropdown,
+    FormSection,
     Input,
-    ListItem,
     MoneyInput,
     PercentageInput,
+    Pagination,
     Tabs,
     TabsContent,
     TabsList,
@@ -20,11 +21,13 @@ import {
     UnsavedChangesDialog,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { formatCurrency } from "@/lib/utils/formatters"
-import { BoxIcon, ChevronLeftIcon, EditIcon, SaveIcon, SearchIcon, TagIcon, UserIcon } from "@/lib/icons"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { ChevronLeftIcon, EditIcon, SaveIcon } from "@/lib/icons"
 import SelectCouponProductsSheet from "./SelectCouponProductsSheet"
 import SelectCouponCategoriesSheet from "./SelectCouponCategoriesSheet"
+import SelectCouponServicesSheet from "./SelectCouponServicesSheet"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import {
     CouponFormState,
@@ -96,127 +99,104 @@ function ScopeField({
     )
 }
 
-function LinkedItemsSection<T>({
-    title,
+function PagedLinkedItems<T extends { id: string }>({
     items,
-    getId,
-    getTitle,
-    getDescription,
-    onRemove,
+    page,
+    onPageChange,
+    renderItem,
+    emptyMessage,
 }: {
-    title: string
     items: T[]
-    getId: (item: T) => string
-    getTitle: (item: T) => string
-    getDescription?: (item: T) => string | undefined
-    onRemove: (id: string) => void
+    page: number
+    onPageChange: (page: number) => void
+    renderItem: (item: T) => React.ReactNode
+    emptyMessage?: string
 }) {
-    if (items.length === 0) return null
+    const totalPages = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE))
+    const safePage = Math.min(page, totalPages)
+    const start = (safePage - 1) * ITEMS_PER_PAGE
+    const paginatedItems = items.slice(start, start + ITEMS_PER_PAGE)
+
+    if (items.length === 0) {
+        return emptyMessage ? (
+            <p className="text-sm text-brand-inactive-text dark:text-dark-body py-2">{emptyMessage}</p>
+        ) : null
+    }
 
     return (
-        <section className="space-y-4">
-            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {items.map((item) => {
-                    const id = getId(item)
-                    return (
-                        <ListItem
-                            key={id}
-                            title={getTitle(item)}
-                            description={getDescription?.(item)}
-                            right={
-                                <Button
-                                    type="button"
-                                    variant="link"
-                                    className="shrink-0 pr-4"
-                                    onClick={() => onRemove(id)}
-                                >
-                                    Remover
-                                </Button>
-                            }
-                            className="min-h-[72px] px-4"
-                        />
-                    )
-                })}
+        <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+            <div className="divide-y divide-brand-border dark:divide-dark-border">
+                {paginatedItems.map((item) => renderItem(item))}
             </div>
-        </section>
+            {totalPages > 1 && (
+                <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={onPageChange} inline />
+            )}
+        </div>
     )
 }
 
-function getCustomerStatusLabel(status?: ScopeCustomer["status"] | null) {
-    if (status === "inativo") return "Inativo"
-    if (status === "bloqueado") return "Bloqueado"
-    return "Ativo"
-}
+const ITEMS_PER_PAGE = 5
+const PLACEHOLDER_IMAGE = "https://Img.dudit.com.br/static/Placeholder.png"
 
-function getCustomerStatusVariant(status?: ScopeCustomer["status"] | null) {
-    if (status === "inativo") return "gray" as const
-    if (status === "bloqueado") return "red" as const
-    return "green" as const
-}
-
-function getItemStatusLabel(isActive?: boolean) {
-    return isActive === false ? "Inativo" : "Ativo"
-}
-
-function getItemStatusVariant(isActive?: boolean) {
-    return isActive === false ? "gray" as const : "green" as const
-}
-
-function SelectionSheet({
-    isOpen,
-    onOpenChange,
-    title,
+function LinkedItemRow({
+    name,
     description,
-    searchValue,
-    onSearchChange,
-    searchPlaceholder,
-    children,
-    footer,
+    imageUrl,
+    avatarName,
+    isActive,
+    onRemove,
 }: {
-    isOpen: boolean
-    onOpenChange: (open: boolean) => void
-    title: string
-    description: string
-    searchValue: string
-    onSearchChange: (value: string) => void
-    searchPlaceholder: string
-    children: React.ReactNode
-    footer?: React.ReactNode
+    name: string
+    description?: string | null
+    imageUrl?: string | null
+    avatarName?: string | null
+    isActive?: boolean
+    onRemove: () => void
 }) {
     return (
-        <Sheet open={isOpen} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="w-full sm:max-w-[560px] p-0 bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border">
-                <SheetHeader className="border-b border-brand-border dark:border-dark-border px-6 py-5 text-left">
-                    <SheetTitle className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</SheetTitle>
-                    <SheetDescription className="text-sm text-brand-inactive-text dark:text-dark-body">{description}</SheetDescription>
-                </SheetHeader>
-
-                <div className="border-b border-brand-border dark:border-dark-border px-6 py-4">
-                    <Input
-                        label=""
-                        placeholder={searchPlaceholder}
-                        value={searchValue}
-                        onChange={(event) => onSearchChange(event.target.value)}
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                        variant="full-rounded"
-                        className="mb-0"
+        <div className="flex items-center gap-3 py-2.5 px-3 border-b border-brand-border dark:border-dark-border last:border-0">
+            {avatarName ? (
+                <UserProfileImage
+                    fullName={avatarName}
+                    imageUrl={imageUrl || undefined}
+                    className="w-10 h-10 shrink-0 text-[14px]"
+                />
+            ) : (
+                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                    <img
+                        src={imageUrl || PLACEHOLDER_IMAGE}
+                        alt=""
+                        className="w-full h-full object-cover rounded-full"
+                        loading="lazy"
                     />
                 </div>
-
-                <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
-
-                <div className="border-t border-brand-border dark:border-dark-border px-6 py-4">
-                    {footer || (
-                        <div className="flex justify-end">
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                                Fechar
-                            </Button>
-                        </div>
+            )}
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]">
+                        {name}
+                    </span>
+                    {isActive != null && (
+                        <Badge variant={isActive === false ? "gray" : "green"} className="shrink-0 scale-90">
+                            {isActive === false ? "Inativo" : "Ativo"}
+                        </Badge>
                     )}
                 </div>
-            </SheetContent>
-        </Sheet>
+                {description && (
+                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                        {description}
+                    </p>
+                )}
+            </div>
+            <Button
+                type="button"
+                variant="link"
+                className="shrink-0 text-xs px-2"
+                onClick={onRemove}
+            >
+                Remover
+            </Button>
+        </div>
     )
 }
 
@@ -248,11 +228,12 @@ export default function CouponFormPage({
 }: CouponFormPageProps) {
     const [activeTab, setActiveTab] = useState("general")
     const [pickerMode, setPickerMode] = useState<PickerMode>(null)
-    const [scopeSearch, setScopeSearch] = useState("")
+    const [linkedPage, setLinkedPage] = useState(1)
+    const [customerPage, setCustomerPage] = useState(1)
 
     const initialSnapshot = useMemo(() => {
         return JSON.stringify({
-            form: mode === "edit" && coupon ? coupon : form, // Simplified snapshot
+            form: mode === "edit" && coupon ? coupon : form,
             relations: {
                 productIds: [...relations.productIds].sort(),
                 categoryIds: [...relations.categoryIds].sort(),
@@ -284,30 +265,13 @@ export default function CouponFormPage({
     const dateFromValue = form.startsAt ? new Date(`${form.startsAt}T12:00:00`) : undefined
     const dateToValue = form.endsAt ? new Date(`${form.endsAt}T12:00:00`) : undefined
 
-    const filteredServices = useMemo(() => {
-        const term = scopeSearch.trim().toLowerCase()
-        return scopeData.services.filter((item) => !term || item.name.toLowerCase().includes(term))
-    }, [scopeData.services, scopeSearch])
-
-
-
     const applyScopeActionLabel = form.applyScope === "products"
         ? "Selecionar produtos"
         : form.applyScope === "categories"
             ? "Selecionar categorias"
             : form.applyScope === "services"
-                ? "Selecionar servicos"
+                ? "Selecionar serviços"
                 : null
-
-    const scopeSummary = form.applyScope === "all"
-        ? "Catalogo completo"
-        : form.applyScope === "categories"
-            ? `${relations.categoryIds.length} categoria(s)`
-            : form.applyScope === "products"
-                ? `${relations.productIds.length} produto(s)`
-                : `${relations.serviceIds.length} servico(s)`
-
-    const customerSummary = form.customerScope === "specific" ? `${relations.customerIds.length} cliente(s)` : "Todos os clientes"
 
     const linkedScopeItems = form.applyScope === "products"
         ? relations.products
@@ -316,6 +280,28 @@ export default function CouponFormPage({
             : form.applyScope === "services"
                 ? relations.services
                 : []
+
+    const handleSaveProducts = useCallback((ids: string[]) => {
+        setSelectedProductIds(ids)
+        setLinkedPage(1)
+        setPickerMode(null)
+    }, [setSelectedProductIds])
+
+    const handleSaveServices = useCallback((ids: string[]) => {
+        setSelectedServiceIds(ids)
+        setLinkedPage(1)
+        setPickerMode(null)
+    }, [setSelectedServiceIds])
+
+    const handleSaveCategories = useCallback((ids: string[]) => {
+        setSelectedCategoryIds(ids)
+        setLinkedPage(1)
+        setPickerMode(null)
+    }, [setSelectedCategoryIds])
+
+    const handleOpenPicker = useCallback((mode: PickerMode) => {
+        setPickerMode(mode)
+    }, [])
 
     return (
         <FadeIn>
@@ -340,7 +326,7 @@ export default function CouponFormPage({
                                         )}
                                     </h1>
                                     <div className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                        {mode === "edit" && coupon ? getCouponPrimaryMeta(coupon) : "Preencha as regras promocionais e o publico do cupom."}
+                                        {mode === "edit" && coupon ? getCouponPrimaryMeta(coupon) : "Preencha as regras promocionais e o público do cupom."}
                                     </div>
                                 </div>
 
@@ -370,8 +356,7 @@ export default function CouponFormPage({
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="general" className="mt-0">
                                             <FadeIn key="general" className="space-y-8">
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
+                                                <FormSection title="Identificação">
                                                     <div className="grid grid-cols-12 gap-5">
                                                         <div className="col-span-12 md:col-span-7">
                                                             <Input
@@ -441,18 +426,15 @@ export default function CouponFormPage({
                                                             />
                                                         </div>
                                                     </div>
-                                                </section>
+                                                </FormSection>
 
-                                                <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Opções</h3>
+                                                <FormSection hasSeparator title="Opções">
                                                     <div className="space-y-4">
                                                         <label className="flex items-start gap-3">
                                                             <Checkbox checked={form.allowCombination} onChange={(value) => setForm((prev) => ({ ...prev, allowCombination: Boolean(value) }))} />
                                                             <div>
                                                                 <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Permitir combinação</p>
-                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Define se esse desconto pode coexistir com outras promocoes.</p>
+                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Define se esse desconto pode coexistir com outras promoções.</p>
                                                             </div>
                                                         </label>
                                                         <label className="flex items-start gap-3">
@@ -463,24 +445,21 @@ export default function CouponFormPage({
                                                             </div>
                                                         </label>
                                                     </div>
-                                                </section>
+                                                </FormSection>
                                             </FadeIn>
                                         </TabsContent>
 
                                         <TabsContent value="scope" className="mt-0">
                                             <FadeIn key="scope" className="space-y-8">
-                                                <section>
+                                                <FormSection title="Escopo">
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                         <ScopeField
                                                             label="Aplicar a"
                                                             actionLabel={applyScopeActionLabel}
                                                             onAction={
-                                                                applyScopeActionLabel
-                                                                    ? () => {
-                                                                        setScopeSearch("")
-                                                                        if (form.applyScope !== "all") setPickerMode(form.applyScope)
-                                                                    }
-                                                                    : undefined
+                                                    applyScopeActionLabel && form.applyScope !== "all"
+                                                        ? () => handleOpenPicker(form.applyScope)
+                                                        : undefined
                                                             }
                                                         >
                                                             <FormDropdown
@@ -501,11 +480,9 @@ export default function CouponFormPage({
                                                             label="Escopo de clientes"
                                                             actionLabel={form.customerScope === "specific" ? "Selecionar clientes" : null}
                                                             onAction={
-                                                                form.customerScope === "specific"
-                                                                    ? () => {
-                                                                        setPickerMode("customers")
-                                                                    }
-                                                                    : undefined
+                                                            form.customerScope === "specific"
+                                                                ? () => handleOpenPicker("customers")
+                                                                : undefined
                                                             }
                                                         >
                                                             <FormDropdown
@@ -519,47 +496,71 @@ export default function CouponFormPage({
                                                             />
                                                         </ScopeField>
                                                     </div>
-                                                </section>
+                                                </FormSection>
 
                                                 {form.applyScope !== "all" && (
-                                                    <LinkedItemsSection
-                                                        title="Itens vinculados"
-                                                        items={linkedScopeItems as any[]}
-                                                        getId={(item) => item.id}
-                                                        getTitle={(item) => item.name}
-                                                        getDescription={(item) => {
-                                                            if ("sku" in item || "price" in item) {
-                                                                const scopedItem = item as ScopeItem
-                                                                if (form.applyScope === "products") {
-                                                                    return [scopedItem.sku ? `SKU: ${scopedItem.sku}` : "Sem SKU", scopedItem.price != null ? formatCurrency(scopedItem.price) : null]
-                                                                        .filter(Boolean)
-                                                                        .join(" • ")
+                                                    <section className="space-y-4">
+                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Itens vinculados</h3>
+                                                        <PagedLinkedItems
+                                                            items={linkedScopeItems as any[]}
+                                                            page={linkedPage}
+                                                            onPageChange={setLinkedPage}
+                                                            emptyMessage="Nenhum item vinculado. Clique em &quot;Selecionar&quot; para adicionar."
+                                                            renderItem={(item: any) => {
+                                                                const isProduct = form.applyScope === "products"
+                                                                const isService = form.applyScope === "services"
+                                                                const itemImage = isProduct || isService ? (item as ScopeItem).image : undefined
+                                                                let description = ""
+                                                                if (isProduct) {
+                                                                    const scoped = item as ScopeItem
+                                                                    const parts = [scoped.sku ? `SKU: ${scoped.sku}` : "Sem SKU"]
+                                                                    if (scoped.price != null) parts.push(formatCurrency(scoped.price))
+                                                                    description = parts.join(" • ")
+                                                                } else if (isService) {
+                                                                    description = (item as ScopeItem).price != null ? formatCurrency((item as ScopeItem).price!) : ""
                                                                 }
-                                                                return scopedItem.price != null ? formatCurrency(scopedItem.price) : undefined
-                                                            }
-                                                            return undefined
-                                                        }}
-                                                        onRemove={(id) => {
-                                                            if (form.applyScope === "products") {
-                                                                setSelectedProductIds((prev) => prev.filter((item) => item !== id))
-                                                            } else if (form.applyScope === "categories") {
-                                                                setSelectedCategoryIds((prev) => prev.filter((item) => item !== id))
-                                                            } else if (form.applyScope === "services") {
-                                                                setSelectedServiceIds((prev) => prev.filter((item) => item !== id))
-                                                            }
-                                                        }}
-                                                    />
+                                                                return (
+                                                                    <LinkedItemRow
+                                                                        name={item.name}
+                                                                        description={description || null}
+                                                                        imageUrl={itemImage ? getR2ImageUrl(itemImage, "thumbnail") || PLACEHOLDER_IMAGE : null}
+                                                                        isActive={item.isActive}
+                                                                        onRemove={() => {
+                                                                            const id = item.id
+                                                                            if (form.applyScope === "products") {
+                                                                                setSelectedProductIds((prev) => prev.filter((i) => i !== id))
+                                                                            } else if (form.applyScope === "categories") {
+                                                                                setSelectedCategoryIds((prev) => prev.filter((i) => i !== id))
+                                                                            } else if (form.applyScope === "services") {
+                                                                                setSelectedServiceIds((prev) => prev.filter((i) => i !== id))
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                )
+                                                            }}
+                                                        />
+                                                    </section>
                                                 )}
 
                                                 {form.customerScope === "specific" && (
-                                                    <LinkedItemsSection
-                                                        title="Clientes vinculados"
-                                                        items={relations.customers}
-                                                        getId={(item) => item.id}
-                                                        getTitle={(item) => item.name}
-                                                        getDescription={(item) => item.email || item.phone || undefined}
-                                                        onRemove={(id) => setSelectedCustomerIds((prev) => prev.filter((item) => item !== id))}
-                                                    />
+                                                    <section className="space-y-4">
+                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Clientes vinculados</h3>
+                                                        <PagedLinkedItems
+                                                            items={relations.customers}
+                                                            page={customerPage}
+                                                            onPageChange={setCustomerPage}
+                                                            emptyMessage="Nenhum cliente vinculado. Clique em &quot;Selecionar clientes&quot; para adicionar."
+                                                            renderItem={(customer: any) => (
+                                                                <LinkedItemRow
+                                                                    name={customer.name}
+                                                                    description={customer.email || customer.phone || null}
+                                                                    avatarName={customer.name}
+                                                                    imageUrl={(customer as ScopeCustomer).avatarUrl}
+                                                                    onRemove={() => setSelectedCustomerIds((prev) => prev.filter((id) => id !== customer.id))}
+                                                                />
+                                                            )}
+                                                        />
+                                                    </section>
                                                 )}
                                             </FadeIn>
                                         </TabsContent>
@@ -664,59 +665,25 @@ export default function CouponFormPage({
                     onClose={() => setPickerMode(null)}
                     products={scopeData.products}
                     selectedIds={relations.productIds}
-                    onToggle={(id) => setSelectedProductIds((prev) => prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id])}
+                    onSave={handleSaveProducts}
                     isLoading={isLoadingScope}
                 />
 
-                <SelectionSheet
+                <SelectCouponServicesSheet
                     isOpen={pickerMode === "services"}
-                    onOpenChange={(open) => {
-                        if (!open) setPickerMode(null)
-                    }}
-                    title="Selecionar serviços"
-                    description="Escolha os serviços que esse cupom pode atingir."
-                    searchValue={scopeSearch}
-                    onSearchChange={setScopeSearch}
-                    searchPlaceholder="Buscar serviço..."
-                >
-                    <div className="space-y-3">
-                        {isLoadingScope ? <ThreeDotsLoader /> : null}
-                        {filteredServices.map((item) => {
-                            const disabled = item.isActive === false
-                            const selected = relations.serviceIds.includes(item.id)
-                            return (
-                                <ListItem
-                                    key={item.id}
-                                    title={item.name}
-                                    description={item.price != null ? formatCurrency(item.price) : undefined}
-                                    left={
-                                        <div className="pl-4">
-                                            <Checkbox
-                                                checked={selected}
-                                                disabled={disabled}
-                                                onChange={() => {
-                                                    if (disabled) return
-                                                    setSelectedServiceIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])
-                                                }}
-                                            />
-                                        </div>
-                                    }
-                                    icon={<BoxIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />}
-                                    right={<Badge variant={getItemStatusVariant(item.isActive)}>{getItemStatusLabel(item.isActive)}</Badge>}
-                                    onClick={disabled ? undefined : () => setSelectedServiceIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])}
-                                    className={`p-3 ${disabled ? "opacity-55 cursor-not-allowed hover:border-brand-border dark:hover:border-dark-border" : ""}`}
-                                />
-                            )
-                        })}
-                    </div>
-                </SelectionSheet>
+                    onClose={() => setPickerMode(null)}
+                    services={scopeData.services}
+                    selectedIds={relations.serviceIds}
+                    onSave={handleSaveServices}
+                    isLoading={isLoadingScope}
+                />
 
                 <SelectCouponCategoriesSheet
                     isOpen={pickerMode === "categories"}
                     onClose={() => setPickerMode(null)}
                     categories={scopeData.categories}
                     selectedIds={relations.categoryIds}
-                    onToggle={(id) => setSelectedCategoryIds((prev) => prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id])}
+                    onSave={handleSaveCategories}
                     isLoading={isLoadingScope}
                 />
 

@@ -7,6 +7,7 @@ import type { NotificationPageCursor } from "@/lib/notifications/types"
 import {
   fetchNotificationsPage,
   getUnreadCountForUser,
+  markAllNotificationsReadForUser,
   markNotificationsReadForUser,
   registerPushSubscription,
   unregisterPushSubscription,
@@ -32,6 +33,14 @@ export async function getUnreadNotificationCountAction() {
 
   const count = await getUnreadCountForUser(user.id)
   return { success: true as const, count }
+}
+
+export async function markAllNotificationsReadAction() {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" as const }
+
+  const updated = await markAllNotificationsReadForUser(user.id)
+  return { success: true as const, updated }
 }
 
 export async function markNotificationsReadAction(notificationIds: string[]) {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent, Badge, Button, AlertModal } from '@/components/reusable';
+import { Tabs, TabsList, TabsTrigger, TabsContent, Badge, Button, AlertModal, ThreeDotsLoader } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, EditIcon, SaveIcon } from '@/lib/icons';
@@ -558,8 +558,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         const newItems = [...prevItems];
                         const existingIndex = newItems.findIndex(i => i.id === productToSelectVariant.id && i.variant === variantNameForCheck);
                         if (existingIndex >= 0) {
-                            newItems[existingIndex] = { 
-                                ...newItems[existingIndex], 
+                            newItems[existingIndex] = {
+                                ...newItems[existingIndex],
                                 qty: newItems[existingIndex].qty + sel.qty,
                                 allowSellWithoutStock: forceBypass ? true : Boolean(newItems[existingIndex].allowSellWithoutStock)
                             };
@@ -1098,8 +1098,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                     onScroll={handleScroll}
                                 >
                                     {isEditLoadingLocked && (
-                                        <div className="absolute inset-0 z-20 bg-white/65 dark:bg-dark-background/65 backdrop-blur-[2px] flex items-center justify-center">
-                                            <div className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Carregando dados do orçamento...</div>
+                                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                                            <ThreeDotsLoader />
                                         </div>
                                     )}
                                     <div className={`flex-1 pt-4 pb-12 px-4 md:px-6 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>

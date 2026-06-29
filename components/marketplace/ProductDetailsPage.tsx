@@ -1288,7 +1288,7 @@ export function ProductDetailsPageClient({
                                 <div>
                                     <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
                                     {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                        <InfoCard color="orange" message={`Pronto ${getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre ${preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e ${preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`} />
+                                        <InfoCard className="mt-3" color="orange" message={`Pronto ${getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre ${preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e ${preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`} />
                                     )}
                                 </div>
                                 <div className="text-right">

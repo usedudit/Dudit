@@ -188,11 +188,18 @@ export async function setWhatsappConnectionActive(partnerId: string, isActive: b
     .eq("provider", provider)
 }
 
-export function getWebhookUrl(provider: WhatsappProviderId = "meta", connectionId?: string): string {
+export function getWebhookUrl(provider: WhatsappProviderId = "meta", connectionId?: string, webhookSecret?: string): string {
   const base = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
   let suffix = provider === "meta" ? "/api/whatsapp/webhook/meta" : `/api/whatsapp/webhook/${provider}`
+  const params: string[] = []
   if (connectionId && provider === "evolution") {
-    suffix += `?cid=${connectionId}`
+    params.push(`cid=${connectionId}`)
+  }
+  if (webhookSecret && provider === "evolution") {
+    params.push(`secret=${encodeURIComponent(webhookSecret)}`)
+  }
+  if (params.length > 0) {
+    suffix += "?" + params.join("&")
   }
   if (!base) return suffix
   const origin = base.startsWith("http") ? base : `https://${base}`
