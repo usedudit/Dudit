@@ -161,7 +161,7 @@ export async function getWhatsappIntegrationAction(): Promise<
                 apiUrl: active.api_url,
                 hasApiKey: !!active.api_key_encrypted,
                 webhookUrl: active.provider === "evolution"
-                    ? getWebhookUrl("evolution", active.id, active.evolution_webhook_secret)
+                    ? getWebhookUrl("evolution", active.id, active.evolution_webhook_secret || undefined)
                     : getWebhookUrl("meta"),
             }
             : null
@@ -184,7 +184,7 @@ export async function getWhatsappIntegrationAction(): Promise<
             apiUrl: c.api_url,
             hasApiKey: !!c.api_key_encrypted,
             webhookUrl: c.provider === "evolution"
-                ? getWebhookUrl("evolution", c.id, c.evolution_webhook_secret)
+                ? getWebhookUrl("evolution", c.id, c.evolution_webhook_secret || undefined)
                 : getWebhookUrl("meta"),
         }))
 

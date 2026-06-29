@@ -1147,7 +1147,7 @@ export function ServiceDetailsPageClient({
                             </span>
                             {activeGiftPromo?.minSpendAmount ? (
                                 <span className="text-[10px] text-brand-inactive-text mt-0.5">
-                                    Em compras deste item acima de {formatMoney(activeGiftPromo.minSpendAmount)}
+                                    Em compras deste item acima de {formatCurrency(activeGiftPromo.minSpendAmount)}
                                 </span>
                             ) : null}
                         </div>

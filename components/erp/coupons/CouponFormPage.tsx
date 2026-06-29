@@ -458,7 +458,7 @@ export default function CouponFormPage({
                                                             actionLabel={applyScopeActionLabel}
                                                             onAction={
                                                     applyScopeActionLabel && form.applyScope !== "all"
-                                                        ? () => handleOpenPicker(form.applyScope)
+                                                        ? () => handleOpenPicker(form.applyScope as PickerMode)
                                                         : undefined
                                                             }
                                                         >

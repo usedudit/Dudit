@@ -69,7 +69,7 @@ export function NotificationPanel({
 
   return (
     <>
-      {unreadCount > 0 && onMarkAllAsRead && (
+      {(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
         <div className="sticky top-0 z-10 bg-white dark:bg-dark-surface px-4 py-2 border-b border-brand-border dark:border-dark-border">
           <button
             type="button"

@@ -61,7 +61,7 @@ type FilterState = {
 
 type SortKey = "coupon" | "scope" | "usage" | "validity" | "status"
 type SortDirection = "asc" | "desc"
-type ActiveTab = "Todos" | "Ativos" | "Inativos" | "Automáticos"
+type ActiveTab = "Todos" | "Ativos" | "Inativos" | "Automaticos"
 type WrapperMode = "list" | "create" | "edit" | "view"
 
 const ITEMS_PER_PAGE = 8
@@ -684,7 +684,7 @@ export default function CouponsPage({
                 activeTab === "Todos" ||
                 (activeTab === "Ativos" && coupon.is_active) ||
                 (activeTab === "Inativos" && !coupon.is_active) ||
-                (activeTab === "Automáticos" && coupon.is_automatic)
+                (activeTab === "Automaticos" && coupon.is_automatic)
 
             const typeLabel = coupon.discount_type === "percentage"
                 ? "Percentual"
