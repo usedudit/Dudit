@@ -1420,7 +1420,7 @@ export async function getMarketplaceOrderDetailsAction(orderId: string, partnerI
     const supabase = await getSupabaseServerClient()
     const { data } = await supabase
       .from("orders")
-      .select("total_amount, payment_method, paid_amount, situation")
+      .select("total_amount, payment_method, paid_amount, situation, order_source")
       .eq("id", orderId)
       .eq("partner_id", partnerId)
       .maybeSingle()
@@ -1430,6 +1430,48 @@ export async function getMarketplaceOrderDetailsAction(orderId: string, partnerI
       paymentMethod: data.payment_method || '',
       paidAmount: Number(data.paid_amount || 0),
       situation: data.situation || 'pending',
+      orderSource: data.order_source || '',
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function getAppointmentOrderItemsAction(orderId: string, partnerId: string) {
+  try {
+    const user = await requireUser()
+    if (!user) return null
+    await requirePermission(partnerId, "orders", "view")
+    const supabase = await getSupabaseServerClient()
+    const [orderRes, itemsRes] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("situation, total_amount, paid_amount")
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle(),
+      supabase
+        .from("order_items")
+        .select("id, line_type, product_id, product_name, product_price, quantity, subtotal, service_id, is_gift, original_price")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true }),
+    ])
+    if (!orderRes.data) return null
+    return {
+      situation: orderRes.data.situation || "pending",
+      totalAmount: Number(orderRes.data.total_amount || 0),
+      paidAmount: Number(orderRes.data.paid_amount || 0),
+      items: (itemsRes.data || []).map((item: any) => ({
+        id: item.id,
+        lineType: item.line_type || "product",
+        productName: item.product_name,
+        productPrice: Number(item.product_price || 0),
+        quantity: Number(item.quantity || 0),
+        subtotal: Number(item.subtotal || 0),
+        serviceId: item.service_id || null,
+        isGift: Boolean(item.is_gift),
+        originalPrice: item.original_price ? Number(item.original_price) : null,
+      })),
     }
   } catch {
     return null

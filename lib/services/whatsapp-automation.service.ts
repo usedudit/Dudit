@@ -7,7 +7,8 @@ import { buildWhatsappMessage } from "@/lib/notifications/templates"
 import { resolveCustomerUserId } from "./notification.service"
 import { shouldDeliverWhatsapp } from "./notification-preferences.service"
 import { parseInTz } from "@/lib/date"
-import type { WhatsappAutomationTrigger } from "@/lib/whatsapp/types"
+import { SecureLogger } from "@/lib/secure-logger"
+import type { WhatsappAutomationTrigger, WhatsappExecutionResult } from "@/lib/whatsapp/types"
 
 const APPOINTMENT_BUTTONS = [
   { id: "confirm_appointment", title: "✅ Confirmar" },
@@ -123,13 +124,21 @@ export async function dispatchWhatsappAutomation(params: {
   templateVariables?: Record<string, string>
   scheduledAt?: Date | null
   includeAppointmentButtons?: boolean
-}) {
+}): Promise<WhatsappExecutionResult> {
   const phone = await resolveCustomerPhone({
     partnerId: params.partnerId,
     customerId: params.customerId,
     fallbackPhone: params.phone,
   })
-  if (!phone) return { queued: false, reason: "no_phone" }
+  if (!phone) {
+    SecureLogger.info("[whatsapp] dispatch: no phone resolved", {
+      partnerId: params.partnerId,
+      trigger: params.trigger,
+      entityId: params.entityId,
+    })
+    return { success: false, resultStatus: "skipped_no_phone", reason: "customer_without_phone", messageId: null, providerMessageId: null }
+  }
+  SecureLogger.info("[whatsapp] dispatch: phone_resolved", { partnerId: params.partnerId, phone })
 
   const userId = await resolveCustomerUserId({
     customerId: params.customerId,
@@ -138,6 +147,7 @@ export async function dispatchWhatsappAutomation(params: {
 
   if (userId) {
     const isEnabled = await shouldDeliverWhatsapp(userId, params.trigger)
+    SecureLogger.info("[whatsapp] dispatch: should_deliver", { userId, trigger: params.trigger, isEnabled })
     if (!isEnabled) {
       await logWhatsappAutomation({
         partnerId: params.partnerId,
@@ -148,14 +158,20 @@ export async function dispatchWhatsappAutomation(params: {
         payload: { reason: "disabled_by_user" },
         response: { reason: "whatsapp_disabled_by_user" },
       })
-      return { queued: false, reason: "whatsapp_disabled_by_user" }
+      return { success: false, resultStatus: "skipped_disabled", reason: "whatsapp_disabled_by_user", messageId: null, providerMessageId: null }
     }
   }
 
   const body = buildWhatsappMessage(params.trigger, params.templateVariables || {})
+  SecureLogger.info("[whatsapp] dispatch: template_built", {
+    partnerId: params.partnerId,
+    trigger: params.trigger,
+    bodyLength: body.length,
+  })
+
   const idempotencyKey = `${params.trigger}:${params.entityType}:${params.entityId}`
 
-  const result = await queueWhatsappMessage({
+  const queueResult = await queueWhatsappMessage({
     partnerId: params.partnerId,
     customerId: params.customerId,
     orderId: params.orderId,
@@ -174,15 +190,43 @@ export async function dispatchWhatsappAutomation(params: {
     scheduledAt: params.scheduledAt,
   })
 
-  if (result.messageId && !result.skipped && !params.scheduledAt) {
+  SecureLogger.info("[whatsapp] dispatch: queued", {
+    partnerId: params.partnerId,
+    messageId: queueResult.messageId,
+    resultStatus: queueResult.resultStatus,
+  })
+
+  let sendResult: WhatsappExecutionResult = queueResult
+
+  if (queueResult.resultStatus === "queued" && !params.scheduledAt) {
     try {
-      await processWhatsappMessageById(result.messageId)
+      const inlineResult = await processWhatsappMessageById(queueResult.messageId!)
+      SecureLogger.info("[whatsapp] dispatch: inline_send", {
+        messageId: queueResult.messageId,
+        resultStatus: inlineResult.resultStatus,
+      })
+      if (inlineResult.resultStatus === "sent") {
+        sendResult = inlineResult
+      }
     } catch (err) {
-      console.error(`[whatsapp] Inline processing failed for message ${result.messageId}:`, err)
+      const msg = err instanceof Error ? err.message : "unknown"
+      SecureLogger.error("[whatsapp] dispatch: inline_send_error", {
+        messageId: queueResult.messageId,
+        error: msg,
+      })
     }
   }
 
-  return { queued: !result.skipped, messageId: result.messageId }
+  SecureLogger.info("[whatsapp] dispatch: final", {
+    partnerId: params.partnerId,
+    trigger: params.trigger,
+    entityId: params.entityId,
+    resultStatus: sendResult.resultStatus,
+    reason: sendResult.reason,
+    messageId: sendResult.messageId,
+  })
+
+  return sendResult
 }
 
 export async function scheduleAppointmentReminders(params: {
@@ -233,6 +277,14 @@ export async function runScheduledWhatsappJob(job: {
 }) {
   const admin = getAdminClient()
 
+  SecureLogger.info("[whatsapp] run: job_started", {
+    jobId: job.id,
+    jobType: job.job_type,
+    entityType: job.entity_type,
+    entityId: job.entity_id,
+    partnerId: job.partner_id,
+  })
+
   if (job.entity_type === "appointment") {
     const { data: apt } = await admin
       .from("appointments")
@@ -241,14 +293,34 @@ export async function runScheduledWhatsappJob(job: {
       .eq("partner_id", job.partner_id)
       .maybeSingle()
 
+    SecureLogger.info("[whatsapp] run: appointment_lookup", {
+      jobId: job.id,
+      found: !!apt,
+      source: apt?.source,
+      status: apt?.status,
+    })
+
     if (!apt || apt.source === "unavailable") {
-      await admin.from("whatsapp_scheduled_jobs").update({ status: "cancelled", completed_at: new Date().toISOString() }).eq("id", job.id)
+      const reason = !apt ? "appointment_not_found" : "source_unavailable"
+      await admin.from("whatsapp_scheduled_jobs").update({
+        status: "cancelled",
+        result_status: "skipped_unavailable",
+        result_reason: reason,
+        completed_at: new Date().toISOString(),
+      }).eq("id", job.id)
+      SecureLogger.info("[whatsapp] run: cancelled - unavailable", { jobId: job.id, reason })
       return
     }
 
     const cancelled = String(apt.status).toLowerCase() === "cancelado"
     if (cancelled && job.job_type.includes("reminder")) {
-      await admin.from("whatsapp_scheduled_jobs").update({ status: "cancelled", completed_at: new Date().toISOString() }).eq("id", job.id)
+      await admin.from("whatsapp_scheduled_jobs").update({
+        status: "cancelled",
+        result_status: "skipped_cancelled",
+        result_reason: "appointment_cancelled",
+        completed_at: new Date().toISOString(),
+      }).eq("id", job.id)
+      SecureLogger.info("[whatsapp] run: cancelled - appointment cancelled", { jobId: job.id })
       return
     }
 
@@ -258,7 +330,9 @@ export async function runScheduledWhatsappJob(job: {
       .eq("id", job.partner_id)
       .maybeSingle()
 
-    await dispatchWhatsappAutomation({
+    SecureLogger.info("[whatsapp] run: dispatch_start", { jobId: job.id, partnerName: jobPartner?.store_name })
+
+    const result = await dispatchWhatsappAutomation({
       partnerId: job.partner_id,
       trigger: job.job_type as WhatsappAutomationTrigger,
       entityType: "appointment",
@@ -274,8 +348,29 @@ export async function runScheduledWhatsappJob(job: {
       },
       includeAppointmentButtons: job.job_type.includes("reminder"),
     })
+
+    const jobStatus = result.success ? "completed" : result.resultStatus.startsWith("failed") ? "failed" : "completed"
+    const updateData: Record<string, unknown> = {
+      status: jobStatus,
+      result_status: result.resultStatus,
+      result_reason: result.reason,
+      completed_at: new Date().toISOString(),
+    }
+    if (result.messageId) updateData.message_id = result.messageId
+    if (result.providerMessageId) updateData.provider_message_id = result.providerMessageId
+
+    await admin.from("whatsapp_scheduled_jobs").update(updateData).eq("id", job.id)
+
+    SecureLogger.info("[whatsapp] run: job_finished", {
+      jobId: job.id,
+      jobStatus,
+      resultStatus: result.resultStatus,
+      reason: result.reason,
+      messageId: result.messageId,
+    })
+
   } else if (job.entity_type === "quote") {
-    await dispatchWhatsappAutomation({
+    const result = await dispatchWhatsappAutomation({
       partnerId: job.partner_id,
       trigger: job.job_type as WhatsappAutomationTrigger,
       entityType: "quote",
@@ -283,12 +378,27 @@ export async function runScheduledWhatsappJob(job: {
       quoteId: job.entity_id,
       customerId: job.payload.customerId as string | undefined,
     })
-  }
 
-  await admin
-    .from("whatsapp_scheduled_jobs")
-    .update({ status: "completed", completed_at: new Date().toISOString() })
-    .eq("id", job.id)
+    const jobStatus = result.success ? "completed" : result.resultStatus.startsWith("failed") ? "failed" : "completed"
+    const updateData: Record<string, unknown> = {
+      status: jobStatus,
+      result_status: result.resultStatus,
+      result_reason: result.reason,
+      completed_at: new Date().toISOString(),
+    }
+    if (result.messageId) updateData.message_id = result.messageId
+    if (result.providerMessageId) updateData.provider_message_id = result.providerMessageId
+
+    await admin.from("whatsapp_scheduled_jobs").update(updateData).eq("id", job.id)
+
+    SecureLogger.info("[whatsapp] run: job_finished", {
+      jobId: job.id,
+      jobStatus,
+      resultStatus: result.resultStatus,
+      reason: result.reason,
+      messageId: result.messageId,
+    })
+  }
 }
 
 export async function processDueScheduledJobs(limit = 20): Promise<number> {

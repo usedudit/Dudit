@@ -4,6 +4,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import {
   handleEvolutionWebhookPayload,
   verifyEvolutionWebhookSecret,
+  refreshEvolutionWebhookUrl,
 } from "@/lib/services/whatsapp-evolution-webhook.service"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
   
   let query = admin
     .from("partner_whatsapp_connections")
-    .select("id, partner_id, instance_name, is_active, evolution_webhook_secret")
+    .select("id, partner_id, instance_name, is_active, evolution_webhook_secret, api_url, api_key_encrypted")
     .eq("provider", "evolution")
     .eq("is_active", true)
 
@@ -74,6 +75,13 @@ export async function POST(request: NextRequest) {
   if (!receivedSecret || !verifyEvolutionWebhookSecret(receivedSecret, expectedSecret)) {
     SecureLogger.warn("[evolution webhook] Invalid or missing secret", { requestId, instanceName, cid })
     return NextResponse.json({ error: "Invalid secret" }, { status: 401 })
+  }
+
+  // Se o webhook chegou sem ?secret= na URL, a instância pode estar usando a URL antiga.
+  // Dispara uma atualização assíncrona do webhook para incluir ?secret=.
+  const hasUrlSecret = !!request.nextUrl.searchParams.get("secret")
+  if (!hasUrlSecret && connection?.evolution_webhook_secret) {
+    refreshEvolutionWebhookUrl(connection as any).catch(() => {})
   }
 
   try {

@@ -644,7 +644,10 @@ export async function connectEvolutionAction(): Promise<
         })
 
         // 4. Build webhook URL and create Evolution client
-        const webhookUrl = getWebhookUrl("evolution", connection.id)
+        // O secret é passado via query param (?secret=) porque a Evolution API
+        // pode não repassar headers customizados (x-evolution-signature) ao
+        // disparar o webhook. O ?secret= é preservado por ser parte da URL.
+        const webhookUrl = getWebhookUrl("evolution", connection.id, connection.evolution_webhook_secret)
         const webhookEvents = [...EVOLUTION_WEBHOOK_EVENTS]
         const webhookHeaders = connection.evolution_webhook_secret
             ? { "x-evolution-signature": connection.evolution_webhook_secret }

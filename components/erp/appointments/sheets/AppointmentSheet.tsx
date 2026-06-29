@@ -168,6 +168,7 @@ export const AppointmentSheet = ({
         paymentMethod: string
         paidAmount: number
         situation: string
+        orderSource: string
     } | null>(null)
 
     useEffect(() => {
@@ -1020,6 +1021,29 @@ export const AppointmentSheet = ({
         });
     }, [partnerId]);
 
+    const [orderItems, setOrderItems] = useState<any[] | null>(null)
+    const [orderPaymentInfo, setOrderPaymentInfo] = useState<{ situation: string; paidAmount: number; totalAmount: number } | null>(null)
+
+    useEffect(() => {
+        if (!partnerId || !linkedOrderId || mode !== 'view') {
+            setOrderItems(null)
+            setOrderPaymentInfo(null)
+            return
+        }
+        let cancelled = false
+        import("@/app/actions/erp/appointments").then(mod => {
+            mod.getAppointmentOrderItemsAction(linkedOrderId, partnerId).then(data => {
+                if (!cancelled && data) {
+                    setOrderItems(data.items)
+                    setOrderPaymentInfo({ situation: data.situation, paidAmount: data.paidAmount, totalAmount: data.totalAmount })
+                }
+            }).catch(() => {
+                if (!cancelled) { setOrderItems(null); setOrderPaymentInfo(null) }
+            })
+        })
+        return () => { cancelled = true }
+    }, [linkedOrderId, partnerId, mode])
+
     const handleConfirmPayment = async (paymentData: any) => {
         if (!financeAccountId) {
             toast.warning("Conta financeira", "Nenhuma conta de recebimento configurada. Configure em Financeiro > Contas.");
@@ -1702,7 +1726,8 @@ export const AppointmentSheet = ({
                         const isCompletedStatus = (status || '').toLowerCase() === 'concluído' || (status || '').toLowerCase() === 'concluido';
                         const isLocked = isPaid || isCompletedStatus;
                         const displaySalesChannel = getSalesChannelLabel(appointment?.salesChannel);
-                        const displayPaymentStatus = getPaymentStatusLabel(appointment?.paymentStatus);
+                        const effectivePaymentStatus = orderPaymentInfo?.situation || appointment?.paymentStatus;
+                        const displayPaymentStatus = getPaymentStatusLabel(effectivePaymentStatus);
                         const displayFulfillmentMode = getFulfillmentModeLabel(appointment?.fulfillmentMode);
                         const displayOrderNumber = orderNumber || (linkedOrderId ? linkedOrderId.slice(0, 8).toUpperCase() : null);
 
@@ -1905,6 +1930,35 @@ export const AppointmentSheet = ({
                                     )}
                                 </div>
 
+                                {/* Products Section */}
+                                {orderItems && orderItems.filter(i => i.lineType !== 'service_booking' || i.serviceId === null).length > 0 && (
+                                    <div>
+                                        <div className="flex justify-between items-center mb-3 px-1">
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Produtos</h3>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {orderItems.filter(i => i.lineType !== 'service_booking' || i.serviceId === null).map((item) => (
+                                                <div key={item.id} className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900/50">
+                                                    <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
+                                                    <div className="pl-4 flex-1">
+                                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">{item.productName}</h4>
+                                                        <div className="text-sm text-brand-inactive-text mt-1">
+                                                            Qtd: {item.quantity}
+                                                            {item.isGift && <span className="ml-2 text-amber-600 font-medium">Brinde</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal)}</span>
+                                                        {item.originalPrice && item.originalPrice > item.productPrice && (
+                                                            <div className="text-xs text-brand-inactive-text line-through">{formatCurrency(item.originalPrice)}</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Total Row */}
                                 <div className="flex justify-between items-end border-t border-brand-border dark:border-dark-border pt-4 px-1">
                                     <div className="flex flex-col">
@@ -1913,9 +1967,9 @@ export const AppointmentSheet = ({
                                     </div>
                                     <div className="flex flex-col text-right">
                                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                            {marketplaceOrderData ? 'Total Final (Marketplace)' : 'Valor Total'}
+                                            {marketplaceOrderData && (marketplaceOrderData.orderSource === "Online Store" || marketplaceOrderData.orderSource === "Marketplace") ? 'Total Final (Marketplace)' : 'Valor Total'}
                                         </span>
-                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(marketplaceOrderData?.totalAmount ?? calculatedPrice)}</span>
+                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(marketplaceOrderData?.totalAmount ?? (orderPaymentInfo?.totalAmount ?? calculatedPrice))}</span>
                                     </div>
                                 </div>
 
@@ -2016,8 +2070,9 @@ export const AppointmentSheet = ({
                         ) : (
                             /* VIEW MODE FOOTER */
                             (() => {
-                                const isFullyPaid = ['pago', 'paid'].includes((status || '').toLowerCase()) || (appointment?.paymentStatus || '').toLowerCase() === 'paid';
-                                const isPartiallyPaid = ['partially paid', 'pago parcialmente', 'parcialmente pago'].includes((status || '').toLowerCase()) || (appointment?.paymentStatus || '').toLowerCase() === 'partially_paid';
+                                const effPaymentStatus = (orderPaymentInfo?.situation || appointment?.paymentStatus || '').toLowerCase();
+                                const isFullyPaid = ['pago', 'paid'].includes((status || '').toLowerCase()) || effPaymentStatus === 'paid';
+                                const isPartiallyPaid = ['partially paid', 'pago parcialmente', 'parcialmente pago'].includes((status || '').toLowerCase()) || effPaymentStatus === 'partially_paid';
                                 const isPaidOrPartiallyPaid = isFullyPaid || isPartiallyPaid;
 
                                 if (isFullyPaid) {
@@ -2840,55 +2895,59 @@ export const AppointmentSheet = ({
             </AnimatePresence>
 
             <AnimatePresence>
-                {isPaymentSheetOpen && (
-                    <PaymentModal
-                        isOpen={isPaymentSheetOpen}
-                        onClose={() => {
-                            setIsPaymentSheetOpen(false);
-                            if (completedOrderId) {
-                                onClose();
-                            }
-                        }}
-                        partnerId={partnerId || ''}
-                        onConfirm={handleConfirmPayment}
-                        cart={selectedServices.map(s => {
-                            const effectivePrice = getEffectiveServicePrice(s);
-                            let finalPrice = effectivePrice;
-                            if (s.pricingUnit === 'Por Dia') {
-                                const start = new Date(`${startDateRange}T${startTimeRange}`);
-                                const end = new Date(`${endDateRange}T${endTimeRange}`);
-                                const diffTime = Math.abs(end.getTime() - start.getTime());
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                const chargeableDays = Math.max(1, diffDays);
-                                finalPrice = effectivePrice * chargeableDays;
-                            } else if (s.pricingUnit === 'Por Hora') {
-                                const start = new Date(`${startDateRange}T${startTimeRange}`);
-                                const end = new Date(`${endDateRange}T${endTimeRange}`);
-                                const diffTime = Math.abs(end.getTime() - start.getTime());
-                                const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-                                const chargeableHours = Math.max(1, diffHours);
-                                finalPrice = effectivePrice * chargeableHours;
-                            }
-                            return {
-                                ...s,
-                                qty: 1,
-                                quantity: 1,
-                                productId: s.id || null,
-                                unitPrice: marketplaceOrderData ? marketplaceOrderData.totalAmount / Math.max(1, selectedServices.length) : finalPrice,
-                                price: marketplaceOrderData ? marketplaceOrderData.totalAmount / Math.max(1, selectedServices.length) : finalPrice,
-                                name: s.name,
-                            };
-                        })}
-                        amountDue={marketplaceOrderData?.totalAmount ?? calculatedPrice}
-                        existingPaidAmount={Number(appointment?.paidAmount ?? 0)}
-                        existingPaymentBreakdown={[]}
-                        customer={{ id: selectedClient?.id, name: selectedClient?.name }}
-                        headerSubtitle="Agendamento de Serviço"
-                        hidePendingDelivery
-                        isMarketplaceOrder={!!marketplaceOrderData}
-                        originalPaymentMethod={marketplaceOrderData?.paymentMethod}
-                    />
-                )}
+                {isPaymentSheetOpen && (() => {
+                    const isMarketplace = !!(marketplaceOrderData && (marketplaceOrderData.orderSource === "Online Store" || marketplaceOrderData.orderSource === "Marketplace"));
+                    const mpTotalPerService = isMarketplace && marketplaceOrderData ? marketplaceOrderData.totalAmount / Math.max(1, selectedServices.length) : null;
+                    return (
+                        <PaymentModal
+                            isOpen={isPaymentSheetOpen}
+                            onClose={() => {
+                                setIsPaymentSheetOpen(false);
+                                if (completedOrderId) {
+                                    onClose();
+                                }
+                            }}
+                            partnerId={partnerId || ''}
+                            onConfirm={handleConfirmPayment}
+                            cart={selectedServices.map(s => {
+                                const effectivePrice = getEffectiveServicePrice(s);
+                                let finalPrice = effectivePrice;
+                                if (s.pricingUnit === 'Por Dia') {
+                                    const start = new Date(`${startDateRange}T${startTimeRange}`);
+                                    const end = new Date(`${endDateRange}T${endTimeRange}`);
+                                    const diffTime = Math.abs(end.getTime() - start.getTime());
+                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    const chargeableDays = Math.max(1, diffDays);
+                                    finalPrice = effectivePrice * chargeableDays;
+                                } else if (s.pricingUnit === 'Por Hora') {
+                                    const start = new Date(`${startDateRange}T${startTimeRange}`);
+                                    const end = new Date(`${endDateRange}T${endTimeRange}`);
+                                    const diffTime = Math.abs(end.getTime() - start.getTime());
+                                    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+                                    const chargeableHours = Math.max(1, diffHours);
+                                    finalPrice = effectivePrice * chargeableHours;
+                                }
+                                return {
+                                    ...s,
+                                    qty: 1,
+                                    quantity: 1,
+                                    productId: s.id || null,
+                                    unitPrice: mpTotalPerService ?? finalPrice,
+                                    price: mpTotalPerService ?? finalPrice,
+                                    name: s.name,
+                                };
+                            })}
+                            amountDue={isMarketplace ? marketplaceOrderData!.totalAmount : calculatedPrice}
+                            existingPaidAmount={Number(appointment?.paidAmount ?? 0)}
+                            existingPaymentBreakdown={[]}
+                            customer={{ id: selectedClient?.id, name: selectedClient?.name }}
+                            headerSubtitle="Agendamento de Serviço"
+                            hidePendingDelivery
+                            isMarketplaceOrder={isMarketplace}
+                            originalPaymentMethod={isMarketplace ? marketplaceOrderData!.paymentMethod : undefined}
+                        />
+                    );
+                })()}
             </AnimatePresence>
         </>
     )

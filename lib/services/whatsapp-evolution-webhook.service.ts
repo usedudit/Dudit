@@ -3,7 +3,9 @@ import "server-only"
 import { timingSafeEqual } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { SecureLogger } from "@/lib/secure-logger"
-import { updateConnectionStatus } from "./whatsapp-connection.service"
+import { decrypt } from "@/lib/cryptoService"
+import { EvolutionWhatsappClient } from "@/lib/whatsapp/providers/evolution-client"
+import { updateConnectionStatus, getWebhookUrl, EVOLUTION_WEBHOOK_EVENTS } from "./whatsapp-connection.service"
 import type { WhatsappConnectionStatus } from "@/lib/whatsapp/types"
 
 // ─── Webhook Secret Verification ─────────────────────────────────────────────
@@ -349,4 +351,54 @@ export async function handleEvolutionWebhookPayload(
   }
 
   return result
+}
+
+/**
+ * Atualiza o webhook de uma instância Evolution para incluir ?secret= na URL.
+ *
+ * Isso garante que instâncias existentes (registradas antes da correção do ?secret=)
+ * passem a validar corretamente mesmo que a Evolution API não repasse headers customizados.
+ *
+ * A função é fire-and-forget: erros são logados mas nunca propagados.
+ * Chamada após cada validação bem-sucedida de webhook que não veio com ?secret=.
+ */
+export async function refreshEvolutionWebhookUrl(
+  connection: EvolutionWebhookConnection & {
+    api_url: string | null
+    api_key_encrypted: string | null
+  },
+): Promise<void> {
+  try {
+    if (!connection.instance_name || !connection.api_url || !connection.evolution_webhook_secret) return
+
+    const apiKey = connection.api_key_encrypted
+      ? decrypt(connection.api_key_encrypted, "whatsapp")
+      : process.env.EVOLUTION_API_KEY?.trim()
+
+    if (!apiKey) return
+
+    const webhookUrl = getWebhookUrl("evolution", connection.id, connection.evolution_webhook_secret)
+    const webhookEvents = [...EVOLUTION_WEBHOOK_EVENTS]
+    const webhookHeaders = { "x-evolution-signature": connection.evolution_webhook_secret }
+
+    const client = new EvolutionWhatsappClient({
+      apiUrl: connection.api_url,
+      apiKey,
+      instanceName: connection.instance_name,
+    })
+
+    await client.setWebhook(webhookUrl, webhookEvents, webhookHeaders)
+
+    SecureLogger.info("[evolution webhook] Updated webhook URL with ?secret=", {
+      instance: connection.instance_name,
+      connectionId: connection.id,
+    })
+  } catch (err) {
+    // Non-fatal: o webhook continuará funcionando se a Evolution repassar headers
+    SecureLogger.warn("[evolution webhook] Failed to refresh webhook URL", {
+      instance: connection.instance_name,
+      connectionId: connection.id,
+      error: err instanceof Error ? err.message : "unknown",
+    })
+  }
 }

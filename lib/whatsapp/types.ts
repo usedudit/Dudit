@@ -136,6 +136,28 @@ export interface WhatsappTemplateView {
   isActive: boolean
 }
 
+export type WhatsappExecutionResultStatus =
+  | "sent"
+  | "queued"
+  | "skipped_no_phone"
+  | "skipped_no_connection"
+  | "skipped_disabled"
+  | "skipped_invalid_phone"
+  | "skipped_duplicate"
+  | "skipped_cancelled"
+  | "skipped_unavailable"
+  | "failed_send"
+  | "failed_provider"
+  | "failed_unknown"
+
+export interface WhatsappExecutionResult {
+  success: boolean
+  resultStatus: WhatsappExecutionResultStatus
+  reason: string | null
+  messageId: string | null
+  providerMessageId: string | null
+}
+
 export interface QueueMessageInput {
   partnerId: string
   customerId?: string | null

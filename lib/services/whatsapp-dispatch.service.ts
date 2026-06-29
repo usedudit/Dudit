@@ -6,7 +6,8 @@ import { createWhatsappProviderFromConnection } from "@/lib/whatsapp/providers"
 import { getActiveWhatsappConnection } from "./whatsapp-connection.service"
 import { normalizePhoneToE164 } from "@/lib/whatsapp/phone"
 import { isRetryableWhatsappError } from "@/lib/whatsapp/errors"
-import type { QueueMessageInput, WhatsappAutomationTrigger, WhatsappTemplateComponent } from "@/lib/whatsapp/types"
+import { SecureLogger } from "@/lib/secure-logger"
+import type { QueueMessageInput, WhatsappAutomationTrigger, WhatsappTemplateComponent, WhatsappExecutionResult } from "@/lib/whatsapp/types"
 
 function calculateNextRetryAt(retryCount: number): string {
   const delayMinutes = Math.pow(2, Math.min(retryCount, 5))
@@ -53,10 +54,16 @@ export async function logWhatsappAutomation(params: {
   })
 }
 
-export async function queueWhatsappMessage(input: QueueMessageInput): Promise<{ messageId: string | null; skipped: boolean }> {
+export async function queueWhatsappMessage(input: QueueMessageInput): Promise<WhatsappExecutionResult> {
   const admin = getAdminClient()
+
   const e164 = normalizePhoneToE164(input.phoneNumber)
   if (!e164) {
+    SecureLogger.info("[whatsapp] queue: invalid phone", {
+      partnerId: input.partnerId,
+      triggerType: input.triggerType,
+      rawPhone: input.phoneNumber,
+    })
     await logWhatsappAutomation({
       partnerId: input.partnerId,
       triggerType: input.triggerType,
@@ -66,11 +73,14 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<{ 
       payload: input.payload,
       response: { reason: "invalid_phone" },
     })
-    return { messageId: null, skipped: true }
+    return { success: false, resultStatus: "skipped_invalid_phone", reason: "invalid_phone_number", messageId: null, providerMessageId: null }
   }
+
+  SecureLogger.info("[whatsapp] queue: phone_normalized", { partnerId: input.partnerId, e164 })
 
   const connection = await getActiveWhatsappConnection(input.partnerId)
   if (!connection?.is_active) {
+    SecureLogger.warn("[whatsapp] queue: no active connection", { partnerId: input.partnerId })
     await logWhatsappAutomation({
       partnerId: input.partnerId,
       triggerType: input.triggerType,
@@ -79,8 +89,10 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<{ 
       executionStatus: "skipped",
       response: { reason: "integration_inactive" },
     })
-    return { messageId: null, skipped: true }
+    return { success: false, resultStatus: "skipped_no_connection", reason: "integration_inactive", messageId: null, providerMessageId: null }
   }
+
+  SecureLogger.info("[whatsapp] queue: connection found", { partnerId: input.partnerId, provider: connection.provider })
 
   if (input.idempotencyKey) {
     const { data: existing } = await admin
@@ -90,9 +102,12 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<{ 
       .eq("idempotency_key", input.idempotencyKey)
       .maybeSingle()
     if (existing?.id) {
-      return { messageId: existing.id, skipped: true }
+      SecureLogger.info("[whatsapp] queue: idempotency hit", { partnerId: input.partnerId, existingId: existing.id })
+      return { success: false, resultStatus: "skipped_duplicate", reason: "idempotency_match", messageId: existing.id, providerMessageId: null }
     }
   }
+
+  SecureLogger.info("[whatsapp] queue: inserting message", { partnerId: input.partnerId, messageType: input.messageType })
 
   const { data: inserted, error } = await admin
     .from("whatsapp_messages")
@@ -115,56 +130,92 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<{ 
     .select("id")
     .single()
 
-  if (error) throw new Error(`Supabase insert failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
-  return { messageId: inserted?.id || null, skipped: false }
+  if (error) {
+    SecureLogger.error("[whatsapp] queue: insert failed", { partnerId: input.partnerId, error: error.message })
+    throw new Error(`Supabase insert failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
+  }
+
+  SecureLogger.info("[whatsapp] queue: inserted", { messageId: inserted?.id })
+  return { success: true, resultStatus: "queued", reason: null, messageId: inserted?.id || null, providerMessageId: null }
 }
 
-export async function processWhatsappMessageById(messageId: string): Promise<void> {
+export async function processWhatsappMessageById(messageId: string): Promise<WhatsappExecutionResult> {
   const admin = getAdminClient()
+
+  SecureLogger.info("[whatsapp] process: start", { messageId })
+
   const { data: message, error } = await admin
     .from("whatsapp_messages")
     .select("*")
     .eq("id", messageId)
     .single()
 
-  if (error || !message) return
-  if (!["pending", "queued"].includes(message.status)) return
+  if (error || !message) {
+    SecureLogger.warn("[whatsapp] process: message not found", { messageId, error: error?.message })
+    return { success: false, resultStatus: "failed_unknown", reason: "message_not_found", messageId, providerMessageId: null }
+  }
 
-  await sendQueuedMessage(message)
+  if (!["pending", "queued"].includes(message.status)) {
+    SecureLogger.info("[whatsapp] process: wrong status", { messageId, status: message.status })
+    return { success: false, resultStatus: "failed_unknown", reason: `unexpected_status_${message.status}`, messageId, providerMessageId: null }
+  }
+
+  return sendQueuedMessage(message)
 }
 
-export async function sendQueuedMessage(message: Record<string, unknown>): Promise<void> {
+export async function sendQueuedMessage(message: Record<string, unknown>): Promise<WhatsappExecutionResult> {
   const admin = getAdminClient()
   const partnerId = String(message.partner_id)
   const messageId = String(message.id)
 
-  const connection = await getActiveWhatsappConnection(partnerId, message.provider as "meta" | "evolution" | "twilio" | undefined)
+  SecureLogger.info("[whatsapp] send: starting", { messageId, partnerId })
+
+  const connection = await getActiveWhatsappConnection(
+    partnerId,
+    message.provider as "meta" | "evolution" | "twilio" | undefined,
+  )
   if (!connection?.is_active) {
+    SecureLogger.warn("[whatsapp] send: connection inactive", { messageId, partnerId })
     await admin
       .from("whatsapp_messages")
       .update({ status: "failed", error_message: "Integração inativa", failed_at: new Date().toISOString() })
       .eq("id", messageId)
-    return
+    return { success: false, resultStatus: "failed_provider", reason: "integration_inactive", messageId, providerMessageId: null }
   }
+
+  SecureLogger.info("[whatsapp] send: connection found", { messageId, provider: connection.provider })
 
   try {
     const provider = createWhatsappProviderFromConnection(connection)
+    SecureLogger.info("[whatsapp] send: provider_created", { messageId, providerId: provider.id })
+
     const payload = (message.payload || {}) as Record<string, unknown>
     const phone = String(message.phone_number)
-    let result
+    let result: { providerMessageId: string }
 
     if (message.message_type === "text" && payload.body) {
-      result = await provider.sendText({ to: phone, body: String(payload.body) })
+      const body = String(payload.body)
+      SecureLogger.info("[whatsapp] send: calling evolution sendText", { messageId, phone, bodyLength: body.length })
+      result = await provider.sendText({ to: phone, body })
     } else {
+      const templateName = String(message.template_name || payload.templateName || "hello_world")
+      const languageCode = String(payload.languageCode || "en_US")
       const interactiveButtons = payload.interactiveButtons as Array<{ id: string; title: string }> | undefined
+
+      SecureLogger.info("[whatsapp] send: calling evolution sendTemplate", { messageId, phone, templateName, languageCode })
       result = await provider.sendTemplate({
         to: phone,
-        templateName: String(message.template_name || payload.templateName || "hello_world"),
-        languageCode: String(payload.languageCode || "en_US"),
+        templateName,
+        languageCode,
         components: buildTemplateComponentsFromPayload(payload),
         interactiveButtons,
       })
     }
+
+    SecureLogger.info("[whatsapp] send: evolution_response", {
+      messageId,
+      providerMessageId: result.providerMessageId,
+    })
 
     await admin
       .from("whatsapp_messages")
@@ -204,21 +255,22 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
       metadata: { messageId, template: message.template_name },
       source: "system",
     })
+
+    SecureLogger.info("[whatsapp] send: completed successfully", { messageId, providerMessageId: result.providerMessageId })
+    return { success: true, resultStatus: "sent", reason: null, messageId, providerMessageId: result.providerMessageId }
+
   } catch (err: unknown) {
     const retryable = isRetryableWhatsappError(err)
     const retryCount = Number(message.retry_count || 0) + 1
     const maxRetries = Number(message.max_retries || 5)
     const errorMessage = err instanceof Error ? err.message : "Erro ao enviar mensagem"
 
-    console.error("[whatsapp] sendQueuedMessage failed", {
+    SecureLogger.error("[whatsapp] send: error", {
       messageId,
       partnerId,
-      phone: String(message.phone_number),
-      template: message.template_name,
       error: errorMessage,
       retryable,
       retryCount,
-      rawError: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
     })
 
     if (retryable && retryCount < maxRetries) {
@@ -231,6 +283,9 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
           error_message: errorMessage,
         })
         .eq("id", messageId)
+
+      SecureLogger.info("[whatsapp] send: will retry", { messageId, retryCount, nextRetryAt: calculateNextRetryAt(retryCount) })
+      return { success: false, resultStatus: "failed_send", reason: errorMessage, messageId, providerMessageId: null }
     } else {
       await admin
         .from("whatsapp_messages")
@@ -250,6 +305,9 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
         executionStatus: "failed",
         response: { error: errorMessage, retryable },
       })
+
+      SecureLogger.error("[whatsapp] send: failed permanently", { messageId, error: errorMessage })
+      return { success: false, resultStatus: "failed_send", reason: errorMessage, messageId, providerMessageId: null }
     }
   }
 }
