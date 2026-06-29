@@ -9,7 +9,7 @@ import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSu
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { downloadPdf } from "@/lib/pdf/download"
-import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
+import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, MoneyBagIcon, ShoppingCartIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
 import OrderListItem from "@/components/erp/orders/OrderListRow"
 
 type DetailPayload = {
@@ -345,7 +345,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                         <div className="flex flex-col">
                                             {(details.summaryByPaymentMethod || []).map((row) => {
                                                 const lowerLabel = row.label.toLowerCase()
-                                                let Icon = MoreHorizontalIcon
+                                                let Icon = MoneyIcon
                                                 if (lowerLabel.includes("dinheiro")) Icon = MoneyIcon
                                                 if (lowerLabel.includes("cartão") || lowerLabel.includes("cartao")) Icon = CreditCardIcon
                                                 if (lowerLabel.includes("pix")) Icon = QRCodeIcon
@@ -388,14 +388,12 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                             })}
 
                                             {(details.summaryByPaymentMethod || []).length === 0 && (
-                                                <div className="text-center p-8 border border-dashed border-brand-border dark:border-dark-border rounded-2xl">
-                                                    <span className="text-brand-inactive-text text-sm font-medium">Nenhuma venda registrada nesta sessão.</span>
-                                                </div>
+                                                <IconPlaceholder icon={ShoppingCartIcon} title="Nenhuma venda registrada nesta sessão" subtitle="Nenhuma venda foi realizada ainda." />
                                             )}
 
                                             <div className="py-4 flex items-center gap-4 mt-2">
                                                 <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                    <MoreHorizontalIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                    <MoneyBagIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">

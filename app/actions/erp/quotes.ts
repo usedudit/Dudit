@@ -27,6 +27,7 @@ import {
 import { checkLimit, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { withTelemetry } from "@/lib/utils/action-logger"
 import { notifyQuoteEvent } from "@/lib/services/quote-notifications.service"
+import { endOfDay, getTodayYmd } from "@/lib/date"
 
 export type ERPQuoteListCursor = { createdAt: string; id: string }
 
@@ -1351,11 +1352,7 @@ function quoteIsEffectivelyExpired(quote: { status: string; expiration_date: str
     if (!quote.expiration_date) return false
     const finalizedStatuses = ["approved", "rejected", "cancelled", "converted_to_order"]
     if (finalizedStatuses.includes(quote.status)) return false
-    const exp = new Date(`${quote.expiration_date}T12:00:00`)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    exp.setHours(0, 0, 0, 0)
-    return exp < today
+    return quote.expiration_date < getTodayYmd()
 }
 
 function pickPrimaryCustomerAddress(addresses: any[] | undefined | null) {
@@ -2043,7 +2040,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             const finalizedStatuses = ["approved", "rejected", "expired", "cancelled", "converted_to_order"]
             if (
                 quote.expiration_date &&
-                new Date(`${quote.expiration_date}T23:59:59`) < now &&
+                endOfDay(quote.expiration_date) < now &&
                 !finalizedStatuses.includes(quote.status)
             ) {
                 // Transition to expired

@@ -556,13 +556,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         hasDiscount: Number(item.product_price) < Number(item.products?.price || item.product_price),
                         quantity: Number(item.quantity),
                         sortOrder: Number(item.sort_order ?? 0),
-                        image: item.product_variants?.image || item.products?.images?.[0] || item.image || item.product?.image || null,
-                        sku: item.product_variants?.sku || item.sku || item.product?.sku || item.products?.sku || "",
+                        image: item.product_variants?.image || item.products?.images?.[0] || item.image || item.product?.image || item.services?.images?.[0] || null,
+                        sku: item.product_variants?.sku || item.sku || item.product?.sku || item.products?.sku || (item.services ? 'SERVIÇO' : ""),
                         stock: Number(item.product_variants?.stock_available ?? item.product_variants?.stock_quantity ?? item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
-                        allowSellWithoutStock: Boolean(item.products?.allow_sell_without_stock),
+                        allowSellWithoutStock: Boolean(item.products?.allow_sell_without_stock) || !!item.services,
                         unit: item.products?.unit || item.product?.unit || null,
                         isEditing: false,
-                        isManual: !item.product_id
+                        isManual: !item.product_id,
+                        isService: !!item.services || item.sku === 'SERVIÇO' || item.products?.sku === 'SERVIÇO'
                     })))
                 }
 
@@ -777,7 +778,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             allowSellWithoutStock: forceBypass ? true : Boolean(product.allow_sell_without_stock),
             unit: product.unit || null,
             isEditing: false,
-            isManual: false
+            isManual: false,
+            isService: Boolean(product.isService)
         }
         setItems([...items, newItem])
         setFieldErrors(prev => {
@@ -2082,12 +2084,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             </div>
                         )}
                         {globalDiscountType === "coupon" && (
-                            <div className="space-y-2">
-                                <InfoCard
-                                    color="gray"
-                                    title="Cupom de desconto"
-                                    message="Selecione um cupom na lista de cupons cadastrados."
-                                />
+                            <div className="space-y-2 border-t pt-6">
                                 <Button
                                     variant="outline"
                                     className="w-full"

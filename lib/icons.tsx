@@ -135,6 +135,7 @@ import {
     File02Icon as File02Icon01,
     Key01Icon,
     Xls01Icon,
+    MoneyBag02Icon,
 } from "@hugeicons/core-free-icons"
 
 
@@ -286,6 +287,7 @@ export const MarketplaceIcon = CreateIcon(Store01Icon)
 
 export const ShoppingCartIcon = CreateIcon(ShoppingCart01Icon)
 export const ShoppingBagIcon = CreateIcon(ShoppingBag01Icon)
+export const MoneyBagIcon = CreateIcon(MoneyBag02Icon)
 
 export const Package = CreateIcon(DeliveryBox01Icon)
 export const BoxIcon = CreateIcon(DeliveryBox01Icon)

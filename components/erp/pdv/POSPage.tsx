@@ -144,6 +144,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
 
     const [pdvPromotions, setPdvPromotions] = useState<any[]>(initialPromotions || [])
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false)
+    const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false)
 
     // Promotions are now SSR-loaded via initialPromotions prop.
     // No client-side useEffect POST needed.
@@ -567,8 +568,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                     return prev
                 }
 
-                return prev.map((item) => (item.id === found.id ? { 
-                    ...item, 
+                return prev.map((item) => (item.id === found.id ? {
+                    ...item,
                     qty: nextQty,
                     allowSellWithoutStock: forceBypass ? true : Boolean(item.allowSellWithoutStock)
                 } : item))
@@ -576,9 +577,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
         }
 
         if (!force && !product.allow_sell_without_stock && availableStock <= 0) {
-            setPendingZeroStockItem({ 
-                product: { ...product, name: selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name }, 
-                callback: () => addToCart(product, variantId, quantity, true) 
+            setPendingZeroStockItem({
+                product: { ...product, name: selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name },
+                callback: () => addToCart(product, variantId, quantity, true)
             })
             setShowZeroStockAlert(true)
             return
@@ -765,7 +766,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                 const variant = item.variantId ? product?.product_variants?.find((currentVariant) => currentVariant.id === item.variantId) : null
                 const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
 
-                if (product && !product.allow_sell_without_stock && nextQty > availableStock) {
+                if (product && !product.allow_sell_without_stock && !item.allowSellWithoutStock && nextQty > availableStock) {
                     notifyError(`Estoque insuficiente para o item ${item.name}${item.variantName ? ` - ${item.variantName}` : ""}`)
                     return item
                 }
@@ -1036,6 +1037,71 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             isFinalizingRef.current = false
         }
     }
+
+    useEffect(() => {
+        const handleOpenShortcuts = () => {
+            setIsShortcutsModalOpen(true)
+        }
+        window.addEventListener("open-pos-shortcuts", handleOpenShortcuts)
+        return () => window.removeEventListener("open-pos-shortcuts", handleOpenShortcuts)
+    }, [])
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const activeEl = document.activeElement
+            const isInput = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || activeEl instanceof HTMLSelectElement
+            const isSearchInput = activeEl?.getAttribute("placeholder") === "Buscar produtos..."
+
+            if (isInput && !isSearchInput) {
+                if (e.key === "F2") {
+                    e.preventDefault()
+                    const searchInput = document.querySelector('input[placeholder="Buscar produtos..."]') as HTMLInputElement | null
+                    if (searchInput) {
+                        searchInput.focus()
+                        searchInput.select()
+                    }
+                }
+                return
+            }
+
+            switch (e.key) {
+                case "F1":
+                    e.preventDefault()
+                    if (cart.length > 0) {
+                        void saveDraftFromMenu()
+                    }
+                    break
+                case "F2":
+                    e.preventDefault()
+                    const searchInput = document.querySelector('input[placeholder="Buscar produtos..."]') as HTMLInputElement | null
+                    if (searchInput) {
+                        searchInput.focus()
+                        searchInput.select()
+                    }
+                    break
+                case "F4":
+                    e.preventDefault()
+                    setCustomerSelectIntent("default")
+                    setIsSelectCustomerOpen(true)
+                    break
+                case "F5":
+                    e.preventDefault()
+                    setIsSelectSellerOpen(true)
+                    break
+                case "F6":
+                    e.preventDefault()
+                    if (cart.length > 0) {
+                        handleOpenPaymentModal()
+                    }
+                    break
+                default:
+                    break
+            }
+        }
+
+        window.addEventListener("keydown", handleKeyDown)
+        return () => window.removeEventListener("keydown", handleKeyDown)
+    }, [cart, saveDraftFromMenu, handleOpenPaymentModal])
 
     useEffect(() => {
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1548,7 +1614,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                                     onShowGifts={() => setIsGiftModalOpen(true)}
                                     emptyState={
                                         <IconPlaceholder
-                                            icon={SalesIcon}
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/PDV.png"
                                             title="Caixa aberto e pronto para vender"
                                             subtitle="Adicione itens ao pedido para ver o resumo, aplicar descontos e continuar o atendimento."
                                             containerSize="h-20 w-20"
@@ -1915,12 +1982,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                                 </div>
                             )}
                             {globalDiscountType === "coupon" && (
-                                <div className="space-y-2">
-                                    <InfoCard
-                                        color="gray"
-                                        title="Cupom de desconto"
-                                        message="Selecione um cupom na lista de cupons cadastrados."
-                                    />
+                                <div className="space-y-2 border-t pt-6">
                                     <Button
                                         variant="outline"
                                         className="w-full"
@@ -2192,6 +2254,56 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                         onClose={() => setIsCameraOpen(false)}
                         onScan={handleScanBarcode}
                     />
+
+                    <DefaultModal
+                        isOpen={isShortcutsModalOpen}
+                        onClose={() => setIsShortcutsModalOpen(false)}
+                        title="Atalhos e Ajuda do PDV"
+                        footer={
+                            <div className="flex w-full items-center">
+                                <Button className="flex-1" onClick={() => setIsShortcutsModalOpen(false)}>
+                                    Entendido
+                                </Button>
+                            </div>
+                        }
+                    >
+                        <div className="space-y-6 pt-2">
+                            <div>
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3 uppercase tracking-wider">Teclas de Atalho</h4>
+                                <div className="grid grid-cols-1 gap-3">
+                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Salvar pedido (Pré-venda)</span>
+                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F1</kbd>
+                                    </div>
+                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Focar no campo de busca</span>
+                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F2</kbd>
+                                    </div>
+                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Selecionar Cliente</span>
+                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F4</kbd>
+                                    </div>
+                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Selecionar Vendedor</span>
+                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F5</kbd>
+                                    </div>
+                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Finalizar Venda (Pagamento)</span>
+                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F6</kbd>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3 uppercase tracking-wider">Dicas do PDV</h4>
+                                <ul className="space-y-2 text-sm text-brand-inactive-text dark:text-dark-body list-disc pl-4">
+                                    <li>Use <span className="font-semibold text-brand-dark dark:text-dark-heading">F2</span> a qualquer momento para voltar o cursor ao campo de pesquisa de produtos.</li>
+                                    <li>Conecte um leitor de código de barras físico. Se precisar travar o foco no leitor para bipar em sequência, clique no cadeado ao lado da busca.</li>
+                                    <li>Campanhas e brindes ativos são validados automaticamente conforme o valor e os produtos adicionados à sacola.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </DefaultModal>
                 </FadeIn>
             )}
         </AnimatePresence>

@@ -650,6 +650,11 @@ export default function OrdersPage({
         return cancellableOrdersSelection.every((order) => order.situation === "paid" || order.situation === "partially_paid" || order.paidAmount > 0.009)
     }, [cancellableOrdersSelection])
 
+    const shouldShowRestoreStockCheckbox = useMemo(() => {
+        if (cancellableOrdersSelection.length === 0) return false
+        return cancellableOrdersSelection.some((order) => order.items_count > 0)
+    }, [cancellableOrdersSelection])
+
     const selectedOrdersForBulkActions = useMemo(() => {
         const selectedIds = selection.ids
         if (selectedIds.size === 0) return [] as Order[]
@@ -737,7 +742,7 @@ export default function OrdersPage({
                 partnerId,
                 actionType: 'cancel',
                 cancelReason: cancelReason.trim() || undefined,
-                restoreStock: restoreStockOnCancel,
+                restoreStock: shouldShowRestoreStockCheckbox ? restoreStockOnCancel : false,
                 generateAutomaticRefund: shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false,
                 userName: currentUserName
             })
@@ -1180,10 +1185,12 @@ export default function OrdersPage({
                                 onChange={(e) => setCancelReason(e.target.value)}
                                 maxLength={120}
                             />
-                            <label className="flex items-center gap-3 py-2 cursor-pointer">
-                                <Checkbox checked={restoreStockOnCancel} onChange={(checked) => setRestoreStockOnCancel(Boolean(checked))} />
-                                <span className="text-sm text-brand-dark dark:text-dark-heading">Restaurar estoque dos itens</span>
-                            </label>
+                            {shouldShowRestoreStockCheckbox && (
+                                <label className="flex items-center gap-3 py-2 cursor-pointer">
+                                    <Checkbox checked={restoreStockOnCancel} onChange={(checked) => setRestoreStockOnCancel(Boolean(checked))} />
+                                    <span className="text-sm text-brand-dark dark:text-dark-heading">Restaurar estoque dos itens</span>
+                                </label>
+                            )}
                             {shouldShowAutomaticRefundCheckbox && (
                                 <label className="flex items-center gap-3 py-2 cursor-pointer">
                                     <Checkbox checked={generateAutomaticRefundOnCancel} onChange={(checked) => setGenerateAutomaticRefundOnCancel(Boolean(checked))} />

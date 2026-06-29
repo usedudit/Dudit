@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { ShoppingCartIcon, TruckIcon, ReturnIcon, MoneyIcon, CancelCircleIcon } from "@/lib/icons"
+import { PaymentMethodIndicator } from "../transactions/PaymentMethodIndicator"
 
 interface OrderGridCardProps {
     order: any
@@ -125,9 +126,19 @@ const OrderGridCard = React.memo(
 
                         {/* Row 2: Stats (Items • Total) */}
                         <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                {order.items_count} {order.items_count === 1 ? 'item' : 'itens'}
-                            </span>
+                            <div className="flex items-center">
+                                {(() => {
+                                    const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+                                    let pmLabel = order.payment_method || null
+                                    if (breakdown.length > 0) {
+                                        const methods = [...new Set(breakdown.map((b: any) => b.method).filter(Boolean))]
+                                        if (methods.length > 0) {
+                                            pmLabel = methods.join(", ")
+                                        }
+                                    }
+                                    return <PaymentMethodIndicator label={pmLabel} />
+                                })()}
+                            </div>
                             <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                             <span className="text-sm font-bold text-brand-primary">
                                 {formatCurrency(order.total_amount)}

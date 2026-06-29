@@ -1841,26 +1841,22 @@ const PaymentModal = ({
                                         <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("w-full h-full flex flex-col items-center px-2", isSinglePricingBusy && "opacity-60")}>
                                             {isMarketplaceOrder && (
                                                 <div className="w-full max-w-sm mb-4">
-                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o  método de pagamento." />
                                                 </div>
                                             )}
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="w-full max-w-sm space-y-3">
-                                                <div className="rounded-[28px] bg-white px-4 pt-2 pb-4 dark:bg-dark-surface">
+                                                <div className="min-w-0 flex-1">
                                                     <PaymentAmountLabel
-                                                        label="Valor recebido (dinheiro)"
+                                                        label="Valor a receber"
                                                         calculation={paymentCalculation}
                                                         baseAllocated={calcBaseAmount}
                                                     />
-                                                    <div className="flex justify-center mt-2">
-                                                        <MoneyInput
-                                                            value={paymentBaseAmount}
-                                                            onChange={handleMoneyInputSync}
-                                                            className="text-center text-[42px] font-black tracking-tight text-brand-dark dark:text-dark-heading border-none bg-transparent h-auto py-0 focus:ring-0 focus:border-none shadow-none"
-                                                            prefix=""
-                                                            autoFocus
-                                                        />
-                                                    </div>
+                                                    <MoneyInput
+                                                        value={paymentBaseAmount}
+                                                        onChange={handleMoneyInputSync}
+                                                        className="font-bold text-lg"
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="flex flex-wrap justify-center gap-3 mb-6 mt-4 w-full px-2">
@@ -2156,7 +2152,6 @@ const PaymentModal = ({
 
                                     {view === 'method_type_select' && (
                                         <motion.div key="method_type_select" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full">
-                                            <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione um método</h3>
                                             <div className="grid grid-cols-2 gap-4">
                                                 {activeMethods
                                                     .filter((method: any) => normalizeMethodType(method.type) === selectedMethodType)

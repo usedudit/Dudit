@@ -1,4 +1,4 @@
-import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
+import { getDateComponents, getDefaultTimezone } from "@/lib/date"
 
 export type OpeningHoursData = {
   [day in string]?: {
@@ -63,13 +63,15 @@ export function parseTimeToMinutes(timeStr: string): number {
  */
 export function getOpeningStatus(
   openingHours: OpeningHoursData | null | undefined,
-  nowDate: Date = new Date()
+  nowDate: Date = new Date(),
+  tz?: string,
 ): string {
   if (!openingHours || typeof openingHours !== "object") {
     return "Informações de horário não disponíveis";
   }
 
-  const { dayOfWeek: currentDayIndex, hour, minute } = getSaoPauloDateComponents(nowDate)
+  const resolvedTz = tz || getDefaultTimezone()
+  const { dayOfWeek: currentDayIndex, hour, minute } = getDateComponents(nowDate, resolvedTz)
   const currentMinutes = hour * 60 + minute
 
   // Verifica horários válidos hoje

@@ -11,6 +11,7 @@ import { NotificationProvider } from "@/hooks/use-notification"
 import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigation"
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
+import { TimezoneProvider } from "@/lib/date"
 
 export const viewport: Viewport = {
     themeColor: "#003229",
@@ -225,7 +226,9 @@ export default async function RootLayout({
                         <NotificationProvider>
                             <FavoritesProvider>
                                 <TransitionProvider>
-                                    {children}
+                                    <TimezoneProvider>
+                                        {children}
+                                    </TimezoneProvider>
                                 </TransitionProvider>
                             </FavoritesProvider>
                         </NotificationProvider>

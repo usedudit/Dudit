@@ -15,6 +15,7 @@ import {
     diffCalendarDaysInSaoPaulo,
 } from "@/lib/utils/formatters"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { startOfDay } from "@/lib/date"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -899,7 +900,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const transferGroupId = crypto.randomUUID()
         const idempotencyKey = crypto.randomUUID()
         const datePart = (input.transactionDate || new Date().toISOString()).slice(0, 10)
-        const transactionTs = new Date(`${datePart}T12:00:00`).toISOString()
+        const transactionTs = startOfDay(datePart).toISOString()
         const status = input.status || "paid"
         const baseDesc = (input.description && input.description.trim()) || "Transferência entre contas"
 
@@ -1310,7 +1311,7 @@ export async function createInstallmentGroupAction(input: {
         if (!(totalAmount > 0)) throw new Error("Valor total deve ser maior que zero.")
 
         const interval = Math.max(1, Math.floor(Number(input.interval) || 1))
-        const startDate = new Date(`${input.startDate}T12:00:00`)
+        const startDate = startOfDay(input.startDate)
         if (Number.isNaN(startDate.getTime())) throw new Error("Data inicial inválida.")
 
         const eachAmount = Math.round((totalAmount / count) * 100) / 100
@@ -1952,7 +1953,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
         if (recErr || !rec) throw new Error("Recorrência não encontrada.")
 
         const dueDateValue = input.occurrenceDate
-        const transactionTs = new Date(`${dueDateValue}T12:00:00`).toISOString()
+        const transactionTs = startOfDay(dueDateValue).toISOString()
 
         // Idempotent check: if already paid for this date, return existing
         const { data: existing } = await supabase
@@ -2187,7 +2188,7 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
         }
 
         const datePart = (input.transactionDateYmd || new Date().toISOString().slice(0, 10)).slice(0, 10)
-        const transactionTs = new Date(`${datePart}T12:00:00`).toISOString()
+        const transactionTs = startOfDay(datePart).toISOString()
         const desc = (input.description && input.description.trim()) || `Ajuste de saldo - ${acc.name}`
 
         const res = await createManualTransactionAction({

@@ -161,19 +161,27 @@ export default function CouponDetailPage({
                                                 <div className="space-y-3 text-sm">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Produtos</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.products.length}</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {coupon.apply_scope === "all" ? "Todos" : coupon.apply_scope === "products" ? relations.products.length : 0}
+                                                        </span>
                                                     </div>
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Serviços</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.services.length}</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {coupon.apply_scope === "all" ? "Todos" : coupon.apply_scope === "services" ? relations.services.length : 0}
+                                                        </span>
                                                     </div>
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Categorias</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.categories.length}</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {coupon.apply_scope === "all" ? "Todas" : coupon.apply_scope === "categories" ? relations.categories.length : 0}
+                                                        </span>
                                                     </div>
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Clientes</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.customers.length}</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {coupon.customer_scope === "all" ? "Todos" : relations.customers.length}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </SidebarCard>
@@ -191,19 +199,19 @@ export default function CouponDetailPage({
                                             ) : (
                                                 <div className="space-y-8">
                                                     <FormSection title="Categorias vinculadas">
-                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.categories.length > 0 ? relations.categories.map((item) => item.name).join(", ") : "Nenhuma categoria específica vinculada."}</p>
+                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.categories.length > 0 ? relations.categories.map((item) => item.name).join(", ") : "Este cupom vale para todas as categorias."}</p>
                                                     </FormSection>
 
                                                     <FormSection hasSeparator title="Produtos vinculados">
-                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.products.length > 0 ? relations.products.map((item) => item.name).join(", ") : "Nenhum produto específico vinculado."}</p>
+                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.products.length > 0 ? relations.products.map((item) => item.name).join(", ") : "Este cupom vale para todos os produtos."}</p>
                                                     </FormSection>
 
                                                     <FormSection hasSeparator title="Serviços vinculados">
-                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.services.length > 0 ? relations.services.map((item) => item.name).join(", ") : "Nenhum serviço específico vinculado."}</p>
+                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.services.length > 0 ? relations.services.map((item) => item.name).join(", ") : "Este cupom vale para todos os serviços."}</p>
                                                     </FormSection>
 
                                                     <FormSection hasSeparator title="Clientes vinculados">
-                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.customers.length > 0 ? relations.customers.map((item) => item.name).join(", ") : "O cupom vale para toda a base de clientes."}</p>
+                                                        <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.customers.length > 0 ? relations.customers.map((item) => item.name).join(", ") : "Este cupom vale para todos os clientes."}</p>
                                                     </FormSection>
                                                 </div>
                                             )}

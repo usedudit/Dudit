@@ -4,6 +4,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { cache } from "react"
 import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
+import { startOfDay } from "@/lib/date"
 
 // ─── Constants (mirrored from ERP appointments.ts) ─────────────────────────
 const DEFAULT_BUSINESS_HOURS = { startHour: 8, startMinute: 0, endHour: 19, endMinute: 0 }
@@ -391,7 +392,7 @@ export async function createPublicAppointment(data: {
           amount: data.price,
           due_date: data.date,
           payment_date: null,
-          transaction_date: `${data.date}T12:00:00.000Z`,
+          transaction_date: startOfDay(data.date).toISOString(),
           status: "pending",
           notes: null,
           payment_type: "Agendamento",

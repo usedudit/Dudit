@@ -7,6 +7,7 @@ import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { increment_usage_counter } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { getDateComponents, getDefaultTimezone, startOfDay } from "@/lib/date"
 
 export type ClaimedRecurringExecution = {
   executionId: string
@@ -42,14 +43,12 @@ function addMinutesToTime(time: string, minutes: number): string {
   return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}:00`
 }
 
-function scheduledDateParts(iso: string): { date: string; time: string } {
-  const d = new Date(iso)
-  const y = d.getFullYear()
-  const mo = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  const h = String(d.getHours()).padStart(2, "0")
-  const mi = String(d.getMinutes()).padStart(2, "0")
-  return { date: `${y}-${mo}-${day}`, time: `${h}:${mi}:00` }
+function scheduledDateParts(iso: string, tz?: string): { date: string; time: string } {
+  const { year, month, day, hour, minute } = getDateComponents(iso, tz || getDefaultTimezone())
+  return {
+    date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`,
+  }
 }
 
 async function syncAppointmentReceivable(params: {
@@ -88,7 +87,7 @@ async function syncAppointmentReceivable(params: {
       amount: price,
       due_date: params.appointment.start_date,
       payment_date: null,
-      transaction_date: `${params.appointment.start_date}T12:00:00.000Z`,
+      transaction_date: startOfDay(String(params.appointment.start_date), getDefaultTimezone()).toISOString(),
       status: "pending",
       payment_type: "Agendamento",
       original_amount: price,

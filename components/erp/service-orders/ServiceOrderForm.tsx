@@ -3,7 +3,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import {
     Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge, IconPlaceholder,
-    FormDropdown, TimePicker, MoneyInput, PercentageInput, ListItem, RadioButton, InfoCard, DefaultModal, HourInput, FormTextarea
+    FormDropdown, TimePicker, MoneyInput, PercentageInput, ListItem, RadioButton, InfoCard, DefaultModal, HourInput, FormTextarea,
+    Tooltip
 } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import Pagination from "@/components/reusable/Pagination"
@@ -237,7 +238,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     const [selectedProductForVariant, setSelectedProductForVariant] = useState<any>(null)
     const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false)
     const [activePromotions, setActivePromotions] = useState<any[]>([])
-    
+
     // Zero-stock confirm modal states
     const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: any; isVariant?: boolean; force?: boolean; callback?: () => void } | null>(null)
     const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
@@ -693,7 +694,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         setServices((prev) => {
             if (prev.some((s) => (s.service_id || s.id) === svc.id)) return prev
             setServicesPage(1)
-            
+
             const pricing = computeItemDisplayPrice(
                 Number(svc.price || 0),
                 svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null,
@@ -773,7 +774,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 const add = (forceBypass?: boolean) => {
                     setProducts(prev => {
                         if (prev.some(p => p.product_id === selectedProductForVariant.id && p.variant_id === variant.id)) return prev
-                        
+
                         const pricing = computeItemDisplayPrice(
                             Number(variant.price || 0),
                             null,
@@ -798,10 +799,10 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 }
 
                 if (cannotSell) {
-                    setPendingZeroStockItem({ 
-                        product: { ...selectedProductForVariant, name: `${selectedProductForVariant.name} - ${variant.name}` }, 
+                    setPendingZeroStockItem({
+                        product: { ...selectedProductForVariant, name: `${selectedProductForVariant.name} - ${variant.name}` },
                         isVariant: true,
-                        callback: () => add(true) 
+                        callback: () => add(true)
                     })
                     setShowZeroStockAlert(true)
                 } else {
@@ -1226,7 +1227,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{svc.name}</div>
                                                                     </div>
                                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, activePromotions, { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
+                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, activePromotions, { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
                                                                     </div>
                                                                 </div>
                                                             ))
@@ -1534,7 +1535,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                         <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{prod.sku}</div>
                                                                     </div>
                                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), null, [], { productId: prod.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
+                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), null, [], { productId: prod.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
                                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                             {prod.stock} em estoque
                                                                         </div>
@@ -1636,12 +1637,13 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     size="md"
                                                                                 />
                                                                                 {!prod.isManual && Number(prod.stock || 0) <= 0 && (
-                                                                                    <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                                    <Tooltip text="Produto sem estoque disponível no momento">
                                                                                         <Badge
                                                                                             variant="orange"
                                                                                             icon={<Package size={14} />}
+                                                                                            className="shrink-0"
                                                                                         />
-                                                                                    </span>
+                                                                                    </Tooltip>
                                                                                 )}
                                                                             </div>
                                                                         </td>
@@ -1737,12 +1739,13 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     size="sm"
                                                                                 />
                                                                                 {!prod.isManual && Number(prod.stock || 0) <= 0 && (
-                                                                                    <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                                    <Tooltip text="Produto sem estoque disponível no momento">
                                                                                         <Badge
                                                                                             variant="orange"
                                                                                             icon={<Package size={12} />}
+                                                                                            className="shrink-0"
                                                                                         />
-                                                                                    </span>
+                                                                                    </Tooltip>
                                                                                 )}
                                                                             </div>
                                                                             <div className="flex-1 max-w-[140px]">
@@ -2050,12 +2053,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                         </div>
                     )}
                     {globalDiscountType === "coupon" && (
-                        <div className="space-y-2">
-                            <InfoCard
-                                color="gray"
-                                title="Cupom de desconto"
-                                message="Selecione um cupom na lista de cupons cadastrados."
-                            />
+                        <div className="space-y-2 border-t pt-6">
                             <Button
                                 variant="outline"
                                 className="w-full"

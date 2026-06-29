@@ -12,6 +12,7 @@ import {
     ListItem,
     FormSection,
     Badge,
+    Tooltip,
 } from "@/components/reusable"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import {
@@ -435,12 +436,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                     size="md"
                                                                 />
                                                                 {!item.isService && Number(item.stock || 0) <= 0 && (
-                                                                    <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                    <Tooltip text="Produto sem estoque disponível no momento">
                                                                         <Badge
                                                                             variant="orange"
                                                                             icon={<Package size={14} />}
+                                                                            className="shrink-0"
                                                                         />
-                                                                    </span>
+                                                                    </Tooltip>
                                                                 )}
                                                             </div>
                                                         </td>
@@ -583,12 +585,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 size="sm"
                                                             />
                                                             {!item.isService && Number(item.stock || 0) <= 0 && (
-                                                                <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                <Tooltip text="Produto sem estoque disponível no momento">
                                                                     <Badge
                                                                         variant="orange"
                                                                         icon={<Package size={12} />}
+                                                                        className="shrink-0"
                                                                     />
-                                                                </span>
+                                                                </Tooltip>
                                                             )}
                                                         </div>
                                                         <div className="flex-1 max-w-[140px]">
@@ -1200,12 +1203,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 size="sm"
                                                             />
                                                             {!item.isService && Number(item.stock || 0) <= 0 && (
-                                                                <span title="Produto sem estoque disponível no momento" className="cursor-help shrink-0">
+                                                                <Tooltip text="Produto sem estoque disponível no momento">
                                                                     <Badge
                                                                         variant="orange"
                                                                         icon={<Package size={12} />}
+                                                                        className="shrink-0"
                                                                     />
-                                                                </span>
+                                                                </Tooltip>
                                                             )}
                                                         </div>
                                                         <div className="flex-1 max-w-[140px]">

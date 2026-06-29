@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
+import { getDateComponents } from "@/lib/date"
 import type { Period } from "@/lib/period-types"
 
 function getDateRangeForPeriod(period: Period, todayOverride?: string) {
@@ -307,7 +308,8 @@ async function getCachedProducts(partnerId: string): Promise<ProductsDashboardDa
       for (const p of productRows) category.set(p.category || "Sem categoria", (category.get(p.category || "Sem categoria") || 0) + 1)
       const hours = new Map<string, number>()
       for (const order of orderRows) {
-        const h = new Date(order.created_at).getHours().toString().padStart(2, "0")
+        const { hour } = getDateComponents(order.created_at)
+        const h = String(hour).padStart(2, "0")
         hours.set(`${h}h`, (hours.get(`${h}h`) || 0) + 1)
       }
 

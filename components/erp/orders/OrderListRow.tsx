@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon, ReturnIcon, MoneyIcon, TruckIcon } from "@/lib/icons"
+import { PaymentMethodIndicator } from "../transactions/PaymentMethodIndicator"
 
 interface ColumnDef {
     id: string
@@ -98,9 +99,19 @@ const OrderListItem = React.memo(
                                         </Tooltip>
                                     )}
                                 </div>
-                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                    {order.secondaryLine || `${order.items_count} ${order.items_count === 1 ? 'item' : 'itens'}`}
-                                </span>
+                                <div className="mt-1 flex items-center">
+                                    {(() => {
+                                        const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+                                        let pmLabel = order.payment_method || null
+                                        if (breakdown.length > 0) {
+                                            const methods = [...new Set(breakdown.map((b: any) => b.method).filter(Boolean))]
+                                            if (methods.length > 0) {
+                                                pmLabel = methods.join(", ")
+                                            }
+                                        }
+                                        return <PaymentMethodIndicator label={pmLabel} />
+                                    })()}
+                                </div>
                             </div>
                         </div>
                     )

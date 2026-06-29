@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { createManualTransactionAction } from "@/app/actions/erp/transactions"
+import { startOfDay } from "@/lib/date"
 
 import { 
   type FinanceAccountType, 
@@ -200,7 +201,7 @@ export async function createFinanceAccountAction(data: {
 
     if (Math.abs(targetCurrent) >= 0.005) {
       const today = new Date().toISOString().slice(0, 10)
-      const transactionTs = new Date(`${today}T12:00:00`).toISOString()
+      const transactionTs = startOfDay(today).toISOString()
       const adj = await createManualTransactionAction({
         partnerId: data.partnerId,
         transactionType: "adjustment",

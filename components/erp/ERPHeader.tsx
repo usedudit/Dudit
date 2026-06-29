@@ -177,11 +177,12 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const isSettingsSubTab = searchParams.has("tab") && !["empresa", "vendas", "adicionais"].includes(searchParams.get("tab") || "")
     const isQueryOrTabInnerPage = hasEntityParam || isSettingsSubTab
 
+    const isPDV = pathname === "/erp/pdv"
     const displayTitle = headerOverride?.title || pageTitle || "Painel"
     const displayBackHref = headerOverride?.backHref || backHref
     const displayOnBack = headerOverride?.onBack || onBack
     const displayIsSubPage = headerOverride?.isSubPage || isSubPage
-    const showBackButton = !!(displayBackHref || displayOnBack || displayIsSubPage || isAutoInnerPage || isQueryOrTabInnerPage)
+    const showBackButton = isPDV || !!(displayBackHref || displayOnBack || displayIsSubPage || isAutoInnerPage || isQueryOrTabInnerPage)
 
     return (
         <header className="sticky top-0 bg-brand-page-bg dark:bg-dark-background z-30 border-b border-brand-border dark:border-dark-border">
@@ -192,7 +193,9 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             <button
                                 className="text-brand-dark dark:text-dark-heading md:hidden"
                                 onClick={() => {
-                                    if (displayOnBack) {
+                                    if (isPDV) {
+                                        router.push("/erp/inicio")
+                                    } else if (displayOnBack) {
                                         displayOnBack()
                                     } else if (displayBackHref) {
                                         router.push(displayBackHref)
@@ -247,6 +250,20 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 {displayTitle}
                             </h1>
 
+                            {isPDV && (
+                                <>
+                                    <div className="h-4 w-px bg-brand-border dark:bg-dark-border mx-1" />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => router.push("/erp/inicio")}
+                                        className="h-8 py-1 px-4 text-xs font-semibold"
+                                    >
+                                        Voltar
+                                    </Button>
+                                </>
+                            )}
+
                         </div>
                         {/* ------------------------------------ */}
                     </div>
@@ -259,6 +276,15 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     </div>
 
                     <div className="flex items-center gap-3">
+                        {isPDV && (
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-pos-shortcuts'))}
+                                className="flex h-9 w-9 items-center justify-center rounded-full border border-brand-border bg-white text-brand-dark hover:bg-brand-gray dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border transition-colors cursor-pointer shrink-0"
+                                title="Atalhos e Ajuda"
+                            >
+                                <HelpCircleIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            </button>
+                        )}
                         <NotificationBell variant="erp" />
 
                         <div className="h-6 w-px bg-brand-border dark:border-dark-border" />

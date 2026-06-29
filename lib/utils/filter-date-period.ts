@@ -8,13 +8,10 @@ export type DatePeriodFilterValue = {
 
 export const EMPTY_DATE_PERIOD: DatePeriodFilterValue = { presets: [], from: "", to: "" }
 
-export function getBrazilTodayYmd(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date())
+import { getTodayYmd, msToYmd } from "@/lib/date"
+
+export function getBrazilTodayYmd(tz?: string): string {
+  return getTodayYmd(tz)
 }
 
 /** Adiciona dias civis a uma data YYYY-MM-DD (calendário gregoriano). */
@@ -69,13 +66,8 @@ export function ymdInBounds(ymd: string | null | undefined, startYmd: string | n
   return true
 }
 
-export function msToBrazilYmd(ms: number): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(ms))
+export function msToBrazilYmd(ms: number, tz?: string): string {
+  return msToYmd(ms, tz)
 }
 
 /** Converte YYYY-MM-DD (valor interno do filtro) para DD-MM-YYYY na UI. */

@@ -1,12 +1,13 @@
-import { getSaoPauloDateComponents } from "./formatters"
+import { getDateComponents, getDefaultTimezone } from "@/lib/date"
 
-export function getDaysUntilBirthday(birthDateStr: string | null | undefined): number | null {
+export function getDaysUntilBirthday(birthDateStr: string | null | undefined, tz?: string): number | null {
   if (!birthDateStr) return null
   const ymd = birthDateStr.slice(0, 10)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null
 
   const [, bMonth, bDay] = ymd.split("-").map(Number)
-  const { year: curYear, month: curMonth, day: curDay } = getSaoPauloDateComponents(new Date())
+  const resolvedTz = tz || getDefaultTimezone()
+  const { year: curYear, month: curMonth, day: curDay } = getDateComponents(new Date(), resolvedTz)
 
   // Create date for birthday in the current year
   const bDayThisYear = new Date(Date.UTC(curYear, bMonth - 1, bDay, 12, 0, 0))
@@ -30,8 +31,8 @@ export interface BirthdayInfo {
   daysUntil: number
 }
 
-export function checkBirthday(birthDateStr: string | null | undefined): BirthdayInfo | null {
-  const daysUntil = getDaysUntilBirthday(birthDateStr)
+export function checkBirthday(birthDateStr: string | null | undefined, tz?: string): BirthdayInfo | null {
+  const daysUntil = getDaysUntilBirthday(birthDateStr, tz)
   if (daysUntil === null) return null
 
   return {

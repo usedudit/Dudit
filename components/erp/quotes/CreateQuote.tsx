@@ -448,7 +448,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         const variants = product.variants || [];
 
         if (variants.length === 0) {
-            if (!product.isService && Number(product.stock || 0) < 1) {
+            if (!product.isService && !product.allow_sell_without_stock && Number(product.stock || 0) < 1) {
                 setPendingZeroStockItem({ product, callback: () => proceedAddProduct(product, true) })
                 setShowZeroStockAlert(true)
                 return;
@@ -584,7 +584,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     });
                 };
 
-                if (sel.qty > Number(v.stock ?? 0)) {
+                if (!productToSelectVariant.allow_sell_without_stock && sel.qty > Number(v.stock ?? 0)) {
                     setPendingZeroStockItem({
                         product: { ...productToSelectVariant, name: `${productToSelectVariant.name} - ${v.name}` },
                         isVariant: true,

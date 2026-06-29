@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
+import { startOfDay, getDefaultTimezone } from "@/lib/date"
 
 export type SyncAppointmentReceivableParams = {
   supabase: SupabaseClient
@@ -73,7 +74,7 @@ export async function syncAppointmentReceivable(
         amount: remaining,
         due_date: startDate,
         payment_date: paidAmount > 0.009 ? new Date().toISOString().slice(0, 10) : null,
-        transaction_date: `${startDate}T12:00:00.000Z`,
+        transaction_date: startOfDay(startDate, getDefaultTimezone()).toISOString(),
         status: "pending",
         payment_type: paymentMethod || "Agendamento",
         original_amount: remaining,
@@ -110,7 +111,7 @@ export async function syncAppointmentReceivable(
           amount: paidAmount,
           due_date: startDate,
           payment_date: new Date().toISOString().slice(0, 10),
-          transaction_date: `${startDate}T12:00:00.000Z`,
+          transaction_date: startOfDay(startDate, getDefaultTimezone()).toISOString(),
           status: "paid",
           payment_type: paymentMethod || "Agendamento",
           original_amount: paidAmount,

@@ -3,6 +3,7 @@ import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { buildNotificationContent } from "@/lib/notifications/templates"
 import type { NotificationType } from "@/lib/notifications/types"
+import { parseInTz, getDefaultTimezone } from "@/lib/date"
 import {
   buildIdempotencyKey,
   createNotification,
@@ -103,8 +104,9 @@ export async function scheduleNotificationAppointmentReminders(params: {
   marketplaceOrderId?: string | null
   serviceName?: string
   storeName?: string
+  timezone?: string
 }) {
-  const start = new Date(`${params.startDate}T${params.startTime}`)
+  const start = parseInTz(params.startDate, params.startTime, params.timezone || getDefaultTimezone())
   if (Number.isNaN(start.getTime())) return
 
   const reminder24h = new Date(start.getTime() - 24 * 60 * 60 * 1000)

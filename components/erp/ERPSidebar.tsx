@@ -227,6 +227,9 @@ function ErpPlanGatedNavItem({
 
 export function ERPSidebar() {
     const pathname = usePathname()
+    if (pathname === "/erp/pdv") {
+        return null
+    }
     const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen } = useSidebar()
     const isCollapsed = !isExpanded
     const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug } = usePermissions()

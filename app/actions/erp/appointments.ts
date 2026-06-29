@@ -11,6 +11,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { applyServiceOrderToGoals } from "@/lib/services/sales-goals.service"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
+import { startOfDay } from "@/lib/date"
 import { getAdminTimeline } from "@/lib/services/timeline.service"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { reserveOrderInventory, releaseOrderInventory, finalizeOrderInventory } from "@/lib/stock/reservations"
@@ -423,7 +424,7 @@ export async function syncAppointmentReceivable(params: {
           status: "pending",
           due_date: params.appointment.start_date,
           payment_date: null,
-          transaction_date: `${params.appointment.start_date}T12:00:00.000Z`,
+          transaction_date: startOfDay(params.appointment.start_date).toISOString(),
           payment_type: paymentMethod || "Agendamento",
           payment_method_id: paymentMethodId || null,
         })

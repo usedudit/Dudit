@@ -258,6 +258,55 @@ export function ProductDetailsPageClient({
         })
     }, [activePromotions, product.id, product.category_id])
 
+    const activeGiftPromo = useMemo(() => {
+        return activePromotions.find((promo) => {
+            if (promo.promotionType !== "gift") return false
+            if (promo.applyScope === "entire_cart") return true
+            if (promo.applyScope === "specific_products" && promo.applicableProductIds?.includes(product.id)) return true
+            if (promo.applyScope === "category" && product.category_id && promo.applicableCategoryIds?.includes(product.category_id)) return true
+            return false
+        })
+    }, [activePromotions, product.id, product.category_id])
+
+    const [giftDetails, setGiftDetails] = useState<{ name: string; image_url: string | null; isProduct: boolean } | null>(null)
+
+    useEffect(() => {
+        if (!activeGiftPromo) {
+            setGiftDetails(null)
+            return
+        }
+
+        const fetchGift = async () => {
+            try {
+                if (activeGiftPromo.giftProductId) {
+                    const { data, error } = await supabase
+                        .from("products")
+                        .select("name, image_url, images")
+                        .eq("id", activeGiftPromo.giftProductId)
+                        .single()
+                    if (data && !error) {
+                        const img = data.image_url || (data.images && data.images[0]) || null
+                        setGiftDetails({ name: data.name, image_url: img, isProduct: true })
+                    }
+                } else if (activeGiftPromo.giftServiceId) {
+                    const { data, error } = await supabase
+                        .from("services")
+                        .select("name, images")
+                        .eq("id", activeGiftPromo.giftServiceId)
+                        .single()
+                    if (data && !error) {
+                        const img = (data.images && data.images[0]) || null
+                        setGiftDetails({ name: data.name, image_url: img, isProduct: false })
+                    }
+                }
+            } catch (e) {
+                console.error("Error loading gift details:", e)
+            }
+        }
+
+        fetchGift()
+    }, [activeGiftPromo, supabase])
+
     // Load user addresses if logged in
     useEffect(() => {
         if (userId) {
@@ -993,7 +1042,7 @@ export function ProductDetailsPageClient({
                 {product.name}
             </h1>
 
-            {showPrice && activePromo && (
+            {showPrice && activePromo && !pricing.hasCampaignDiscount && (
                 <div className="mb-6 flex">
                     <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
                         {activePromo.name}
@@ -1015,48 +1064,59 @@ export function ProductDetailsPageClient({
                     const hasPix = pricing.pixDiscountPercent > 0;
                     const displayPrice = pricing.bestPrice;
                     const pixUnitPrice = displayPrice * (1 - pricing.pixDiscountPercent / 100);
-                    // Caso: Campanha + Pix
-                    if (hasCampaign && hasPix) {
-                        return (
-                            <div className="space-y-1">
-                                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
-                                <Badge variant="blue" className="ml-2">
-                                    <TagIcon size={12} />
-                                    {pricing.campaignDiscountLabel} OFF
-                                </Badge>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
-                                        {formatMoney(pixUnitPrice)}
-                                    </p>
-                                    <span className="text-sm font-semibold text-brand-green">no Pix</span>
-                                </div>
-                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                                    ou {formatMoney(displayPrice)} em outros meios
-                                </p>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 block text-left px-0 py-0">
-                                    Ver opções de pagamento
-                                </Button>
-                            </div>
-                        );
-                    }
 
-                    // Caso: Só campanha (sem Pix)
-                    if (hasCampaign && !hasPix) {
+                    // Caso: Campanha (com ou sem Pix) usando o novo design de banner
+                    if (hasCampaign) {
+                        const discountBadge = (
+                            <span className="bg-[#ffe082] text-[#e65100] dark:bg-[#e65100]/20 dark:text-[#ffb74d] text-xs font-bold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">
+                                {pricing.campaignDiscountLabel} OFF
+                            </span>
+                        );
+
                         return (
-                            <div className="space-y-1">
-                                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
-                                <Badge variant="blue" className="ml-2">
-                                    <TagIcon size={12} />
-                                    {pricing.campaignDiscountLabel} OFF
-                                </Badge>
-                                <div className="flex items-center gap-2">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark">
-                                        {formatMoney(displayPrice)}
-                                    </p>
+                            <div className="rounded-xl overflow-hidden border border-brand-orange/20 shadow-sm mb-6">
+                                {/* Banner de Campanha */}
+                                <div className="bg-brand-orange text-white px-4 py-2.5 flex justify-between items-center select-none font-extrabold italic uppercase tracking-wider text-xs md:text-sm">
+                                    <span>{activePromo?.name || "Oferta de Campanha"}</span>
+                                    <span>{pricing.campaignDiscountLabel} OFF</span>
                                 </div>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
-                                    Ver opções de pagamento
-                                </Button>
+
+                                {/* Bloco de Preço */}
+                                <div className="bg-brand-orange-light/10 dark:bg-brand-orange-light/5 p-4 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-brand-inactive-text line-through font-normal">
+                                            {formatMoney(pricing.original)}
+                                        </span>
+                                    </div>
+                                    {hasPix ? (
+                                        <>
+                                            <div className="flex items-baseline gap-2 flex-wrap">
+                                                <p className="text-3xl md:text-4xl leading-none font-extrabold text-brand-dark">
+                                                    {formatMoney(pixUnitPrice)}
+                                                </p>
+                                                {discountBadge}
+                                                <span className="text-xs md:text-sm font-semibold text-brand-green">no Pix</span>
+                                            </div>
+                                            <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                                ou {formatMoney(displayPrice)} em outros meios
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <div className="flex items-baseline gap-2 flex-wrap">
+                                            <p className="text-3xl md:text-4xl leading-none font-extrabold text-brand-dark">
+                                                {formatMoney(displayPrice)}
+                                            </p>
+                                            {discountBadge}
+                                        </div>
+                                    )}
+                                    <Button
+                                        variant="link"
+                                        onClick={() => setShowPaymentMethodsModal(true)}
+                                        className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left hover:underline"
+                                    >
+                                        Ver opções de pagamento
+                                    </Button>
+                                </div>
                             </div>
                         );
                     }
@@ -1141,6 +1201,49 @@ export function ProductDetailsPageClient({
                     );
                 })()}
             </div>
+
+            {/* Brinde de Campanha discreto */}
+            {giftDetails && (
+                <div className="mb-6 p-3 bg-brand-green/5 dark:bg-brand-green/10 border border-brand-green/15 rounded-xl flex items-center justify-between gap-3 animate-fade-in select-none">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 relative rounded-lg overflow-hidden border border-brand-green/20 shrink-0 bg-white flex items-center justify-center">
+                            {giftDetails.image_url ? (
+                                <img
+                                    src={getProductImageUrl(giftDetails.image_url)}
+                                    alt={giftDetails.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-brand-green animate-pulse">
+                                    <polyline points="20 12 20 22 4 22 4 12" />
+                                    <rect x="2" y="7" width="20" height="5" />
+                                    <line x1="12" y1="22" x2="12" y2="7" />
+                                    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                                    <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+                                </svg>
+                            )}
+                        </div>
+                        <div className="flex flex-col text-left">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-extrabold tracking-wider px-1.5 py-0.5 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 uppercase">
+                                    Brinde Incluso
+                                </span>
+                            </div>
+                            <span className="text-xs md:text-sm font-bold text-brand-dark mt-0.5">
+                                {giftDetails.name}
+                            </span>
+                            {activeGiftPromo?.minSpendAmount ? (
+                                <span className="text-[10px] text-brand-inactive-text mt-0.5">
+                                    Em compras deste item acima de {formatMoney(activeGiftPromo.minSpendAmount)}
+                                </span>
+                            ) : null}
+                        </div>
+                    </div>
+                    <div className="shrink-0 text-brand-green text-[10px] md:text-xs font-bold bg-brand-green/10 border border-brand-green/20 rounded-full px-2 py-1 select-none">
+                        GRÁTIS
+                    </div>
+                </div>
+            )}
 
             {VariantsSection}
 

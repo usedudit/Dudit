@@ -14,6 +14,7 @@ import {
 import { addPurchasableServiceToCartAction } from "@/app/actions/marketplace/cart-extensions"
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { parseInTz } from "@/lib/date"
 
 const revalidateOrdersCache = async () => await revalidateOrders("")
 
@@ -287,7 +288,7 @@ export async function confirmOrderFulfillmentAction(orderId: string) {
     let latestCompletionTime = 0
     let latestAppt: any = null
     for (const appt of appointments) {
-      const apptEnd = new Date(`${appt.end_date}T${appt.end_time}`)
+      const apptEnd = parseInTz(appt.end_date, appt.end_time)
       if (apptEnd.getTime() > latestCompletionTime) {
         latestCompletionTime = apptEnd.getTime()
         latestAppt = appt
