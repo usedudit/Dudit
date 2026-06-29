@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache"
 import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { searchMarketplaceDirect } from "@/app/actions/marketplace/search"
+import { searchMarketplaceDirect, searchMarketplaceDirectFull } from "@/app/actions/marketplace/search"
 import { applySellerDiversity, sortByTrendingScore } from "@/lib/marketplace/ranking"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
@@ -309,15 +309,17 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
 
 // NO unstable_cache - Redis is the single source of truth.
 // searchMarketplaceDirect already uses react.cache() for per-request deduplication.
-export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType, cidade?: string) => {
-  return await searchMarketplaceDirect(query, type, {
+export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType, cidade?: string, section?: string) => {
+  const { results, moreDistantSellers, moreDistantItems } = await searchMarketplaceDirectFull(query, type, {
     vitrines: type === 'vitrines' ? 40 : 4,
     produtos: 40,
     servicos: 40,
     planos: 40,
     geral: 40,
-    cidade
+    cidade,
+    section
   })
+  return { items: results, moreDistantSellers, moreDistantItems }
 }
 
 // Helper to extract fallback values from product variants

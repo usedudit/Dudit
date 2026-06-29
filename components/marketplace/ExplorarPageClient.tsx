@@ -42,6 +42,9 @@ import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 
 interface ExplorarPageClientProps {
     initialResults?: any[]
+    initialMoreDistantSellers?: any[]
+    initialMoreDistantItems?: any[]
+    initialSection?: string
     query?: string
     type?: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos'
     cidade?: string
@@ -70,6 +73,31 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "alimentacao": "Alimentação",
     "outros": "Outros"
 }
+
+const SECTIONS_BANNERS = [
+    {
+        id: "promos",
+        title: "Em promoção",
+        subtitle: "Ofertas imperdíveis",
+        emoji: "🎯",
+        gradient: "from-[#FF6B35] to-[#FF8C42]"
+    },
+    {
+        id: "best-rated",
+        title: "Melhor avaliados",
+        subtitle: "Nota acima de 4.8",
+        emoji: "🏆",
+        gradient: "from-[#11998e] to-[#38ef7d]"
+    },
+    {
+        id: "best-sellers",
+        title: "Mais vendidos",
+        subtitle: "Os queridinhos da cidade",
+        emoji: "🔥",
+        gradient: "from-[#4facfe] to-[#00f2fe]"
+    }
+]
+
 
 const CATEGORY_GRADIENTS = [
     "from-[#FF8008] to-[#FFC837]", // Warm Orange/Yellow
@@ -105,26 +133,42 @@ function formatCitySlug(slug: string | null) {
 
 const ExploreContentSkeleton = ({ type }: { type: string }) => {
     return (
-        <div className="space-y-12 animate-pulse">
+        <div className="space-y-10 animate-pulse">
             {type === 'tudo' && (
-                <div>
-                    <div className="flex justify-between items-center mb-4">
-                        <SkeletonLoader width={220} height={24} className="rounded" />
-                        <SkeletonLoader width={60} height={16} className="rounded" />
+                <div className="space-y-8">
+                    {/* Banners Row Skeleton */}
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <SkeletonLoader width={220} height={24} className="rounded" />
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i} className="shrink-0 w-[220px] sm:w-[260px]">
+                                    <SkeletonLoader height={110} className="rounded-[16px]" />
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex gap-4 overflow-x-auto scrollbar-none">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <div key={i} className="shrink-0 w-[270px] sm:w-[320px]">
-                                <SkeletonLoader height={140} className="rounded-[16px] mb-3" />
-                                <div className="flex items-center gap-3">
-                                    <SkeletonLoader width={48} height={48} circle />
-                                    <div className="flex-1 space-y-2">
-                                        <SkeletonLoader width="60%" height={16} className="rounded" />
-                                        <SkeletonLoader width="40%" height={12} className="rounded" />
+
+                    {/* Sellers Row Skeleton */}
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <SkeletonLoader width={180} height={20} className="rounded" />
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto scrollbar-none pb-2">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="shrink-0 w-[270px] sm:w-[320px]">
+                                    <SkeletonLoader height={140} className="rounded-[16px] mb-3" />
+                                    <div className="flex items-center gap-3">
+                                        <SkeletonLoader width={48} height={48} circle />
+                                        <div className="flex-1 space-y-2">
+                                            <SkeletonLoader width="60%" height={16} className="rounded" />
+                                            <SkeletonLoader width="40%" height={12} className="rounded" />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
@@ -295,6 +339,9 @@ const CategoryCarousel = ({
 
 export function ExplorarPageClient({
     initialResults = [],
+    initialMoreDistantSellers = [],
+    initialMoreDistantItems = [],
+    initialSection,
     query = '',
     type = 'tudo',
     cidade = '',
@@ -320,6 +367,16 @@ export function ExplorarPageClient({
     const [currentType, setCurrentType] = useState<any>(type)
     const [sortBy, setSortBy] = useState<SortOption>("relevancia")
     const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(cidade || pathCity || null)
+    const [selectedRadius, setSelectedRadius] = useState<number | null>(() => {
+        const urlRadius = searchParams.get("radius")
+        return urlRadius ? Number(urlRadius) : null
+    })
+    const [selectedSection, setSelectedSection] = useState<string | null>(() => {
+        return initialSection || searchParams.get("section") || null
+    })
+    const [moreDistantSellers, setMoreDistantSellers] = useState<any[]>(initialMoreDistantSellers)
+    const [moreDistantItems, setMoreDistantItems] = useState<any[]>(initialMoreDistantItems)
+
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [viewMode, setViewMode] = useState<ViewMode>("grid")
 
@@ -364,19 +421,33 @@ export function ExplorarPageClient({
 
     const fetchType = currentType
 
-    // Unified URL synchronization helper
     const updateUrl = (
         city: string | null,
         categories: string[],
         searchQ: string,
-        typeStr: string
+        typeStr: string,
+        radiusVal?: number | null,
+        sectionVal?: string | null
     ) => {
         const queryParams = new URLSearchParams()
         if (searchQ) queryParams.set("q", searchQ)
         if (typeStr !== "tudo") queryParams.set("type", typeStr)
 
+        const rVal = radiusVal !== undefined ? radiusVal : selectedRadius
+        const isCity = city && city !== "brasil" && !city.startsWith("estado-")
+        if (rVal && isCity) {
+            queryParams.set("radius", String(rVal))
+        }
+
+        const sVal = sectionVal !== undefined ? sectionVal : selectedSection
+        if (sVal) {
+            queryParams.set("section", sVal)
+        }
+
         const queryStr = queryParams.toString()
         const queryPart = queryStr ? `?${queryStr}` : ""
+
+
 
         if (city) {
             if (categories.length > 0) {
@@ -404,6 +475,17 @@ export function ExplorarPageClient({
             setSelectedCitySlug(urlCity)
         }
 
+        const urlRadius = searchParams.get("radius")
+        const nextRadius = urlRadius ? Number(urlRadius) : null
+        if (nextRadius !== selectedRadius) {
+            setSelectedRadius(nextRadius)
+        }
+
+        const urlSection = searchParams.get("section")
+        if (urlSection !== selectedSection) {
+            setSelectedSection(urlSection)
+        }
+
         const pathCategorySlug = slug[1] || null
         const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : null
 
@@ -422,7 +504,9 @@ export function ExplorarPageClient({
         if (!isCatsEqual) {
             setSelectedCategories(nextCats)
         }
-    }, [searchParams, params])
+    }, [searchParams, params, selectedRadius, selectedSection])
+
+
 
     // Handle city synchronization from URL/cookies/localProfile on mount
     useEffect(() => {
@@ -490,18 +574,35 @@ export function ExplorarPageClient({
         any,
         MarketplaceListCursor
     >({
-        queryKey: ["explore", query, fetchType, selectedCitySlug],
+        queryKey: ["explore", query, fetchType, selectedCitySlug, selectedRadius, selectedSection],
         initialPage:
-            (fetchType === type && selectedCitySlug === cidade) ||
-                (isLandingPage && type === 'tudo' && selectedCitySlug === cidade)
+            ((fetchType === type && selectedCitySlug === cidade) ||
+                (isLandingPage && type === 'tudo' && selectedCitySlug === cidade)) &&
+                selectedRadius === (searchParams.get("radius") ? Number(searchParams.get("radius")) : null) &&
+                selectedSection === (searchParams.get("section") || null)
                 ? { items: initialResults, nextCursor: null, hasMore: selectedCitySlug ? false : initialResults.length >= (isLandingPage ? 40 : (type === 'tudo' ? 10 : 40)) }
                 : undefined,
         fetchFn: async ({ cursor }) => {
+            const userCoords = userProfile?.latitude && userProfile?.longitude
+                ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                : null
+
             const res = await searchMarketplace(query, fetchType as any, {
                 ...limitConfig,
                 cursor,
-                cidade: selectedCitySlug || undefined
+                cidade: selectedCitySlug || undefined,
+                radius: selectedRadius || undefined,
+                latitude: userCoords?.lat,
+                longitude: userCoords?.lng,
+                section: selectedSection || undefined,
             })
+
+
+            if (!cursor) {
+                setMoreDistantSellers(res.moreDistantSellers || [])
+                setMoreDistantItems(res.moreDistantItems || [])
+            }
+
             return res
         },
         dedupeKey: (item) => String(item?.itemType || "") + ":" + String(item?.id || ""),
@@ -509,6 +610,7 @@ export function ExplorarPageClient({
         refetchOnMount: true,
         refetchOnWindowFocus: false,
     })
+
 
     const rawItems = useMemo(() => {
         const all = rawItemsUncapped || []
@@ -665,6 +767,17 @@ export function ExplorarPageClient({
         if (maxPrice) filtered = filtered.filter((p) => p.price && p.price <= Number(maxPrice))
         if (promoOn) filtered = filtered.filter((p) => p.originalPrice !== undefined)
 
+        // Filtragem por Seção
+        if (selectedSection) {
+            if (selectedSection === "promos") {
+                filtered = filtered.filter(p => p.itemType === 'produto' && p.originalPrice !== undefined && p.originalPrice > p.price)
+            } else if (selectedSection === "best-rated") {
+                filtered = filtered.filter(p => p.itemType === 'produto' && (p.rating ?? 0) >= 4.8)
+            } else if (selectedSection === "best-sellers") {
+                filtered = filtered.filter(p => p.itemType === 'produto')
+            }
+        }
+
         // Sorting
         if (sortBy === "preco_menor") {
             filtered.sort((a, b) => (a.price || 0) - (b.price || 0))
@@ -678,7 +791,7 @@ export function ExplorarPageClient({
             )
         }
         return filtered
-    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, sortBy, categoriesList])
+    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, sortBy, selectedSection, categoriesList])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0
@@ -711,29 +824,7 @@ export function ExplorarPageClient({
 
     const showFeaturedSections = currentType === 'tudo' && selectedCategories.length === 0 && !query && rawItems.length > 0
 
-    const promoCarouselItems = useMemo(() => {
-        if (!showFeaturedSections) return []
-        return normalizedInitialResults
-            .filter(p => p.itemType === 'produto' && p.originalPrice !== undefined && p.originalPrice > p.price)
-            .sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
-            .slice(0, 20)
-    }, [normalizedInitialResults, showFeaturedSections])
 
-    const bestRatedCarouselItems = useMemo(() => {
-        if (!showFeaturedSections) return []
-        return normalizedInitialResults
-            .filter(p => p.itemType === 'produto' && (p.rating ?? 0) >= 4.8)
-            .sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
-            .slice(0, 20)
-    }, [normalizedInitialResults, showFeaturedSections])
-
-    const bestSellingCarouselItems = useMemo(() => {
-        if (!showFeaturedSections) return []
-        return normalizedInitialResults
-            .filter(p => p.itemType === 'produto')
-            .sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
-            .slice(0, 20)
-    }, [normalizedInitialResults, showFeaturedSections])
 
     const subcategoryGroups = useMemo(() => {
         if (selectedCategories.length === 0) return []
@@ -759,6 +850,12 @@ export function ExplorarPageClient({
         setPromoOn(false)
         updateUrl(selectedCitySlug, [], query, newType)
     }
+
+    const handleRadiusChange = (radius: number | null) => {
+        setSelectedRadius(radius)
+        updateUrl(selectedCitySlug, selectedCategories, query, currentType, radius)
+    }
+
 
     const toggleCategory = (catName: string) => {
         setSelectedCategories((prev) => {
@@ -877,7 +974,8 @@ export function ExplorarPageClient({
         setPromoOn(false)
         setSortBy("relevancia")
         setCurrentType("tudo")
-        updateUrl(selectedCitySlug, [], query, "tudo")
+        setSelectedRadius(null)
+        updateUrl(selectedCitySlug, [], query, "tudo", null)
     }
 
     const typeOptions = [
@@ -989,26 +1087,41 @@ export function ExplorarPageClient({
                     {/* FEATURED SECTIONS - only on default explore page */}
                     {showFeaturedSections && (
                         <div className="mb-4 lg:mb-8 space-y-6 lg:space-y-10">
-                            {/* 1. CATEGORY CARDS CAROUSEL */}
-                            <CategoryCarousel
-                                categories={categoriesList}
-                                selectedCategories={selectedCategories}
-                                onToggleCategory={(catName) => {
-                                    if (catName === "__all__") {
-                                        setSelectedCategories([])
-                                        updateUrl(selectedCitySlug, [], query, currentType)
-                                    } else {
-                                        toggleCategory(catName)
-                                    }
-                                }}
-                                onSeeAllCategories={() => {
-                                    setSelectedCategories([])
-                                    updateUrl(selectedCitySlug, [], query, currentType)
-                                }}
-                            />
+                            {/* 1. SEÇÕES BANNERS (Descubra o que tem em...) */}
+                            <div className="w-full">
+                                <h2 className="text-lg lg:text-2xl font-bold text-brand-dark mb-4 animate-fade-in">
+                                    {selectedCitySlug 
+                                        ? `Descubra o que tem em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}` 
+                                        : "Descubra o que tem por perto"}
+                                </h2>
+                                <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                    {SECTIONS_BANNERS.map((banner) => {
+                                        const isActive = selectedSection === banner.id
+                                        return (
+                                            <button
+                                                key={banner.id}
+                                                onClick={() => {
+                                                    const nextSection = isActive ? null : banner.id
+                                                    setSelectedSection(nextSection)
+                                                    updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, nextSection)
+                                                }}
+                                                className={`shrink-0 w-[220px] sm:w-[260px] h-[110px] rounded-[16px] bg-gradient-to-r ${banner.gradient} p-4 flex flex-col justify-between text-left text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none border-2 ${
+                                                    isActive ? 'border-brand-green ring-2 ring-brand-green/30' : 'border-transparent'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-start">
+                                                    <span className="text-xs font-semibold uppercase tracking-wider opacity-90">{banner.subtitle}</span>
+                                                    <span className="text-2xl">{banner.emoji}</span>
+                                                </div>
+                                                <span className="text-lg font-bold leading-tight">{banner.title}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
 
-                            {/* 3. VENDEDORES EM DESTAQUE */}
-                            {vitrinesDestaque.length > 0 && (
+                            {/* 2. VENDEDORES EM DESTAQUE */}
+                            {!selectedSection && vitrinesDestaque.length > 0 && (
                                 <HorizontalCarousel
                                     title="Vendedores em destaque"
                                     items={vitrinesDestaque}
@@ -1022,86 +1135,9 @@ export function ExplorarPageClient({
                                     itemWidthClass="w-[270px] sm:w-[320px]"
                                 />
                             )}
-
-                            {/* 4. ITENS EM PROMOÇÃO */}
-                            {promoCarouselItems.length > 0 && (
-                                <HorizontalCarousel
-                                    title="Em promoção"
-                                    items={promoCarouselItems}
-                                    renderItem={(item) => (
-                                        <ItemCard
-                                            key={item.id}
-                                            product={item}
-                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                                            className="w-full"
-                                        />
-                                    )}
-                                    onSeeAll={() => {
-                                        setCurrentType("produtos" as any)
-                                        updateUrl(selectedCitySlug, [], "", "produtos")
-                                    }}
-                                    banner={{
-                                        title: "Em\nPromoção",
-                                        subtitle: "Ofertas imperdíveis",
-                                        gradient: "from-[#FF6B35] to-[#FF8C42]",
-                                    }}
-                                    itemWidthClass="w-[190px] sm:w-[210px]"
-                                />
-                            )}
-
-                            {/* 5. MELHOR AVALIADOS */}
-                            {bestRatedCarouselItems.length > 0 && (
-                                <HorizontalCarousel
-                                    title="Melhor avaliados"
-                                    items={bestRatedCarouselItems}
-                                    renderItem={(item) => (
-                                        <ItemCard
-                                            key={item.id}
-                                            product={item}
-                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                                            className="w-full"
-                                        />
-                                    )}
-                                    onSeeAll={() => {
-                                        setCurrentType("produtos" as any)
-                                        updateUrl(selectedCitySlug, [], "", "produtos")
-                                    }}
-                                    banner={{
-                                        title: "Melhor\nAvaliados",
-                                        subtitle: "Nota acima de 4.8",
-                                        gradient: "from-[#11998e] to-[#38ef7d]",
-                                    }}
-                                    itemWidthClass="w-[190px] sm:w-[210px]"
-                                />
-                            )}
-
-                            {/* 6. MAIS VENDIDOS */}
-                            {bestSellingCarouselItems.length > 0 && (
-                                <HorizontalCarousel
-                                    title="Mais vendidos"
-                                    items={bestSellingCarouselItems}
-                                    renderItem={(item) => (
-                                        <ItemCard
-                                            key={item.id}
-                                            product={item}
-                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                                            className="w-full"
-                                        />
-                                    )}
-                                    onSeeAll={() => {
-                                        setCurrentType("produtos" as any)
-                                        updateUrl(selectedCitySlug, [], "", "produtos")
-                                    }}
-                                    banner={{
-                                        title: "Mais\nVendidos",
-                                        subtitle: "Os queridinhos da cidade",
-                                        gradient: "from-[#4facfe] to-[#00f2fe]",
-                                    }}
-                                    itemWidthClass="w-[190px] sm:w-[210px]"
-                                />
-                            )}
                         </div>
                     )}
+
 
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                         {/* SIDEBAR (Desktop only) */}
@@ -1121,6 +1157,9 @@ export function ExplorarPageClient({
                             activeCategoriesList={activeCategoriesList}
                             selectedCategories={selectedCategories}
                             onToggleCategory={toggleCategory}
+                            selectedRadius={selectedRadius}
+                            onRadiusChange={handleRadiusChange}
+
                             minPrice={minPrice}
                             onMinPriceChange={setMinPrice}
                             maxPrice={maxPrice}
@@ -1238,12 +1277,51 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : (
                                         <>
+                                            {/* Carrossel de Lojas Locais na Busca */}
+                                            {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
+                                                <div className="mb-6">
+                                                    <HorizontalCarousel
+                                                        title="Lojas encontradas"
+                                                        items={vitrinesDestaque}
+                                                        renderItem={(vitrine) => (
+                                                            <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
+                                                        )}
+                                                        onSeeAll={() => {
+                                                            setCurrentType("vitrines")
+                                                            updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
+                                                        }}
+                                                        itemWidthClass="w-[270px] sm:w-[320px]"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Carrossel de Lojas Distantes na Busca */}
+                                            {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
+                                                <div className="mb-6">
+                                                    <HorizontalCarousel
+                                                        title="Lojas um pouco mais distantes do seu raio de busca"
+                                                        items={moreDistantSellers}
+                                                        renderItem={(vitrine) => (
+                                                            <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} className="w-full" />
+                                                        )}
+                                                        onSeeAll={() => {
+                                                            const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
+                                                            setSelectedCitySlug(stateSlug)
+                                                            setCurrentType("vitrines")
+                                                            updateUrl(stateSlug, selectedCategories, query, "vitrines")
+                                                        }}
+                                                        itemWidthClass="w-[270px] sm:w-[320px]"
+                                                    />
+                                                </div>
+                                            )}
+
                                             {/* View Controls and Results */}
                                             <ExplorarViewControls
                                                 viewMode={viewMode}
                                                 onViewModeChange={setViewMode}
                                                 resultsCount={filteredResults.length}
                                             />
+
 
                                             {filteredResults.length === 0 && !hasNextPage ? (
                                                 <div className="py-12 flex flex-col items-center">
@@ -1297,8 +1375,33 @@ export function ExplorarPageClient({
                                                     )}
                                                 </div>
                                             )}
+
+                                            {/* Carrossel de Itens Distantes na Busca */}
+                                            {!!query && moreDistantItems.length > 0 && (
+                                                <div className="mt-12 pt-8 border-t border-gray-100">
+                                                    <HorizontalCarousel
+                                                        title="Um pouco mais distantes do seu raio de busca"
+                                                        items={moreDistantItems}
+                                                        renderItem={(item) => (
+                                                            <ItemCard
+                                                                key={item.id}
+                                                                product={item}
+                                                                userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                                                                className="w-full"
+                                                            />
+                                                        )}
+                                                        onSeeAll={() => {
+                                                            const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
+                                                            setSelectedCitySlug(stateSlug)
+                                                            updateUrl(stateSlug, selectedCategories, query, currentType)
+                                                        }}
+                                                        itemWidthClass="w-[190px] sm:w-[210px]"
+                                                    />
+                                                </div>
+                                            )}
                                         </>
                                     )}
+
                                 </motion.div>
                             </AnimatePresence>
                         </div>
@@ -1327,6 +1430,9 @@ export function ExplorarPageClient({
                 activeCategoriesList={activeCategoriesList}
                 selectedCategories={selectedCategories}
                 onToggleCategory={toggleCategory}
+                selectedRadius={selectedRadius}
+                onRadiusChange={handleRadiusChange}
+
                 minPrice={minPrice}
                 onMinPriceChange={setMinPrice}
                 maxPrice={maxPrice}

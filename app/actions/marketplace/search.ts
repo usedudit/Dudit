@@ -10,10 +10,10 @@ import { cache } from "react"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getUserSessionData } from "@/lib/data/user"
-import { enrichMarketplaceDistance } from "@/lib/services/location.service"
+import { enrichMarketplaceDistance, calculateDistance } from "@/lib/services/location.service"
 import { resolveCityAndStateFromSlug } from "./products"
 import { normalizeSearchQuery } from "@/lib/search/normalize"
-import { applySellerDiversity } from "@/lib/marketplace/ranking"
+import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
     if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
@@ -79,8 +79,34 @@ function normalizePlan(item: any) {
     }
 }
 
+export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ lat: number; lng: number } | null> {
+    if (!cidadeSlug || cidadeSlug === "brasil" || cidadeSlug.startsWith("estado-")) return null
+    const parts = cidadeSlug.split("-")
+    const state = parts.pop()?.toUpperCase() || ""
+    const targetCitySlug = parts.join("-")
+
+    const resolved = await resolveCityAndStateFromSlug(cidadeSlug)
+    const dbCity = resolved?.city
+    const dbState = resolved?.state || state
+
+    if (!dbCity) return null
+
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+        .from("addresses")
+        .select("latitude, longitude")
+        .ilike("city", dbCity)
+        .eq("state", dbState)
+        .not("latitude", "is", null)
+        .limit(1)
+
+    if (error || !data || data.length === 0) return null
+    return { lat: Number(data[0].latitude), lng: Number(data[0].longitude) }
+}
+
 /**
  * FUNÇÃO DIRETA para uso em Server Components (SSR).
+
  * Sem rate limiting, sem overhead de serialização de Server Action.
  * NÃO EXPOSTA como export de "use server" - só pode ser importada pelo servidor.
  */
@@ -90,16 +116,106 @@ export const searchMarketplaceDirect = cache(async (
     type: MarketplaceSearchType,
     limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
 ) => {
-    const { results } = await _searchMarketplaceCore(query, type, limits)
-    const user = await getCurrentUser()
-    if (!user) return results
+    const { results } = await searchMarketplaceDirectFull(query, type, limits)
+    return results
+})
 
-    const sessionData = await getUserSessionData(user.id)
-    const coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
+export const searchMarketplaceDirectFull = cache(async (
+    query: string,
+    type: MarketplaceSearchType,
+    limits: { 
+        vitrines?: number; 
+        produtos?: number; 
+        servicos?: number; 
+        planos?: number; 
+        geral?: number; 
+        cursor?: number; 
+        lastId?: string; 
+        cursorRank?: number;
+        cidade?: string;
+        radius?: number;
+        latitude?: number;
+        longitude?: number;
+        section?: string;
+    } = {}
+) => {
+    const user = await getCurrentUser()
+    const sessionData = user ? await getUserSessionData(user.id) : null
+    let coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
         ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
         : null
 
-    return enrichMarketplaceDistance(results || [], coords)
+    if (!coords && limits.latitude && limits.longitude) {
+        coords = { lat: limits.latitude, lng: limits.longitude }
+    }
+
+    let finalCoords = coords
+    if (!finalCoords && limits.cidade) {
+        finalCoords = await resolveCityCoordsFromSlug(limits.cidade)
+    }
+
+    const isCity = limits.cidade && limits.cidade !== "brasil" && !limits.cidade.startsWith("estado-")
+    const shouldFetchDistant = isCity && !limits.cursor && !limits.lastId && query && query.trim() !== ""
+
+    // Executa em paralelo a busca local e a nacional
+    const localPromise = _searchMarketplaceCore(query, type, {
+        ...limits,
+        centerCoords: finalCoords
+    })
+
+    const distantPromise = shouldFetchDistant
+        ? _searchMarketplaceCore(query, type, {
+            vitrines: type === 'vitrines' || type === 'tudo' ? 20 : 0,
+            produtos: type === 'produtos' || type === 'tudo' ? 20 : 0,
+            servicos: type === 'servicos' || type === 'tudo' ? 20 : 0,
+            planos: type === 'planos' || type === 'tudo' ? 20 : 0,
+            geral: 40,
+        })
+        : Promise.resolve({ results: [] })
+
+    const [localRes, distantRes] = await Promise.all([localPromise, distantPromise])
+
+    const resultsWithDistance = enrichMarketplaceDistance(localRes.results || [], finalCoords)
+
+    let moreDistantSellers: any[] = []
+    let moreDistantItems: any[] = []
+
+    if (shouldFetchDistant && distantRes.results && distantRes.results.length > 0) {
+        const localIds = new Set(localRes.results.map(r => `${r.itemType}:${r.id}`))
+        const distantFiltered = distantRes.results.filter(r => !localIds.has(`${r.itemType}:${r.id}`))
+
+        const enrichedDistant = enrichMarketplaceDistance(distantFiltered, finalCoords)
+
+        moreDistantSellers = enrichedDistant.filter(r => r.itemType === 'loja').slice(0, 20)
+        moreDistantItems = enrichedDistant.filter(r => r.itemType !== 'loja').slice(0, 20)
+    }
+
+    let finalResults = resultsWithDistance
+
+    if (limits.section) {
+        const filterSection = (list: any[]) => {
+            let filtered = list
+            if (limits.section === "promos") {
+                filtered = list.filter(p => p.itemType === 'produto' && p.promotional_price !== null && p.promotional_price !== undefined)
+            } else if (limits.section === "best-rated") {
+                filtered = list.filter(p => p.itemType === 'produto' && (p.rating ?? 0) >= 4.8)
+            } else if (limits.section === "best-sellers") {
+                filtered = list.filter(p => p.itemType === 'produto')
+            }
+            return [...filtered].sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
+        }
+
+        finalResults = filterSection(finalResults)
+        if (moreDistantItems.length > 0) {
+            moreDistantItems = filterSection(moreDistantItems)
+        }
+    }
+
+    return {
+        results: finalResults,
+        moreDistantSellers,
+        moreDistantItems
+    }
 })
 
 export type MarketplaceListCursor = { createdAt?: string; id: string; rank?: number }
@@ -111,7 +227,19 @@ export type MarketplaceListCursor = { createdAt?: string; id: string; rank?: num
 export const searchMarketplace = async (
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: MarketplaceListCursor | null; cidade?: string } = {}
+    limits: { 
+        vitrines?: number; 
+        produtos?: number; 
+        servicos?: number; 
+        planos?: number; 
+        geral?: number; 
+        cursor?: MarketplaceListCursor | null; 
+        cidade?: string;
+        radius?: number;
+        latitude?: number;
+        longitude?: number;
+        section?: string;
+    } = {}
 ) => {
     // Rate limit APENAS para chamadas do client (POST / Server Actions)
     const { success } = await requireRateLimit(RateLimitCategory.API_GENERAL)
@@ -125,7 +253,7 @@ export const searchMarketplace = async (
     const lastId = cursor?.id || undefined
     const cursorRank = typeof cursor?.rank === "number" ? cursor.rank : undefined
 
-    const { results } = await _searchMarketplaceCore(query, type, {
+    const { results, moreDistantSellers, moreDistantItems } = await searchMarketplaceDirectFull(query, type, {
         vitrines: limits.vitrines,
         produtos: limits.produtos,
         servicos: limits.servicos,
@@ -135,17 +263,14 @@ export const searchMarketplace = async (
         lastId,
         cursorRank,
         cidade: limits.cidade,
+        radius: limits.radius,
+        latitude: limits.latitude,
+        longitude: limits.longitude,
+        section: limits.section,
     })
 
-    const user = await getCurrentUser()
-    const sessionData = user ? await getUserSessionData(user.id) : null
-    const coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
-        ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
-        : null
-    const resultsWithDistance = enrichMarketplaceDistance(results || [], coords)
 
-    // Normalize pagination response to the app-wide standard.
-    const items = resultsWithDistance || []
+    const items = results || []
     const last = items[items.length - 1]
     const nextCursor: MarketplaceListCursor | null = last?.id
         ? {
@@ -155,14 +280,11 @@ export const searchMarketplace = async (
         }
         : null
 
-    // This search backend doesn’t currently expose an exact hasMore flag.
-    // We conservatively assume "hasMore" when we got a full page.
-    // We assume "hasMore" when we got a full page.
     const limitCount =
         type === "tudo"
             ? (limits.geral ?? 40)
             : type === "vitrines"
-                ? (limits.vitrines ?? 40) // Standardizing to 40 for client searches
+                ? (limits.vitrines ?? 40)
                 : type === "produtos"
                     ? (limits.produtos ?? 20)
                     : type === "planos"
@@ -170,7 +292,7 @@ export const searchMarketplace = async (
                         : (limits.servicos ?? 20)
 
     const hasMore = items.length >= limitCount && !!nextCursor
-    return { items, nextCursor, hasMore }
+    return { items, nextCursor, hasMore, moreDistantSellers, moreDistantItems }
 }
 
 
@@ -184,7 +306,22 @@ const serializeSearchKey = (query: string, type: string, limits: any) => {
 async function _searchMarketplaceCore(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number; cidade?: string } = {}
+    limits: { 
+        vitrines?: number; 
+        produtos?: number; 
+        servicos?: number; 
+        planos?: number; 
+        geral?: number; 
+        cursor?: number; 
+        lastId?: string; 
+        cursorRank?: number; 
+        cidade?: string;
+        radius?: number;
+        latitude?: number;
+        longitude?: number;
+        centerCoords?: { lat: number; lng: number } | null;
+        section?: string;
+    } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     if (limits.cidade) {
         if (limits.cidade === "brasil") {
@@ -193,6 +330,7 @@ async function _searchMarketplaceCore(
         }
         return searchMarketplaceByCity(query, type, limits.cidade, limits)
     }
+
 
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
 
@@ -716,7 +854,19 @@ async function searchMarketplaceByCity(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos',
     cidadeSlug: string,
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; lastId?: string; cursorRank?: number }
+    limits: { 
+        vitrines?: number; 
+        produtos?: number; 
+        servicos?: number; 
+        planos?: number; 
+        geral?: number; 
+        lastId?: string; 
+        cursorRank?: number;
+        radius?: number;
+        latitude?: number;
+        longitude?: number;
+        centerCoords?: { lat: number; lng: number } | null;
+    }
 ) {
     const supabase = getAdminClient()
     const parts = cidadeSlug.split("-")
@@ -729,11 +879,13 @@ async function searchMarketplaceByCity(
 
     let partnersQuery = supabase
         .from("partners")
-        .select("id, addresses!inner(city, state)")
+        .select("id, latitude, longitude, addresses!inner(city, state)")
         .eq("is_active", true)
         .eq("addresses.state", dbState)
 
-    if (dbCity) {
+    if (cidadeSlug.startsWith("estado-")) {
+        // Rota de estado: não filtra por cidade
+    } else if (dbCity) {
         partnersQuery = partnersQuery.eq("addresses.city", dbCity)
     } else {
         partnersQuery = partnersQuery.ilike("addresses.city", targetCitySlug.replace(/-/g, ' '))
@@ -743,11 +895,33 @@ async function searchMarketplaceByCity(
     if (partnersRes.error) {
         console.error("[searchMarketplaceByCity] Partner fetch error:", partnersRes.error)
     }
-    const partnerIds = (partnersRes.data || []).map((p: any) => p.id)
+    const allPartners = partnersRes.data || []
+    let partnerIds = allPartners.map((p: any) => p.id)
+
+    // Filtro por Raio
+    let centerCoords = limits.centerCoords || null
+    if (!centerCoords && limits.latitude && limits.longitude) {
+        centerCoords = { lat: limits.latitude, lng: limits.longitude }
+    }
+    if (!centerCoords && !cidadeSlug.startsWith("estado-")) {
+        centerCoords = await resolveCityCoordsFromSlug(cidadeSlug)
+    }
+
+    if (centerCoords && limits.radius && partnerIds.length > 0) {
+        const partnersInRadius = allPartners.filter((p: any) => {
+            if (p.latitude !== null && p.longitude !== null) {
+                const dist = calculateDistance(centerCoords!, { lat: p.latitude, lng: p.longitude })
+                return dist <= limits.radius!
+            }
+            return true // Fallback: mantém parceiros da cidade que não possuem coordenadas salvas
+        })
+        partnerIds = partnersInRadius.map((p: any) => p.id)
+    }
 
     if (!partnerIds.length) {
         return { results: [], filteredIds: [] }
     }
+
 
     if (query.trim()) {
         return searchMarketplacePostgresFTS(query, type, {

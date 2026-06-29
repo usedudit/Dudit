@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { ExplorarPageClient } from "@/components/marketplace/ExplorarPageClient"
 import { getCachedExploreProducts } from "@/app/actions/marketplace/products"
+import { resolveCityCoordsFromSlug } from "@/app/actions/marketplace/search"
 import type { Metadata } from "next"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { parseMarketplaceType } from "@/lib/types/marketplace"
@@ -336,16 +337,21 @@ export default async function ExplorarPage({
 
     // Para estados, passa apenas o slug do estado; a função searchMarketplaceByCity filtrará por estado
     const searchSlug = stateSlug ? stateSlug : cidade
-    const products = await getCachedExploreProducts(query, serverFetchType, searchSlug)
+    const { items: exploreItems, moreDistantSellers, moreDistantItems } = await getCachedExploreProducts(query, serverFetchType, searchSlug, section)
 
     const cartCount = sessionData?.cartCount || 0
 
-    const productsWithDistance = enrichMarketplaceDistance(
-        products || [],
-        userProfile?.latitude && userProfile?.longitude
-            ? { lat: userProfile.latitude, lng: userProfile.longitude }
-            : null,
-    )
+    let refCoords = userProfile?.latitude && userProfile?.longitude
+        ? { lat: userProfile.latitude, lng: userProfile.longitude }
+        : null
+    if (!refCoords && searchSlug) {
+        refCoords = await resolveCityCoordsFromSlug(searchSlug)
+    }
+
+    const productsWithDistance = enrichMarketplaceDistance(exploreItems || [], refCoords)
+    const moreDistantSellersWithDistance = enrichMarketplaceDistance(moreDistantSellers || [], refCoords)
+    const moreDistantItemsWithDistance = enrichMarketplaceDistance(moreDistantItems || [], refCoords)
+
 
     const state = stateSlug
         ? stateSlug.replace(/^estado-/, "").toUpperCase()
@@ -425,6 +431,9 @@ export default async function ExplorarPage({
             <Suspense>
                 <ExplorarPageClient
                     initialResults={productsWithDistance}
+                    initialMoreDistantSellers={moreDistantSellersWithDistance}
+                    initialMoreDistantItems={moreDistantItemsWithDistance}
+                    initialSection={section}
                     query={query}
                     type={type}
                     cidade={searchSlug}

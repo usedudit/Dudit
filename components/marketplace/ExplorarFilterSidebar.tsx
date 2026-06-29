@@ -25,6 +25,8 @@ interface ExplorarFilterSidebarProps {
     onPromoToggle: () => void
     activeFiltersCount: number
     onClearFilters: () => void
+    selectedRadius?: number | null
+    onRadiusChange?: (radius: number | null) => void
 }
 
 export function ExplorarFilterSidebar({
@@ -48,6 +50,8 @@ export function ExplorarFilterSidebar({
     onPromoToggle,
     activeFiltersCount,
     onClearFilters,
+    selectedRadius,
+    onRadiusChange,
 }: ExplorarFilterSidebarProps) {
     return (
         <aside className="hidden lg:block lg:w-[280px] lg:shrink-0 border-r border-gray-100">
@@ -82,6 +86,26 @@ export function ExplorarFilterSidebar({
                     </button>
                 </section>
 
+                {/* Raio de busca */}
+                {selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-") && onRadiusChange && (
+                    <section>
+                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h3>
+                        <select
+                            value={selectedRadius || ""}
+                            onChange={(e) => onRadiusChange(e.target.value ? Number(e.target.value) : null)}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-brand-dark hover:border-brand-green focus:border-brand-green focus:outline-none transition-colors bg-white cursor-pointer"
+                        >
+                            <option value="">Toda a cidade (sem limite)</option>
+                            <option value="5">Até 5 km</option>
+                            <option value="10">Até 10 km</option>
+                            <option value="25">Até 25 km</option>
+                            <option value="50">Até 50 km</option>
+                            <option value="100">Até 100 km</option>
+                        </select>
+                    </section>
+                )}
+
+
                 {/* Type Section - Using FormDropdown */}
                 <section>
                     <FormDropdown
@@ -95,7 +119,8 @@ export function ExplorarFilterSidebar({
                 {/* Categories Section - Using Checkbox */}
                 <section>
                     <h3 className="mb-3 text-sm font-bold text-brand-dark">Categorias</h3>
-                    <div className="space-y-2 max-h-[200px] overflow-y-hidden">
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+
                         {activeCategoriesList.map((cat) => {
                             const isSelected = selectedCategories.includes(cat.name)
                             return (

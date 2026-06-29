@@ -1562,8 +1562,8 @@ const HIGH_SECTIONS: SectionDef[] = [
     { id: "trending", gatilho: GATILHOS_MAP.trending, priority: "high", fetch: fetchTrending },
     { id: "endingSoon", gatilho: GATILHOS_MAP.endingSoon, priority: "high", fetch: fetchEndingSoon },
     { id: "recent", gatilho: GATILHOS_MAP.recent, priority: "high", fetch: fetchRecent },
-    { id: "gems", gatilho: GATILHOS_MAP.gems, priority: "high", fetch: fetchGems },
 ]
+
 
 const MEDIUM_SECTIONS: SectionDef[] = [
     { id: "bestSellers", gatilho: GATILHOS_MAP.bestSellers, priority: "medium", fetch: fetchBestSellers },

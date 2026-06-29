@@ -29,6 +29,8 @@ interface ExplorarFiltersBottomSheetProps {
     onPromoToggle: () => void
     activeFiltersCount: number
     onClearFilters: () => void
+    selectedRadius?: number | null
+    onRadiusChange?: (radius: number | null) => void
 }
 
 export function ExplorarFiltersBottomSheet({
@@ -54,6 +56,8 @@ export function ExplorarFiltersBottomSheet({
     onPromoToggle,
     activeFiltersCount,
     onClearFilters,
+    selectedRadius,
+    onRadiusChange,
 }: ExplorarFiltersBottomSheetProps) {
     return (
         <BottomSheet isOpen={isOpen} onClose={onClose} title="Filtros">
@@ -92,6 +96,26 @@ export function ExplorarFiltersBottomSheet({
                     </button>
                 </section>
 
+                {/* Raio de busca */}
+                {selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-") && onRadiusChange && (
+                    <section>
+                        <h4 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h4>
+                        <select
+                            value={selectedRadius || ""}
+                            onChange={(e) => onRadiusChange(e.target.value ? Number(e.target.value) : null)}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-brand-dark hover:border-brand-green focus:border-brand-green focus:outline-none transition-colors bg-white cursor-pointer"
+                        >
+                            <option value="">Toda a cidade (sem limite)</option>
+                            <option value="5">Até 5 km</option>
+                            <option value="10">Até 10 km</option>
+                            <option value="25">Até 25 km</option>
+                            <option value="50">Até 50 km</option>
+                            <option value="100">Até 100 km</option>
+                        </select>
+                    </section>
+                )}
+
+
                 {/* Type Section */}
                 <section>
                     <h4 className="mb-3 text-sm font-bold text-brand-dark">Tipo</h4>
@@ -117,7 +141,8 @@ export function ExplorarFiltersBottomSheet({
                 {/* Categories Section */}
                 <section>
                     <h4 className="mb-3 text-sm font-bold text-brand-dark">Categorias</h4>
-                    <div className="max-h-[200px] space-y-2 overflow-y-auto pr-2">
+                    <div className="max-h-[200px] space-y-2 overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+
                         {activeCategoriesList.map((cat) => {
                             const isSelected = selectedCategories.includes(cat.name)
                             return (
