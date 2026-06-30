@@ -5,7 +5,6 @@
  * TRIGGER_SECRET_KEY must be configured - there is no fallback.
  */
 
-import { randomUUID } from "crypto"
 import { runScheduledWhatsappJob } from "@/lib/services/whatsapp-automation.service"
 import { processPendingWhatsappMessages } from "@/lib/services/whatsapp-dispatch.service"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -43,88 +42,51 @@ export async function executeWhatsappScheduledJob(payload: WhatsappScheduledJobP
   const admin = getAdminClient()
   const idempotencyKey = `${payload.jobType}:${payload.entityType}:${payload.entityId}:${payload.runAt.slice(0, 16)}`
 
-  // ── DEBUG: log payload ───────────────────────────────────────────────
-  console.log("[DEBUG:execute] payload.jobType:", payload.jobType)
-  console.log("[DEBUG:execute] payload.entityType:", payload.entityType)
-  console.log("[DEBUG:execute] payload.entityId:", payload.entityId)
-  console.log("[DEBUG:execute] payload.runAt:", JSON.stringify(payload.runAt))
-  console.log("[DEBUG:execute] payload.runAt.length:", payload.runAt.length)
-  console.log("[DEBUG:execute] payload.runAt.slice(0,16):", JSON.stringify(payload.runAt.slice(0, 16)))
-  const parsedDate = new Date(payload.runAt)
-  console.log("[DEBUG:execute] new Date(payload.runAt).toISOString():", parsedDate.toISOString())
-  console.log("[DEBUG:execute] new Date(payload.runAt).toISOString().slice(0,16):", parsedDate.toISOString().slice(0, 16))
-  console.log("[DEBUG:execute] computed idempotencyKey:", JSON.stringify(idempotencyKey))
-  console.log("[DEBUG:execute] computed idempotencyKey.length:", idempotencyKey.length)
+  // ── DEBUG: payload basics ──────────────────────────────────────────
+  console.log("[DEBUG] partnerId:", payload.partnerId)
+  console.log("[DEBUG] entityId:", payload.entityId)
+  console.log("[DEBUG] runAt:", payload.runAt)
+  console.log("[DEBUG] computedKey:", idempotencyKey)
 
-  // ── DEBUG: fallback query por entity_id ──────────────────────────────
-  const { data: fallbackRows } = await admin
+  // ── DEBUG: todas as linhas com este entity_id ──────────────────────
+  const { data: rows } = await admin
     .from("whatsapp_scheduled_jobs")
-    .select("id, idempotency_key, job_type, entity_type, entity_id, run_at, status, attempts")
+    .select("id,idempotency_key,entity_id,partner_id,run_at,status")
     .eq("entity_id", payload.entityId)
-    .eq("job_type", payload.jobType)
-    .order("created_at", { ascending: false })
-    .limit(5)
 
-  console.log("[DEBUG:execute] fallback rows found:", fallbackRows?.length ?? 0)
-  for (const row of fallbackRows || []) {
-    const dbKey = row.idempotency_key
-    console.log("[DEBUG:execute] row:", JSON.stringify({
-      id: row.id,
-      db_idempotency_key: dbKey,
-      db_key_length: dbKey?.length,
-      job_type: row.job_type,
-      entity_type: row.entity_type,
-      entity_id: row.entity_id,
-      run_at: row.run_at,
-      status: row.status,
-      attempts: row.attempts,
-    }))
-    if (dbKey === idempotencyKey) {
-      console.log("[DEBUG:execute] KEYS MATCH for row", row.id)
-    } else {
-      console.log("[DEBUG:execute] KEYS DIFFER for row", row.id)
-      console.log("[DEBUG:execute] char codes - computed:", JSON.stringify([...idempotencyKey].map(c => c.charCodeAt(0))))
-      console.log("[DEBUG:execute] char codes - db:     ", JSON.stringify([...(dbKey || "")].map(c => c.charCodeAt(0))))
-    }
+  console.log("[DEBUG] rows with entityId:", rows?.length ?? 0)
+  for (const row of rows ?? []) {
+    console.log("[DEBUG] entityId row:", JSON.stringify(row))
+    console.log("[DEBUG] row.key === computedKey:", row.idempotency_key === idempotencyKey)
   }
 
-  // ── Tentativa principal (original) ───────────────────────────────────
+  // ── DEBUG: ilike por entityId na idempotency_key ───────────────────
+  const { data: rows2 } = await admin
+    .from("whatsapp_scheduled_jobs")
+    .select("id,idempotency_key")
+    .ilike("idempotency_key", `%${payload.entityId}%`)
+
+  console.log("[DEBUG] ilike rows:", rows2?.length ?? 0)
+  for (const row of rows2 ?? []) {
+    console.log("[DEBUG] ilike row:", JSON.stringify(row))
+    console.log("[DEBUG] ilike row.key === computedKey:", row.idempotency_key === idempotencyKey)
+  }
+
+  // ── Lookup original por idempotency_key ────────────────────────────
   const { data: job } = await admin
     .from("whatsapp_scheduled_jobs")
     .select("*")
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle()
 
-  console.log("[DEBUG:execute] main lookup found:", !!job, "jobId:", job?.id)
+  console.log("[DEBUG] main lookup found:", !!job, "jobId:", job?.id)
 
   if (job) {
     await runScheduledWhatsappJob(job)
     return
   }
 
-  // ── FALLBACK TEMPORÁRIO: se o lookup por chave falhou mas o registro existe ──
-  if (fallbackRows && fallbackRows.length > 0) {
-    console.log("[DEBUG:execute] FALLBACK: usando primeiro registro por entity_id:", fallbackRows[0].id)
-    const { data: fullJob } = await admin
-      .from("whatsapp_scheduled_jobs")
-      .select("*")
-      .eq("id", fallbackRows[0].id)
-      .single()
-    if (fullJob) {
-      await runScheduledWhatsappJob(fullJob)
-      return
-    }
-  }
-
-  console.log("[DEBUG:execute] NENHUM registro encontrado — criando job com randomUUID")
-  await runScheduledWhatsappJob({
-    id: randomUUID(),
-    partner_id: payload.partnerId,
-    job_type: payload.jobType,
-    entity_type: payload.entityType,
-    entity_id: payload.entityId,
-    payload: {},
-  })
+  console.log("[DEBUG] JOB NOT FOUND — stopping without fallback")
 }
 
 export async function executeWhatsappRetryBatch(): Promise<{ processed: number }> {
