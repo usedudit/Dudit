@@ -106,6 +106,12 @@ export async function scheduleNotificationAppointmentReminders(params: {
   storeName?: string
   timezone?: string
 }) {
+  const userId = await resolveCustomerUserId({
+    customerId: params.customerId,
+    marketplaceOrderId: params.marketplaceOrderId,
+  })
+  if (!userId) return
+
   const start = parseInTz(params.startDate, params.startTime, params.timezone || getDefaultTimezone())
   if (Number.isNaN(start.getTime())) return
 
@@ -301,6 +307,7 @@ export async function onAppointmentStatusChanged(
     customerName: String(appointment.customer_name || "Cliente"),
     date: String(appointment.start_date),
     time: String(appointment.start_time).slice(0, 5),
+    cancellationNote: (appointment.cancellation_note as string) || undefined,
   }
 
   if (next === "confirmado") {

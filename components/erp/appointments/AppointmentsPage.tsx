@@ -21,7 +21,8 @@ import {
 
 import {
     formatDateStr,
-    getWeekDays
+    getWeekDays,
+    getGridHoursRange
 } from './utils';
 
 import { TopSelectionBar } from './Shared';
@@ -416,10 +417,10 @@ const AppointmentsPage = ({
         }
     };
 
-    const handleDeleteAppointment = async (id: string) => {
+    const handleDeleteAppointment = async (id: string, notify?: boolean, note?: string) => {
         setIsSaving(true);
         try {
-            const res = await deleteAppointmentAction(id);
+            const res = await deleteAppointmentAction(id, notify, note);
             if (res.success) {
                 appointmentCacheRef.current.clear();
                 setAppointments(prev => prev.filter(a => a.id !== id));
@@ -624,7 +625,7 @@ const AppointmentsPage = ({
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
         const hourHeight = 80;
-        const startHour = 8;
+        const { startHour } = getGridHoursRange(currentDate, openingHours);
         const totalMinutes = (y / hourHeight) * 60;
         const snappedMinutes = Math.floor(totalMinutes / 15) * 15;
         const hour = startHour + Math.floor(snappedMinutes / 60);
@@ -638,8 +639,7 @@ const AppointmentsPage = ({
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
 
-        const startHour = 8;
-        const endHour = 19;
+        const { startHour, endHour } = getGridHoursRange(currentDate, openingHours);
         const hoursCount = endHour - startHour + 1;
 
         const totalWidth = rect.width;
@@ -727,7 +727,7 @@ const AppointmentsPage = ({
                             )}
                         </AnimatePresence>
 
-                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                        <div className="max-w-[1300px] mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                             {/* Desktop Header */}
                             <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                                 <div className="flex flex-col gap-2 pt-1">

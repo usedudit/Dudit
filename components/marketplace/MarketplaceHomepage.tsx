@@ -22,6 +22,69 @@ import {
     IconPlaceholder
 } from "@/components/reusable"
 import citiesData from "@/lib/data/cities.json"
+
+const COMMON_CITY_ACCENTS: Record<string, string> = {
+    "sao-paulo": "São Paulo",
+    "cambe": "Cambé",
+    "brasilia": "Brasília",
+    "goiania": "Goiânia",
+    "florianopolis": "Florianópolis",
+    "belem": "Belém",
+    "sao-luis": "São Luís",
+    "maceio": "Maceió",
+    "cuiaba": "Cuiabá",
+    "macapa": "Macapá",
+    "vitoria": "Vitória",
+    "ribeirao-preto": "Ribeirão Preto",
+    "sao-jose-dos-campos": "São José dos Campos",
+    "sao-bernardo-do-campo": "São Bernardo do Campo",
+    "sao-caetano-do-sul": "São Caetano do Sul",
+    "sao-jose-do-rio-preto": "São José do Rio Preto",
+    "sao-goncalo": "São Gonçalo",
+    "sao-joao-de-meriti": "São João de Meriti",
+    "sao-jose": "São José",
+    "petropolis": "Petrópolis",
+    "teresopolis": "Teresópolis",
+    "sao-carlos": "São Carlos",
+    "chapeco": "Chapecó",
+    "marilia": "Marília",
+    "paranagua": "Paranaguá",
+    "cacador": "Caçador",
+    "criciuma": "Criciúma",
+    "tubarao": "Tubarão",
+    "blumenau": "Blumenau",
+    "joinville": "Joinville",
+    "itajai": "Itajaí",
+    "balneario-camboriu": "Balneário Camboriú",
+    "sao-francisco-do-sul": "São Francisco do Sul",
+    "sao-joaquim": "São João",
+    "caxias-do-sul": "Caxias do Sul",
+    "maringa": "Maringá",
+    "cascavel": "Cascavel",
+    "ponta-grossa": "Ponta Grossa",
+    "foz-do-iguacu": "Foz do Iguaçu",
+    "guarapuava": "Guarapuava",
+    "paranavai": "Paranavaí",
+    "apucarana": "Apucarana",
+    "arapongas": "Arapongas",
+    "umuarama": "Umuarama",
+    "toledo": "Toledo",
+    "campo-mourao": "Campo Mourão",
+    "patos-de-minas": "Patos de Minas",
+    "pocos-de-caldas": "Poços de Caldas",
+    "juiz-de-fora": "Juiz de Fora",
+    "governador-valadares": "Governador Valadares",
+    "teofilo-otoni": "Teófilo Otoni",
+    "sao-joao-del-rei": "São João del-Rei",
+    "sao-lourenco": "São Lourenço",
+    "sao-sebastiao": "São Sebastião",
+    "ilhabela": "Ilhabela",
+    "ubatuba": "Ubatuba",
+    "guaruja": "Guarujá",
+    "aracaju": "Aracaju",
+    "joao-pessoa": "João Pessoa",
+};
+
 import { MapPinIcon, XIcon } from "@/lib/icons"
 
 interface MarketplaceHomeProps {
@@ -101,9 +164,34 @@ export default function MarketplaceHome({
     }, [searchQuery])
 
     const formatCitySlugForDisplay = (slug: string): string => {
+        if (!slug) return ""
+        if (slug === "brasil") return "Brasil"
+        if (slug.startsWith("estado-")) {
+            return slug.replace("estado-", "").toUpperCase()
+        }
         const parts = slug.split("-")
         const state = parts.pop()?.toUpperCase() || ""
-        const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
+        const cityKey = parts.join("-")
+        
+        let city = COMMON_CITY_ACCENTS[cityKey]
+        if (!city) {
+            city = parts
+                .map(p => {
+                    if (p === "sao") return "São"
+                    if (p === "joao") return "João"
+                    if (p === "jose") return "José"
+                    if (p === "conceicao") return "Conceição"
+                    if (p === "ribeirao") return "Ribeirão"
+                    if (p === "uniao") return "União"
+                    if (p === "cristovao") return "Cristóvão"
+                    if (p === "sebastiao") return "Sebastião"
+                    if (p === "cambe") return "Cambé"
+                    if (p === "e") return "e"
+                    if (p === "do" || p === "da" || p === "dos" || p === "das" || p === "de") return p
+                    return p.charAt(0).toUpperCase() + p.slice(1)
+                })
+                .join(" ")
+        }
         return `${city} - ${state}`
     }
 

@@ -79,8 +79,14 @@ function normalizePlan(item: any) {
     }
 }
 
+const cityCoordsCache = new Map<string, { lat: number; lng: number } | null>()
+
 export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ lat: number; lng: number } | null> {
     if (!cidadeSlug || cidadeSlug === "brasil" || cidadeSlug.startsWith("estado-")) return null
+    if (cityCoordsCache.has(cidadeSlug)) {
+        return cityCoordsCache.get(cidadeSlug) || null
+    }
+
     const parts = cidadeSlug.split("-")
     const state = parts.pop()?.toUpperCase() || ""
     const targetCitySlug = parts.join("-")
@@ -100,8 +106,13 @@ export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ l
         .not("latitude", "is", null)
         .limit(1)
 
-    if (error || !data || data.length === 0) return null
-    return { lat: Number(data[0].latitude), lng: Number(data[0].longitude) }
+    if (error || !data || data.length === 0) {
+        cityCoordsCache.set(cidadeSlug, null)
+        return null
+    }
+    const result = { lat: Number(data[0].latitude), lng: Number(data[0].longitude) }
+    cityCoordsCache.set(cidadeSlug, result)
+    return result
 }
 
 /**
@@ -186,8 +197,14 @@ export const searchMarketplaceDirectFull = cache(async (
 
         const enrichedDistant = enrichMarketplaceDistance(distantFiltered, finalCoords)
 
-        moreDistantSellers = enrichedDistant.filter(r => r.itemType === 'loja').slice(0, 20)
-        moreDistantItems = enrichedDistant.filter(r => r.itemType !== 'loja').slice(0, 20)
+        moreDistantSellers = enrichedDistant
+            .filter(r => r.itemType === 'loja')
+            .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+            .slice(0, 20)
+        moreDistantItems = enrichedDistant
+            .filter(r => r.itemType !== 'loja')
+            .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+            .slice(0, 20)
     }
 
     let finalResults = resultsWithDistance
@@ -860,6 +877,7 @@ async function searchMarketplaceByCity(
         servicos?: number; 
         planos?: number; 
         geral?: number; 
+        cursor?: number;
         lastId?: string; 
         cursorRank?: number;
         radius?: number;
@@ -948,7 +966,7 @@ async function searchMarketplaceByCity(
     let rawPlans: any[] = []
     let filteredPartners: any[] = []
 
-    const partnerDetailsRes = await supabase
+    let partnerDetailsQuery = supabase
         .from("partners")
         .select(`
             id, store_name, store_description, store_image_url, banner_url,
@@ -964,6 +982,12 @@ async function searchMarketplaceByCity(
         .order("created_at", { ascending: false })
         .limit(type === 'vitrines' || type === 'tudo' ? limitCount : 0)
 
+    if (limits.cursor) {
+        partnerDetailsQuery = partnerDetailsQuery.lt("created_at", new Date(limits.cursor).toISOString())
+    }
+
+    const partnerDetailsRes = await partnerDetailsQuery
+
     if (partnerDetailsRes.error) {
         console.error("[searchMarketplaceByCity] Partner details query error:", partnerDetailsRes.error)
     }
@@ -972,61 +996,70 @@ async function searchMarketplaceByCity(
     if (partnerIds.length > 0) {
         const promises = []
         if (type === 'tudo' || type === 'produtos') {
-            promises.push(
-                supabase
-                    .from("products")
-                    .select(`
-                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
-                        category_id, category:product_categories!category_id(name), created_at,
-                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
-                        subcategory_id, subcategory:product_categories!subcategory_id(name),
-                        partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
-                        product_variants(variant_options, price_adjustment, is_active),
-                        show_price_in_store
-                    `)
-                    .eq("is_active", true)
-                    .eq("show_in_marketplace", true)
-                    .in("partner_id", partnerIds)
-                    .order("created_at", { ascending: false })
-                    .limit(type === 'produtos' || type === 'tudo' ? limitCount : 0)
-            )
+            let pq = supabase
+                .from("products")
+                .select(`
+                    id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                    category_id, category:product_categories!category_id(name), created_at,
+                    marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
+                    subcategory_id, subcategory:product_categories!subcategory_id(name),
+                    partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    product_variants(variant_options, price_adjustment, is_active),
+                    show_price_in_store
+                `)
+                .eq("is_active", true)
+                .eq("show_in_marketplace", true)
+                .in("partner_id", partnerIds)
+                .order("created_at", { ascending: false })
+                .limit(type === 'produtos' || type === 'tudo' ? limitCount : 0)
+
+            if (limits.cursor) {
+                pq = pq.lt("created_at", new Date(limits.cursor).toISOString())
+            }
+            promises.push(pq)
         }
         if (type === 'tudo' || type === 'servicos') {
-            promises.push(
-                supabase
-                    .from("services")
-                    .select(`
-                        id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
-                        marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                        partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
-                        show_price_in_store
-                    `)
-                    .eq("is_active", true)
-                    .eq("show_in_marketplace", true)
-                    .in("partner_id", partnerIds)
-                    .order("created_at", { ascending: false })
-                    .limit(type === 'servicos' || type === 'tudo' ? limitCount : 0)
-            )
+            let sq = supabase
+                .from("services")
+                .select(`
+                    id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                    marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
+                    partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    show_price_in_store
+                `)
+                .eq("is_active", true)
+                .eq("show_in_marketplace", true)
+                .in("partner_id", partnerIds)
+                .order("created_at", { ascending: false })
+                .limit(type === 'servicos' || type === 'tudo' ? limitCount : 0)
+
+            if (limits.cursor) {
+                sq = sq.lt("created_at", new Date(limits.cursor).toISOString())
+            }
+            promises.push(sq)
         }
         if (type === 'tudo' || type === 'planos') {
-            promises.push(
-                supabase
-                    .from("recurring_plans")
-                    .select(`
-                        id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                        partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
-                        recurring_plan_items(
-                            id, item_type, product_id, variant_id, service_id, quantity, unit_price,
-                            products:product_id(id, name, price, images),
-                            services:service_id(id, name, price, duration_minutes)
-                        )
-                    `)
-                    .eq("status", "active")
-                    .eq("show_in_marketplace", true)
-                    .in("partner_id", partnerIds)
-                    .order("created_at", { ascending: false })
-                    .limit(type === 'planos' || type === 'tudo' ? limitCount : 0)
-            )
+            let rq = supabase
+                .from("recurring_plans")
+                .select(`
+                    id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                    partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    recurring_plan_items(
+                        id, item_type, product_id, variant_id, service_id, quantity, unit_price,
+                        products:product_id(id, name, price, images),
+                        services:service_id(id, name, price, duration_minutes)
+                    )
+                `)
+                .eq("status", "active")
+                .eq("show_in_marketplace", true)
+                .in("partner_id", partnerIds)
+                .order("created_at", { ascending: false })
+                .limit(type === 'planos' || type === 'tudo' ? limitCount : 0)
+
+            if (limits.cursor) {
+                rq = rq.lt("created_at", new Date(limits.cursor).toISOString())
+            }
+            promises.push(rq)
         }
 
         const resList = await Promise.all(promises)

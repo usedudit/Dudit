@@ -16,6 +16,7 @@ interface TemplateContext {
     minStock?: string
     count?: string
     supplierName?: string
+    cancellationNote?: string
 }
 
 // ─── WhatsApp Message Builder ─────────────────────────────────────────────────
@@ -31,6 +32,7 @@ interface WhatsappMessageContext {
     quote_number?: string
     tracking_code?: string
     delivery_address?: string
+    cancellation_note?: string
 }
 
 function fmtDate(dateStr?: string): string {
@@ -106,6 +108,7 @@ export function buildWhatsappMessage(
                 ``,
                 `*Serviço:* ${service}`,
                 when ? `*Data:* ${when}` : "",
+                ctx.cancellation_note ? `*Motivo:* ${ctx.cancellation_note}` : "",
                 ``,
                 ``,
                 `Se precisar reagendar, é só nos chamar aqui. Estamos à disposição! 💬`,
@@ -454,12 +457,12 @@ export function buildNotificationContent(
             if (audience === "seller") {
                 return {
                     title: "❌ Agendamento cancelado",
-                    message: `O agendamento de "${service}" com ${customer}${when ? ` para ${when}` : ""} foi cancelado.`,
+                    message: `O agendamento de "${service}" com ${customer}${when ? ` para ${when}` : ""} foi cancelado.${ctx.cancellationNote ? `\nMotivo: ${ctx.cancellationNote}` : ""}`,
                 }
             }
             return {
                 title: "❌ Agendamento cancelado",
-                message: `Atenção: seu agendamento de "${service}" em ${store}${when ? ` para ${when}` : ""} foi cancelado.`,
+                message: `Atenção: seu agendamento de "${service}" em ${store}${when ? ` para ${when}` : ""} foi cancelado.${ctx.cancellationNote ? `\nMotivo: ${ctx.cancellationNote}` : ""}`,
             }
         case "appointment_rescheduled":
             if (audience === "seller") {

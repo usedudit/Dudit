@@ -333,12 +333,18 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
   return { fallback_variant_image: image, fallback_variant_price: price }
 }
 
+const cityResolveCache = new Map<string, { city: string; state: string } | null>()
+
 /**
  * Resolves a city-uf slug to capitalized/accented city name and state.
  * Queries unique addresses in the DB to match them. Fallback to formatting.
  */
 export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city: string; state: string } | null> {
   if (!slug) return null
+  if (cityResolveCache.has(slug)) {
+    return cityResolveCache.get(slug) || null
+  }
+
   const parts = slug.split("-")
   const state = parts.pop()?.toUpperCase()
   const citySlugWithoutState = parts.join("-")
@@ -348,6 +354,7 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
   const { data: addresses } = await supabase
     .from("addresses")
     .select("city, state")
+    .eq("state", state)
 
   if (addresses && addresses.length > 0) {
     const targetSlug = citySlugWithoutState
@@ -363,12 +370,16 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
       return addrSlug === targetSlug && a.state === state
     })
     if (match) {
-      return { city: match.city, state: match.state }
+      const result = { city: match.city, state: match.state }
+      cityResolveCache.set(slug, result)
+      return result
     }
   }
 
   const fallbackCityName = citySlugWithoutState.split('-').join(' ').replace(/\b\w/g, l => l.toUpperCase())
-  return { city: fallbackCityName, state }
+  const result = { city: fallbackCityName, state }
+  cityResolveCache.set(slug, result)
+  return result
 }
 
 /**

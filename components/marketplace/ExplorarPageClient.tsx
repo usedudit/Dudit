@@ -48,6 +48,7 @@ interface ExplorarPageClientProps {
     query?: string
     type?: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos'
     cidade?: string
+    resolvedCityName?: string | null
     categoria?: string
     sectionTitle?: string
     userProfile?: any
@@ -123,18 +124,73 @@ const FALLBACK_CATEGORIES = [
     { name: "Infantil & Brinquedos", icon_url: "https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png" }
 ]
 
-function formatCitySlug(slug: string | null) {
-    if (!slug) return ""
-    const parts = slug.split("-")
-    const state = parts.pop()?.toUpperCase() || ""
-    const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
-    return `${city} - ${state}`
-}
+const COMMON_CITY_ACCENTS: Record<string, string> = {
+    "sao-paulo": "São Paulo",
+    "cambe": "Cambé",
+    "brasilia": "Brasília",
+    "goiania": "Goiânia",
+    "florianopolis": "Florianópolis",
+    "belem": "Belém",
+    "sao-luis": "São Luís",
+    "maceio": "Maceió",
+    "cuiaba": "Cuiabá",
+    "macapa": "Macapá",
+    "vitoria": "Vitória",
+    "ribeirao-preto": "Ribeirão Preto",
+    "sao-jose-dos-campos": "São José dos Campos",
+    "sao-bernardo-do-campo": "São Bernardo do Campo",
+    "sao-caetano-do-sul": "São Caetano do Sul",
+    "sao-jose-do-rio-preto": "São José do Rio Preto",
+    "sao-goncalo": "São Gonçalo",
+    "sao-joao-de-meriti": "São João de Meriti",
+    "sao-jose": "São José",
+    "petropolis": "Petrópolis",
+    "teresopolis": "Teresópolis",
+    "sao-carlos": "São Carlos",
+    "chapeco": "Chapecó",
+    "marilia": "Marília",
+    "paranagua": "Paranaguá",
+    "cacador": "Caçador",
+    "criciuma": "Criciúma",
+    "tubarao": "Tubarão",
+    "blumenau": "Blumenau",
+    "joinville": "Joinville",
+    "itajai": "Itajaí",
+    "balneario-camboriu": "Balneário Camboriú",
+    "sao-francisco-do-sul": "São Francisco do Sul",
+    "sao-joaquim": "São João",
+    "caxias-do-sul": "Caxias do Sul",
+    "maringa": "Maringá",
+    "cascavel": "Cascavel",
+    "ponta-grossa": "Ponta Grossa",
+    "foz-do-iguacu": "Foz do Iguaçu",
+    "guarapuava": "Guarapuava",
+    "paranavai": "Paranavaí",
+    "apucarana": "Apucarana",
+    "arapongas": "Arapongas",
+    "umuarama": "Umuarama",
+    "toledo": "Toledo",
+    "campo-mourao": "Campo Mourão",
+    "patos-de-minas": "Patos de Minas",
+    "pocos-de-caldas": "Poços de Caldas",
+    "juiz-de-fora": "Juiz de Fora",
+    "governador-valadares": "Governador Valadares",
+    "teofilo-otoni": "Teófilo Otoni",
+    "sao-joao-del-rei": "São João del-Rei",
+    "sao-lourenco": "São Lourenço",
+    "sao-sebastiao": "São Sebastião",
+    "ilhabela": "Ilhabela",
+    "ubatuba": "Ubatuba",
+    "guaruja": "Guarujá",
+    "aracaju": "Aracaju",
+    "joao-pessoa": "João Pessoa",
+};
 
-const ExploreContentSkeleton = ({ type }: { type: string }) => {
+
+const ExploreContentSkeleton = ({ type, hasSection }: { type: string; hasSection?: boolean }) => {
     return (
         <div className="space-y-10 animate-pulse">
-            {type === 'tudo' && (
+            {type === 'tudo' && !hasSection && (
                 <div className="space-y-8">
                     {/* Banners Row Skeleton */}
                     <div>
@@ -345,6 +401,7 @@ export function ExplorarPageClient({
     query = '',
     type = 'tudo',
     cidade = '',
+    resolvedCityName,
     categoria = '',
     userProfile,
     cartCount,
@@ -361,6 +418,41 @@ export function ExplorarPageClient({
 
     const slug = (params?.slug as string[]) || []
     const pathCity = slug[0] || ""
+
+    const formatCitySlug = useCallback((slug: string | null) => {
+        if (!slug) return ""
+        if (slug === "brasil") return "Brasil"
+        if (slug.startsWith("estado-")) {
+            return slug.replace("estado-", "").toUpperCase()
+        }
+        if (slug === cidade && resolvedCityName) {
+            return resolvedCityName
+        }
+        const parts = slug.split("-")
+        const state = parts.pop()?.toUpperCase() || ""
+        const cityKey = parts.join("-")
+        
+        let city = COMMON_CITY_ACCENTS[cityKey]
+        if (!city) {
+            city = parts
+                .map(p => {
+                    if (p === "sao") return "São"
+                    if (p === "joao") return "João"
+                    if (p === "jose") return "José"
+                    if (p === "conceicao") return "Conceição"
+                    if (p === "ribeirao") return "Ribeirão"
+                    if (p === "uniao") return "União"
+                    if (p === "cristovao") return "Cristóvão"
+                    if (p === "sebastiao") return "Sebastião"
+                    if (p === "cambe") return "Cambé"
+                    if (p === "e") return "e"
+                    if (p === "do" || p === "da" || p === "dos" || p === "das" || p === "de") return p
+                    return p.charAt(0).toUpperCase() + p.slice(1)
+                })
+                .join(" ")
+        }
+        return `${city} - ${state}`
+    }, [cidade, resolvedCityName])
     const pathCategorySlug = slug[1] || ""
     const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : ""
 
@@ -575,13 +667,32 @@ export function ExplorarPageClient({
         MarketplaceListCursor
     >({
         queryKey: ["explore", query, fetchType, selectedCitySlug, selectedRadius, selectedSection],
-        initialPage:
-            ((fetchType === type && selectedCitySlug === cidade) ||
+        initialPage: (() => {
+            const match = ((fetchType === type && selectedCitySlug === cidade) ||
                 (isLandingPage && type === 'tudo' && selectedCitySlug === cidade)) &&
                 selectedRadius === (searchParams.get("radius") ? Number(searchParams.get("radius")) : null) &&
                 selectedSection === (searchParams.get("section") || null)
-                ? { items: initialResults, nextCursor: null, hasMore: selectedCitySlug ? false : initialResults.length >= (isLandingPage ? 40 : (type === 'tudo' ? 10 : 40)) }
-                : undefined,
+            if (!match) return undefined
+
+            const last = initialResults[initialResults.length - 1]
+            const calcNextCursor: MarketplaceListCursor | null = last?.id
+                ? {
+                    id: String(last.id),
+                    ...(last.created_at ? { createdAt: String(last.created_at) } : {}),
+                    ...(typeof last._searchRank === "number" ? { rank: last._searchRank } : {}),
+                }
+                : null
+
+            const isTudo = fetchType === 'tudo'
+            const limitVal = isTudo ? 10 : 40
+            const hasMore = initialResults.length >= limitVal && !!calcNextCursor
+
+            return {
+                items: initialResults,
+                nextCursor: calcNextCursor,
+                hasMore,
+            }
+        })(),
         fetchFn: async ({ cursor }) => {
             const userCoords = userProfile?.latitude && userProfile?.longitude
                 ? { lat: userProfile.latitude, lng: userProfile.longitude }
@@ -822,7 +933,7 @@ export function ExplorarPageClient({
         return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price).slice(0, 20)
     }, [filteredResults, currentType])
 
-    const showFeaturedSections = currentType === 'tudo' && selectedCategories.length === 0 && !query && rawItems.length > 0
+    const showFeaturedSections = currentType === 'tudo' && selectedCategories.length === 0 && !query && !selectedSection && rawItems.length > 0
 
 
 
@@ -928,15 +1039,22 @@ export function ExplorarPageClient({
     }, [filteredResults, categoriesWithProducts, currentType, selectedCategories, query])
 
     const pageTitle = useMemo(() => {
-        const citySuffix = selectedCitySlug ? ` em ${formatCitySlug(selectedCitySlug)}` : ""
+        const citySuffix = selectedCitySlug 
+            ? (selectedCitySlug === "brasil" ? " no Brasil" : ` em ${formatCitySlug(selectedCitySlug)}`)
+            : ""
         if (query) return `Resultados para "${query}"${citySuffix}`
+        if (selectedSection) {
+            if (selectedSection === "promos") return `Itens em promoção${citySuffix}`
+            if (selectedSection === "best-rated") return `Melhor avaliados${citySuffix}`
+            if (selectedSection === "best-sellers") return `Mais vendidos${citySuffix}`
+        }
         if (selectedCategories.length > 0) return `${selectedCategories[0]}${citySuffix}`
         if (currentType === "produtos") return `Produtos${citySuffix}`
         if (currentType === "servicos") return `Serviços${citySuffix}`
         if (currentType === "planos") return `Assinaturas e Planos${citySuffix}`
         if (currentType === "vitrines") return `Lojas e Vitrines${citySuffix}`
         return `Itens${citySuffix}`
-    }, [query, currentType, selectedCategories, selectedCitySlug])
+    }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection])
 
     const emptySubtitle = useMemo(() => {
         const cityNameOnly = selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : ""
@@ -1119,22 +1237,6 @@ export function ExplorarPageClient({
                                     })}
                                 </div>
                             </div>
-
-                            {/* 2. VENDEDORES EM DESTAQUE */}
-                            {!selectedSection && vitrinesDestaque.length > 0 && (
-                                <HorizontalCarousel
-                                    title="Vendedores em destaque"
-                                    items={vitrinesDestaque}
-                                    renderItem={(vitrine) => (
-                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
-                                    )}
-                                    onSeeAll={() => {
-                                        setCurrentType("vitrines" as any)
-                                        updateUrl(selectedCitySlug, [], "", "vitrines")
-                                    }}
-                                    itemWidthClass="w-[270px] sm:w-[320px]"
-                                />
-                            )}
                         </div>
                     )}
 
@@ -1142,6 +1244,7 @@ export function ExplorarPageClient({
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                         {/* SIDEBAR (Desktop only) */}
                         <ExplorarFilterSidebar
+                            userProfile={userProfile}
                             selectedCitySlug={selectedCitySlug}
                             formatCitySlug={formatCitySlug}
                             onCitySelect={() => setIsCityModalOpen(true)}
@@ -1184,14 +1287,14 @@ export function ExplorarPageClient({
                                 <ExplorarHeaderSection
                                     title={pageTitle}
                                     resultsCount={filteredResults.length}
-                                    showBackButton={!!query}
+                                    showBackButton={!!query || !!selectedSection}
                                     onBack={() => {
-                                        const newParams = new URLSearchParams()
-                                        const type = parseMarketplaceType(searchParams.get("type"))
-                                        if (type !== "tudo") newParams.set("type", type)
-                                        const queryStr = newParams.toString()
-                                        const newUrl = queryStr ? `?${queryStr}` : ""
-                                        router.push(`/explorar/${selectedCitySlug}${newUrl}`)
+                                        if (selectedSection) {
+                                            setSelectedSection(null)
+                                            updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, null)
+                                        } else {
+                                            router.back()
+                                        }
                                     }}
                                 />
                             )}
@@ -1229,7 +1332,7 @@ export function ExplorarPageClient({
                                     transition={{ duration: 0.2 }}
                                 >
                                     {isLoading || (isFetching && !isFetchingNextPage) ? (
-                                        <ExploreContentSkeleton type={currentType} />
+                                        <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
                                     ) : !selectedCitySlug ? (
                                         <div className="flex justify-center">
                                             <IconPlaceholder
@@ -1277,6 +1380,24 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : (
                                         <>
+                                            {/* Vendedores em destaque (Browse Mode) */}
+                                            {!query && currentType === 'tudo' && !selectedSection && vitrinesDestaque.length > 0 && (
+                                                <div className="mb-6 animate-fade-in">
+                                                    <HorizontalCarousel
+                                                        title="Vendedores em destaque"
+                                                        items={vitrinesDestaque}
+                                                        renderItem={(vitrine) => (
+                                                            <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
+                                                        )}
+                                                        onSeeAll={() => {
+                                                            setCurrentType("vitrines")
+                                                            updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
+                                                        }}
+                                                        itemWidthClass="w-[270px] sm:w-[320px]"
+                                                    />
+                                                </div>
+                                            )}
+
                                             {/* Carrossel de Lojas Locais na Busca */}
                                             {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
                                                 <div className="mb-6">
@@ -1413,6 +1534,7 @@ export function ExplorarPageClient({
 
             {/* BOTTOM SHEETS (Mobile) */}
             <ExplorarFiltersBottomSheet
+                userProfile={userProfile}
                 isOpen={isFiltersBottomSheetOpen}
                 onClose={() => setIsFiltersBottomSheetOpen(false)}
                 selectedCitySlug={selectedCitySlug}

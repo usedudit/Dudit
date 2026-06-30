@@ -31,6 +31,7 @@ interface ExplorarFiltersBottomSheetProps {
     onClearFilters: () => void
     selectedRadius?: number | null
     onRadiusChange?: (radius: number | null) => void
+    userProfile?: any
 }
 
 export function ExplorarFiltersBottomSheet({
@@ -58,6 +59,7 @@ export function ExplorarFiltersBottomSheet({
     onClearFilters,
     selectedRadius,
     onRadiusChange,
+    userProfile,
 }: ExplorarFiltersBottomSheetProps) {
     return (
         <BottomSheet isOpen={isOpen} onClose={onClose} title="Filtros">
@@ -97,7 +99,7 @@ export function ExplorarFiltersBottomSheet({
                 </section>
 
                 {/* Raio de busca */}
-                {selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-") && onRadiusChange && (
+                {((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
                     <section>
                         <h4 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h4>
                         <select

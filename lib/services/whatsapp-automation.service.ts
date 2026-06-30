@@ -237,6 +237,13 @@ export async function scheduleAppointmentReminders(params: {
   customerId?: string | null
   phone?: string | null
 }) {
+  const phone = await resolveCustomerPhone({
+    partnerId: params.partnerId,
+    customerId: params.customerId,
+    fallbackPhone: params.phone,
+  })
+  if (!phone) return
+
   const start = parseInTz(params.startDate, params.startTime)
   if (Number.isNaN(start.getTime())) return
 
@@ -484,12 +491,13 @@ export async function onAppointmentStatusChanged(
     .eq("id", partnerId)
     .maybeSingle()
 
-  const vars = {
+  const vars: Record<string, string> = {
     customer_name: String(appointment.customer_name || "cliente"),
     service_name: String(appointment.service_name || "serviço"),
     date: String(appointment.start_date || ""),
     time: String(appointment.start_time || ""),
     store_name: partner?.store_name || "",
+    ...((appointment.cancellation_note as string) ? { cancellation_note: appointment.cancellation_note as string } : {}),
   }
 
   if (next === "confirmado") {
@@ -685,7 +693,12 @@ export async function onQuoteShared(quote: Record<string, unknown>) {
     },
   })
 
-  // valid_until é YYYY-MM-DD (data civil brasileira), interpretar no timezone padrão
+  const phone = await resolveCustomerPhone({
+    partnerId,
+    customerId: quote.customer_id as string | null,
+  })
+  if (!phone) return
+
   const expiresAt = quote.valid_until ? parseInTz(String(quote.valid_until), "23:59") : null
   if (expiresAt && expiresAt.getTime() > Date.now()) {
     const reminderAt = new Date(expiresAt.getTime() - 24 * 60 * 60 * 1000)
@@ -696,7 +709,7 @@ export async function onQuoteShared(quote: Record<string, unknown>) {
         entityType: "quote",
         entityId: String(quote.id),
         runAt: reminderAt,
-        payload: { customerId: quote.customer_id },
+        payload: { customerId: quote.customer_id, phone },
       })
     }
   }

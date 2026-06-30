@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { ExplorarPageClient } from "@/components/marketplace/ExplorarPageClient"
-import { getCachedExploreProducts } from "@/app/actions/marketplace/products"
+import { getCachedExploreProducts, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { resolveCityCoordsFromSlug } from "@/app/actions/marketplace/search"
 import type { Metadata } from "next"
 import { getCurrentUser } from "@/lib/auth/authorization"
@@ -180,15 +180,19 @@ export async function generateMetadata({
         }
     }
 
-    // --- CASE 4: /explorar/[cidade-uf] or /explorar/[cidade-uf]/[categoria] ---
-    // Format city name from slug (e.g., "cambe-pr" -> "Cambe, PR")
-    const cityNameRaw = location
-        .split("-")
-        .slice(0, -1)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ")
-    const stateUf = location.split("-").pop()?.toUpperCase() || ""
-    const cidadeDisplay = `${cityNameRaw}, ${stateUf}`
+    let cidadeDisplay = ""
+    const resolvedCity = await resolveCityAndStateFromSlug(location)
+    if (resolvedCity) {
+        cidadeDisplay = `${resolvedCity.city}, ${resolvedCity.state}`
+    } else {
+        const cityNameRaw = location
+            .split("-")
+            .slice(0, -1)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ")
+        const stateUf = location.split("-").pop()?.toUpperCase() || ""
+        cidadeDisplay = `${cityNameRaw}, ${stateUf}`
+    }
 
     if (categoryName) {
         const title = `${categoryName} em ${cidadeDisplay}`
@@ -339,6 +343,14 @@ export default async function ExplorarPage({
     const searchSlug = stateSlug ? stateSlug : cidade
     const { items: exploreItems, moreDistantSellers, moreDistantItems } = await getCachedExploreProducts(query, serverFetchType, searchSlug, section)
 
+    let resolvedCityName: string | null = null
+    if (cidade && cidade !== "brasil" && !cidade.startsWith("estado-")) {
+        const resolved = await resolveCityAndStateFromSlug(cidade)
+        if (resolved) {
+            resolvedCityName = `${resolved.city} - ${resolved.state}`
+        }
+    }
+
     const cartCount = sessionData?.cartCount || 0
 
     let refCoords = userProfile?.latitude && userProfile?.longitude
@@ -437,6 +449,7 @@ export default async function ExplorarPage({
                     query={query}
                     type={type}
                     cidade={searchSlug}
+                    resolvedCityName={resolvedCityName}
                     categoria={categoria}
                     sectionTitle={sectionTitle}
                     userProfile={userProfile}

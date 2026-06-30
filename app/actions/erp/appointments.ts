@@ -1301,7 +1301,7 @@ async function handleAppointmentStockMovement(params: {
   revalidateStockMovements(partnerId)
 }
 
-export async function deleteAppointmentAction(appointmentId: string, notifyClient: boolean = true) {
+export async function deleteAppointmentAction(appointmentId: string, notifyClient: boolean = true, cancellationNote?: string) {
   try {
     if (!appointmentId) return { success: false, error: "Agendamento inválido" }
     const { partnerId, user } = await getPartnerContextWithPermission("delete")
@@ -1326,15 +1326,17 @@ export async function deleteAppointmentAction(appointmentId: string, notifyClien
       })
 
       if (notifyClient && current.source !== "unavailable") {
+        const currentWithNote = cancellationNote ? { ...current, cancellation_note: cancellationNote } : current
+
         import("@/lib/services/whatsapp-automation.service")
           .then(({ onAppointmentStatusChanged }) =>
-            onAppointmentStatusChanged(current, current.status, "Cancelado"),
+            onAppointmentStatusChanged(currentWithNote, current.status, "Cancelado"),
           )
           .catch(console.error)
 
         import("@/lib/services/notification-automation.service")
           .then(({ onAppointmentStatusChanged }) =>
-            onAppointmentStatusChanged(current, current.status, "Cancelado", "manual"),
+            onAppointmentStatusChanged(currentWithNote, current.status, "Cancelado", "manual"),
           )
           .catch(console.error)
       }
@@ -1461,6 +1463,50 @@ export async function getAppointmentOrderItemsAction(orderId: string, partnerId:
       situation: orderRes.data.situation || "pending",
       totalAmount: Number(orderRes.data.total_amount || 0),
       paidAmount: Number(orderRes.data.paid_amount || 0),
+      items: (itemsRes.data || []).map((item: any) => ({
+        id: item.id,
+        lineType: item.line_type || "product",
+        productName: item.product_name,
+        productPrice: Number(item.product_price || 0),
+        quantity: Number(item.quantity || 0),
+        subtotal: Number(item.subtotal || 0),
+        serviceId: item.service_id || null,
+        isGift: Boolean(item.is_gift),
+        originalPrice: item.original_price ? Number(item.original_price) : null,
+      })),
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function getAppointmentOrderDataAction(orderId: string, partnerId: string) {
+  try {
+    const user = await requireUser()
+    if (!user) return null
+    await requirePermission(partnerId, "orders", "view")
+    const supabase = await getSupabaseServerClient()
+    const [orderRes, itemsRes] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("order_number, situation, total_amount, paid_amount, payment_method, order_source")
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle(),
+      supabase
+        .from("order_items")
+        .select("id, line_type, product_name, product_price, quantity, subtotal, service_id, is_gift, original_price")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true }),
+    ])
+    if (!orderRes.data) return null
+    return {
+      orderNumber: orderRes.data.order_number || null,
+      situation: orderRes.data.situation || "pending",
+      totalAmount: Number(orderRes.data.total_amount || 0),
+      paidAmount: Number(orderRes.data.paid_amount || 0),
+      paymentMethod: orderRes.data.payment_method || "",
+      orderSource: orderRes.data.order_source || "",
       items: (itemsRes.data || []).map((item: any) => ({
         id: item.id,
         lineType: item.line_type || "product",

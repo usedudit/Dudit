@@ -27,6 +27,7 @@ interface ExplorarFilterSidebarProps {
     onClearFilters: () => void
     selectedRadius?: number | null
     onRadiusChange?: (radius: number | null) => void
+    userProfile?: any
 }
 
 export function ExplorarFilterSidebar({
@@ -52,6 +53,7 @@ export function ExplorarFilterSidebar({
     onClearFilters,
     selectedRadius,
     onRadiusChange,
+    userProfile,
 }: ExplorarFilterSidebarProps) {
     return (
         <aside className="hidden lg:block lg:w-[280px] lg:shrink-0 border-r border-gray-100">
@@ -87,7 +89,7 @@ export function ExplorarFilterSidebar({
                 </section>
 
                 {/* Raio de busca */}
-                {selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-") && onRadiusChange && (
+                {((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
                     <section>
                         <h3 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h3>
                         <select

@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge } from '@/components/reusable';
-import { getAvailableTimeSlotsAction, getMarketplaceOrderDetailsAction } from '@/app/actions/erp/appointments';
+import { getAvailableTimeSlotsAction, getMarketplaceOrderDetailsAction, getAppointmentOrderDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
@@ -20,16 +20,13 @@ import { useMediaQuery } from '@/components/erp/hooks';
 import BottomSheet from '@/components/BottomSheet';
 import Portal from '@/components/Portal';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
-import PaymentModal from '@/components/erp/orders/PaymentModal';
 import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
 import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
 import { fetchPartnerCustomersBucket } from '@/app/actions/erp/client-loaders';
 import { createServiceAction } from '@/app/actions/erp/servicos';
-import { confirmAppointmentOrderPaymentAction, createERPOrderAction, getAppointmentOrderNumberAction } from '@/app/actions/erp/orders';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
 import { getFinanceAccountsAction } from '@/app/actions/erp/finance-accounts';
 import { pickBankThenCashDefaultFinanceAccountId } from '@/lib/finance-utils';
-import { updateAppointmentAction } from '@/app/actions/erp/appointments';
 import { useCSRFToken } from '@/hooks/use-csrf-token';
 
 export const AppointmentSheet = ({
@@ -55,7 +52,7 @@ export const AppointmentSheet = ({
     appointmentsList,
 }: {
     onClose: () => void,
-    onDelete?: (id: string, notify?: boolean) => Promise<boolean>,
+    onDelete?: (id: string, notify?: boolean, note?: string) => Promise<boolean>,
     mode: 'create' | 'view',
     appointment?: Appointment | null,
     onSave: (data: any | any[]) => void,
@@ -100,6 +97,7 @@ export const AppointmentSheet = ({
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
     const [notifyClientOnCancel, setNotifyClientOnCancel] = useState(true);
+    const [cancelNote, setCancelNote] = useState('');
 
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
@@ -197,7 +195,11 @@ export const AppointmentSheet = ({
     const [endTimeRange, setEndTimeRange] = useState<string>('');
 
     // Specific Staff Selection for New Appointment
-    const [selectedStaffId, setSelectedStaffId] = useState<string>(initialStaffId || (staffSource.length > 0 ? staffSource[0].id : ''));
+    const [selectedStaffId, setSelectedStaffId] = useState<string>(
+        appointment?.staffId
+        || initialStaffId
+        || (staffSource.length > 0 ? staffSource[0].id : '')
+    );
 
     // Calendar selection and navigation base
     const [selectedCalDate, setSelectedCalDate] = useState<Date>(() => {
@@ -294,6 +296,13 @@ export const AppointmentSheet = ({
             onClose();
         }
     };
+
+    const handleCheckoutNavigation = useCallback(() => {
+        const linkedOrderId = appointment?.marketplaceOrderId || appointment?.saleId;
+        if (linkedOrderId) {
+            router.push(`/erp/orders?edit=${linkedOrderId}&payment=1`);
+        }
+    }, [appointment?.marketplaceOrderId, appointment?.saleId, router]);
 
     // Recurrence State
     const [recurrenceFreq, setRecurrenceFreq] = useState('Não se repete');
@@ -724,6 +733,10 @@ export const AppointmentSheet = ({
         const timeStr = needsRangePicker ? startTimeRange : (selectedTimeSlot || '09:00');
 
         const isOutsideHours = checkOutsideOperatingHours(baseDateStr, timeStr, calculatedDuration);
+        if (isOutsideHours) {
+            toast.error("Horário Inválido", "O horário selecionado está fora do horário de funcionamento do negócio.");
+            return;
+        }
         const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
             ...appointment,
             date: baseDateStr,
@@ -906,6 +919,10 @@ export const AppointmentSheet = ({
         const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
         const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
         const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
+        if (isOutsideHours) {
+            toast.error("Horário Inválido", "O horário selecionado está fora do horário de funcionamento do negócio.");
+            return;
+        }
         const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
             ...appointment,
             date: finalDateStr,
@@ -987,27 +1004,12 @@ export const AppointmentSheet = ({
         if (s === 'finalizado' || s === 'finished') return 'bg-gray-700';
         return 'bg-blue-600';
     }
-    const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
-    const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
     const [financeAccountId, setFinanceAccountId] = useState<string>('');
     const [orderNumber, setOrderNumber] = useState<string | null>(null);
 
-    const linkedOrderId = completedOrderId
-        || appointment?.marketplaceOrderId
+    const linkedOrderId = appointment?.marketplaceOrderId
         || appointment?.saleId
         || null;
-
-    useEffect(() => {
-        if (!partnerId || !linkedOrderId) {
-            setOrderNumber(null);
-            return;
-        }
-        let cancelled = false;
-        getAppointmentOrderNumberAction(linkedOrderId, partnerId).then(num => {
-            if (!cancelled) setOrderNumber(num);
-        });
-        return () => { cancelled = true; };
-    }, [partnerId, linkedOrderId]);
 
     // Fetch default finance account for order creation
     useEffect(() => {
@@ -1026,191 +1028,25 @@ export const AppointmentSheet = ({
 
     useEffect(() => {
         if (!partnerId || !linkedOrderId || mode !== 'view') {
+            setOrderNumber(null)
             setOrderItems(null)
             setOrderPaymentInfo(null)
             return
         }
         let cancelled = false
-        import("@/app/actions/erp/appointments").then(mod => {
-            mod.getAppointmentOrderItemsAction(linkedOrderId, partnerId).then(data => {
-                if (!cancelled && data) {
-                    setOrderItems(data.items)
-                    setOrderPaymentInfo({ situation: data.situation, paidAmount: data.paidAmount, totalAmount: data.totalAmount })
-                }
-            }).catch(() => {
-                if (!cancelled) { setOrderItems(null); setOrderPaymentInfo(null) }
-            })
+        getAppointmentOrderDataAction(linkedOrderId, partnerId).then(data => {
+            if (!cancelled && data) {
+                setOrderNumber(data.orderNumber)
+                setOrderItems(data.items)
+                setOrderPaymentInfo({ situation: data.situation, paidAmount: data.paidAmount, totalAmount: data.totalAmount })
+            }
+        }).catch(() => {
+            if (!cancelled) { setOrderNumber(null); setOrderItems(null); setOrderPaymentInfo(null) }
         })
         return () => { cancelled = true }
     }, [linkedOrderId, partnerId, mode])
 
-    const handleConfirmPayment = async (paymentData: any) => {
-        if (!financeAccountId) {
-            toast.warning("Conta financeira", "Nenhuma conta de recebimento configurada. Configure em Financeiro > Contas.");
-            return { error: "Conta financeira não configurada" };
-        }
 
-        const paymentStatus = paymentData.paymentStatus as 'paid' | 'partially_paid' | 'unpaid';
-        const existingOrderId = linkedOrderId;
-
-        const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
-        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
-        const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
-        const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
-            ...appointment,
-            date: finalDateStr,
-            time: timeStr,
-            duration: calculatedDuration,
-            staffId: selectedServices[0]?.staffId || '',
-            status: status
-        } as Appointment, appointmentsList) : false;
-
-        let finalNotes = notes;
-        if (isOutsideHours) {
-            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Marcado fora do horário de funcionamento]`;
-        }
-        if (hasCollision) {
-            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Conflito de horário detectado]`;
-        }
-
-        const appointmentUpdatePayload = {
-            paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
-            paidAmount: paymentData.paidAmount,
-            customerName: selectedClient?.name || 'Cliente Sem Nome',
-            customerId: selectedClient?.id || null,
-            serviceName: selectedServices.map(s => s.name).join(', '),
-            serviceId: selectedServices[0]?.id || null,
-            categoryId: selectedServices[0]?.category_id || null,
-            date: finalDateStr,
-            time: timeStr,
-            endDate: needsRangePicker ? endDateRange : finalDateStr,
-            endTime: needsRangePicker ? endTimeRange : timeStr,
-            duration: calculatedDuration,
-            staffId: selectedServices[0]?.staffId || '',
-            staffName: selectedServices[0]?.staff || '',
-            price: calculatedPrice,
-            pricingUnit: selectedServices[0]?.pricingUnit || 'Por Serviço',
-            notes: finalNotes || null,
-        };
-
-        try {
-            if (existingOrderId) {
-                const result = await confirmAppointmentOrderPaymentAction({
-                    orderId: existingOrderId,
-                    partnerId: partnerId || '',
-                    paymentStatus,
-                    paidAmount: paymentData.paidAmount,
-                    paymentMethod: paymentData.paymentMethod || 'pendente',
-                    paymentBreakdown: paymentData.paymentBreakdown,
-                    paymentProvider: paymentData.paymentProvider || null,
-                    mpPaymentId: paymentData.mpPaymentId || null,
-                    financeAccountId,
-                    notes: notes || undefined,
-                    servicePrice: calculatedPrice,
-                    serviceName: selectedServices.map(s => s.name).join(', '),
-                    serviceId: selectedServices[0]?.id || null,
-                    categoryId: selectedServices[0]?.category_id || null,
-                });
-
-                if (!result.success) {
-                    return { error: result.error || 'Erro ao confirmar pagamento' };
-                }
-
-                setCompletedOrderId(existingOrderId);
-
-                if (appointment?.id) {
-                    try {
-                        const updateRes = await updateAppointmentAction(appointment.id, appointmentUpdatePayload as any);
-                        if (updateRes.success && updateRes.item && onAppointmentUpdated) {
-                            onAppointmentUpdated(updateRes.item);
-                        }
-                    } catch { }
-                }
-
-                router.refresh();
-                return { success: true, orderNumber: result.orderNumber || existingOrderId, orderId: existingOrderId };
-            }
-
-            const items = selectedServices.map((s, idx) => {
-                const effectivePrice = getEffectiveServicePrice(s);
-                let finalPrice = effectivePrice;
-                if (s.pricingUnit === 'Por Dia') {
-                    const start = new Date(`${startDateRange}T${startTimeRange}`);
-                    const end = new Date(`${endDateRange}T${endTimeRange}`);
-                    const diffTime = Math.abs(end.getTime() - start.getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    const chargeableDays = Math.max(1, diffDays);
-                    finalPrice = effectivePrice * chargeableDays;
-                } else if (s.pricingUnit === 'Por Hora') {
-                    const start = new Date(`${startDateRange}T${startTimeRange}`);
-                    const end = new Date(`${endDateRange}T${endTimeRange}`);
-                    const diffTime = Math.abs(end.getTime() - start.getTime());
-                    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-                    const chargeableHours = Math.max(1, diffHours);
-                    finalPrice = effectivePrice * chargeableHours;
-                }
-                return {
-                    productId: null as string | null,
-                    customName: s.name,
-                    quantity: 1,
-                    unitPrice: finalPrice,
-                    sortOrder: idx,
-                };
-            });
-
-            const payload = {
-                partnerId: partnerId || '',
-                customerId: selectedClient?.id,
-                customerName: selectedClient?.name || 'Consumidor final',
-                salesChannel: 'Agendamento',
-                deliveryMethod: 'pickup' as const,
-                financeAccountId,
-                paymentStatus,
-                paymentMethod: paymentData.paymentMethod || 'pendente',
-                paymentBreakdown: paymentData.paymentBreakdown,
-                deliveryStatus: 'delivered' as const,
-                paidAmount: paymentData.paidAmount,
-                items,
-                subtotal: calculatedPrice,
-                discountValue: 0,
-                discountType: 'fixed' as const,
-                shippingCost: 0,
-                additionalCosts: 0,
-                totalAmount: calculatedPrice,
-                notes: notes || undefined,
-                csrf_token: csrfToken || undefined,
-                paymentProvider: paymentData.paymentProvider || undefined,
-                mpPaymentId: paymentData.mpPaymentId || undefined,
-            };
-
-            const result = await createERPOrderAction(payload);
-            if (!('success' in result) || !result.success) {
-                return { error: ('error' in result ? result.error : 'Erro ao criar venda') || 'Erro ao criar venda' };
-            }
-
-            const orderId = 'orderId' in result ? (result as any).orderId : undefined;
-            const orderNumber = 'orderNumber' in result ? (result as any).orderNumber : undefined;
-
-            if (orderId) setCompletedOrderId(orderId);
-
-            if (appointment?.id) {
-                try {
-                    const updateRes = await updateAppointmentAction(appointment.id, {
-                        ...appointmentUpdatePayload,
-                        saleId: orderId,
-                    } as any);
-                    if (updateRes.success && updateRes.item && onAppointmentUpdated) {
-                        onAppointmentUpdated(updateRes.item);
-                    }
-                } catch { }
-            }
-
-            router.refresh();
-            return { success: true, orderNumber, orderId };
-        } catch {
-            return { error: 'Erro ao processar venda do agendamento' };
-        }
-    };
 
     const VIEW_STATUS_OPTIONS = [
         { value: 'Reservado', label: 'Reservado' },
@@ -1847,14 +1683,11 @@ export const AppointmentSheet = ({
                                             )}
                                         </div>
                                         {appointment.needsReschedule && (
-                                            <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3 col-span-2">
-                                                <p className="font-bold text-amber-800 dark:text-amber-300">
-                                                    Reagendamento necessário
-                                                </p>
-                                                <p className="text-amber-700/90 dark:text-amber-400/90 mt-0.5">
-                                                    O horário original não está mais disponível.
-                                                </p>
-                                            </div>
+                                            <InfoCard
+                                                color="orange"
+                                                title="Reagendamento necessário"
+                                                message="O horário original não está mais disponível."
+                                            />
                                         )}
                                     </div>
                                 )}
@@ -1931,13 +1764,13 @@ export const AppointmentSheet = ({
                                 </div>
 
                                 {/* Products Section */}
-                                {orderItems && orderItems.filter(i => i.lineType !== 'service_booking' || i.serviceId === null).length > 0 && (
+                                {orderItems && orderItems.filter(i => i.lineType !== 'service_booking').length > 0 && (
                                     <div>
                                         <div className="flex justify-between items-center mb-3 px-1">
                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading">Produtos</h3>
                                         </div>
                                         <div className="space-y-3">
-                                            {orderItems.filter(i => i.lineType !== 'service_booking' || i.serviceId === null).map((item) => (
+                                            {orderItems.filter(i => i.lineType !== 'service_booking').map((item) => (
                                                 <div key={item.id} className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900/50">
                                                     <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
                                                     <div className="pl-4 flex-1">
@@ -2145,7 +1978,7 @@ export const AppointmentSheet = ({
                                                     <DropdownItem onClick={() => setCurrentView('datetime')}>
                                                         Remarcar
                                                     </DropdownItem>
-                                                    <DropdownItem className="text-red-500 hover:text-red-600" onClick={() => setIsCancelConfirmOpen(true)}>
+                                                    <DropdownItem className="text-red-500 hover:text-red-600" onClick={() => { setCancelNote(''); setIsCancelConfirmOpen(true); }}>
                                                         Cancelar
                                                     </DropdownItem>
                                                 </>
@@ -2154,7 +1987,7 @@ export const AppointmentSheet = ({
 
                                         {hasChanges ? (
                                             <>
-                                                <Button variant="outline" className="flex-1 font-bold h-12" onClick={() => setIsPaymentSheetOpen(true)}>
+                                                <Button variant="outline" className="flex-1 font-bold h-12" onClick={handleCheckoutNavigation}>
                                                     Checkout
                                                 </Button>
                                                 <Button variant="default" className="flex-1 font-bold h-12" onClick={handleSaveChanges}>
@@ -2162,7 +1995,7 @@ export const AppointmentSheet = ({
                                                 </Button>
                                             </>
                                         ) : (
-                                            <Button variant="default" className="flex-1 font-bold h-12" onClick={() => setIsPaymentSheetOpen(true)}>
+                                            <Button variant="default" className="flex-1 font-bold h-12" onClick={handleCheckoutNavigation}>
                                                 Checkout
                                             </Button>
                                         )}
@@ -2598,40 +2431,108 @@ export const AppointmentSheet = ({
                 cancelText="Continuar editando"
                 variant="warning"
             />
-            <AlertModal
-                isOpen={isCancelConfirmOpen}
-                onClose={() => setIsCancelConfirmOpen(false)}
-                onConfirm={async () => {
-                    setIsCancelConfirmOpen(false);
-                    if (appointment?.id && onDelete) {
-                        const success = await onDelete(appointment.id, notifyClientOnCancel);
-                        if (success) {
-                            toast.success("Cancelado", "Agendamento cancelado com sucesso.");
-                        } else {
-                            toast.error("Erro", "Não foi possível cancelar o agendamento.");
-                        }
-                    }
-                }}
-                title="Cancelar agendamento?"
-                message={
-                    <div className="space-y-4 text-center sm:text-left">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
-                        </p>
-                        <div className="flex items-center gap-2 mt-4 p-3 bg-gray-50 dark:bg-zinc-900/50 rounded-xl justify-center sm:justify-start">
-                            <Checkbox
-                                label="Notificar o cliente sobre o cancelamento"
-                                checked={notifyClientOnCancel}
-                                onChange={(checked) => setNotifyClientOnCancel(!!checked)}
-                            />
-                        </div>
-                    </div>
-                }
-                confirmText="Cancelar agendamento"
-                cancelText="Voltar"
-                variant="danger"
-                isDestructive
-            />
+            <AnimatePresence>
+                {isCancelConfirmOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => setIsCancelConfirmOpen(false)}>
+                            <div className="p-6 space-y-5">
+                                <div className="text-center">
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento?</h3>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                                        Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading block mb-1">Observação (opcional)</label>
+                                    <textarea
+                                        className="w-full h-20 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900/50 p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-brand-primary"
+                                        placeholder="Motivo do cancelamento..."
+                                        value={cancelNote}
+                                        onChange={(e) => setCancelNote(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-zinc-900/50 rounded-xl justify-center">
+                                    <Checkbox
+                                        label="Notificar o cliente sobre o cancelamento"
+                                        checked={notifyClientOnCancel}
+                                        onChange={(checked) => setNotifyClientOnCancel(!!checked)}
+                                    />
+                                </div>
+                                <div className="flex gap-3">
+                                    <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
+                                        <Button variant="destructive" className="flex-1 h-12 rounded-xl" onClick={async () => {
+                                            setIsCancelConfirmOpen(false);
+                                            if (appointment?.id && onDelete) {
+                                                const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
+                                                if (success) {
+                                                    toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                                                } else {
+                                                    toast.error("Erro", "Não foi possível cancelar o agendamento.");
+                                                }
+                                            }
+                                        }}>Cancelar agendamento</Button>
+                                </div>
+                            </div>
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center"
+                                onClick={() => setIsCancelConfirmOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                                    className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="text-center sm:text-left">
+                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento?</h3>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                                            Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading block mb-1">Observação (opcional)</label>
+                                        <textarea
+                                            className="w-full h-20 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900/50 p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-brand-primary"
+                                            placeholder="Motivo do cancelamento..."
+                                            value={cancelNote}
+                                            onChange={(e) => setCancelNote(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-zinc-900/50 rounded-xl justify-center sm:justify-start">
+                                        <Checkbox
+                                            label="Notificar o cliente sobre o cancelamento"
+                                            checked={notifyClientOnCancel}
+                                            onChange={(checked) => setNotifyClientOnCancel(!!checked)}
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 flex-col sm:flex-row">
+                                        <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
+                                        <Button variant="destructive" className="flex-1 h-12 rounded-xl" onClick={async () => {
+                                            setIsCancelConfirmOpen(false);
+                                            if (appointment?.id && onDelete) {
+                                                const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
+                                                if (success) {
+                                                    toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                                                } else {
+                                                    toast.error("Erro", "Não foi possível cancelar o agendamento.");
+                                                }
+                                            }
+                                        }}>Cancelar agendamento</Button>
+                                    </div>
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
             <AlertModal
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
@@ -2643,38 +2544,37 @@ export const AppointmentSheet = ({
                 isDestructive
             />
 
-            {!isPaymentSheetOpen && (
-                isMobile ? (
-                    <BottomSheet isOpen={true} onClose={handleCloseAttempt}>
-                        {SheetContent}
-                    </BottomSheet>
-                ) : (
-                    <Portal>
+            {isMobile ? (
+                <BottomSheet isOpen={true} onClose={handleCloseAttempt}>
+                    {SheetContent}
+                </BottomSheet>
+            ) : (
+                <Portal>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/50"
+                        onClick={handleCloseAttempt}
+                    >
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-50 bg-black/50"
-                            onClick={handleCloseAttempt}
+                            initial={{ x: '100%', opacity: 1 }}
+                            animate={{
+                                x: isNestedSheetOpen ? "-40px" : 0,
+                                scale: isNestedSheetOpen ? 0.97 : 1,
+                                opacity: isNestedSheetOpen ? 0.7 : 1
+                            }}
+                            exit={{ x: '100%', opacity: 1 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                            className="fixed right-4 top-4 bottom-4 z-50 w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <motion.div
-                                initial={{ x: '100%', opacity: 1 }}
-                                animate={{
-                                    x: isNestedSheetOpen ? "-40px" : 0,
-                                    scale: isNestedSheetOpen ? 0.97 : 1,
-                                    opacity: isNestedSheetOpen ? 0.7 : 1
-                                }}
-                                exit={{ x: '100%', opacity: 1 }}
-                                transition={{ type: "spring", stiffness: 400, damping: 40 }}
-                                className="fixed right-4 top-4 bottom-4 z-50 w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                {SheetContent}
-                            </motion.div>
+                            {SheetContent}
                         </motion.div>
-                    </Portal>
-                )
-            )}
+                    </motion.div>
+                </Portal>
+            )
+            }
 
 
             <AnimatePresence>
@@ -2895,59 +2795,6 @@ export const AppointmentSheet = ({
             </AnimatePresence>
 
             <AnimatePresence>
-                {isPaymentSheetOpen && (() => {
-                    const isMarketplace = !!(marketplaceOrderData && (marketplaceOrderData.orderSource === "Online Store" || marketplaceOrderData.orderSource === "Marketplace"));
-                    const mpTotalPerService = isMarketplace && marketplaceOrderData ? marketplaceOrderData.totalAmount / Math.max(1, selectedServices.length) : null;
-                    return (
-                        <PaymentModal
-                            isOpen={isPaymentSheetOpen}
-                            onClose={() => {
-                                setIsPaymentSheetOpen(false);
-                                if (completedOrderId) {
-                                    onClose();
-                                }
-                            }}
-                            partnerId={partnerId || ''}
-                            onConfirm={handleConfirmPayment}
-                            cart={selectedServices.map(s => {
-                                const effectivePrice = getEffectiveServicePrice(s);
-                                let finalPrice = effectivePrice;
-                                if (s.pricingUnit === 'Por Dia') {
-                                    const start = new Date(`${startDateRange}T${startTimeRange}`);
-                                    const end = new Date(`${endDateRange}T${endTimeRange}`);
-                                    const diffTime = Math.abs(end.getTime() - start.getTime());
-                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                    const chargeableDays = Math.max(1, diffDays);
-                                    finalPrice = effectivePrice * chargeableDays;
-                                } else if (s.pricingUnit === 'Por Hora') {
-                                    const start = new Date(`${startDateRange}T${startTimeRange}`);
-                                    const end = new Date(`${endDateRange}T${endTimeRange}`);
-                                    const diffTime = Math.abs(end.getTime() - start.getTime());
-                                    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-                                    const chargeableHours = Math.max(1, diffHours);
-                                    finalPrice = effectivePrice * chargeableHours;
-                                }
-                                return {
-                                    ...s,
-                                    qty: 1,
-                                    quantity: 1,
-                                    productId: s.id || null,
-                                    unitPrice: mpTotalPerService ?? finalPrice,
-                                    price: mpTotalPerService ?? finalPrice,
-                                    name: s.name,
-                                };
-                            })}
-                            amountDue={isMarketplace ? marketplaceOrderData!.totalAmount : calculatedPrice}
-                            existingPaidAmount={Number(appointment?.paidAmount ?? 0)}
-                            existingPaymentBreakdown={[]}
-                            customer={{ id: selectedClient?.id, name: selectedClient?.name }}
-                            headerSubtitle="Agendamento de Serviço"
-                            hidePendingDelivery
-                            isMarketplaceOrder={isMarketplace}
-                            originalPaymentMethod={isMarketplace ? marketplaceOrderData!.paymentMethod : undefined}
-                        />
-                    );
-                })()}
             </AnimatePresence>
         </>
     )

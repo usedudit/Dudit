@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon } from "@/lib/icons"
+import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon, ClockIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -139,16 +139,18 @@ const getUniqueBrands = (methods: any[]) => Array.from(new Set(methods
     .map(brand => brand.trim().toLowerCase())
     .filter(Boolean)))
 
-const RatingInline = ({ rating, reviewsCount }: { rating: number; reviewsCount: number }) => (
-    <div className="flex items-center gap-1.5 text-[12px] lg:text-[13px] text-brand-dark">
-        <StarIcon size={14} className="text-brand-green fill-brand-green" />
+const RatingInline = ({ rating, reviewsCount, short }: { rating: number; reviewsCount: number; short?: boolean }) => (
+    <div className="flex items-center gap-1 text-[12px] lg:text-[13px] text-brand-dark">
+        <StarIcon size={14} className="text-brand-green fill-brand-green shrink-0" />
         {reviewsCount > 0 ? (
             <>
                 <span className="font-semibold">{formatNumber(rating || 0, 1, 1)}</span>
-                <span className="text-brand-inactive-text">({reviewsCount} avaliações)</span>
+                <span className="text-brand-inactive-text">
+                    {short ? `(${reviewsCount})` : `(${reviewsCount} avaliações)`}
+                </span>
             </>
         ) : (
-            <span className="text-brand-inactive-text">Sem avaliações</span>
+            <span className="text-brand-inactive-text">{short ? "(0)" : "Sem avaliações"}</span>
         )}
     </div>
 )
@@ -177,6 +179,48 @@ const StatItem = ({ value, label, icon }: any) => (
     </div>
 )
 
+const getBusinessDayStatus = (value: any) => {
+    if (!value?.enabled) return "closed"
+    
+    try {
+        const now = new Date()
+        const currentMinutes = now.getHours() * 60 + now.getMinutes()
+        
+        const [fromH, fromM] = value.from.split(":").map(Number)
+        const fromMinutes = fromH * 60 + fromM
+        
+        const [toH, toM] = value.to.split(":").map(Number)
+        const toMinutes = toH * 60 + toM
+        
+        if (fromMinutes < toMinutes) {
+            if (currentMinutes < fromMinutes || currentMinutes >= toMinutes) {
+                return "closed"
+            }
+            if (toMinutes - currentMinutes <= 60) {
+                return "closing_soon"
+            }
+            return "open"
+        } else {
+            const isOpen = currentMinutes >= fromMinutes || currentMinutes < toMinutes
+            if (!isOpen) return "closed"
+            
+            let remaining = 0
+            if (currentMinutes >= fromMinutes) {
+                remaining = (24 * 60 - currentMinutes) + toMinutes
+            } else {
+                remaining = toMinutes - currentMinutes
+            }
+            
+            if (remaining <= 60) {
+                return "closing_soon"
+            }
+            return "open"
+        }
+    } catch {
+        return "open"
+    }
+}
+
 const formatOpeningHoursList = (hours: any) => {
     if (typeof hours === "string" || !hours || typeof hours !== "object") return []
     const normalizedHours = normalizeOpeningHours(hours)
@@ -192,14 +236,19 @@ const formatOpeningHoursList = (hours: any) => {
     const currentDayKey = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][new Date().getDay()]
     return Object.entries(normalizedHours)
         .sort((a, b) => ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].indexOf(a[0]) - ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].indexOf(b[0]))
-        .map(([key, value]: [string, any]) => ({
-            dayName: daysMap[key] || key,
-            timeString: value?.enabled ? `${value.from} - ${value.to}` : "Fechado",
-            isCurrentDay: key === currentDayKey,
-        }))
+        .map(([key, value]: [string, any]) => {
+            const isCurrentDay = key === currentDayKey
+            const status = isCurrentDay ? getBusinessDayStatus(value) : "open"
+            return {
+                dayName: daysMap[key] || key,
+                timeString: value?.enabled ? `${value.from} - ${value.to}` : "Fechado",
+                isCurrentDay,
+                status,
+            }
+        })
 }
 
-const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; name?: string; address?: string }) => {
+const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: number; name?: string; address?: string; isActive?: boolean }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<any>(null)
     const [isMapping, setIsMapping] = useState(true)
@@ -256,6 +305,14 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
         }
     }, [lat, lng, name, address])
 
+    useEffect(() => {
+        if (isActive && mapRef.current) {
+            setTimeout(() => {
+                mapRef.current?.resize()
+            }, 100)
+        }
+    }, [isActive])
+
     if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || !isMapping) {
         return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Localizacao indisponivel no mapa.</div>
     }
@@ -293,7 +350,7 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
     )
 }
 
-const InfoTab = ({ partner, stats }: any) => {
+const InfoTab = ({ partner, stats, isActive }: any) => {
     const hoursList = formatOpeningHoursList(partner.openingHours)
     const paymentMethodsArr = (partner.paymentMethods || []).filter(isPaymentActive)
     const pixMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "pix")
@@ -353,12 +410,36 @@ const InfoTab = ({ partner, stats }: any) => {
                     <div>
                         <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Horário de Funcionamento</h3>
                         <div className="space-y-3">
-                            {hoursList.map((item: any) => (
-                                <div key={item.dayName} className="flex justify-between items-center text-[14px]">
-                                    <span className={item.isCurrentDay ? "text-brand-green font-medium" : "text-brand-dark"}>{item.dayName}</span>
-                                    <span className={item.isCurrentDay ? "text-brand-green font-medium" : "text-brand-inactive-text"}>{item.timeString}</span>
-                                </div>
-                            ))}
+                            {hoursList.map((item: any) => {
+                                let dayColor = "text-brand-dark"
+                                let timeColor = "text-brand-inactive-text"
+                                if (item.isCurrentDay) {
+                                    if (item.status === "closing_soon") {
+                                        dayColor = "text-yellow-600 font-medium"
+                                        timeColor = "text-yellow-600 font-medium"
+                                    } else if (item.status === "closed") {
+                                        dayColor = "text-red-600 font-medium"
+                                        timeColor = "text-red-600 font-medium"
+                                    } else {
+                                        dayColor = "text-brand-green font-medium"
+                                        timeColor = "text-brand-green font-medium"
+                                    }
+                                }
+                                return (
+                                    <div key={item.dayName} className="flex justify-between items-center text-[14px]">
+                                        <span className="flex items-center gap-1.5">
+                                            <span className={dayColor}>{item.dayName}</span>
+                                            {item.isCurrentDay && item.status === "closing_soon" && (
+                                                <ClockIcon size={14} className="text-yellow-600 shrink-0" />
+                                            )}
+                                            {item.isCurrentDay && item.status === "closed" && (
+                                                <ClockIcon size={14} className="text-red-600 shrink-0" />
+                                            )}
+                                        </span>
+                                        <span className={timeColor}>{item.timeString}</span>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
                     <div className="h-[1px] bg-brand-border w-full" />
@@ -376,7 +457,7 @@ const InfoTab = ({ partner, stats }: any) => {
                     </div>
                 </div>
                 <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 shrink-0">
-                    <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.storeName} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} />
+                    <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.storeName} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} isActive={isActive} />
                 </div>
             </div>
         </div>
@@ -496,6 +577,22 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const [isContextModalOpen, setIsContextModalOpen] = useState(false)
     const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info" | "gallery">("reviews")
     const [isAboutPageOpen, setIsAboutPageOpen] = useState(false)
+    const [infoHasBeenOpened, setInfoHasBeenOpened] = useState(false)
+    const [reviewsHasBeenOpened, setReviewsHasBeenOpened] = useState(false)
+    const [galleryHasBeenOpened, setGalleryHasBeenOpened] = useState(false)
+
+    useEffect(() => {
+        if (activeSection === "info" || (isAboutPageOpen && mobileModalTab === "info")) {
+            setInfoHasBeenOpened(true)
+        }
+        if (activeSection === "reviews" || (isAboutPageOpen && mobileModalTab === "reviews")) {
+            setReviewsHasBeenOpened(true)
+        }
+        if (activeSection === "gallery" || (isAboutPageOpen && mobileModalTab === "gallery")) {
+            setGalleryHasBeenOpened(true)
+        }
+    }, [activeSection, mobileModalTab, isAboutPageOpen])
+
     const [gallery, setGallery] = useState<string[]>(() => partner.gallery || [])
     const [localImages, setLocalImages] = useState<string[]>(() => partner.gallery || [])
     const [searchValue, setSearchValue] = useState("")
@@ -821,17 +918,14 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] border border-brand-border shrink-0 bg-gray-50" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                                    <h1 className="text-[18px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
+                                    <h1 className="text-[16px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
+                                    <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} short />
                                 </div>
                                 <p className="text-[12px] text-brand-inactive-text font-normal leading-tight">{partner.city}, {partner.state}</p>
-                                <div className="mt-0.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                            <button onClick={() => setShowShareModal(true)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
-                                <ShareIcon size={14} />
-                            </button>
                             <button
                                 onClick={() => setIsAboutPageOpen(true)}
                                 className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors"
@@ -1114,24 +1208,30 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     )}
 
                     <div className="hidden lg:block">
-                        {activeSection === "info" && (
-                            <div>
-                                <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informações de {partner.storeName}</h2>
-                                <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} />
-                            </div>
-                        )}
-                        {activeSection === "reviews" && (
-                            <div>
-                                <h2 className="text-[24px] font-normal text-brand-dark mb-6">Avaliações</h2>
-                                <ReviewsTab reviews={reviews} />
-                            </div>
-                        )}
-                        {activeSection === "gallery" && (
-                            <div>
-                                <h2 className="text-[24px] font-normal text-brand-dark mb-6">Galeria</h2>
-                                <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
-                            </div>
-                        )}
+                        <div style={{ display: activeSection === "info" ? "block" : "none" }}>
+                            {infoHasBeenOpened && (
+                                <>
+                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informações de {partner.storeName}</h2>
+                                    <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={activeSection === "info"} />
+                                </>
+                            )}
+                        </div>
+                        <div style={{ display: activeSection === "reviews" ? "block" : "none" }}>
+                            {reviewsHasBeenOpened && (
+                                <>
+                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Avaliações</h2>
+                                    <ReviewsTab reviews={reviews} />
+                                </>
+                            )}
+                        </div>
+                        <div style={{ display: activeSection === "gallery" ? "block" : "none" }}>
+                            {galleryHasBeenOpened && (
+                                <>
+                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Galeria</h2>
+                                    <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                                </>
+                            )}
+                        </div>
                     </div>
                 </main>
             </div>
@@ -1173,24 +1273,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <BottomSheet isOpen={isAboutPageOpen} onClose={() => setIsAboutPageOpen(false)}>
                 <div className="flex flex-col">
-                    <div className="px-1 py-2 flex items-start justify-between gap-4">
-                        <div className="flex flex-col gap-2 shrink-0">
-                            <div className="flex flex-col items-center">
-                                <span className="text-[18px] font-bold text-brand-dark leading-tight">{stats.salesCount >= 1000 ? `${formatNumber(stats.salesCount / 1000, 1, 1)}k` : stats.salesCount}</span>
-                                <span className="text-[10px] text-brand-inactive-text font-medium uppercase leading-tight mt-0.5">Vendas</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <span className="text-[13px] font-semibold text-brand-dark leading-tight whitespace-nowrap">{formatJoinDate(partner.createdAt)}</span>
-                                <span className="text-[10px] text-brand-inactive-text font-medium uppercase leading-tight mt-0.5">Na Dudit</span>
+                    <div className="px-1 py-2 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[50px] h-[50px] border border-brand-border shrink-0 bg-gray-50" />
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                    <h2 className="text-[16px] font-bold text-brand-dark leading-tight truncate">{partner.storeName}</h2>
+                                    <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} short />
+                                </div>
+                                <p className="text-[13px] text-brand-inactive-text font-normal leading-tight mt-0.5">{partner.city}, {partner.state}</p>
                             </div>
                         </div>
-                        <div className="flex flex-col items-center min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[64px] h-[64px] border border-brand-border shrink-0 mb-2 bg-gray-50" />
-                            <div className="flex items-center gap-2 min-w-0">
-                                <h2 className="text-[18px] font-bold text-brand-dark leading-none truncate">{partner.storeName}</h2>
-                                <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} />
-                            </div>
-                            <p className="text-[13px] text-brand-inactive-text font-medium mt-0.5">{partner.city}, {partner.state}</p>
+                        <div className="flex flex-col items-end shrink-0 text-right">
+                            <span className="text-[13px] font-medium text-brand-dark leading-tight">{stats.salesCount >= 1000 ? `${formatNumber(stats.salesCount / 1000, 1, 1)}k` : stats.salesCount} vendas</span>
+                            <span className="text-[13px] font-medium text-brand-inactive-text leading-tight mt-1">{formatJoinDate(partner.createdAt)}</span>
                         </div>
                     </div>
                     <div className="sticky top-0 z-40 bg-white border-b border-brand-border mb-4">
@@ -1203,15 +1299,21 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </Tabs>
                     </div>
                     <div className="px-2 pb-6">
-                        {mobileModalTab === "reviews" && (
-                            <ReviewsTab reviews={reviews} />
-                        )}
-                        {mobileModalTab === "info" && (
-                            <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} />
-                        )}
-                        {mobileModalTab === "gallery" && (
-                            <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
-                        )}
+                        <div style={{ display: mobileModalTab === "reviews" ? "block" : "none" }}>
+                            {reviewsHasBeenOpened && (
+                                <ReviewsTab reviews={reviews} />
+                            )}
+                        </div>
+                        <div style={{ display: mobileModalTab === "info" ? "block" : "none" }}>
+                            {infoHasBeenOpened && (
+                                <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={isAboutPageOpen && mobileModalTab === "info"} />
+                            )}
+                        </div>
+                        <div style={{ display: mobileModalTab === "gallery" ? "block" : "none" }}>
+                            {galleryHasBeenOpened && (
+                                <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                            )}
+                        </div>
                     </div>
                 </div>
             </BottomSheet>

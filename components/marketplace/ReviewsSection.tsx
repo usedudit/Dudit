@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
 import { StarIcon, FlagIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -77,6 +77,8 @@ function getVariantLabel(v: any): string | null {
 
 export function ReviewsSection({ reviews, showItemInfo = false, className = "" }: ReviewsSectionProps) {
     const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null)
+    const [visibleCount, setVisibleCount] = useState(20)
+    const sentinelRef = useRef<HTMLDivElement>(null)
 
     const avgRating = reviews.length > 0
         ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
@@ -86,6 +88,34 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
         star,
         count: reviews.filter(r => r.rating === star).length
     }))
+
+    const displayedReviews = useMemo(() => {
+        return reviews.slice(0, visibleCount)
+    }, [reviews, visibleCount])
+
+    const hasMore = reviews.length > visibleCount
+
+    useEffect(() => {
+        if (!hasMore) return
+
+        const observer = new IntersectionObserver((entries) => {
+            const first = entries[0]
+            if (first.isIntersecting) {
+                setVisibleCount(prev => Math.min(prev + 20, reviews.length))
+            }
+        }, { rootMargin: "200px" })
+
+        const currentSentinel = sentinelRef.current
+        if (currentSentinel) {
+            observer.observe(currentSentinel)
+        }
+
+        return () => {
+            if (currentSentinel) {
+                observer.unobserve(currentSentinel)
+            }
+        }
+    }, [hasMore, reviews.length])
 
     if (reviews.length === 0) {
         return (
@@ -127,7 +157,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
             </div>
 
             <div className="space-y-6">
-                {reviews.map((rev) => {
+                {displayedReviews.map((rev) => {
                     const itemName = rev.products?.name || rev.services?.name || rev.product_name || rev.service_name
                     const itemImages = rev.products?.images || rev.services?.images || null
                     const unit = rev.unit || rev.products?.unit || rev.services?.unit
@@ -213,6 +243,12 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                     )
                 })}
             </div>
+
+            {hasMore && (
+                <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
+                    <span className="text-xs text-brand-inactive-text">Carregando mais avaliações...</span>
+                </div>
+            )}
 
             {reportTarget && (
                 <ReportModal

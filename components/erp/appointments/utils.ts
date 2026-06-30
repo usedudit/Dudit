@@ -271,3 +271,52 @@ export const checkAppointmentCollision = (apt: Appointment, allApts: Appointment
     });
 };
 
+export const getGridHoursRange = (currentDate: Date, openingHours: any) => {
+    let startHour = 8;
+    let endHour = 19;
+    if (openingHours) {
+        const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+        const dName = DAYS_OF_WEEK[currentDate.getDay()];
+        const dConfig = openingHours[dName];
+        if (dConfig && dConfig.enabled && dConfig.from && dConfig.to) {
+            const fromHour = parseInt(dConfig.from.split(':')[0], 10);
+            const toHour = parseInt(dConfig.to.split(':')[0], 10);
+            const toMin = parseInt(dConfig.to.split(':')[1], 10);
+            if (!isNaN(fromHour) && !isNaN(toHour)) {
+                startHour = fromHour;
+                endHour = toMin > 0 ? toHour : toHour - 1;
+            }
+        } else {
+            // Fallback: union of all enabled days
+            let minHour = 24;
+            let maxHour = 0;
+            let hasOpenDays = false;
+            for (const day of DAYS_OF_WEEK) {
+                const cfg = openingHours[day];
+                if (cfg && cfg.enabled && cfg.from && cfg.to) {
+                    const fHour = parseInt(cfg.from.split(':')[0], 10);
+                    const tHour = parseInt(cfg.to.split(':')[0], 10);
+                    const tMin = parseInt(cfg.to.split(':')[1], 10);
+                    if (!isNaN(fHour) && !isNaN(tHour)) {
+                        if (fHour < minHour) minHour = fHour;
+                        const dayEnd = tMin > 0 ? tHour : tHour - 1;
+                        if (dayEnd > maxHour) maxHour = dayEnd;
+                        hasOpenDays = true;
+                    }
+                }
+            }
+            if (hasOpenDays) {
+                startHour = minHour;
+                endHour = maxHour;
+            }
+        }
+    }
+    // Safety boundaries
+    if (startHour > endHour) {
+        startHour = 8;
+        endHour = 19;
+    }
+    return { startHour, endHour };
+};
+
+

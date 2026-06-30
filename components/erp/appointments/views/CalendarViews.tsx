@@ -5,7 +5,7 @@ import { CalendarX, X, CalendarPlus, CalendarOff, ArrowUpDown, AlertTriangle } f
 import { MoneyIcon, PartiallyPaidIcon, LikeIcon, PlayIcon, EyeOffIcon, ClockIcon, BlockedIcon } from '@/lib/icons';
 import { Button } from '../../../reusable';
 import { Appointment, StaffMember } from '../types';
-import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, isMultiDay, checkAppointmentCollision } from '../utils';
+import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, isMultiDay, checkAppointmentCollision, getGridHoursRange } from '../utils';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
@@ -274,8 +274,7 @@ export const MobileView = ({
 
 // ... DayView ...
 export const DayView = ({ appointments, allAppointments = [], currentDate, staffMembers, onOpenView, handleGridMouseMove, handleGridMouseLeave, handleGridClick, hoverColIndex, hoverTime, activePopover, setActivePopover, handleOpenCreate, handleOpenUnavailable, openingHours }: any) => {
-    const startHour = 8;
-    const endHour = 19;
+    const { startHour, endHour } = getGridHoursRange(currentDate, openingHours);
     const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => i + startHour);
 
     // Split appointments into all-day/multi-day and regular hourly

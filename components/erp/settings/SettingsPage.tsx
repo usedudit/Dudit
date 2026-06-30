@@ -27,7 +27,7 @@ import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { ReturnPolicySubPage } from "./ReturnPolicySubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
-import { ServiceCheckoutSettingsSubPage } from "./ServiceCheckoutSettingsSubPage"
+import { SystemSettingsSubPage } from "./SystemSettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
@@ -57,7 +57,7 @@ type ActivePage =
   | "recibo"
   | "vitrine"
   | "delivery"
-  | "service-checkout"
+  | "system-settings"
   | "resources"
 
 export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProps) {
@@ -79,7 +79,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "recibo": "recibo-devolucao",
     "vitrine": "vitrine",
     "delivery": "entrega",
-    "service-checkout": "servicos-checkout",
+    "system-settings": "configuracoes-sistema",
     "integrations": "integracoes",
     "resources": "gerenciar-recursos",
   }
@@ -165,7 +165,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const isOwnerOrAdmin = isOwner || isAdmin
   const isOwnerAdminOrManager = isOwner || isAdmin || isManager
 
-  const canAccessOS = businessInfo?.sells?.includes("services") && isOwnerAdminOrManager
   const showVitrine = isOwnerOrAdmin && isSystemResourceActive(businessInfo, "showcase")
   const isQuick = businessInfo.mode === "quick"
   const isDeliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
@@ -177,13 +176,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessPayments = isOwnerOrAdmin
   const canAccessReturns = isOwnerAdminOrManager
   const canAccessDelivery = isOwnerOrAdmin
-  const canAccessServiceCheckout = canAccessOS
+  const canAccessSystemSettings = isOwnerOrAdmin
   const canAccessBusinessData = isOwnerAdminOrManager
   const canAccessResources = isOwnerOrAdmin
   const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const paymentsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const commissionsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
-  const serviceCheckoutPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const deliveryPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const integrationsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
@@ -357,17 +355,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 className="px-4 py-3 gap-4"
                               />
                             )}
-                            {canAccessServiceCheckout && (
+                            {canAccessSystemSettings && (
                               <ListItem
                                 icon={WrenchIcon}
-                                title={serviceCheckoutPlanBlocked ? (
-                                  <span className="inline-flex items-center gap-2">
-                                    Serviços - Checkout
-                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                  </span>
-                                ) : "Serviços - Checkout"}
-                                description="Entrada (sinal) e opções de pagamento na vitrine."
-                                onClick={() => setActivePage("service-checkout")}
+                                title="Configurações do Sistema"
+                                description="Fuso horário e configurações gerais do sistema."
+                                onClick={() => setActivePage("system-settings")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -447,8 +440,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "recibo" && <ReturnPolicySubPage key="recibo" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && <ShowcaseSubPage key="vitrine" partner={partner} onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
-          {activePage === "service-checkout" && canAccessServiceCheckout && (
-            <ServiceCheckoutSettingsSubPage key="service-checkout" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={serviceCheckoutPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />
+          {activePage === "system-settings" && canAccessSystemSettings && (
+            <SystemSettingsSubPage key="system-settings" partnerId={partner.id} onBack={() => setActivePage("home")} />
           )}
           {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => setActivePage("home")} />}
         </AnimatePresence>

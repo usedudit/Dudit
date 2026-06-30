@@ -977,15 +977,14 @@ export function ServiceDetailsPageClient({
                         );
 
                         return (
-                            <div className="rounded-xl overflow-hidden border border-brand-orange/20 shadow-sm mb-6">
+                            <div className="rounded-xl overflow-hidden border border-orange-100 mb-6">
                                 {/* Banner de Campanha */}
-                                <div className="bg-brand-orange text-white px-4 py-2.5 flex justify-between items-center select-none font-extrabold italic uppercase tracking-wider text-xs md:text-sm">
+                                <div className="bg-orange-300 text-white px-4 py-2.5 flex justify-between items-center select-none font-semibold text-xs md:text-sm">
                                     <span>{activePromo?.name || "Oferta de Campanha"}</span>
-                                    <span>{pricing.campaignDiscountLabel} OFF</span>
                                 </div>
 
                                 {/* Bloco de Preço */}
-                                <div className="bg-brand-orange-light/10 dark:bg-brand-orange-light/5 p-4 space-y-1">
+                                <div className="bg-[#fff7ed] border border-orange-100 p-4 space-y-1">
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-brand-inactive-text line-through font-normal">
                                             {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix}
@@ -994,10 +993,9 @@ export function ServiceDetailsPageClient({
                                     {hasPix ? (
                                         <>
                                             <div className="flex items-baseline gap-2 flex-wrap">
-                                                <p className="text-3xl md:text-4xl leading-none font-extrabold text-brand-dark">
+                                                <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
                                                     {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
                                                 </p>
-                                                {discountBadge}
                                                 <span className="text-xs md:text-sm font-semibold text-brand-green">no Pix</span>
                                             </div>
                                             <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
@@ -1006,10 +1004,9 @@ export function ServiceDetailsPageClient({
                                         </>
                                     ) : (
                                         <div className="flex items-baseline gap-2 flex-wrap">
-                                            <p className="text-3xl md:text-4xl leading-none font-extrabold text-brand-dark">
+                                            <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
                                                 {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix}
                                             </p>
-                                            {discountBadge}
                                         </div>
                                     )}
                                     <Button
