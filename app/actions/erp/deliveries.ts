@@ -1356,7 +1356,7 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           payment_method,
           payment_breakdown,
           paid_amount,
-          coupon_discount_amount,
+          discount_amount,
           payment_method_discount_amount,
           payment_method_extra_amount,
           additional_costs,

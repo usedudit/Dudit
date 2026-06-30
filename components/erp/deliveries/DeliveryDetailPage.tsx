@@ -586,7 +586,7 @@ export default function DeliveryDetailPage({
                     : Number(order.paid_amount || 0) > 0 && order.payment_method
                         ? [{ method: order.payment_method, amount: Number(order.paid_amount || 0) }]
                         : []
-                const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
+                const couponDiscountAmount = Math.max(0, Number(order.discount_amount ?? order.coupon_discount_amount ?? 0))
                 const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))
                 const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
                 const subtotalValue = Number(order.subtotal_value || 0) > 0
