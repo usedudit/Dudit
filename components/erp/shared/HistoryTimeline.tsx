@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MoneyIcon, ClockIcon, FileIcon, BlockedIcon, InfoIcon } from "@/lib/icons"
 import { formatDateTime, cn } from "@/lib/utils"
+import { IconPlaceholder } from "@/components/reusable"
 
 export interface HistoryEntry {
     id: string | number
@@ -69,9 +70,7 @@ export function HistoryTimeline({
 }: HistoryTimelineProps) {
     if (entries.length === 0) {
         return (
-            <div className="rounded-2xl border border-dashed border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-8 text-center text-sm text-brand-inactive-text dark:text-dark-body">
-                {emptyMessage}
-            </div>
+            <IconPlaceholder icon={ClockIcon} title="Nenhum histórico encontrado" subtitle={emptyMessage} />
         )
     }
 

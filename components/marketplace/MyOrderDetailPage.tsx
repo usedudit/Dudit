@@ -1269,7 +1269,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     )}
 
                                     {(order.order_items || []).some((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription") && (
-                                        <FormSection title="Atendimento e Assinaturas">
+                                        <FormSection title="Locais de atendimento">
                                             <div className="space-y-4">
                                                 {(order.order_items || [])
                                                     .filter((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription")
@@ -1278,7 +1278,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         const mode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
                                                         const isCustomerAddress = mode === "customer_location" || mode === "delivery";
                                                         const address = isCustomerAddress
-                                                            ? (order.delivery_address || "Endereco nao informado")
+                                                            ? (order.delivery_address || "Endereço nao informado")
                                                             : formatPartnerAddress(order.partners?.addresses);
 
                                                         const isServiceCancelled = order.situation === "cancelled";

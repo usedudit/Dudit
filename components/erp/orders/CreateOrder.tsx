@@ -16,7 +16,7 @@ import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
 import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -587,6 +587,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
         load()
     }, [editOrderId, partnerId, notifyError, normalizeSalesChannel])
+
+    const searchParams = useSearchParams()
+    useEffect(() => {
+        if (!isLoadingData && editOrderId && searchParams?.get("payment") === "1") {
+            setIsPaymentModalOpen(true)
+        }
+    }, [isLoadingData, editOrderId, searchParams])
 
     useEffect(() => {
         async function loadAccounts() {

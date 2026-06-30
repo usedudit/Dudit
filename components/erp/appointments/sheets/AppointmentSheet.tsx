@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge } from '@/components/reusable';
-import { getAvailableTimeSlotsAction, getMarketplaceOrderDetailsAction, getAppointmentOrderDataAction } from '@/app/actions/erp/appointments';
+import { getAvailableTimeSlotsAction, getAppointmentOrderDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
@@ -168,18 +168,6 @@ export const AppointmentSheet = ({
         situation: string
         orderSource: string
     } | null>(null)
-
-    useEffect(() => {
-        const orderId = appointment?.marketplaceOrderId
-        const partner = partnerId
-        if (!orderId || !partner || mode !== 'view') {
-            setMarketplaceOrderData(null)
-            return
-        }
-        getMarketplaceOrderDetailsAction(orderId, partner).then(data => {
-            setMarketplaceOrderData(data)
-        }).catch(() => setMarketplaceOrderData(null))
-    }, [appointment?.marketplaceOrderId, partnerId, mode])
 
     // Status & Notes State
     const [status, setStatus] = useState(appointment?.status || 'Reservado');
@@ -569,7 +557,17 @@ export const AppointmentSheet = ({
     }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, defaultDate, initialStaffId, staffSource]);
 
     // Calculate Price dynamically for Time-Based Services
-    const getEffectiveServicePrice = (svc: any) => computeItemDisplayPrice(Number(svc.price || 0), svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null, aptPromotions, { serviceId: svc.id }).bestPrice
+    const isMarketplaceOrder = useMemo(() => 
+        mode === 'view' && (marketplaceOrderData?.orderSource === "Online Store" || marketplaceOrderData?.orderSource === "Marketplace"),
+        [mode, marketplaceOrderData?.orderSource]
+    )
+
+    const effectivePromotions = useMemo(() => 
+        isMarketplaceOrder ? aptPromotions : [],
+        [isMarketplaceOrder, aptPromotions]
+    )
+
+    const getEffectiveServicePrice = (svc: any) => computeItemDisplayPrice(Number(svc.price || 0), svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null, effectivePromotions, { serviceId: svc.id }).bestPrice
 
     const calculatedPrice = useMemo(() => {
         return selectedServices.reduce((acc, service) => {
@@ -1030,6 +1028,7 @@ export const AppointmentSheet = ({
         if (!partnerId || !linkedOrderId || mode !== 'view') {
             setOrderNumber(null)
             setOrderItems(null)
+            setMarketplaceOrderData(null)
             setOrderPaymentInfo(null)
             return
         }
@@ -1038,10 +1037,17 @@ export const AppointmentSheet = ({
             if (!cancelled && data) {
                 setOrderNumber(data.orderNumber)
                 setOrderItems(data.items)
+                setMarketplaceOrderData({
+                    totalAmount: data.totalAmount,
+                    paymentMethod: data.paymentMethod || "",
+                    paidAmount: data.paidAmount,
+                    situation: data.situation,
+                    orderSource: data.orderSource || "",
+                })
                 setOrderPaymentInfo({ situation: data.situation, paidAmount: data.paidAmount, totalAmount: data.totalAmount })
             }
         }).catch(() => {
-            if (!cancelled) { setOrderNumber(null); setOrderItems(null); setOrderPaymentInfo(null) }
+            if (!cancelled) { setOrderNumber(null); setOrderItems(null); setMarketplaceOrderData(null); setOrderPaymentInfo(null) }
         })
         return () => { cancelled = true }
     }, [linkedOrderId, partnerId, mode])
@@ -1314,7 +1320,7 @@ export const AppointmentSheet = ({
                                                                     />
                                                                 </div>
                                                             )}
-                                                            {(() => { const pr = computeItemDisplayPrice(Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, aptPromotions, { serviceId: item.id }); return (<div className="flex items-center gap-1.5 mt-2">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}
+                                                            {(() => { const pr = computeItemDisplayPrice(Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, effectivePromotions, { serviceId: item.id }); return (<div className="flex items-center gap-1.5 mt-2">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}
                                                         </div>
                                                     </div>
                                                 );
@@ -1748,7 +1754,7 @@ export const AppointmentSheet = ({
                                                 onRemove={!isLocked ? () => handleRemoveServiceRequest(idx) : undefined}
                                                 timeRange={getServiceTimeRange(idx)}
                                                 fulfillmentMode={appointment?.fulfillmentMode}
-                                                promotions={aptPromotions}
+                                                promotions={effectivePromotions}
                                             />
                                         ))}
                                     </div>

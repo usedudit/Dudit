@@ -709,24 +709,38 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       const row = createdRows[i]
       const price = Number(row.price || 0)
       if (price > 0.009 && row.source !== "unavailable") {
-        // ── Central pricing engine ──────────────────────────────────────────
-        const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
-        const rawPromotions = await listActivePromotionsForMarketplaceAction(partnerId, row.customer_id || null)
-        const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
+        const isMarketplace = !!row.marketplace_order_id
 
-        const pricingResult = calculateOrderPricing({
-          items: [{
-            serviceId: row.service_id,
-            categoryId: row.category_id,
-            unitPrice: price,
-            quantity: 1
-          }],
-          shippingCost: 0,
-          promotions: filteredPromotions,
-        })
+        let pricingResult: any
+        let giftItems: any[] = []
+        let filteredPromotions: any[] = []
+        if (isMarketplace) {
+          const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
+          const rawPromotions = await listActivePromotionsForMarketplaceAction(partnerId, row.customer_id || null)
+          filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
 
-        const giftIds = pricingResult.appliedGiftProductIds || []
-        const giftItems = await buildGiftOrderItems(supabase, giftIds, filteredPromotions)
+          pricingResult = calculateOrderPricing({
+            items: [{
+              serviceId: row.service_id,
+              categoryId: row.category_id,
+              unitPrice: price,
+              quantity: 1
+            }],
+            shippingCost: 0,
+            promotions: filteredPromotions,
+          })
+
+          const giftIds = pricingResult.appliedGiftProductIds || []
+          giftItems = await buildGiftOrderItems(supabase, giftIds, filteredPromotions)
+        } else {
+          pricingResult = {
+            finalTotal: price,
+            subtotal: price,
+            appliedGiftProductIds: [],
+            appliedPromotionIds: [],
+            pricingVersion: null,
+          }
+        }
 
         // 1. Create a pending order in public.orders
         const { data: order, error: orderErr } = await supabase
