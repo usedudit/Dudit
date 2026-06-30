@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, IconPlaceholder } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import Pagination from "@/components/reusable/Pagination"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -21,6 +21,34 @@ import DeliveryDetailPage from "./DeliveryDetailPage"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { formatDistance } from "@/lib/services/location.service"
+import { toast } from "@/hooks/use-notification"
+
+const CHANGE_STATUS_REASONS = [
+    { value: "operational_error", label: "Erro operacional / Clique acidental" },
+    { value: "rescheduling", label: "Cliente solicitou reagendamento" },
+    { value: "logistics_issue", label: "Problema logístico / Rota" },
+    { value: "payment_issue", label: "Problema com pagamento" },
+    { value: "other", label: "Outro" }
+]
+
+function doesTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
+    if (currentStatus === "delivered" && nextStatus !== "delivered") {
+        return true;
+    }
+    if (currentStatus === "delivery_failed" && nextStatus !== "delivery_failed") {
+        return true;
+    }
+    if (currentStatus === "sent" && ["preparing", "pickup_available", "delivery_failed", "not_sent", "pending"].includes(nextStatus)) {
+        return true;
+    }
+    if (currentStatus === "pickup_available" && ["preparing", "sent", "delivery_failed", "not_sent", "pending"].includes(nextStatus)) {
+        return true;
+    }
+    if (currentStatus === "preparing" && ["not_sent", "pending", "delivery_failed"].includes(nextStatus)) {
+        return true;
+    }
+    return false;
+}
 
 type SortKey = "order_id" | "delivery_fee" | "status" | "delivery_person" | "estimated_time" | "dates" | "delivered_at"
 type SortDirection = "asc" | "desc"
@@ -250,19 +278,82 @@ export default function DeliveriesPage({
         return list
     }, [items, search, filters, sortConfig, statusOverrides])
 
-    const handleQuickStatusChange = async (deliveryId: string, status: string) => {
+    const [statusModal, setStatusModal] = useState<{ isOpen: boolean; deliveryId: string; currentStatus: string; nextStatus: string } | null>(null)
+    const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
+        isOpen: boolean
+        deliveryId: string
+        nextStatus: string
+        currentStatus: string
+        reasonDropdownValue: string
+        customReasonText: string
+    } | null>(null)
+    const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; deliveryId: string; nextStatus: string } | null>(null)
+
+    const handleStatusChangeClick = useCallback((deliveryId: string, currentStatus: string) => {
+        setStatusModal({
+            isOpen: true,
+            deliveryId,
+            currentStatus,
+            nextStatus: currentStatus
+        })
+    }, [])
+
+    const handleStatusTransition = useCallback((deliveryId: string, currentStatus: string, nextStatus: string) => {
+        setStatusModal(null)
+        if (currentStatus === nextStatus) return
+
+        if (doesTransitionRequireReason(currentStatus, nextStatus)) {
+            setDeliveryWarningModal({
+                isOpen: true,
+                deliveryId,
+                nextStatus,
+                currentStatus,
+                reasonDropdownValue: "",
+                customReasonText: ""
+            })
+        } else {
+            setSimpleConfirmModal({
+                isOpen: true,
+                deliveryId,
+                nextStatus
+            })
+        }
+    }, [])
+
+    const confirmDeliveryWarningStatusChange = useCallback(async () => {
+        if (!deliveryWarningModal) return
+        const { deliveryId, nextStatus, reasonDropdownValue, customReasonText } = deliveryWarningModal
+        const reason = reasonDropdownValue === "other"
+            ? customReasonText.trim()
+            : CHANGE_STATUS_REASONS.find(r => r.value === reasonDropdownValue)?.label || ""
+
+        setDeliveryWarningModal(null)
+        await executeStatusChange(deliveryId, nextStatus, reason)
+    }, [deliveryWarningModal])
+
+    const executeStatusChange = useCallback(async (deliveryId: string, nextStatus: string, reason?: string) => {
         const previous = statusOverrides[deliveryId]
-        setStatusOverrides((prev) => ({ ...prev, [deliveryId]: status }))
-        const res = await updateERPDeliveryStatusAction({ partnerId, deliveryId, status: status as any })
+        setStatusOverrides((prev) => ({ ...prev, [deliveryId]: nextStatus }))
+        const res = await updateERPDeliveryStatusAction({
+            partnerId,
+            deliveryId,
+            status: nextStatus as any,
+            changeReason: reason
+        })
         if (!res.success) {
+            toast.error(res.error || "Erro ao atualizar status da entrega.")
             setStatusOverrides((prev) => {
                 const next = { ...prev }
                 if (previous) next[deliveryId] = previous
                 else delete next[deliveryId]
                 return next
             })
+        } else {
+            toast.success("Status da entrega atualizado com sucesso!")
         }
-    }
+    }, [partnerId, statusOverrides])
+
+    const handleQuickStatusChange = handleStatusChangeClick
 
     const totalPages = Math.max(1, Math.ceil(mapped.length / ITEMS_PER_PAGE))
     const paginated = mapped.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
@@ -490,6 +581,110 @@ export default function DeliveriesPage({
                     )}
                 </div>
             </DefaultModal>
+
+            <DefaultModal
+                isOpen={!!statusModal}
+                onClose={() => setStatusModal(null)}
+                title="Alterar Status de Entrega"
+                maxWidth="sm"
+                footer={
+                    <div className="flex gap-3 justify-end w-full">
+                        <Button variant="outline" onClick={() => setStatusModal(null)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (statusModal) {
+                                    handleStatusTransition(statusModal.deliveryId, statusModal.currentStatus, statusModal.nextStatus)
+                                }
+                            }}
+                            disabled={!statusModal?.nextStatus}
+                        >
+                            Confirmar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="p-4 space-y-4">
+                    <FormDropdown
+                        label="Status da entrega"
+                        value={statusModal?.nextStatus || ""}
+                        setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
+                        options={[
+                            { value: "pending", label: "Pendente" },
+                            { value: "preparing", label: "Em preparação" },
+                            { value: "sent", label: "Saiu para entrega" },
+                            { value: "delivered", label: "Concluída" },
+                            { value: "cancelled", label: "Cancelada" },
+                            { value: "delivery_failed", label: "Falha na entrega" },
+                        ]}
+                        placeholder="Selecione o status"
+                    />
+                </div>
+            </DefaultModal>
+
+            <AlertModal
+                isOpen={deliveryWarningModal?.isOpen ?? false}
+                onClose={() => setDeliveryWarningModal(null)}
+                onConfirm={confirmDeliveryWarningStatusChange}
+                title="Atenção: Alteração de Status"
+                message={
+                    <div className="flex flex-col gap-4 text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Esta entrega já estava como{" "}
+                            <strong className="text-brand-dark dark:text-dark-heading">
+                                {getDeliveryStatusMeta(deliveryWarningModal?.currentStatus || "").label}
+                            </strong>{" "}
+                            e você está alterando para{" "}
+                            <strong className="text-brand-dark dark:text-dark-heading">
+                                {getDeliveryStatusMeta(deliveryWarningModal?.nextStatus || "").label}
+                            </strong>.
+                            Esta ação requer uma justificativa.
+                        </p>
+                        <div className="flex flex-col gap-4 mt-2">
+                            <FormDropdown
+                                label="Motivo da alteração"
+                                options={CHANGE_STATUS_REASONS}
+                                value={deliveryWarningModal?.reasonDropdownValue || ""}
+                                setValue={(val) => setDeliveryWarningModal(prev => prev ? { ...prev, reasonDropdownValue: val } : null)}
+                                placeholder="Selecione o motivo"
+                            />
+                            {deliveryWarningModal?.reasonDropdownValue === "other" && (
+                                <Input
+                                    label="Descreva o motivo"
+                                    placeholder="Digite o motivo aqui..."
+                                    value={deliveryWarningModal?.customReasonText || ""}
+                                    onChange={(e) => setDeliveryWarningModal(prev => prev ? { ...prev, customReasonText: e.target.value } : null)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                }
+                confirmText="Confirmar Alteração"
+                cancelText="Cancelar"
+                variant="warning"
+                disabled={
+                    !deliveryWarningModal?.reasonDropdownValue ||
+                    (deliveryWarningModal.reasonDropdownValue === "other" && !deliveryWarningModal.customReasonText.trim())
+                }
+            />
+
+            <AlertModal
+                isOpen={simpleConfirmModal?.isOpen ?? false}
+                title="Confirmar Alteração de Status"
+                description={`Tem certeza que deseja alterar o status desta entrega para ${getDeliveryStatusMeta(simpleConfirmModal?.nextStatus || "").label}?`}
+                confirmText="Confirmar"
+                cancelText="Cancelar"
+                onClose={() => setSimpleConfirmModal(null)}
+                onConfirm={async () => {
+                    if (simpleConfirmModal) {
+                        const { deliveryId, nextStatus } = simpleConfirmModal;
+                        setSimpleConfirmModal(null);
+                        await executeStatusChange(deliveryId, nextStatus);
+                    }
+                }}
+                variant="info"
+            />
         </AnimatePresence>
     )
 }

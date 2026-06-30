@@ -158,11 +158,7 @@ export default function DeliveryKanbanCard({
 
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown onEdit={onDetails}>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "pending")}>Marcar Pendente</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "preparing")}>Marcar Em preparação</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "sent")}>Marcar Saiu p/ entrega</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivered")}>Marcar Concluída</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "cancelled")}>Marcar Cancelada</DropdownItem>
+              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
             </ActionsDropdown>
           </div>
         </div>

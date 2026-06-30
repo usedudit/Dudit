@@ -795,8 +795,11 @@ export async function getSmartDeliverySuggestionsAction(input: {
       if (activeOrderIds.has(String(o.id))) return false
       const situation = String(o.situation || "").toLowerCase()
       if (situation === "cancelled" || situation === "refunded") return false
-      if (String(o.delivery_status || "") === "delivered") return false
       if (!formatAddress(o)) return false
+
+      // Apenas pendente / nao enviado / em preparação
+      const dStatus = String(o.delivery_status || "").toLowerCase()
+      if (dStatus !== "pending" && dStatus !== "preparing" && dStatus !== "not_sent") return false
 
       // Pedidos que só tem serviços vc nem mostra
       const items = o.order_items || []
@@ -943,8 +946,9 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       const situation = String(order.situation || "").toLowerCase()
       if (situation === "cancelled" || situation === "refunded") return false
 
-      // Pedidos que já foram entregues vc nem mostra
-      if (order.delivery_status === "delivered") return false
+      // Apenas pendente / nao enviado / em preparação
+      const dStatus = String(order.delivery_status || "").toLowerCase()
+      if (dStatus !== "pending" && dStatus !== "preparing" && dStatus !== "not_sent") return false
 
       // Pedidos de tipo retirada vc nem mostra
       if (order.delivery_type === "pickup") return false
@@ -1355,7 +1359,6 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           coupon_discount_amount,
           payment_method_discount_amount,
           payment_method_extra_amount,
-          subtotal_value,
           additional_costs,
           discount_value,
           notes,
@@ -1392,6 +1395,7 @@ export async function updateERPDeliveryStatusAction(params: {
   partnerId: string
   deliveryId: string
   status: DeliveryStatusValue
+  changeReason?: string
 }) {
   const user = await requireUser()
   const actor = await getDeliveryActorScope(params.partnerId)
@@ -1491,6 +1495,7 @@ export async function updateERPDeliveryStatusAction(params: {
           : nextStatus === "cancelled"
             ? "Entrega cancelada"
             : "Status da entrega alterado",
+      ...(params.changeReason ? [`Motivo: ${params.changeReason}`] : []),
     ],
     metadata: { oldStatus: String(currentDelivery.status || ""), newStatus: nextStatus },
   })

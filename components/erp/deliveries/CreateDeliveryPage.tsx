@@ -140,6 +140,14 @@ export default function CreateDeliveryPage({
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
     const [planAccess, setPlanAccess] = useState<{ allowed: boolean; maxOrders: number; planSlug: string; message?: string | null } | null>(null)
     const [infoOrder, setInfoOrder] = useState<OrderPickerItem | null>(null)
+    const [activeOrder, setActiveOrder] = useState<OrderPickerItem | null>(null)
+
+    useEffect(() => {
+        if (infoOrder) {
+            setActiveOrder(infoOrder)
+        }
+    }, [infoOrder])
+
     const [orderToRemove, setOrderToRemove] = useState<string | null>(null)
 
     const isDirty = useMemo(() => {
@@ -730,7 +738,9 @@ export default function CreateDeliveryPage({
                 const isOpen = !!infoOrder;
                 const handleClose = () => setInfoOrder(null);
 
-                const sheetContent = infoOrder && (
+                if (!activeOrder) return null;
+
+                const sheetContent = (
                     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
                         <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                             <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
@@ -757,19 +767,19 @@ export default function CreateDeliveryPage({
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
                                             <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
-                                                {formatCurrency(infoOrder.totalAmount || 0)}
+                                                {formatCurrency(activeOrder.totalAmount || 0)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
                                             <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                {infoOrder.orderDate ? formatDateTime(infoOrder.orderDate) : "-"}
+                                                {activeOrder.orderDate ? formatDateTime(activeOrder.orderDate) : "-"}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Canal de Venda</span>
                                             <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                {infoOrder.orderSource || "Manual"}
+                                                {activeOrder.orderSource || "Manual"}
                                             </span>
                                         </div>
                                     </div>
@@ -778,60 +788,69 @@ export default function CreateDeliveryPage({
 
                                     <CustomerCard
                                         customer={{
-                                            name: infoOrder.customer?.name || "Cliente",
-                                            email: infoOrder.customer?.email || "",
-                                            phone: infoOrder.customer?.phone || "",
+                                            name: activeOrder.customer?.name || "Cliente",
+                                            email: activeOrder.customer?.email || "",
+                                            phone: activeOrder.customer?.phone || "",
                                         }}
-                                        address={buildCustomerAddress(infoOrder.address)}
+                                        address={buildCustomerAddress(activeOrder.address)}
                                         showMap={false}
                                         chrome="minimal"
                                     />
                                 </TabsContent>
 
                                 <TabsContent value="itens" className="mt-0">
-                                    {(!infoOrder.items || infoOrder.items.length === 0) ? (
-                                        <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
-                                            Nenhum item detalhado foi retornado para o pedido selecionado.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {infoOrder.items.map((item: any) => {
-                                                const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
-                                                const itemSku = item.products?.sku || item.sku || "N/A"
-                                                const itemPrice = Number(item.product_price || item.price || 0)
-                                                const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
+                                    {(() => {
+                                        const filteredItems = (activeOrder.items || []).filter((item: any) => {
+                                            const pType = String(item.products?.product_type || "").toLowerCase()
+                                            return pType !== "serviço" && pType !== "servico" && pType !== "service"
+                                        })
+                                        if (filteredItems.length === 0) {
+                                            return (
+                                                <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
+                                                    Nenhum item detalhado foi retornado para o pedido selecionado.
+                                                </div>
+                                            )
+                                        }
+                                        return (
+                                            <div className="space-y-4">
+                                                {filteredItems.map((item: any) => {
+                                                    const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
+                                                    const itemSku = item.products?.sku || item.sku || "N/A"
+                                                    const itemPrice = Number(item.product_price || item.price || 0)
+                                                    const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
 
-                                                return (
-                                                    <div key={item.id} className="flex items-start gap-4">
-                                                        <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                            <img
-                                                                src={itemImage}
-                                                                className="w-full h-full object-cover rounded-xl"
-                                                                alt={item.product_name || "Produto sem nome"}
-                                                                onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                            />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start mb-0.5">
+                                                    return (
+                                                        <div key={item.id} className="flex items-start gap-4">
+                                                            <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                <img
+                                                                    src={itemImage}
+                                                                    className="w-full h-full object-cover rounded-xl"
+                                                                    alt={item.product_name || "Produto sem nome"}
+                                                                    onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-0.5">
                                                                     <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
                                                                         {item.product_name || "Produto sem nome"}
                                                                     </h4>
-                                                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(itemSubtotal)}
-                                                                </span>
-                                                            </div>
-                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                SKU: {itemSku}
-                                                            </div>
-                                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(itemSubtotal)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                    SKU: {itemSku}
+                                                                </div>
+                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                    {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
+                                                    )
+                                                })}
+                                            </div>
+                                        )
+                                    })()}
                                 </TabsContent>
                             </div>
                         </Tabs>
@@ -844,8 +863,6 @@ export default function CreateDeliveryPage({
                     </div>
                 );
 
-                if (!isOpen) return null;
-
                 return isMobile ? (
                     <BottomSheet isOpen={isOpen} onClose={handleClose}>
                         {sheetContent}
@@ -853,11 +870,11 @@ export default function CreateDeliveryPage({
                 ) : (
                     <Portal>
                         <div
-                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
                             onClick={handleClose}
                         >
                             <div
-                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-100"}`}
+                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {sheetContent}

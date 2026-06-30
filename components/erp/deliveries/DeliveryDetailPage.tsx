@@ -103,6 +103,13 @@ export default function DeliveryDetailPage({
         customReasonText: string
     } | null>(null)
     const [selectedLink, setSelectedLink] = useState<any | null>(null)
+    const [activeLink, setActiveLink] = useState<any | null>(null)
+
+    useEffect(() => {
+        if (selectedLink) {
+            setActiveLink(selectedLink)
+        }
+    }, [selectedLink])
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
@@ -124,6 +131,10 @@ export default function DeliveryDetailPage({
             setLoading(true)
             const res = await getERPDeliveryDetailsAction(deliveryId, partnerId)
             if (mounted.current) {
+                if (!res.success) {
+                    console.error("[DeliveryDetailPage] Failed to load:", res.error)
+                    toast.error(res.error || "Erro ao carregar detalhes da entrega.")
+                }
                 setDelivery(res.success ? res.data : null)
                 setLoading(false)
             }
@@ -219,7 +230,19 @@ export default function DeliveryDetailPage({
     }
 
     if (loading) return <div className="h-full flex items-center justify-center"><ThreeDotsLoader /></div>
-    if (!delivery) return null
+    if (!delivery) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+                <p className="text-red-500 font-bold text-lg">Não foi possível carregar a entrega</p>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                    Verifique se o pedido/entrega existe ou se o seu plano atual possui acesso.
+                </p>
+                <Button variant="outline" onClick={handleBack} className="mt-4">
+                    Voltar para Entregas
+                </Button>
+            </div>
+        )
+    }
 
     const statusMeta = getDeliveryStatusMeta(delivery.status)
     const links = (delivery.delivery_orders || []).filter((l: any) => l?.orders)
@@ -553,9 +576,9 @@ export default function DeliveryDetailPage({
                 const isOpen = !!selectedLink;
                 const handleClose = () => setSelectedLink(null);
 
-                if (!isOpen) return null;
+                if (!activeLink) return null;
 
-                const order = selectedLink.orders;
+                const order = activeLink.orders;
                 if (!order) return null;
 
                 const paymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
@@ -633,8 +656,8 @@ export default function DeliveryDetailPage({
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
-                                            <Badge variant={getDeliveryStatusMeta(selectedLink.status || order.delivery_status).variant}>
-                                                {getDeliveryStatusMeta(selectedLink.status || order.delivery_status).label}
+                                            <Badge variant={getDeliveryStatusMeta(activeLink.status || order.delivery_status).variant}>
+                                                {getDeliveryStatusMeta(activeLink.status || order.delivery_status).label}
                                             </Badge>
                                         </div>
                                     </div>
@@ -654,49 +677,58 @@ export default function DeliveryDetailPage({
                                 </TabsContent>
 
                                 <TabsContent value="itens" className="mt-0">
-                                    {(!order.order_items || order.order_items.length === 0) ? (
-                                        <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
-                                            Nenhum item detalhado foi retornado para o pedido selecionado.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {order.order_items.map((item: any) => {
-                                                const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
-                                                const itemSku = item.products?.sku || item.sku || "N/A"
-                                                const itemPrice = Number(item.product_price || item.price || 0)
-                                                const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
+                                    {(() => {
+                                        const filteredItems = (order.order_items || []).filter((item: any) => {
+                                            const pType = String(item.products?.product_type || "").toLowerCase()
+                                            return pType !== "serviço" && pType !== "servico" && pType !== "service"
+                                        })
+                                        if (filteredItems.length === 0) {
+                                            return (
+                                                <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
+                                                    Nenhum item detalhado foi retornado para o pedido selecionado.
+                                                </div>
+                                            )
+                                        }
+                                        return (
+                                            <div className="space-y-4">
+                                                {filteredItems.map((item: any) => {
+                                                    const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
+                                                    const itemSku = item.products?.sku || item.sku || "N/A"
+                                                    const itemPrice = Number(item.product_price || item.price || 0)
+                                                    const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
 
-                                                return (
-                                                    <div key={item.id} className="flex items-start gap-4">
-                                                        <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                            <img
-                                                                src={itemImage}
-                                                                className="w-full h-full object-cover rounded-xl"
-                                                                alt={item.product_name || "Produto sem nome"}
-                                                                onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                            />
+                                                    return (
+                                                        <div key={item.id} className="flex items-start gap-4">
+                                                            <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                <img
+                                                                    src={itemImage}
+                                                                    className="w-full h-full object-cover rounded-xl"
+                                                                    alt={item.product_name || "Produto sem nome"}
+                                                                    onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-0.5">
+                                                                    <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                        {item.product_name || "Produto sem nome"}
+                                                                    </h4>
+                                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(itemSubtotal)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                    SKU: {itemSku}
+                                                                </div>
+                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                    {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start mb-0.5">
-                                                                <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                    {item.product_name || "Produto sem nome"}
-                                                                </h4>
-                                                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(itemSubtotal)}
-                                                                </span>
-                                                            </div>
-                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                SKU: {itemSku}
-                                                            </div>
-                                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                {item.quantity} un. • {formatCurrency(itemPrice)} / un.
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
+                                                    )
+                                                })}
+                                            </div>
+                                        )
+                                    })()}
                                 </TabsContent>
 
                                 <TabsContent value="pagamento" className="mt-0 space-y-3">
@@ -803,7 +835,7 @@ export default function DeliveryDetailPage({
                                 type="button"
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 h-12 font-bold"
                                 onClick={() => {
-                                    setSelectedNewStatus(selectedLink.status || order.delivery_status || "pending");
+                                    setSelectedNewStatus(activeLink.status || order.delivery_status || "pending");
                                     setIsStatusModalOpen(true);
                                 }}
                             >
@@ -823,11 +855,11 @@ export default function DeliveryDetailPage({
                 ) : (
                     <Portal>
                         <div
-                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
                             onClick={handleClose}
                         >
                             <div
-                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-100"}`}
+                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {sheetContent}

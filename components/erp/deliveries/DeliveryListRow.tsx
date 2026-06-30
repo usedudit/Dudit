@@ -77,11 +77,7 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onQuickStat
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown onEdit={() => onDetails(delivery)}>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "pending")}>Status: Pendente</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "preparing")}>Status: Em preparação</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "sent")}>Status: Saiu para entrega</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivered")}>Status: Concluída</DropdownItem>
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "cancelled")}>Status: Cancelada</DropdownItem>
+              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
             </ActionsDropdown>
           </div>
         )
