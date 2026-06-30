@@ -58,12 +58,9 @@ export function DeliveryRouteMap({
         const mapboxgl = (window as any).mapboxgl
         mapboxgl.accessToken = token
 
-        const center = (() => {
-          const first = points?.[0]
-          if (initialLat != null && initialLng != null) return [initialLng, initialLat]
-          if (first?.latitude && first?.longitude) return [first.longitude, first.latitude]
-          return [-46.6333, -23.5505]
-        })()
+        const center = initialLat != null && initialLng != null
+          ? [initialLng, initialLat]
+          : [-46.6333, -23.5505]
 
         const map = new mapboxgl.Map({
           container: mapContainerRef.current,
@@ -88,9 +85,13 @@ export function DeliveryRouteMap({
 
     return () => {
       cancelled = true
-      if (mapRef.current) mapRef.current.remove()
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+      }
+      setReady(false)
     }
-  }, [initialLat, initialLng, points])
+  }, [initialLat, initialLng, token])
 
   useEffect(() => {
     if (!ready || !mapRef.current || !(window as any).mapboxgl) return

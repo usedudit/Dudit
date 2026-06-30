@@ -42,51 +42,24 @@ export async function executeWhatsappScheduledJob(payload: WhatsappScheduledJobP
   const admin = getAdminClient()
   const idempotencyKey = `${payload.jobType}:${payload.entityType}:${payload.entityId}:${payload.runAt.slice(0, 16)}`
 
-  // ── DEBUG: payload basics ──────────────────────────────────────────
-  console.log("[DEBUG] partnerId:", payload.partnerId)
-  console.log("[DEBUG] entityId:", payload.entityId)
-  console.log("[DEBUG] runAt:", payload.runAt)
-  console.log("[DEBUG] computedKey:", idempotencyKey)
-
-  // ── DEBUG: todas as linhas com este entity_id ──────────────────────
-  const { data: rows } = await admin
-    .from("whatsapp_scheduled_jobs")
-    .select("id,idempotency_key,entity_id,partner_id,run_at,status")
-    .eq("entity_id", payload.entityId)
-
-  console.log("[DEBUG] rows with entityId:", rows?.length ?? 0)
-  for (const row of rows ?? []) {
-    console.log("[DEBUG] entityId row:", JSON.stringify(row))
-    console.log("[DEBUG] row.key === computedKey:", row.idempotency_key === idempotencyKey)
-  }
-
-  // ── DEBUG: ilike por entityId na idempotency_key ───────────────────
-  const { data: rows2 } = await admin
-    .from("whatsapp_scheduled_jobs")
-    .select("id,idempotency_key")
-    .ilike("idempotency_key", `%${payload.entityId}%`)
-
-  console.log("[DEBUG] ilike rows:", rows2?.length ?? 0)
-  for (const row of rows2 ?? []) {
-    console.log("[DEBUG] ilike row:", JSON.stringify(row))
-    console.log("[DEBUG] ilike row.key === computedKey:", row.idempotency_key === idempotencyKey)
-  }
-
-  // ── Lookup original por idempotency_key ────────────────────────────
   const { data: job } = await admin
     .from("whatsapp_scheduled_jobs")
     .select("*")
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle()
 
-  console.log("[DEBUG] main lookup found:", !!job, "jobId:", job?.id)
-
   if (job) {
     await runScheduledWhatsappJob(job)
     return
   }
 
-  console.log("[DEBUG] JOB NOT FOUND — stopping without fallback")
+  console.error("[whatsapp] scheduled job not found in database", {
+    idempotencyKey,
+    jobType: payload.jobType,
+    entityId: payload.entityId,
+    partnerId: payload.partnerId,
+    runAt: payload.runAt,
+  })
 }
 
 export async function executeWhatsappRetryBatch(): Promise<{ processed: number }> {

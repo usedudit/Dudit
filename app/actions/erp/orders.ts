@@ -1302,17 +1302,14 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     })
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    if (!data.financeAccountId) {
-        return { error: "Selecione a conta de recebimento da venda." }
-    }
-    const { data: financeAccount } = await supabase
+    const { data: financeAccount } = data.financeAccountId ? await supabase
         .from("finance_accounts")
         .select("id")
         .eq("id", data.financeAccountId)
         .eq("partner_id", partnerId)
         .limit(1)
-        .maybeSingle()
-    if (!financeAccount?.id) {
+        .maybeSingle() : { data: null }
+    if (data.financeAccountId && !financeAccount?.id) {
         return { error: "Conta de recebimento inválida para esta venda." }
     }
 
@@ -1623,6 +1620,15 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             accountId: order.finance_account_id || data.financeAccountId,
             createdByUserId: user.id,
         })
+    }
+
+    // Sync payment status to linked appointments
+    if (paymentState.situation === "paid" || paymentState.situation === "partially_paid" || paymentState.situation === "pending") {
+        await supabase
+            .from("appointments")
+            .update({ payment_status: paymentState.situation })
+            .eq("marketplace_order_id", order.id)
+            .eq("partner_id", partnerId)
     }
 
     await invalidateInventoryItems(partnerId, stockItems)
@@ -2114,17 +2120,14 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     })
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    if (!data.financeAccountId) {
-        return { error: "Selecione a conta de recebimento da venda." }
-    }
-    const { data: financeAccount } = await supabase
+    const { data: financeAccount } = data.financeAccountId ? await supabase
         .from("finance_accounts")
         .select("id")
         .eq("id", data.financeAccountId)
         .eq("partner_id", data.partnerId)
         .limit(1)
-        .maybeSingle()
-    if (!financeAccount?.id) {
+        .maybeSingle() : { data: null }
+    if (data.financeAccountId && !financeAccount?.id) {
         return { error: "Conta de recebimento inválida para esta venda." }
     }
 
@@ -2240,6 +2243,15 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             accountId: data.financeAccountId,
             createdByUserId: user.id,
         })
+    }
+
+    // Sync payment status to linked appointments
+    if (paymentState.situation === "paid" || paymentState.situation === "partially_paid" || paymentState.situation === "pending") {
+        await supabase
+            .from("appointments")
+            .update({ payment_status: paymentState.situation })
+            .eq("marketplace_order_id", orderId)
+            .eq("partner_id", data.partnerId)
     }
 
     await supabase.from("order_items").delete().eq("order_id", orderId)

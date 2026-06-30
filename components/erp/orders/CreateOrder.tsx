@@ -546,7 +546,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setInventoryAlreadyDeducted(Boolean(order.inventory_deducted))
 
                 if (order.order_items) {
-                    setItems(order.order_items.map((item: any) => ({
+                    const nonServiceItems = (order.order_items as any[]).filter((item: any) => item.line_type !== 'service_booking')
+                    setItems(nonServiceItems.map((item: any) => ({
                         id: item.id || Math.random().toString(36).substr(2, 9),
                         productId: item.product_id,
                         variantId: item.variant_id || null,
@@ -615,10 +616,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [deliveryMethod, deliveryPeople.length, partnerId])
 
     useEffect(() => {
-        if (editOrderId || financeAccountId || financeAccounts.length === 0) return
+        if (financeAccountId || financeAccounts.length === 0) return
         const defaultOrderAccountId = pickBankThenCashDefaultFinanceAccountId(financeAccounts)
         if (defaultOrderAccountId) setFinanceAccountId(defaultOrderAccountId)
-    }, [editOrderId, financeAccountId, financeAccounts])
+    }, [financeAccountId, financeAccounts])
 
     useEffect(() => {
         if (!isDiscountModalOpen) return

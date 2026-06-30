@@ -761,7 +761,18 @@ export async function getSmartDeliverySuggestionsAction(input: {
 
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("id, order_number, customer_name, delivery_address, situation, delivery_status, created_at, distance_km")
+    .select(`
+      id,
+      order_number,
+      customer_name,
+      delivery_address,
+      situation,
+      delivery_status,
+      created_at,
+      distance_km,
+      delivery_type,
+      order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images, product_type))
+    `)
     .eq("partner_id", input.partnerId)
     .order("created_at", { ascending: false })
     .limit(600)
@@ -786,6 +797,19 @@ export async function getSmartDeliverySuggestionsAction(input: {
       if (situation === "cancelled" || situation === "refunded") return false
       if (String(o.delivery_status || "") === "delivered") return false
       if (!formatAddress(o)) return false
+
+      // Pedidos que só tem serviços vc nem mostra
+      const items = o.order_items || []
+      if (items.length === 0) return false
+      const allServices = items.every((item: any) => {
+        const pType = String(item.products?.product_type || "").toLowerCase()
+        return pType === "serviço" || pType === "servico" || pType === "service"
+      })
+      if (allServices) return false
+
+      // Pedidos de tipo retirada vc nem mostra
+      if (o.delivery_type === "pickup") return false
+
       return true
     })
 
@@ -902,7 +926,8 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       delivery_status,
       created_at,
       order_source,
-      order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images))
+      delivery_type,
+      order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images, product_type))
     `)
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
@@ -915,11 +940,24 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
 
   return (data || [])
     .filter((order: any) => {
-      // Step 1 eligibility rules (basic, safe defaults)
       const situation = String(order.situation || "").toLowerCase()
-      if (situation === "cancelled") return false
-      // If system uses a refunded situation, exclude it as well
-      if (situation === "refunded") return false
+      if (situation === "cancelled" || situation === "refunded") return false
+
+      // Pedidos que já foram entregues vc nem mostra
+      if (order.delivery_status === "delivered") return false
+
+      // Pedidos de tipo retirada vc nem mostra
+      if (order.delivery_type === "pickup") return false
+
+      // Pedidos que só tem serviços vc nem mostra
+      const items = order.order_items || []
+      if (items.length === 0) return false
+      const allServices = items.every((item: any) => {
+        const pType = String(item.products?.product_type || "").toLowerCase()
+        return pType === "serviço" || pType === "servico" || pType === "service"
+      })
+      if (allServices) return false
+
       return true
     })
     .map((order: any) => ({
@@ -1310,7 +1348,18 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           order_source,
           situation,
           delivery_status,
-          order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images))
+          delivery_type,
+          payment_method,
+          payment_breakdown,
+          paid_amount,
+          coupon_discount_amount,
+          payment_method_discount_amount,
+          payment_method_extra_amount,
+          subtotal_value,
+          additional_costs,
+          discount_value,
+          notes,
+          order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images, product_type))
         )
       )
     `)

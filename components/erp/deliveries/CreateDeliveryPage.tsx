@@ -7,7 +7,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 
 import { FadeIn } from "@/components/animations/FadeIn"
-import { usePickerBucket } from "@/components/erp/hooks"
+import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import {
     Badge,
@@ -38,11 +38,13 @@ import {
     SearchIcon,
     TrashIcon,
     InfoIcon,
+    XIcon,
 } from "@/lib/icons"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import Portal from "@/components/Portal"
+import BottomSheet from "@/components/BottomSheet"
 
 type DeliveryPerson = { id: string; userId?: string; fullName: string }
 
@@ -124,6 +126,7 @@ export default function CreateDeliveryPage({
     initialOrderIds?: string[]
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
     const [activeTab, setActiveTab] = useState("Pedidos")
     const [step, setStep] = useState<1 | 2>(1)
@@ -568,58 +571,7 @@ export default function CreateDeliveryPage({
                                                             </div>
                                                         </section>
 
-                                                        <div className="h-px w-full bg-brand-border dark:bg-dark-border" />
 
-                                                        <section>
-                                                            <h3 className="mb-5 text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                                Itens do Pedido
-                                                            </h3>
-                                                            {allItems.length === 0 ? (
-                                                                <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
-                                                                    Nenhum item detalhado foi retornado para os pedidos selecionados.
-                                                                </div>
-                                                            ) : (
-                                                                <div className="space-y-4">
-                                                                    {allItems.map((item) => {
-                                                                        const itemImage = getR2ImageUrl((item as any).products?.images || (item as any).image || null, "thumbnail")
-                                                                        const itemSku = (item as any).products?.sku || (item as any).sku || "N/A"
-                                                                        const itemPrice = Number((item as any).product_price || (item as any).price || 0)
-                                                                        const itemSubtotal = Number((item as any).subtotal || itemPrice * Number(item.quantity || 0))
-
-                                                                        return (
-                                                                            <div key={item.id} className="flex items-start gap-4">
-                                                                                <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                                    <img
-                                                                                        src={itemImage}
-                                                                                        className="w-full h-full object-cover rounded-xl"
-                                                                                        alt={item.product_name || "Produto sem nome"}
-                                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                                    />
-                                                                                </div>
-                                                                                <div className="flex-1 min-w-0">
-                                                                                    <div className="flex justify-between items-start mb-1">
-                                                                                        <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                            {item.product_name || "Produto sem nome"}
-                                                                                        </h4>
-                                                                                        <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
-                                                                                            {formatCurrency(itemSubtotal)}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">
-                                                                                        SKU: {itemSku}
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                                        <span>
-                                                                                            {item.quantity} un. • {formatCurrency(itemPrice)} / un.
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        )
-                                                                    })}
-                                                                </div>
-                                                            )}
-                                                        </section>
                                                     </>
                                                 )}
                                             </div>
@@ -774,62 +726,146 @@ export default function CreateDeliveryPage({
                 description="Você tem alterações na entrega que ainda não foram salvas."
             />
 
-            <Sheet open={!!infoOrder} onOpenChange={(open) => { if (!open) setInfoOrder(null) }}>
-                <SheetContent side="right" className="w-full sm:max-w-[460px] p-0 bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border flex flex-col h-full">
-                    <SheetHeader className="border-b border-brand-border dark:border-dark-border px-6 py-5 text-left shrink-0">
-                        <SheetTitle className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                            Detalhes do Pedido
-                        </SheetTitle>
-                        <SheetDescription className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Informações detalhadas do pedido {infoOrder?.displayId}
-                        </SheetDescription>
-                    </SheetHeader>
+            {(() => {
+                const isOpen = !!infoOrder;
+                const handleClose = () => setInfoOrder(null);
 
-                    {infoOrder && (
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
-                                        {formatCurrency(infoOrder.totalAmount || 0)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                        {infoOrder.orderDate ? formatDateTime(infoOrder.orderDate) : "-"}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Canal de Venda</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                        {infoOrder.orderSource || "Manual"}
-                                    </span>
-                                </div>
+                const sheetContent = infoOrder && (
+                    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                        <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
+                            <Button variant="filled" onClick={handleClose} size="icon">
+                                <XIcon className="h-5 w-5" />
+                            </Button>
+                        </header>
+
+                        <Tabs defaultValue="dados_gerais" className="flex flex-col flex-1 overflow-hidden">
+                            <div className="px-6 border-b border-brand-border dark:border-dark-border shrink-0">
+                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 h-12">
+                                    <TabsTrigger value="dados_gerais">
+                                        Dados Gerais
+                                    </TabsTrigger>
+                                    <TabsTrigger value="itens">
+                                        Itens do Pedido
+                                    </TabsTrigger>
+                                </TabsList>
                             </div>
 
-                            <div className="border-t border-brand-border dark:border-dark-border w-full" />
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                {formatCurrency(infoOrder.totalAmount || 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                {infoOrder.orderDate ? formatDateTime(infoOrder.orderDate) : "-"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Canal de Venda</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                {infoOrder.orderSource || "Manual"}
+                                            </span>
+                                        </div>
+                                    </div>
 
-                            <CustomerCard
-                                customer={{
-                                    name: infoOrder.customer?.name || "Cliente",
-                                    email: infoOrder.customer?.email || "",
-                                    phone: infoOrder.customer?.phone || "",
-                                }}
-                                address={buildCustomerAddress(infoOrder.address)}
-                                showMap={false}
-                                chrome="minimal"
-                            />
-                        </div>
-                    )}
+                                    <div className="border-t border-brand-border dark:border-dark-border w-full" />
 
-                    <div className="border-t border-brand-border dark:border-dark-border px-6 py-4 flex justify-end shrink-0 bg-white dark:bg-dark-surface">
-                        <Button type="button" variant="outline" onClick={() => setInfoOrder(null)}>
-                            Fechar
-                        </Button>
+                                    <CustomerCard
+                                        customer={{
+                                            name: infoOrder.customer?.name || "Cliente",
+                                            email: infoOrder.customer?.email || "",
+                                            phone: infoOrder.customer?.phone || "",
+                                        }}
+                                        address={buildCustomerAddress(infoOrder.address)}
+                                        showMap={false}
+                                        chrome="minimal"
+                                    />
+                                </TabsContent>
+
+                                <TabsContent value="itens" className="mt-0">
+                                    {(!infoOrder.items || infoOrder.items.length === 0) ? (
+                                        <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
+                                            Nenhum item detalhado foi retornado para o pedido selecionado.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {infoOrder.items.map((item: any) => {
+                                                const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
+                                                const itemSku = item.products?.sku || item.sku || "N/A"
+                                                const itemPrice = Number(item.product_price || item.price || 0)
+                                                const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
+
+                                                return (
+                                                    <div key={item.id} className="flex items-start gap-4">
+                                                        <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                            <img
+                                                                src={itemImage}
+                                                                className="w-full h-full object-cover rounded-xl"
+                                                                alt={item.product_name || "Produto sem nome"}
+                                                                onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex justify-between items-start mb-0.5">
+                                                                    <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                        {item.product_name || "Produto sem nome"}
+                                                                    </h4>
+                                                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(itemSubtotal)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                SKU: {itemSku}
+                                                            </div>
+                                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </TabsContent>
+                            </div>
+                        </Tabs>
+
+                        <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+                            <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>
+                                Fechar
+                            </Button>
+                        </footer>
                     </div>
-                </SheetContent>
-            </Sheet>
+                );
+
+                if (!isOpen) return null;
+
+                return isMobile ? (
+                    <BottomSheet isOpen={isOpen} onClose={handleClose}>
+                        {sheetContent}
+                    </BottomSheet>
+                ) : (
+                    <Portal>
+                        <div
+                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                            onClick={handleClose}
+                        >
+                            <div
+                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-100"}`}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {sheetContent}
+                            </div>
+                        </div>
+                    </Portal>
+                );
+            })()}
 
             <AlertModal
                 isOpen={!!orderToRemove}

@@ -2,18 +2,21 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Button, Badge, InfoCard, ThreeDotsLoader, ActionsDropdown, FormDropdown } from "@/components/reusable"
+import { Button, Badge, InfoCard, ThreeDotsLoader, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
-import { DropdownItem } from "@/components/reusable/Dropdown"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon } from "@/lib/icons"
+import { ChevronLeftIcon, XIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
 import { toast } from "@/hooks/use-notification"
+import Portal from "@/components/Portal"
+import BottomSheet from "@/components/BottomSheet"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { parseAddressString } from "../orders/CreateOrder"
 
 const CHANGE_STATUS_REASONS = [
     { value: "operational_error", label: "Erro operacional / Clique acidental" },
@@ -99,6 +102,11 @@ export default function DeliveryDetailPage({
         reasonDropdownValue: string
         customReasonText: string
     } | null>(null)
+    const [selectedLink, setSelectedLink] = useState<any | null>(null)
+    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+    const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
+    const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const mounted = useRef(true)
 
@@ -147,23 +155,32 @@ export default function DeliveryDetailPage({
             : CHANGE_STATUS_REASONS.find(r => r.value === reasonDropdownValue)?.label || ""
 
         setDeliveryWarningModal(null)
-        await handleOrderDeliveryStatusChange(orderId, nextStatus, reason)
+        await handleOrderDeliveryStatusChange(orderId, nextStatus, reason, true)
     }
 
-    const handleOrderDeliveryStatusChange = async (orderId: string, nextStatus: string, reason?: string) => {
+    const handleOrderDeliveryStatusChange = async (orderId: string, nextStatus: string, reason?: string, isConfirmed?: boolean) => {
         const link = (delivery?.delivery_orders || []).find((l: any) => l?.orders?.id === orderId)
         const currentStatus = link?.status || link?.orders?.delivery_status || "not_sent"
 
-        if (!reason && doesTransitionRequireReason(currentStatus, nextStatus)) {
-            setDeliveryWarningModal({
-                isOpen: true,
-                orderId,
-                nextStatus,
-                currentStatus,
-                reasonDropdownValue: "",
-                customReasonText: "",
-            })
-            return
+        if (!isConfirmed) {
+            if (doesTransitionRequireReason(currentStatus, nextStatus)) {
+                setDeliveryWarningModal({
+                    isOpen: true,
+                    orderId,
+                    nextStatus,
+                    currentStatus,
+                    reasonDropdownValue: "",
+                    customReasonText: "",
+                })
+                return
+            } else {
+                setSimpleConfirmModal({
+                    isOpen: true,
+                    orderId,
+                    nextStatus
+                })
+                return
+            }
         }
 
         setUpdatingOrderId(orderId)
@@ -181,6 +198,11 @@ export default function DeliveryDetailPage({
                 const detailRes = await getERPDeliveryDetailsAction(deliveryId, partnerId)
                 if (detailRes.success) {
                     setDelivery(detailRes.data)
+                    // If sheet is open for this order, update its state too!
+                    if (selectedLink && selectedLink.orders?.id === orderId) {
+                        const updatedLink = (detailRes.data?.delivery_orders || []).find((l: any) => l?.orders?.id === orderId)
+                        if (updatedLink) setSelectedLink(updatedLink)
+                    }
                 }
                 const routeRes = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
                 if (routeRes.success) {
@@ -274,7 +296,11 @@ export default function DeliveryDetailPage({
                                         const displayId = order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`
 
                                         return (
-                                            <div key={link.id} className="p-4 flex items-center justify-between gap-4">
+                                            <div
+                                                key={link.id}
+                                                className="p-4 flex items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-dark-border/40 cursor-pointer transition-colors"
+                                                onClick={() => setSelectedLink(link)}
+                                            >
                                                 <div className="min-w-0">
                                                     <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
                                                         {displayId}
@@ -290,46 +316,6 @@ export default function DeliveryDetailPage({
                                                     <Badge variant={deliveryMeta.variant}>
                                                         {deliveryMeta.label}
                                                     </Badge>
-
-                                                    {/* Individual Order Status Actions */}
-                                                    <div className="ml-2 border-l border-brand-border dark:border-dark-border pl-2 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                                        {!["delivered", "cancelled", "delivery_failed"].includes(link.status) ? (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    className="py-1 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-950/30 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 border border-emerald-200/50"
-                                                                    onClick={() => handleOrderDeliveryStatusChange(order.id, "delivered")}
-                                                                    disabled={updatingOrderId === order.id}
-                                                                >
-                                                                    {updatingOrderId === order.id ? "Salvando..." : "Entregue"}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="py-1 px-2.5 bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/30 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 border border-red-200/50"
-                                                                    onClick={() => handleOrderDeliveryStatusChange(order.id, "delivery_failed")}
-                                                                    disabled={updatingOrderId === order.id}
-                                                                >
-                                                                    Falhou
-                                                                </button>
-                                                            </>
-                                                        ) : (
-                                                            <ActionsDropdown
-                                                                onEdit={undefined}
-                                                                trigger={
-                                                                    <Button size="sm" variant="outline" className="h-7 py-0 px-2 text-xs font-medium">
-                                                                        Alterar
-                                                                    </Button>
-                                                                }
-                                                            >
-                                                                <DropdownItem onClick={() => handleOrderDeliveryStatusChange(order.id, "pending")}>Pendente</DropdownItem>
-                                                                <DropdownItem onClick={() => handleOrderDeliveryStatusChange(order.id, "preparing")}>Em preparação</DropdownItem>
-                                                                <DropdownItem onClick={() => handleOrderDeliveryStatusChange(order.id, "sent")}>Saiu para entrega</DropdownItem>
-                                                                <DropdownItem onClick={() => handleOrderDeliveryStatusChange(order.id, "delivered")}>Concluída</DropdownItem>
-                                                                <DropdownItem onClick={() => handleOrderDeliveryStatusChange(order.id, "delivery_failed")}>Falha na entrega</DropdownItem>
-                                                                <DropdownItem onClick={() => handleOrderDeliveryStatusChange(order.id, "cancelled")}>Cancelada</DropdownItem>
-                                                            </ActionsDropdown>
-                                                        )}
-                                                    </div>
                                                 </div>
                                             </div>
                                         )
@@ -361,58 +347,7 @@ export default function DeliveryDetailPage({
                             </div>
                         )}
 
-                        {/* Order Items list */}
-                        <div>
-                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
-                                Itens dos Pedidos
-                            </h3>
-                            {allItems.length === 0 ? (
-                                <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
-                                    Nenhum item detalhado foi retornado para os pedidos selecionados.
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {allItems.map((item: any, idx: number) => {
-                                        const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
-                                        const itemSku = item.products?.sku || item.sku || "N/A"
-                                        const itemPrice = Number(item.product_price || item.price || 0)
-                                        const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
 
-                                        return (
-                                            <div key={`${item.id || idx}-${idx}`} className="flex items-start gap-4">
-                                                <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                    <img
-                                                        src={itemImage}
-                                                        className="w-full h-full object-cover rounded-xl"
-                                                        alt={item.product_name || "Produto sem nome"}
-                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                    />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                            {item.product_name || "Produto sem nome"}
-                                                        </h4>
-                                                        <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
-                                                            {formatCurrency(itemSubtotal)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">
-                                                        SKU: {itemSku} • Pedido: {item.orderDisplayId}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        <span>
-                                                            {item.quantity} un. • {formatCurrency(itemPrice)} / un.
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
 
                     </div>
 
@@ -548,13 +483,418 @@ export default function DeliveryDetailPage({
                 }
                 confirmText="Confirmar Alteração"
                 cancelText="Cancelar"
-                variant="warning"
-                disabled={
-                    !deliveryWarningModal?.reasonDropdownValue ||
-                    (deliveryWarningModal.reasonDropdownValue === "other" && !deliveryWarningModal.customReasonText.trim())
-                }
             />
 
+            {/* Helper payment code */}
+            {(() => {
+                const getPaymentTypeLabel = (o: any) => {
+                    const pm = String(o.payment_method || "").toLowerCase();
+                    if (pm === "pix" || pm === "bank_transfer") return "Pix";
+                    if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
+                    if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
+                    if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) return "Dinheiro";
+                    if (pm.includes("boleto")) return "Boleto";
+                    return o.payment_method || "Não informado";
+                }
+
+                const getPaymentIcon = (o: any) => {
+                    const subMethod = String(o.payment_method || "").toLowerCase();
+                    let iconName = null;
+                    if (subMethod.includes("pix") || subMethod.includes("bank_transfer")) {
+                        iconName = "Pix.png";
+                    } else if (subMethod.includes("crédito") || subMethod.includes("credito") || subMethod.includes("credit")) {
+                        iconName = "CreditCard.png";
+                    } else if (subMethod.includes("débito") || subMethod.includes("debito") || subMethod.includes("debit")) {
+                        iconName = "DebitCard.png";
+                    } else if (subMethod.includes("boleto")) {
+                        iconName = "Boleto.png";
+                    }
+
+                    if (iconName) {
+                        return (
+                            <img src={`https://img.dudit.com.br/static/icons/payments/${iconName}`} alt="Payment icon" className="w-5 h-5 object-contain shrink-0" />
+                        );
+                    }
+                    return <span className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>;
+                }
+
+                const getPaymentStatusDisplay = (situation: string) => {
+                    switch (situation) {
+                        case "paid":
+                            return {
+                                label: "Pago",
+                                color: "text-green-700 dark:text-green-400",
+                            };
+                        case "partially_paid":
+                            return {
+                                label: "Parcialmente Pago",
+                                color: "text-brand-orange dark:text-orange-400",
+                            };
+                        case "pending":
+                        case "unpaid":
+                            return {
+                                label: "Pendente",
+                                color: "text-brand-orange dark:text-orange-400",
+                            };
+                        case "cancelled":
+                            return {
+                                label: "Cancelado",
+                                color: "text-red-700 dark:text-red-400",
+                            };
+                        default:
+                            const meta = getPaymentStatusMeta(situation);
+                            return {
+                                label: meta.label,
+                                color: "text-gray-700 dark:text-gray-400",
+                            };
+                    }
+                }
+
+                const isOpen = !!selectedLink;
+                const handleClose = () => setSelectedLink(null);
+
+                if (!isOpen) return null;
+
+                const order = selectedLink.orders;
+                if (!order) return null;
+
+                const paymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
+                    ? order.payment_breakdown.filter((entry: any) => entry?.method)
+                    : Number(order.paid_amount || 0) > 0 && order.payment_method
+                        ? [{ method: order.payment_method, amount: Number(order.paid_amount || 0) }]
+                        : []
+                const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
+                const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))
+                const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
+                const subtotalValue = Number(order.subtotal_value || 0) > 0
+                    ? Number(order.subtotal_value || 0)
+                    : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - paymentMethodExtraAmount
+                const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
+                const cashEntry = Array.isArray(order.payment_breakdown)
+                    ? order.payment_breakdown.find((entry: any) => entry?.method === "cash")
+                    : null
+                const wantsChange = cashEntry?.wantsChange ?? String(order.payment_method || "").toLowerCase().includes("troco para")
+                const payWithAmount = cashEntry?.payWithAmount ?? (() => {
+                    const match = String(order.payment_method || "").match(/troco para R\$\s*([\d,.]+)/i)
+                    if (match) {
+                        const cleanNum = match[1].replace(/\./g, "").replace(',', '.')
+                        return Number(cleanNum)
+                    }
+                    return null
+                })()
+                const cashChangeAmount = wantsChange && payWithAmount ? payWithAmount - Number(order.total_amount || 0) : 0
+
+                const statusDisplay = getPaymentStatusDisplay(order.situation);
+
+                const sheetContent = (
+                    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                        <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
+                            <Button variant="filled" onClick={handleClose} size="icon">
+                                <XIcon className="h-5 w-5" />
+                            </Button>
+                        </header>
+
+                        <Tabs defaultValue="dados_gerais" className="flex flex-col flex-1 overflow-hidden">
+                            <div className="px-6 border-b border-brand-border dark:border-dark-border shrink-0">
+                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 h-12">
+                                    <TabsTrigger value="dados_gerais">
+                                        Dados Gerais
+                                    </TabsTrigger>
+                                    <TabsTrigger value="itens">
+                                        Itens do Pedido
+                                    </TabsTrigger>
+                                    <TabsTrigger value="pagamento">
+                                        Pagamento
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                {formatCurrency(order.total_amount || 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                {order.created_at ? formatDateTime(order.created_at) : "-"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Canal de Venda</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                {order.order_source || "Manual"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
+                                            <Badge variant={getDeliveryStatusMeta(selectedLink.status || order.delivery_status).variant}>
+                                                {getDeliveryStatusMeta(selectedLink.status || order.delivery_status).label}
+                                            </Badge>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                                    <CustomerCard
+                                        customer={{
+                                            name: order.customer_name || "Cliente",
+                                            email: "",
+                                            phone: "",
+                                        }}
+                                        address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
+                                        showMap={false}
+                                        chrome="minimal"
+                                    />
+                                </TabsContent>
+
+                                <TabsContent value="itens" className="mt-0">
+                                    {(!order.order_items || order.order_items.length === 0) ? (
+                                        <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
+                                            Nenhum item detalhado foi retornado para o pedido selecionado.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {order.order_items.map((item: any) => {
+                                                const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
+                                                const itemSku = item.products?.sku || item.sku || "N/A"
+                                                const itemPrice = Number(item.product_price || item.price || 0)
+                                                const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
+
+                                                return (
+                                                    <div key={item.id} className="flex items-start gap-4">
+                                                        <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                            <img
+                                                                src={itemImage}
+                                                                className="w-full h-full object-cover rounded-xl"
+                                                                alt={item.product_name || "Produto sem nome"}
+                                                                onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex justify-between items-start mb-0.5">
+                                                                <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                    {item.product_name || "Produto sem nome"}
+                                                                </h4>
+                                                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(itemSubtotal)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                SKU: {itemSku}
+                                                            </div>
+                                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </TabsContent>
+
+                                <TabsContent value="pagamento" className="mt-0 space-y-3">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Método de Pagamento</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-4 h-4 flex items-center justify-center overflow-hidden shrink-0">
+                                                {getPaymentIcon(order)}
+                                            </div>
+                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                {getPaymentTypeLabel(order)}
+                                            </span>
+                                            <span className="text-brand-border dark:text-dark-border">|</span>
+                                            <span className={`font-bold ${statusDisplay.color}`}>
+                                                {statusDisplay.label}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {paymentBreakdown.length > 1 && (
+                                        <div className="flex justify-between items-start text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
+                                            <div className="flex flex-col gap-1 text-right">
+                                                {paymentBreakdown.map((entry: any, index: number) => (
+                                                    <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                        {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Original</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotalValue)}</span>
+                                    </div>
+
+                                    {Number(order.delivery_fee || 0) > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor da Entrega</span>
+                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.delivery_fee)}</span>
+                                        </div>
+                                    )}
+
+                                    {Number(order.additional_costs || 0) > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outros Custos</span>
+                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>
+                                        </div>
+                                    )}
+
+                                    {Number(order.discount_value || 0) > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Pedido</span>
+                                            <span className="text-brand-green font-bold">- {formatCurrency(order.discount_value)}</span>
+                                        </div>
+                                    )}
+
+                                    {couponDiscountAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto por Cupom</span>
+                                            <span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>
+                                        </div>
+                                    )}
+
+                                    {paymentMethodDiscountAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Método</span>
+                                            <span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>
+                                        </div>
+                                    )}
+
+                                    {paymentMethodExtraAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa do Método</span>
+                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>
+                                        </div>
+                                    )}
+
+                                    {changeAmount > 0.009 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Troco</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(changeAmount)}</span>
+                                        </div>
+                                    )}
+
+                                    {wantsChange && payWithAmount !== null && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Troco Solicitado</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(cashChangeAmount)} (para {formatCurrency(payWithAmount)})</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_amount)}</span>
+                                    </div>
+                                </TabsContent>
+                            </div>
+                        </Tabs>
+
+                        <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface flex gap-3">
+                            <Button
+                                type="button"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 h-12 font-bold"
+                                onClick={() => {
+                                    setSelectedNewStatus(selectedLink.status || order.delivery_status || "pending");
+                                    setIsStatusModalOpen(true);
+                                }}
+                            >
+                                Alterar Status
+                            </Button>
+                            <Button type="button" variant="outline" className="flex-1 h-12" onClick={handleClose}>
+                                Fechar
+                            </Button>
+                        </footer>
+                    </div>
+                );
+
+                return isMobile ? (
+                    <BottomSheet isOpen={isOpen} onClose={handleClose}>
+                        {sheetContent}
+                    </BottomSheet>
+                ) : (
+                    <Portal>
+                        <div
+                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                            onClick={handleClose}
+                        >
+                            <div
+                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-100"}`}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {sheetContent}
+                            </div>
+                        </div>
+                    </Portal>
+                );
+            })()}
+
+            <DefaultModal
+                isOpen={isStatusModalOpen}
+                onClose={() => setIsStatusModalOpen(false)}
+                title="Alterar Status de Entrega"
+                maxWidth="sm"
+                footer={
+                    <div className="flex gap-3 justify-end w-full">
+                        <Button variant="outline" onClick={() => setIsStatusModalOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                if (selectedLink && selectedNewStatus) {
+                                    setIsStatusModalOpen(false);
+                                    await handleOrderDeliveryStatusChange(selectedLink.orders.id, selectedNewStatus);
+                                }
+                            }}
+                            disabled={!selectedNewStatus}
+                        >
+                            Confirmar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="p-4 space-y-4">
+                    <FormDropdown
+                        label="Status da entrega"
+                        value={selectedNewStatus}
+                        setValue={setSelectedNewStatus}
+                        options={[
+                            { value: "delivered", label: "Entregue" },
+                            { value: "delivery_failed", label: "Falha na entrega" },
+                            { value: "pending", label: "Pendente" },
+                            { value: "preparing", label: "Em preparação" },
+                            { value: "sent", label: "Saiu para entrega" },
+                            { value: "cancelled", label: "Cancelada" },
+                        ]}
+                        placeholder="Selecione o status"
+                    />
+                </div>
+            </DefaultModal>
+
+            <AlertModal
+                isOpen={simpleConfirmModal?.isOpen ?? false}
+                title="Confirmar Alteração de Status"
+                description={`Tem certeza que deseja alterar o status da entrega deste pedido para ${getDeliveryStatusLabel(simpleConfirmModal?.nextStatus)}?`}
+                confirmText="Confirmar"
+                cancelText="Cancelar"
+                onClose={() => setSimpleConfirmModal(null)}
+                onConfirm={async () => {
+                    if (simpleConfirmModal) {
+                        const { orderId, nextStatus } = simpleConfirmModal;
+                        setSimpleConfirmModal(null);
+                        await handleOrderDeliveryStatusChange(orderId, nextStatus, undefined, true);
+                    }
+                }}
+                variant="info"
+            />
         </FadeIn>
     )
 }
