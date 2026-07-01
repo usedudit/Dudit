@@ -17,6 +17,7 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "../orders/CreateOrder"
+import PaymentStatusModal from "../orders/PaymentStatusModal"
 
 const CHANGE_STATUS_REASONS = [
     { value: "operational_error", label: "Erro operacional / Clique acidental" },
@@ -104,6 +105,7 @@ export default function DeliveryDetailPage({
     } | null>(null)
     const [selectedLink, setSelectedLink] = useState<any | null>(null)
     const [activeLink, setActiveLink] = useState<any | null>(null)
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
 
     useEffect(() => {
         if (selectedLink) {
@@ -125,25 +127,26 @@ export default function DeliveryDetailPage({
         }
     }, [])
 
+    const loadDeliveryDetails = useCallback(async () => {
+        setLoading(true)
+        const res = await getERPDeliveryDetailsAction(deliveryId, partnerId)
+        if (mounted.current) {
+            if (!res.success) {
+                console.error("[DeliveryDetailPage] Failed to load:", res.error)
+                toast.error(res.error || "Erro ao carregar detalhes da entrega.")
+            }
+            setDelivery(res.success ? res.data : null)
+            setLoading(false)
+        }
+    }, [deliveryId, partnerId])
+
     useEffect(() => {
         mounted.current = true
-        const run = async () => {
-            setLoading(true)
-            const res = await getERPDeliveryDetailsAction(deliveryId, partnerId)
-            if (mounted.current) {
-                if (!res.success) {
-                    console.error("[DeliveryDetailPage] Failed to load:", res.error)
-                    toast.error(res.error || "Erro ao carregar detalhes da entrega.")
-                }
-                setDelivery(res.success ? res.data : null)
-                setLoading(false)
-            }
-        }
-        run()
+        loadDeliveryDetails()
         return () => {
             mounted.current = false
         }
-    }, [deliveryId, partnerId])
+    }, [loadDeliveryDetails])
 
     useEffect(() => {
         let alive = true
@@ -826,6 +829,19 @@ export default function DeliveryDetailPage({
                                         <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
                                         <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_amount)}</span>
                                     </div>
+
+                                    {order.situation !== "paid" && (
+                                        <div className="pt-4 flex justify-end">
+                                            <Button
+                                                type="button"
+                                                variant="filled"
+                                                className="w-full text-xs h-9 bg-brand-dark hover:bg-brand-dark/95 text-white dark:bg-dark-heading dark:text-dark-surface dark:hover:bg-dark-heading/90"
+                                                onClick={() => setIsPaymentModalOpen(true)}
+                                            >
+                                                Registrar Recebimento
+                                            </Button>
+                                        </div>
+                                    )}
                                 </TabsContent>
                             </div>
                         </Tabs>
@@ -927,6 +943,16 @@ export default function DeliveryDetailPage({
                 }}
                 variant="info"
             />
+
+            {isPaymentModalOpen && activeLink?.order && (
+                <PaymentStatusModal
+                    isOpen={isPaymentModalOpen}
+                    onClose={() => setIsPaymentModalOpen(false)}
+                    order={activeLink.order}
+                    partnerId={partnerId}
+                    onSuccess={loadDeliveryDetails}
+                />
+            )}
         </FadeIn>
     )
 }

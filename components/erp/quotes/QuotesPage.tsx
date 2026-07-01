@@ -398,9 +398,13 @@ export default function QuotesPage({
     }, [])
 
     const handleShareQuote = useCallback((quote: Quote) => {
+        if (quote.status === 'draft' || quote.status === 'pending_client') {
+            error("Não é possível compartilhar", "Orçamentos rascunho ou pendentes não podem ser compartilhados.")
+            return
+        }
         setQuoteToShare(quote)
         setShowShareModal(true)
-    }, [])
+    }, [error])
 
     const handleConfirmDelete = async () => {
         if (!quoteToDelete) return

@@ -16,7 +16,8 @@ import {
     CustomerCard,
     FormSection,
     DefaultModal,
-    Input
+    Input,
+    InfoCard
 } from "@/components/reusable"
 import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -24,6 +25,7 @@ import { formatCurrency } from "@/lib/utils"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { useSupabase } from "@/providers/supabase-provider"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
@@ -68,6 +70,19 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     // Notifications & Messages
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+    const { supabase } = useSupabase()
+    const [currentUser, setCurrentUser] = useState<any>(null)
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data }: any) => {
+            if (data?.user) setCurrentUser(data.user)
+        })
+    }, [supabase])
+
+    const customerEmail = order.customer_snapshot?.email || ""
+    const isClientEmailMatched = useMemo(() => {
+        return !!(currentUser && customerEmail && currentUser.email?.toLowerCase() === customerEmail.toLowerCase())
+    }, [currentUser, customerEmail])
 
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
     const buildImageUrl = (key: string) => {
@@ -204,7 +219,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     // ─── ONLINE SIGNING FLOW ─────────────────────────────────────────────────
     const handleSignOS = async () => {
         const canvas = canvasRef.current
-        if (!canvas || !signerName.trim() || signatureCode.length < 4) return
+        if (!canvas || (!isClientEmailMatched && signatureCode.length < 4)) return
 
         setIsProcessingSignature(true)
         setErrorMessage(null)
@@ -242,8 +257,8 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
             // 4. Submit signature & verify code on backend
             const signRes = await signPublicServiceOrderAction(
                 token,
-                signerName,
-                signatureCode,
+                "Cliente",
+                isClientEmailMatched ? "" : signatureCode,
                 urlRes.key,
                 ip,
                 userAgent
@@ -252,7 +267,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
             if (signRes.success) {
                 setSuccessMessage("Ordem de serviço assinada com sucesso!")
                 setShowSignModal(false)
-                
+
                 // Refresh local data
                 const refreshRes = await getServiceOrderByTokenAction(token)
                 if (refreshRes.success && refreshRes.data) {
@@ -304,8 +319,8 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                         >
                             {/* Sticky Header */}
                             <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-                                <div className="px-4 md:px-6 pt-4 pb-2">
-                                    <div className="flex items-center justify-between">
+                                <div className="px-4 md:px-6 pt-4">
+                                    <div className="flex items-center justify-between pb-2">
                                         <div className="flex items-center gap-3">
                                             {partnerLogo ? (
                                                 <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-lg border border-brand-border dark:border-dark-border" />
@@ -365,16 +380,16 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                         <div className="space-y-8 text-left">
                                             <FormSection title="Informações do serviço">
                                                 <div className="space-y-3">
-                                                    <div className="flex justify-between items-center text-xs">
+                                                    <div className="flex justify-between items-center text-sm">
                                                         <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Código da OS</span>
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">#{order.order_number}</span>
                                                     </div>
-                                                    <div className="flex justify-between items-center text-xs">
+                                                    <div className="flex justify-between items-center text-sm">
                                                         <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de abertura</span>
-                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">{formatDateTime(order.created_at)}</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateTime(order.created_at)}</span>
                                                     </div>
                                                     {order.expected_completion_date && (
-                                                        <div className="flex justify-between items-center text-xs">
+                                                        <div className="flex justify-between items-center text-sm">
                                                             <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Previsão de conclusão</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(order.expected_completion_date)}</span>
                                                         </div>
@@ -382,17 +397,22 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 </div>
                                             </FormSection>
 
-                                            <FormSection title="Prestador de Serviço" hasSeparator>
-                                                <div className="space-y-2">
-                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{partnerName}</p>
-                                                    {partner?.address && <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">{partner.address}</p>}
-                                                    {partner?.phone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {partner.phone}</p>}
-                                                </div>
-                                            </FormSection>
 
                                             <FormSection title="Cliente" hasSeparator>
                                                 {order.customer_snapshot ? (
-                                                    <CustomerCard customer={order.customer_snapshot} chrome="minimal" />
+                                                    <CustomerCard
+                                                        customer={order.customer_snapshot}
+                                                        address={order.customer_snapshot ? {
+                                                            street: order.customer_snapshot.street || order.customer_snapshot.address_street,
+                                                            number: order.customer_snapshot.number || order.customer_snapshot.address_number,
+                                                            complement: order.customer_snapshot.complement || order.customer_snapshot.address_complement,
+                                                            neighborhood: order.customer_snapshot.neighborhood || order.customer_snapshot.address_neighborhood,
+                                                            city: order.customer_snapshot.city || order.customer_snapshot.address_city,
+                                                            state: order.customer_snapshot.state || order.customer_snapshot.address_state || order.customer_snapshot.address_uf || order.customer_snapshot.uf,
+                                                            zipCode: order.customer_snapshot.zip_code || order.customer_snapshot.zipCode || order.customer_snapshot.address_zip_code,
+                                                        } : null}
+                                                        chrome="minimal"
+                                                    />
                                                 ) : (
                                                     <div className="space-y-2">
                                                         <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{order.customer_name || "Consumidor final"}</p>
@@ -580,9 +600,11 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 signatureImageKey={order.signature_image_key}
                                                 signedAt={order.signed_at}
                                                 partnerName={partnerName}
+                                                partnerAddress={partner?.address || undefined}
                                                 partnerAvatar={partnerLogo || undefined}
                                                 printMode={false}
                                                 showCustomerContact={false}
+                                                salespersonName={order.assigned_user_name || undefined}
                                             />
                                         </div>
                                     </div>
@@ -606,9 +628,11 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                 signatureImageKey={order.signature_image_key}
                                 signedAt={order.signed_at}
                                 partnerName={partnerName}
+                                partnerAddress={partner?.address || undefined}
                                 partnerAvatar={partnerLogo || undefined}
                                 printMode={false}
                                 showCustomerContact={false}
+                                salespersonName={order.assigned_user_name || undefined}
                             />
                         </div>
 
@@ -633,7 +657,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                         </Button>
                         <Button
                             onClick={handleSignOS}
-                            disabled={!signerName.trim() || signatureCode.length < 4 || !hasCanvasContent || isProcessingSignature}
+                            disabled={(!isClientEmailMatched && signatureCode.length < 4) || !hasCanvasContent || isProcessingSignature}
                             className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
                         >
                             {isProcessingSignature ? "Assinando..." : "Confirmar Assinatura"}
@@ -642,25 +666,21 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                 }
             >
                 <div className="space-y-4 text-left">
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        Preencha os campos abaixo e desenhe sua assinatura no quadro. O código de assinatura de 4 dígitos foi gerado pelo profissional responsável pela OS.
-                    </p>
+                    <InfoCard color="blue" message={isClientEmailMatched
+                        ? `Você está conectado como ${currentUser.email} e pode assinar esta ordem de serviço diretamente. Desenhe sua assinatura abaixo.`
+                        : "Preencha o campo de código e desenhe sua assinatura no quadro. O código de assinatura de 4 dígitos foi gerado pelo profissional responsável pela OS."
+                    } />
 
                     <div className="space-y-3">
-                        <Input
-                            label="Nome completo do signatário"
-                            value={signerName}
-                            onChange={(e) => setSignerName(e.target.value)}
-                            placeholder="Ex: João da Silva"
-                        />
-
-                        <Input
-                            label="Código de assinatura (4 dígitos)"
-                            maxLength={4}
-                            value={signatureCode}
-                            onChange={(e) => setSignatureCode(e.target.value.replace(/\D/g, ""))}
-                            placeholder="0000"
-                        />
+                        {!isClientEmailMatched && (
+                            <Input
+                                label="Código de assinatura (4 dígitos)"
+                                maxLength={4}
+                                value={signatureCode}
+                                onChange={(e) => setSignatureCode(e.target.value.replace(/\D/g, ""))}
+                                placeholder="0000"
+                            />
+                        )}
 
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-bold uppercase text-brand-inactive-text dark:text-dark-body">Desenhe sua assinatura abaixo</label>

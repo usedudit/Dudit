@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Dudit - Compre local, venda mais',
+    name: 'Dudit | Descubra. Anuncie. Organize.',
     short_name: 'Dudit',
     description:
-      'Compre de quem vende perto de você. Descubra produtos e serviços locais e gerencie seu negócio em um só lugar.',
+      'Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.',
     start_url: '/',
     display: 'standalone',
     background_color: '#003229',

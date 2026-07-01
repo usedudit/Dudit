@@ -95,7 +95,21 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                 .from("quote_items")
                 .select(`
                     *,
-                    products (id, name, sku, images, price, stock_quantity, allow_sell_without_stock)
+                    products (
+                        id, 
+                        name, 
+                        sku, 
+                        images, 
+                        price, 
+                        stock_quantity, 
+                        allow_sell_without_stock,
+                        product_variants (
+                            id,
+                            variant_name,
+                            sku,
+                            variant_options
+                        )
+                    )
                 `)
                 .eq("quote_id", quoteId)
                 .order("sort_order", { ascending: true })
@@ -103,6 +117,31 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
             if (itemsError) {
                 console.error("[getQuoteWithItems] Items error:", itemsError)
             }
+
+            const mappedItems = (items || []).map((item: any) => {
+                let resolvedImage = item.products?.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png';
+                if (item.custom_name && item.products?.product_variants) {
+                    const customName = item.custom_name.trim();
+                    const productName = item.products.name || "";
+                    const suffix = customName.startsWith(productName)
+                        ? customName.slice(productName.length).replace(/^[\s-–—]+/, "").trim()
+                        : customName;
+
+                    const match = item.products.product_variants.find(
+                        (v: any) =>
+                            v.variant_name?.toLowerCase().trim() === suffix.toLowerCase() ||
+                            v.variant_name?.toLowerCase().trim() === customName.toLowerCase() ||
+                            (item.product_sku_snapshot && v.sku?.toLowerCase().trim() === item.product_sku_snapshot.toLowerCase().trim())
+                    );
+                    if (match?.variant_options?.image) {
+                        resolvedImage = match.variant_options.image;
+                    }
+                }
+                return {
+                    ...item,
+                    image: resolvedImage
+                };
+            });
 
             let userProfile = null
             if (quote.user_id) {
@@ -123,7 +162,7 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
 
             return {
                 ...quote,
-                items: items || [],
+                items: mappedItems,
                 user_profiles: userProfile
             }
         },

@@ -38,6 +38,7 @@ export type PermissionTemplate = {
   delivery: { view: boolean; create: boolean; edit: boolean; update_status: boolean }
   recurring_plans: { view: boolean; manage: boolean }
   recurring_subscriptions: { view: boolean; manage: boolean }
+  productivity: { view: boolean; goals_view: boolean; goals_manage: boolean; commissions_view: boolean; commissions_manage: boolean }
   settings: {
     view: boolean
     settings_negocio: boolean

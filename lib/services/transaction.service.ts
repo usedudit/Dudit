@@ -13,6 +13,7 @@ interface OrderDataForTransaction {
     customer_id?: string | null
     finance_account_id?: string | null
     order_source?: string | null
+    reference_note?: string
 }
 
 function normalizeMethod(value?: string | null) {
@@ -133,7 +134,7 @@ export async function createTransactionFromOrder(
         // Format: "sale-tx:{order_number}:{index}" - unique per entry, stable across retries.
         const entriesWithRef = entries.map((entry, index) => ({
             ...entry,
-            referenceNote: `sale-tx:${orderData.order_number}:${index}`,
+            referenceNote: orderData.reference_note || `sale-tx:${orderData.order_number}:${index}`,
         }))
 
         // Batch dedup: single query to find all already-created transactions for this order

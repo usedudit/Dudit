@@ -32,8 +32,8 @@ interface OSPreviewProps {
     salespersonName?: string;
 }
 
-const DEFAULT_PRIMARY = "#113833";
-const DEFAULT_SECONDARY = "#1ba895";
+const DEFAULT_PRIMARY = "#003229";
+const DEFAULT_SECONDARY = "#d4f995";
 
 const OSPreview = ({
     invoiceNumber,
@@ -146,15 +146,15 @@ const OSPreview = ({
 
     // Advanced Pagination Logic modeled after QuotePreview
     const pages = useMemo(() => {
-        const ROW_HEIGHT = 80;
-        const TOTALS_SECTION_HEIGHT = 160;
-        const NOTES_SECTION_HEIGHT = (description || signatureImageKey) ? 180 : 0;
+        const ROW_HEIGHT = 40;
+        const TOTALS_SECTION_HEIGHT = 150;
+        const NOTES_SECTION_HEIGHT = (description || signatureImageKey) ? 120 : 0;
 
-        const P1_FIXED_CONTENT_HEIGHT = 560;
+        const P1_FIXED_CONTENT_HEIGHT = 420;
         const P1_TOTAL_AVAILABLE_HEIGHT = 1050;
         const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT;
 
-        const PN_FIXED_CONTENT_HEIGHT = 300;
+        const PN_FIXED_CONTENT_HEIGHT = 230;
         const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT;
 
         const chunks: { items: any[]; hasTotals: boolean; type: string }[] = [];

@@ -48,12 +48,21 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Pedidos e Vendas", href: "/erp/orders" },
             { label: "Orçamentos", href: "/erp/quotes" },
-            { label: "Metas", href: "/erp/goals" },
             { label: "PDV (Frente de Caixa)", href: "/erp/pdv" },
             { label: "Devoluções", href: "/erp/returns" },
             { label: "Expedição e Entregas", href: "/erp/logistics" },
             { label: "Dashboard de Entregas", href: "/erp/logistics/dashboard" },
             { label: "Entregadores", href: "/erp/logistics/drivers" },
+        ],
+    },
+    {
+        icon: ChartIcon,
+        label: "Produtividade",
+        href: "/erp/produtividade",
+        submenu: [
+            { label: "Visão Geral", href: "/erp/produtividade" },
+            { label: "Metas", href: "/erp/produtividade/metas" },
+            { label: "Comissões", href: "/erp/produtividade/comissoes" },
         ],
     },
     {
@@ -144,6 +153,9 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/reports": "crescer",
     "/erp/coupons": "crescer",
     "/erp/promotions": "escalar",
+    "/erp/produtividade": "escalar",
+    "/erp/produtividade/metas": "escalar",
+    "/erp/produtividade/comissoes": "escalar",
     "/erp/goals": "crescer",
     "/erp/service-orders": "crescer",
     "/erp/returns": "crescer",
@@ -259,7 +271,8 @@ export function ERPSidebar() {
     const couponsResourceActive = isSystemResourceActive(businessInfo, "coupons")
     const campaignsResourceActive = isSystemResourceActive(businessInfo, "campaigns")
     const showcaseResourceActive = isSystemResourceActive(businessInfo, "showcase")
-    const salesGroupActive = ordersResourceActive || quotesResourceActive || goalsResourceActive || returnsResourceActive || posResourceActive || deliveriesResourceActive
+    const productivityResourceActive = isSystemResourceActive(businessInfo, "productivity")
+    const salesGroupActive = ordersResourceActive || quotesResourceActive || returnsResourceActive || posResourceActive || deliveriesResourceActive
     const servicesGroupActive = servicesResourceActive || appointmentsResourceActive || serviceOrdersResourceActive || serviceCadastrosResourceActive
 
     const [isMounted, setIsMounted] = useState(false)
@@ -300,6 +313,7 @@ export function ERPSidebar() {
                 if (item.label === "Produtos" && !sellsProducts && !sellsServices) return null; // Only show if they sell anything at all (but usually products. The label is Produtos for the catalogue.)
                 if (item.label === "Produtos" && !sellsProducts && sellsServices) return null; // Don't show products if they only sell services
                 if (item.label === "Serviços" && !sellsServices) return null;
+                if (item.label === "Produtividade" && !productivityResourceActive) return null;
                 if (isQuick) {
                     // Quick mode navigation: simplified, no advanced modules
                     const allowed = new Set(["Início", "Vendas", "Produtos", "Serviços", "Configurações"])
@@ -321,7 +335,6 @@ export function ERPSidebar() {
                     newItem.submenu = newItem.submenu.filter((sub) => {
                         if (item.href === "/erp/orders") {
                             if (sub.href === "/erp/orders") return ordersResourceActive
-                            if (sub.href === "/erp/goals") return goalsResourceActive
                             if (sub.href === "/erp/returns") return returnsResourceActive
                             if (sub.href === "/erp/quotes") return quotesResourceActive
                             if (sub.href === "/erp/pdv") return posResourceActive
@@ -345,6 +358,9 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/coupons") return couponsResourceActive
                             if (sub.href === "/erp/promotions") return campaignsResourceActive
                             return marketingResourceActive
+                        }
+                        if (item.label === "Produtividade") {
+                            return productivityResourceActive
                         }
                         return true
                     })

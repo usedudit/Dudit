@@ -295,7 +295,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         price: Number(item.unit_price),
                         qty: Number(item.quantity),
                         stock: Number(item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
-                        image: item.products?.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png',
+                        image: item.image || item.products?.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png',
                         isEditing: false,
                         isBlank: !item.product_id,
                         isManual: !item.product_id,
@@ -575,6 +575,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 variantId: v.id,
                                 stock: v.stock,
                                 qty: sel.qty,
+                                image: v.variant_options?.image || v.image || productToSelectVariant.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png',
                                 isEditing: false,
                                 isManual: false,
                                 allowSellWithoutStock: forceBypass || false
@@ -785,18 +786,6 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     return;
                 }
 
-                if (status !== originalQuoteData.status) {
-                    const stRes = await updateQuoteStatusAction({
-                        quoteId: existingQuote.id,
-                        partnerId,
-                        status: status as "draft" | "sent" | "approved" | "rejected" | "expired" | "cancelled",
-                    });
-                    if (!stRes.success) {
-                        notifyError("Status", (stRes as { error?: string }).error || "Não foi possível atualizar o status.");
-                        return;
-                    }
-                }
-
                 const upRes = await updateQuoteAction({
                     quoteId: existingQuote.id,
                     partnerId,
@@ -879,6 +868,18 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     }
                 }
 
+                if (status !== originalQuoteData.status) {
+                    const stRes = await updateQuoteStatusAction({
+                        quoteId: existingQuote.id,
+                        partnerId,
+                        status: status as "draft" | "sent" | "approved" | "rejected" | "expired" | "cancelled",
+                    });
+                    if (!stRes.success) {
+                        notifyError("Status", (stRes as { error?: string }).error || "Não foi possível atualizar o status.");
+                        return;
+                    }
+                }
+
                 const res = await getQuoteDetailsAction(existingQuote.id, partnerId);
                 if (res.success && res.data) {
                     const q = res.data as any;
@@ -891,7 +892,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         price: Number(item.unit_price),
                         qty: Number(item.quantity),
                         stock: Number(item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
-                        image: item.products?.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png",
+                        image: item.image || item.products?.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png",
                         isEditing: false,
                         isBlank: !item.product_id,
                         isManual: !item.product_id,

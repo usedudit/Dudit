@@ -141,6 +141,13 @@ export interface PartnerPermissions {
         can_add_delivery?: boolean
     }
     suppliers?: ResourcePermissions
+    productivity?: {
+        view: boolean
+        goals_view: boolean
+        goals_manage: boolean
+        commissions_view: boolean
+        commissions_manage: boolean
+    }
 }
 
 // ─── New Route-Based Permissions ────────────────────────────────────────────
@@ -200,6 +207,10 @@ export type RouteKey =
     | "settings_integrations"
     | "settings_team"
     | "settings_subscription"
+    // Produtividade
+    | "productivity_overview"
+    | "productivity_goals"
+    | "productivity_commissions"
 
 export type PartnerRoutePermissions = Record<RouteKey, RoutePermissions>
 

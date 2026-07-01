@@ -13,11 +13,11 @@ import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
-    title: "Dudit - Achou, anunciou, resolveu.",
-    description: "Descubra produtos, serviços e negócios perto de você. Compre direto de quem vende na sua cidade, sem taxa. Milhares de opções na sua região.",
+    title: "Dudit | Descubra. Anuncie. Organize.",
+    description: "Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.",
     openGraph: {
-        title: "Dudit - Achou, anunciou, resolveu.",
-        description: "Descubra produtos, serviços e negócios perto de você.",
+        title: "Dudit | Descubra. Anuncie. Organize.",
+        description: "Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
@@ -34,8 +34,8 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         site: "@dudit",
         creator: "@dudit",
-        title: "Dudit - Achou, anunciou, resolveu.",
-        description: "Descubra produtos, serviços e negócios perto de você.",
+        title: "Dudit | Descubra. Anuncie. Organize.",
+        description: "Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {

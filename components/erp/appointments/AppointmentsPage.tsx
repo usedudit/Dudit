@@ -39,6 +39,7 @@ import {
     deleteUnavailableSeriesAction,
     type AppointmentInput
 } from '@/app/actions/erp/appointments';
+import { saveAppointmentItemsAction } from '@/app/actions/erp/appointment-items';
 import { getUnavailableTypesAction } from '@/app/actions/erp/unavailable-types';
 import { FadeIn } from '@/components/animations/FadeIn';
 import FilterSheet from '@/components/reusable/FilterSheet';
@@ -451,6 +452,11 @@ const AppointmentsPage = ({
 
         try {
             if (selectedAppointment && sheetMode === 'view') {
+                // Save items FIRST so stock movements can find them in DB
+                if (payload.appointmentItems && payload.appointmentItems.length > 0) {
+                    await saveAppointmentItemsAction(selectedAppointment.id, payload.appointmentItems);
+                }
+
                 const updateRes = await updateAppointmentAction(selectedAppointment.id, {
                     customerName: payload.customerName || payload.customer || selectedAppointment.customer,
                     customerId: payload.customerId || null,
@@ -493,6 +499,7 @@ const AppointmentsPage = ({
                     status: item.status || 'Reservado',
                     customerId: item.customerId || realClients.find((c) => c.name === item.customerName)?.id || null,
                     services: item.services || undefined,
+                    items: item.items || undefined,
                 }));
 
                 const createRes = await createAppointmentsAction(rows);

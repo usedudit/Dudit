@@ -152,7 +152,7 @@ export default function GoalsPage(props: {
                         const params = new URLSearchParams(searchParams.toString())
                         params.delete("edit")
                         params.delete("duplicate")
-                        router.push(`/erp/goals?${params.toString()}`)
+                        router.push(`/erp/produtividade/metas?${params.toString()}`)
                     }
                 } else {
                     setEditingGoal(null)
@@ -360,7 +360,7 @@ export default function GoalsPage(props: {
                     </div>
                     {activeTab === "Metas" && (
                         <div className="flex items-center gap-3">
-                            <Button onClick={() => router.push("/erp/goals?create=true")} leftIcon={<PlusIcon size={18} />}>
+                            <Button onClick={() => router.push("/erp/produtividade/metas?create=true")} leftIcon={<PlusIcon size={18} />}>
                                 Nova meta
                             </Button>
                         </div>
@@ -372,7 +372,7 @@ export default function GoalsPage(props: {
                     onTabChange={setActiveTab}
                     search={search}
                     onSearchChange={setSearch}
-                    onCreate={() => router.push("/erp/goals?create=true")}
+                    onCreate={() => router.push("/erp/produtividade/metas?create=true")}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
                     filters={filters}
                     setFilters={setFilters}
@@ -398,7 +398,7 @@ export default function GoalsPage(props: {
                                         imageAlt="Sem metas"
                                         title={hasActiveFilters ? "Nenhuma meta encontrada" : "Nenhuma meta criada"}
                                         subtitle={hasActiveFilters ? "Ajuste os filtros ou tente outra busca." : "Crie metas para acompanhar e premiar o desempenho da equipe."}
-                                        itemButton={{ text: "Nova meta", action: () => router.push("/erp/goals?create=true") }}
+                                        itemButton={{ text: "Nova meta", action: () => router.push("/erp/produtividade/metas?create=true") }}
                                     />
                                 </div>
                             ) : (
@@ -407,8 +407,8 @@ export default function GoalsPage(props: {
                                         <GoalGridCard
                                             key={goal.id}
                                             goal={goal}
-                                            onEdit={() => router.push(`/erp/goals?edit=${goal.id}`)}
-                                            onDuplicate={() => router.push(`/erp/goals?duplicate=${goal.id}`)}
+                                            onEdit={() => router.push(`/erp/produtividade/metas?edit=${goal.id}`)}
+                                            onDuplicate={() => router.push(`/erp/produtividade/metas?duplicate=${goal.id}`)}
                                             onDelete={() => setGoalToDelete(goal)}
                                         />
                                     ))}

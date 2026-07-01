@@ -87,7 +87,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             openPlanUpgrade("crescer");
             return;
         }
-        const phone = customer.phone || customer.mobile;
+        const phone = customer.phone || customer.mobile || customer.phone_fixed;
         if (!phone) {
             notifyError("O cliente não possui um número de celular cadastrado.");
             return;
@@ -167,19 +167,21 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                             )}
                         </span>
                     </Button>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSendNotificationBirthday}
-                        isLoading={isSendingNotification}
-                    >
-                        <span className="flex items-center gap-1.5">
-                            Enviar notificação
-                            {!hasMinimumPlan(planSlug, "crescer") && planStarIconForTarget("crescer") && (
-                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                            )}
-                        </span>
-                    </Button>
+                    {customer.user_id && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSendNotificationBirthday}
+                            isLoading={isSendingNotification}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                Enviar notificação
+                                {!hasMinimumPlan(planSlug, "crescer") && planStarIconForTarget("crescer") && (
+                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                )}
+                            </span>
+                        </Button>
+                    )}
                 </div>
             </section>
         );

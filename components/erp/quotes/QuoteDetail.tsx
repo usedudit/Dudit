@@ -153,6 +153,18 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
     const partnerAvatar = partnerImage ? getR2ImageUrl(partnerImage) : '';
 
+    const previewMeta = useMemo(() => {
+        const meta = quote?.metadata || {};
+        const preview = meta.preview || {};
+        return {
+            primaryColor: preview.primaryColor || undefined,
+            secondaryColor: preview.secondaryColor || undefined,
+            quoteTitle: preview.quoteTitle || undefined,
+            quoteSubtitle: preview.quoteSubtitle || undefined,
+            showDecoration: preview.showDecoration !== false,
+        };
+    }, [quote?.metadata]);
+
     useEffect(() => {
         const fetchAddress = async () => {
             if (!partnerId) return;
@@ -499,8 +511,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         {/* Desktop action buttons */}
                                         <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                             <ActionsDropdown
+                                                onEdit={() => onEditQuote && onEditQuote(quote)}
                                                 onPrint={() => setShowPrintModal(true)}
                                                 onShare={() => {
+                                                    if (quote?.status === 'draft' || quote?.status === 'pending_client') {
+                                                        notifyError("Não é possível compartilhar", "Orçamentos rascunho ou pendentes não podem ser compartilhados.");
+                                                        return;
+                                                    }
                                                     if (!hasMinimumPlan(planSlug, "crescer")) {
                                                         openPlanUpgrade("crescer");
                                                     } else {
@@ -924,10 +941,15 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                             discountValue={discount}
                                             total={total}
                                             note={quote.notes || undefined}
+                                            primaryColor={previewMeta.primaryColor}
+                                            secondaryColor={previewMeta.secondaryColor}
+                                            quoteTitle={previewMeta.quoteTitle}
+                                            quoteSubtitle={previewMeta.quoteSubtitle}
                                             partnerName={partnerName}
                                             partnerAddress={partnerAddress}
                                             partnerAvatar={partnerAvatar}
-                                            showDecoration={true}
+                                            showDecoration={previewMeta.showDecoration}
+                                            salespersonName={quote.user_profiles?.full_name || undefined}
                                         />
                                     </FadeIn>
                                 </TabsContent>
@@ -943,8 +965,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                         {/* Mobile Bottom Action Bar */}
                         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-lg">
                             <ActionsDropdown
+                                onEdit={() => onEditQuote && onEditQuote(quote)}
                                 onPrint={() => setShowPrintModal(true)}
                                 onShare={() => {
+                                    if (quote?.status === 'draft' || quote?.status === 'pending_client') {
+                                        notifyError("Não é possível compartilhar", "Orçamentos rascunho ou pendentes não podem ser compartilhados.");
+                                        return;
+                                    }
                                     if (!hasMinimumPlan(planSlug, "crescer")) {
                                         openPlanUpgrade("crescer");
                                     } else {

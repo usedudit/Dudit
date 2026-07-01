@@ -76,6 +76,9 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                 price: item.unit_price,
             }))
 
+            const meta = quoteDetails.metadata || {}
+            const preview = meta.preview || {}
+
             setQuoteData({
                 invoiceNumber: quoteDetails.quote_number || "",
                 quoteDate: quoteDetails.issue_date || "",
@@ -91,6 +94,12 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                 partnerName,
                 partnerAddress,
                 partnerAvatar,
+                primaryColor: preview.primaryColor || undefined,
+                secondaryColor: preview.secondaryColor || undefined,
+                quoteTitle: preview.quoteTitle || undefined,
+                quoteSubtitle: preview.quoteSubtitle || undefined,
+                showDecoration: preview.showDecoration !== false,
+                salespersonName: quoteDetails.user_profiles?.full_name || undefined,
             })
             setLoading(false)
         }
@@ -223,6 +232,12 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                                                 partnerName={quoteData.partnerName}
                                                 partnerAddress={quoteData.partnerAddress}
                                                 partnerAvatar={quoteData.partnerAvatar}
+                                                primaryColor={quoteData.primaryColor}
+                                                secondaryColor={quoteData.secondaryColor}
+                                                quoteTitle={quoteData.quoteTitle}
+                                                quoteSubtitle={quoteData.quoteSubtitle}
+                                                showDecoration={quoteData.showDecoration}
+                                                salespersonName={quoteData.salespersonName}
                                             />
                                         </div>
                                     </div>

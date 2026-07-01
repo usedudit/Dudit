@@ -130,6 +130,7 @@ const QuoteGridCard = React.memo(
                             }}
                         >
                             <ActionsDropdown
+                                onEdit={onEdit}
                                 onDuplicate={onDuplicate}
                                 onDelete={onDelete}
                                 onPrint={onPrint}

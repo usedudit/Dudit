@@ -538,7 +538,7 @@ export async function getCustomerByIdAction(customerId: string) {
       cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
       store_credit, notes, birth_date, mother_name, father_name, website,
       created_at, zip_code, street, number, complement, neighborhood,
-      city, state, country
+      city, state, country, user_id
     `)
     .eq("id", customerId)
     .maybeSingle()
@@ -574,7 +574,7 @@ export async function getCustomerOrdersAction(customerId: string) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, marketplace_user_id")
+    .select("id, user_id")
     .eq("id", customerId)
     .maybeSingle()
 
@@ -582,7 +582,7 @@ export async function getCustomerOrdersAction(customerId: string) {
     return { orders: [] }
   }
 
-  const buyerIds = [customer.marketplace_user_id, customer.id].filter(Boolean)
+  const buyerIds = [customer.user_id, customer.id].filter(Boolean)
 
   if (buyerIds.length === 0) {
     return { orders: [], stats: null }
@@ -835,7 +835,7 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, name, email, phone, status, store_credit, created_at, store_id, cpf, person_type, cnpj, birth_date")
+      .select("id, partner_id, name, email, phone, phone_fixed, status, store_credit, created_at, store_id, cpf, person_type, cnpj, birth_date, user_id")
       .eq("partner_id", partnerId)
 
     if (options?.storeId) {

@@ -2161,23 +2161,58 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
 
                 const { data: quoteItems } = await admin
                     .from("quote_items")
-                    .select("*, products(name, sku, images, unit)")
+                    .select(`
+                        *,
+                        products(
+                            name,
+                            sku,
+                            images,
+                            unit,
+                            product_variants(
+                                id,
+                                variant_name,
+                                sku,
+                                variant_options
+                            )
+                        )
+                    `)
                     .eq("quote_id", quote.id)
                     .order("sort_order", { ascending: true })
                 items = quoteItems || []
 
-                const formattedItems = items.map((item: any) => ({
-                    id: item.id,
-                    product_id: item.product_id,
-                    name: item.custom_name || item.product_name_snapshot || item.products?.name || "Produto sem nome",
-                    sku: item.product_sku_snapshot || item.products?.sku || "",
-                    quantity: Number(item.quantity || 0),
-                    unit_price: Number(item.unit_price || 0),
-                    total_price: Number(item.unit_price || 0) * Number(item.quantity || 0),
-                    description: item.description || "",
-                    image: item.products?.images && item.products.images.length > 0 ? item.products.images[0] : "https://img.dudit.com.br/static/Placeholder.png",
-                    unit: item.products?.unit || "un"
-                }))
+                const formattedItems = items.map((item: any) => {
+                    let resolvedImage = item.products?.images && item.products.images.length > 0 ? item.products.images[0] : "https://img.dudit.com.br/static/Placeholder.png";
+                    if (item.custom_name && item.products?.product_variants) {
+                        const customName = item.custom_name.trim();
+                        const productName = item.products.name || "";
+                        const suffix = customName.startsWith(productName)
+                            ? customName.slice(productName.length).replace(/^[\s-–—]+/, "").trim()
+                            : customName;
+
+                        const match = item.products.product_variants.find(
+                            (v: any) =>
+                                v.variant_name?.toLowerCase().trim() === suffix.toLowerCase() ||
+                                v.variant_name?.toLowerCase().trim() === customName.toLowerCase() ||
+                                (item.product_sku_snapshot && v.sku?.toLowerCase().trim() === item.product_sku_snapshot.toLowerCase().trim())
+                        );
+                        if (match?.variant_options?.image) {
+                            resolvedImage = match.variant_options.image;
+                        }
+                    }
+
+                    return {
+                        id: item.id,
+                        product_id: item.product_id,
+                        name: item.custom_name || item.product_name_snapshot || item.products?.name || "Produto sem nome",
+                        sku: item.product_sku_snapshot || item.products?.sku || "",
+                        quantity: Number(item.quantity || 0),
+                        unit_price: Number(item.unit_price || 0),
+                        total_price: Number(item.unit_price || 0) * Number(item.quantity || 0),
+                        description: item.description || "",
+                        image: resolvedImage,
+                        unit: item.products?.unit || "un"
+                    };
+                })
 
                 let partnerAddressFormatted = "Endereço não cadastrado"
                 const { data: partnerAddr } = await admin
@@ -2381,7 +2416,7 @@ export async function approvePublicQuoteAction(
             // 1. Fetch quote by public_token
             const { data: quote, error: quoteErr } = await supabase
                 .from("quotes")
-                .select("id, partner_id, status, quote_number, expiration_date")
+                .select("id, partner_id, status, quote_number, expiration_date, customers(email)")
                 .eq("public_token", publicToken)
                 .maybeSingle()
 
@@ -2389,17 +2424,25 @@ export async function approvePublicQuoteAction(
                 return errorResponse("Link ou código de aprovação inválido")
             }
 
-            // 2. Determine auth method
+            // 2. Determine auth method and check permission
             const currentUser = await getCurrentUser().catch(() => null)
-            const method = currentUser ? "auth" : "code"
+            const customerEmail = (quote as any).customers?.email || null
 
-            if (method === "code") {
-                if (!approverName || !approverName.trim()) {
-                    return errorResponse("Nome do aprovador é obrigatório.")
+            let isAuthorized = false
+            let method = "code"
+
+            if (currentUser) {
+                if (customerEmail && currentUser.email && currentUser.email.toLowerCase() === customerEmail.toLowerCase()) {
+                    isAuthorized = true
+                    method = "auth"
                 }
+            }
+
+            if (!isAuthorized) {
                 if (!approvalCode || !approvalCode.trim()) {
                     return errorResponse("Código de aprovação é obrigatório.")
                 }
+                method = "code"
             }
 
             // 3. Call RPC to approve public quote
@@ -2465,7 +2508,7 @@ export async function rejectPublicQuoteAction(
             // 1. Fetch quote by public_token
             const { data: quote, error: quoteErr } = await supabase
                 .from("quotes")
-                .select("id, partner_id, status, quote_number, expiration_date")
+                .select("id, partner_id, status, quote_number, expiration_date, customers(email)")
                 .eq("public_token", publicToken)
                 .maybeSingle()
 
@@ -2477,17 +2520,25 @@ export async function rejectPublicQuoteAction(
                 return errorResponse("O motivo da recusa é obrigatório.")
             }
 
-            // 2. Determine auth method
+            // 2. Determine auth method and check permission
             const currentUser = await getCurrentUser().catch(() => null)
-            const method = currentUser ? "auth" : "code"
+            const customerEmail = (quote as any).customers?.email || null
 
-            if (method === "code") {
-                if (!rejectorName || !rejectorName.trim()) {
-                    return errorResponse("Nome do cliente é obrigatório.")
+            let isAuthorized = false
+            let method = "code"
+
+            if (currentUser) {
+                if (customerEmail && currentUser.email && currentUser.email.toLowerCase() === customerEmail.toLowerCase()) {
+                    isAuthorized = true
+                    method = "auth"
                 }
+            }
+
+            if (!isAuthorized) {
                 if (!approvalCode || !approvalCode.trim()) {
                     return errorResponse("Código de aprovação é obrigatório.")
                 }
+                method = "code"
             }
 
             // 3. Call RPC to reject public quote

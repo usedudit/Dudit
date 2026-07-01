@@ -111,6 +111,7 @@ const QuoteListItem = React.memo(
                             onClick={(e) => e.stopPropagation()}
                         >
                             <ActionsDropdown
+                                onEdit={() => onEdit(quote)}
                                 onDuplicate={() => onDuplicate(quote)}
                                 onDelete={() => onDelete(quote)}
                                 onPrint={onPrint ? () => onPrint(quote) : undefined}

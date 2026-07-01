@@ -149,6 +149,14 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "settings_subscription", path: "/erp/settings/subscription", label: "Minha Assinatura", category: "Configurações",
         specificPermissions: ["can_change_subscription"],
     },
+
+    // ── Produtividade
+    productivity_overview: { key: "productivity_overview", path: "/erp/produtividade", label: "Visão Geral", category: "Produtividade" },
+    productivity_goals: { key: "productivity_goals", path: "/erp/produtividade/metas", label: "Metas", category: "Produtividade" },
+    productivity_commissions: {
+        key: "productivity_commissions", path: "/erp/produtividade/comissoes", label: "Comissões", category: "Produtividade",
+        specificPermissions: ["can_pay_commission"],
+    },
 }
 
 // ─── Path-to-RouteKey Lookup ────────────────────────────────────────────────
@@ -248,6 +256,10 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     settings_integrations: withSpecific(full, { can_manage_integrations: true }),
     settings_team: withSpecific(full, { can_invite: true, can_remove_member: true, can_revoke_invite: true, can_manage_team: true }),
     settings_subscription: withSpecific(full, { can_change_subscription: true }),
+    // Produtividade - full
+    productivity_overview: full,
+    productivity_goals: full,
+    productivity_commissions: withSpecific(full, { can_pay_commission: true }),
 }
 
 // ─── ADMIN: Operacional Completo (exceto nível societário) ──────────────────
@@ -321,6 +333,10 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     settings_integrations: noAccess,
     settings_team: withSpecific(viewOnly, { can_invite: false, can_remove_member: false, can_revoke_invite: false, can_manage_team: true }),
     settings_subscription: noAccess,
+    // Produtividade - pode visualizar overview, gerenciar metas, visualizar comissões
+    productivity_overview: viewOnly,
+    productivity_goals: withSpecific(crud, { can_manage: true }),
+    productivity_commissions: withSpecific(viewOnly, { can_pay_commission: false }),
 }
 
 // ─── OPERATOR: Operador ─────────────────────────────────────────────────────
@@ -380,6 +396,10 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     settings_integrations: noAccess,
     settings_team: noAccess,
     settings_subscription: noAccess,
+    // Produtividade - sem acesso
+    productivity_overview: noAccess,
+    productivity_goals: noAccess,
+    productivity_commissions: noAccess,
 }
 
 // ─── DELIVERY: Entregador ───────────────────────────────────────────────────
@@ -435,6 +455,10 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     settings_integrations: noAccess,
     settings_team: noAccess,
     settings_subscription: noAccess,
+    // Produtividade - sem acesso
+    productivity_overview: noAccess,
+    productivity_goals: noAccess,
+    productivity_commissions: noAccess,
 }
 
 // ─── Combined Presets ───────────────────────────────────────────────────────
@@ -743,6 +767,19 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
         }
     }
     if (legacy.goals) apply("goals", mapLegacy(legacy.goals))
+    if (legacy.productivity) {
+        apply("productivity_overview", { access: legacy.productivity.view })
+        apply("productivity_goals", {
+            access: legacy.productivity.goals_view,
+            create: legacy.productivity.goals_manage,
+            edit: legacy.productivity.goals_manage,
+            specific: { can_manage: legacy.productivity.goals_manage },
+        })
+        apply("productivity_commissions", {
+            access: legacy.productivity.commissions_view,
+            specific: { can_pay_commission: legacy.productivity.commissions_manage },
+        })
+    }
     if (legacy.customers) apply("customers", mapLegacy(legacy.customers))
 
     if (legacy.financial) {

@@ -114,7 +114,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
 
   const isDirty = currentSnapshot !== initialSnapshot
   const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
-  const handleBack = useCallback(() => handleNavigation("/erp/goals"), [handleNavigation])
+  const handleBack = useCallback(() => handleNavigation("/erp/produtividade/metas"), [handleNavigation])
 
   const assignedSellerNames = useMemo(
     () => sellers.filter((seller) => form.assignedUserIds.includes(seller.id)).map((seller) => seller.name),
@@ -237,7 +237,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
     }
 
     toast({ title: "Sucesso", description: mode === "edit" ? "Meta atualizada." : "Meta criada." })
-    router.push("/erp/goals")
+    router.push("/erp/produtividade/metas")
     router.refresh()
   }
 

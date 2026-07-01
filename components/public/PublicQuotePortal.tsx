@@ -15,7 +15,6 @@ import {
     TabsTrigger,
     TabsContent,
     CustomerCard,
-    ThreeDotsLoader,
     FormSection,
     DefaultModal,
     Input,
@@ -24,6 +23,7 @@ import {
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
+import { useSupabase } from "@/providers/supabase-provider"
 
 interface PublicQuotePortalProps {
     token: string
@@ -83,6 +83,14 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
     const commentEndRef = useRef<HTMLDivElement>(null)
+
+    const { supabase } = useSupabase()
+    const [currentUser, setCurrentUser] = useState<any>(null)
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data }: any) => {
+            if (data?.user) setCurrentUser(data.user)
+        })
+    }, [supabase])
 
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
     const formatDateString = (dateStr: string) => {
@@ -162,13 +170,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
         setIsProcessingAction(true)
         setErrorMessage(null)
         try {
-            const res = await approvePublicQuoteAction(token, approverName, approvalCode, ip, userAgent)
+            const res = await approvePublicQuoteAction(token, "Cliente", isClientEmailMatched ? "" : approvalCode, ip, userAgent)
             if (res.success) {
                 setSuccessMessage("Orçamento aprovado com sucesso!")
                 setShowApproveModal(false)
-                if (typeof window !== "undefined") {
-                    localStorage.setItem("dudit_guest_name", approverName)
-                }
                 // Reload data
                 const refreshRes = await getPublicQuoteAction(token, ip, userAgent)
                 if (refreshRes.success && refreshRes.data) {
@@ -193,13 +198,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
         setIsProcessingAction(true)
         setErrorMessage(null)
         try {
-            const res = await rejectPublicQuoteAction(token, approverName, approvalCode, rejectionReason, ip, userAgent)
+            const res = await rejectPublicQuoteAction(token, "Cliente", isClientEmailMatched ? "" : approvalCode, rejectionReason, ip, userAgent)
             if (res.success) {
                 setSuccessMessage("Orçamento recusado com sucesso.")
                 setShowRejectModal(false)
-                if (typeof window !== "undefined") {
-                    localStorage.setItem("dudit_guest_name", approverName)
-                }
                 // Reload data
                 const refreshRes = await getPublicQuoteAction(token, ip, userAgent)
                 if (refreshRes.success && refreshRes.data) {
@@ -219,6 +221,18 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     // ─── RENDERING COMPUTED DATA ─────────────────────────────────────────────
     const dataQuote = { ...quote, ...snapshot }
     const items = snapshot?.items || quote.items || []
+
+    const previewMeta = useMemo(() => {
+        const meta = quote?.metadata || {}
+        const preview = meta.preview || {}
+        return {
+            primaryColor: preview.primaryColor || undefined,
+            secondaryColor: preview.secondaryColor || undefined,
+            quoteTitle: preview.quoteTitle || undefined,
+            quoteSubtitle: preview.quoteSubtitle || undefined,
+            showDecoration: preview.showDecoration !== false,
+        }
+    }, [quote?.metadata])
 
     const resolvedPartner = useMemo(() => {
         const qp = quote.partners
@@ -247,6 +261,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const customerName = selectedCustomer?.name || "Consumidor final"
     const customerEmail = selectedCustomer?.email || ""
     const customerPhone = selectedCustomer?.phone || ""
+
+    const isClientEmailMatched = useMemo(() => {
+        return !!(currentUser && customerEmail && currentUser.email?.toLowerCase() === customerEmail.toLowerCase())
+    }, [currentUser, customerEmail])
 
     // Address rendering for customer
     const customerAddressText = (() => {
@@ -285,8 +303,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         >
                             {/* Sticky Header inside left column */}
                             <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-                                <div className="px-4 md:px-6 pt-4 pb-2">
-                                    <div className="flex items-center justify-between">
+                                <div className="px-4 md:px-6 pt-4">
+                                    <div className="flex items-center justify-between pb-2">
                                         <div className="flex items-center gap-3">
                                             {partnerLogo ? (
                                                 <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-lg border border-brand-border dark:border-dark-border" />
@@ -345,29 +363,18 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                             {/* Code & Expiry FormSection */}
                                             <FormSection title="Informações da proposta">
                                                 <div className="space-y-3">
-                                                    <div className="flex justify-between items-center text-xs">
+                                                    <div className="flex justify-between items-center text-sm">
                                                         <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Código da proposta</span>
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">{dataQuote.quote_number || "Orçamento"}</span>
                                                     </div>
-                                                    <div className="flex justify-between items-center text-xs">
+                                                    <div className="flex justify-between items-center text-sm">
                                                         <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de emissão</span>
-                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.issue_date)}</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.issue_date)}</span>
                                                     </div>
-                                                    <div className="flex justify-between items-center text-xs">
+                                                    <div className="flex justify-between items-center text-sm">
                                                         <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Validade da proposta</span>
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.expiration_date)}</span>
                                                     </div>
-                                                </div>
-                                            </FormSection>
-
-                                            {/* Issuer / Seller FormSection */}
-                                            <FormSection title="Fornecedor" hasSeparator>
-                                                <div className="space-y-2">
-                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{partnerName}</p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">{partnerAddress}</p>
-                                                    {partnerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {partnerPhone}</p>}
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {partnerEmail}</p>
-                                                    {sellerName && <p className="text-xs font-semibold text-brand-green mt-2">Vendedor: {sellerName} ({sellerEmail})</p>}
                                                 </div>
                                             </FormSection>
 
@@ -524,10 +531,11 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                 discountValue={Number(dataQuote.discount_value || 0)}
                                                 total={Number(dataQuote.total || 0)}
                                                 note={dataQuote.notes || undefined}
-                                                primaryColor={dataQuote.primary_color || undefined}
-                                                secondaryColor={dataQuote.secondary_color || undefined}
-                                                quoteTitle={dataQuote.quote_title || undefined}
-                                                quoteSubtitle={dataQuote.quote_subtitle || undefined}
+                                                primaryColor={previewMeta.primaryColor}
+                                                secondaryColor={previewMeta.secondaryColor}
+                                                quoteTitle={previewMeta.quoteTitle}
+                                                quoteSubtitle={previewMeta.quoteSubtitle}
+                                                showDecoration={previewMeta.showDecoration}
                                                 partnerName={partnerName}
                                                 partnerAddress={partnerAddress}
                                                 partnerAvatar={partnerLogo || undefined}
@@ -555,10 +563,11 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                 discountValue={Number(dataQuote.discount_value || 0)}
                                 total={Number(dataQuote.total || 0)}
                                 note={dataQuote.notes || undefined}
-                                primaryColor={dataQuote.primary_color || undefined}
-                                secondaryColor={dataQuote.secondary_color || undefined}
-                                quoteTitle={dataQuote.quote_title || undefined}
-                                quoteSubtitle={dataQuote.quote_subtitle || undefined}
+                                primaryColor={previewMeta.primaryColor}
+                                secondaryColor={previewMeta.secondaryColor}
+                                quoteTitle={previewMeta.quoteTitle}
+                                quoteSubtitle={previewMeta.quoteSubtitle}
+                                showDecoration={previewMeta.showDecoration}
                                 partnerName={partnerName}
                                 partnerAddress={partnerAddress}
                                 partnerAvatar={partnerLogo || undefined}
@@ -589,7 +598,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         </Button>
                         <Button
                             onClick={handleApprove}
-                            disabled={!approverName.trim() || approvalCode.length < 4 || isProcessingAction}
+                            disabled={(!isClientEmailMatched && approvalCode.length < 4) || isProcessingAction}
                             className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
                         >
                             {isProcessingAction ? "Aprovando..." : "Confirmar aprovação"}
@@ -597,27 +606,25 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                     </div>
                 }
             >
-                <div className="space-y-4">
+                <div className="space-y-4 text-left">
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        Insira suas credenciais abaixo. O código de aprovação de 4 dígitos foi gerado pelo vendedor responsável.
+                        {isClientEmailMatched 
+                            ? `Você está conectado como ${currentUser.email} e pode aprovar esta proposta diretamente.`
+                            : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
+                        }
                     </p>
 
-                    <div className="space-y-3">
-                        <Input
-                            label="Seu nome completo"
-                            value={approverName}
-                            onChange={(e) => setApproverName(e.target.value)}
-                            placeholder="Ex: João da Silva"
-                        />
-
-                        <Input
-                            label="Código de aprovação (4 dígitos)"
-                            maxLength={4}
-                            value={approvalCode}
-                            onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
-                            placeholder="0000"
-                        />
-                    </div>
+                    {!isClientEmailMatched && (
+                        <div className="space-y-3">
+                            <Input
+                                label="Código de aprovação (4 dígitos)"
+                                maxLength={4}
+                                value={approvalCode}
+                                onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
+                                placeholder="0000"
+                            />
+                        </div>
+                    )}
                 </div>
             </DefaultModal>
 
@@ -638,7 +645,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         </Button>
                         <Button
                             onClick={handleReject}
-                            disabled={!approverName.trim() || approvalCode.length < 4 || !rejectionReason.trim() || isProcessingAction}
+                            disabled={(!isClientEmailMatched && approvalCode.length < 4) || !rejectionReason.trim() || isProcessingAction}
                             className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 h-auto border-none"
                         >
                             {isProcessingAction ? "Recusando..." : "Confirmar recusa"}
@@ -646,26 +653,24 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                     </div>
                 }
             >
-                <div className="space-y-4">
+                <div className="space-y-4 text-left">
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        Insira suas credenciais e informe o motivo comercial. O vendedor receberá uma notificação imediata.
+                        {isClientEmailMatched 
+                            ? `Você está conectado como ${currentUser.email} e pode recusar esta proposta diretamente.`
+                            : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
+                        }
                     </p>
 
                     <div className="space-y-3">
-                        <Input
-                            label="Seu nome completo"
-                            value={approverName}
-                            onChange={(e) => setApproverName(e.target.value)}
-                            placeholder="Ex: João da Silva"
-                        />
-
-                        <Input
-                            label="Código de aprovação (4 dígitos)"
-                            maxLength={4}
-                            value={approvalCode}
-                            onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
-                            placeholder="0000"
-                        />
+                        {!isClientEmailMatched && (
+                            <Input
+                                label="Código de aprovação (4 dígitos)"
+                                maxLength={4}
+                                value={approvalCode}
+                                onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
+                                placeholder="0000"
+                            />
+                        )}
 
                         <FormTextarea
                             label="Motivo da recusa"

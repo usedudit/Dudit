@@ -12,7 +12,7 @@ export interface Appointment {
     endDate?: string;   // End Date (YYYY-MM-DD) - New
     endTime?: string;   // End Time (HH:MM) - New
     duration: number;   // minutes (calculated total)
-    status: 'Reservado' | 'Confirmado' | 'Aguardando' | 'Iniciado' | 'Concluído' | 'Pago' | 'Ausência' | 'Cancelado' | 'Indisponível' | 'Partially Paid' | 'Pago Parcialmente';
+    status: 'Reservado' | 'Confirmado' | 'Aguardando' | 'Em andamento' | 'Iniciado' | 'Concluído' | 'Pago' | 'Ausência' | 'Cancelado' | 'Indisponível' | 'Partially Paid' | 'Pago Parcialmente';
     paymentStatus?: string;
     paidAmount?: number;
     salesChannel?: string;

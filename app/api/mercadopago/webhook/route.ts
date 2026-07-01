@@ -157,7 +157,7 @@ async function processWebhookWithRetry(
     // ── Idempotency check: has this payment already been processed? ──
     const { data: existingOrderData, error: checkError } = await supabase
       .from("orders")
-      .select("id, situation, total_amount, partner_id, payment_expires_at, cancelled_at")
+      .select("id, situation, total_amount, partner_id, payment_expires_at, cancelled_at, payment_breakdown, finance_account_id")
       .eq("mp_payment_id", paymentId.toString())
       .limit(1)
       .single()
@@ -257,7 +257,7 @@ async function processWebhookWithRetry(
     if (!orderData) {
       const { data: order, error: orderError } = await supabase
         .from("orders")
-        .select("id, situation, total_amount, partner_id")
+        .select("id, situation, total_amount, partner_id, payment_breakdown, finance_account_id")
         .eq("mp_payment_id", paymentId.toString())
         .limit(1)
         .single()
@@ -338,12 +338,22 @@ async function processWebhookWithRetry(
     }
 
     // ── Update order ──
+    const oldBreakdown = Array.isArray(orderData.payment_breakdown) ? orderData.payment_breakdown : []
+    const newBreakdown = oldBreakdown.map((entry: any) => {
+      const isMpPix = String(entry.method).toLowerCase().includes("mercado pago") && String(entry.method).toLowerCase().includes("pix")
+      if (isMpPix || oldBreakdown.length <= 1) {
+        return { ...entry, amountReceived: entry.amount }
+      }
+      return entry
+    })
+
     const updateData: any = {
       situation: orderStatus,
       payment_method: paymentMethodName,
       payment_provider: "Mercado Pago",
       mp_payment_id: paymentId.toString(),
       updated_at: new Date().toISOString(),
+      payment_breakdown: newBreakdown,
     }
 
     if (paymentInfo.status === "approved" && paymentInfo.date_approved) {
@@ -396,24 +406,25 @@ async function processWebhookWithRetry(
     // ── Create revenue transaction when paid ──
     if (orderStatus === "paid") {
       try {
-        const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
+        const { createFinancialTransactionsForReceivedAmount } = await import("@/app/actions/erp/orders")
         const { data: fullOrder } = await supabase
           .from("orders")
-          .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id")
+          .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
           .eq("id", orderId)
           .single()
 
         if (fullOrder) {
-          await createTransactionFromOrder(supabase, {
-            order_number: fullOrder.order_number,
-            partner_id: fullOrder.partner_id,
-            total_amount: fullOrder.total_amount,
-            payment_method: fullOrder.payment_method,
-            payment_provider: fullOrder.payment_provider,
-            payment_breakdown: fullOrder.payment_breakdown,
-            payment_date: paymentInfo.date_approved || new Date().toISOString(),
-            customer_id: fullOrder.customer_id,
-            customer_name: fullOrder.customer_name,
+          await createFinancialTransactionsForReceivedAmount(supabase, {
+            orderId: orderId,
+            orderNumber: fullOrder.order_number,
+            partnerId: fullOrder.partner_id,
+            totalAmount: fullOrder.total_amount,
+            newBreakdown: fullOrder.payment_breakdown || [],
+            oldBreakdown: orderData.payment_breakdown || [],
+            customerId: fullOrder.customer_id || fullOrder.buyer_id || null,
+            customerName: fullOrder.customer_name || null,
+            financeAccountId: fullOrder.finance_account_id || null,
+            orderSource: fullOrder.order_source || "manual",
           })
 
           const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")

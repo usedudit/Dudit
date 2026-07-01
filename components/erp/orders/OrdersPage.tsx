@@ -18,6 +18,7 @@ import OrderGridCard from "./OrderGridCard"
 import OrderPageControls from "./OrderPageControls"
 import CreateOrder from "./CreateOrder"
 import OrderDetailView from "./OrderDetailView"
+import PaymentStatusModal from "./PaymentStatusModal"
 
 // Icons
 import {
@@ -554,13 +555,6 @@ export default function OrdersPage({
 
     const openPaymentStatusModal = (order: Order) => {
         setPaymentStatusModal({ open: true, order })
-        const status = order.situation
-        setPaymentStatusValue(
-            status === "paid" ? "paid"
-                : status === "partially_paid" ? "partially_paid"
-                    : "pending"
-        )
-        setPaidAmountValue(order.paidAmount ?? 0)
     }
 
     const handlePaymentStatusClick = useCallback((order: Order) => {
@@ -573,52 +567,6 @@ export default function OrdersPage({
             openEntity('edit', order.originalId)
         }
     }, [openEntity, openPaymentStatusModal])
-
-    const submitPaymentStatusChange = async () => {
-        const targetOrder = paymentStatusModal.order
-        if (!targetOrder) return
-
-        let targetStatusValue = paymentStatusValue
-        let targetPaidAmount: number | undefined = undefined
-
-        const breakdown = Array.isArray(targetOrder.payment_breakdown) ? targetOrder.payment_breakdown : []
-        const isSinglePayment = breakdown.length <= 1
-
-        if (isSinglePayment) {
-            const total = targetOrder.total_amount
-            if (paidAmountValue >= total - 0.005) {
-                targetStatusValue = "paid"
-            } else if (paidAmountValue > 0.005) {
-                targetStatusValue = "partially_paid"
-            } else {
-                targetStatusValue = "pending"
-            }
-            targetPaidAmount = paidAmountValue
-        }
-
-        setActionModal({ open: true, text: "Atualizando status de pagamento..." })
-        try {
-            const result = await updateOrdersStatusInBatchAction({
-                orderIds: [targetOrder.originalId],
-                partnerId,
-                actionType: "payment_status",
-                statusValue: targetStatusValue,
-                paidAmount: targetPaidAmount,
-            })
-            if (result.success) {
-                afterMutation(targetOrder.originalId)
-                toast({ title: "Sucesso", description: "Status de pagamento atualizado." })
-                setPaymentStatusModal({ open: false, order: null })
-            } else {
-                toast({ title: "Erro", description: result.error, variant: "destructive" })
-            }
-        } catch (error) {
-            console.error(error)
-            toast({ title: "Erro", description: "Falha ao atualizar status de pagamento.", variant: "destructive" })
-        } finally {
-            setActionModal({ open: false, text: "" })
-        }
-    }
 
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
@@ -1272,99 +1220,17 @@ export default function OrdersPage({
                 </div>
             </DefaultModal>
 
-            <DefaultModal
+            <PaymentStatusModal
                 isOpen={paymentStatusModal.open}
                 onClose={() => setPaymentStatusModal({ open: false, order: null })}
-                title="Alterar status de pagamento"
-                footer={
-                    <div className="flex justify-end gap-3 w-full">
-                        <Button variant="outline" onClick={() => setPaymentStatusModal({ open: false, order: null })}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={submitPaymentStatusChange}>
-                            Salvar
-                        </Button>
-                    </div>
-                }
-            >
-                <div className="flex flex-col gap-4 p-4">
-                    <InfoCard
-                        title="Pedido"
-                        message={paymentStatusModal.order?.displayId || "-"}
-                        color="gray"
-                    />
-                    {(() => {
-                        const targetOrder = paymentStatusModal.order
-                        if (!targetOrder) return null
-
-                        const breakdown = Array.isArray(targetOrder.payment_breakdown) ? targetOrder.payment_breakdown : []
-                        const isSinglePayment = breakdown.length <= 1
-
-                        if (isSinglePayment) {
-                            const paymentMethodLabelText = formatPaymentMethodLabel(targetOrder.payment_method || breakdown[0]?.method || "", null)
-                            const calculatedStatus = paidAmountValue >= targetOrder.total_amount - 0.005
-                                ? "Pago"
-                                : paidAmountValue > 0.005
-                                    ? "Parcialmente Pago"
-                                    : "Pendente"
-
-                            return (
-                                <div className="flex flex-col gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1">
-                                            Meio de pagamento
-                                        </label>
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                            {paymentMethodLabelText || "Não informado"}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1">
-                                            Valor total do pedido
-                                        </label>
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(targetOrder.total_amount)}
-                                        </span>
-                                    </div>
-                                    <MoneyInput
-                                        label="Valor Pago"
-                                        value={paidAmountValue}
-                                        onChange={(val) => setPaidAmountValue(val)}
-                                        max={targetOrder.total_amount}
-                                    />
-                                    <div className="flex items-center gap-2 pt-1">
-                                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body uppercase">
-                                            Status calculado:
-                                        </span>
-                                        <Badge
-                                            variant={
-                                                calculatedStatus === "Pago" ? "green" :
-                                                    calculatedStatus === "Parcialmente Pago" ? "orange" : "gray"
-                                            }
-                                            className="text-xs font-bold"
-                                        >
-                                            {calculatedStatus}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            )
-                        }
-
-                        return (
-                            <FormDropdown
-                                label="Status de pagamento"
-                                options={[
-                                    { value: "pending", label: "Pendente" },
-                                    { value: "paid", label: "Pago" },
-                                    { value: "partially_paid", label: "Parcialmente Pago" }
-                                ]}
-                                value={paymentStatusValue}
-                                setValue={setPaymentStatusValue}
-                            />
-                        )
-                    })()}
-                </div>
-            </DefaultModal>
+                order={paymentStatusModal.order}
+                partnerId={partnerId}
+                onSuccess={() => {
+                    if (paymentStatusModal.order) {
+                        afterMutation(paymentStatusModal.order.originalId)
+                    }
+                }}
+            />
 
             <AlertModal
                 isOpen={deliveryWarningModal?.isOpen ?? false}

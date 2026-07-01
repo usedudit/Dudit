@@ -734,6 +734,72 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
     }
 }
 
+export async function createFinancialTransactionsForReceivedAmount(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    params: {
+        orderId: string
+        orderNumber: string
+        partnerId: string
+        totalAmount: number
+        newBreakdown: any[]
+        oldBreakdown: any[]
+        customerId?: string | null
+        customerName?: string | null
+        financeAccountId?: string | null
+        orderSource?: string | null
+    }
+) {
+    try {
+        const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
+
+        const oldBreakdown = Array.isArray(params.oldBreakdown) ? params.oldBreakdown : []
+        const newBreakdown = Array.isArray(params.newBreakdown) ? params.newBreakdown : []
+
+        for (let i = 0; i < newBreakdown.length; i++) {
+            const newEntry = newBreakdown[i]
+            if (!newEntry?.method) continue
+
+            const newReceived = Number(newEntry.amountReceived || 0)
+
+            const oldEntry = oldBreakdown.find((old: any) => 
+                old?.method === newEntry.method && 
+                old?.paymentMethodId === newEntry.paymentMethodId
+            ) || oldBreakdown[i]
+
+            const oldReceived = oldEntry ? Number(oldEntry.amountReceived || 0) : 0
+            const delta = newReceived - oldReceived
+
+            if (delta > 0.009) {
+                const oldFormatted = oldReceived.toFixed(2)
+                const newFormatted = newReceived.toFixed(2)
+                const refNote = `sale-tx:${params.orderNumber}:${newEntry.method}:${oldFormatted}_to_${newFormatted}`
+
+                await createTransactionFromOrder(supabase, {
+                    order_number: params.orderNumber,
+                    partner_id: params.partnerId,
+                    total_amount: delta,
+                    payment_method: newEntry.method,
+                    payment_provider: params.orderSource === "Marketplace" || String(newEntry.method).toLowerCase().includes("mercado pago") ? "Mercado Pago" : null,
+                    payment_breakdown: [{
+                        method: newEntry.method,
+                        amount: delta,
+                        paymentMethodId: newEntry.paymentMethodId || null,
+                        installmentNumber: newEntry.installmentNumber || 1,
+                    }],
+                    payment_date: new Date().toISOString(),
+                    customer_id: params.customerId || null,
+                    customer_name: params.customerName || null,
+                    finance_account_id: params.financeAccountId || null,
+                    order_source: params.orderSource || "manual",
+                    reference_note: refNote,
+                })
+            }
+        }
+    } catch (error) {
+        console.error("[orders_financial] createFinancialTransactionsForReceivedAmount:", error)
+    }
+}
+
 async function resolvePartnerUserIdFromUserId(
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
     partnerId: string,
@@ -1596,20 +1662,22 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         )
     }
 
-    if (paymentState.situation === "paid") {
-        await createFinancialTransactionsForPaidOrder(supabase, {
+    if (paymentState.paidAmount > 0.009) {
+        await createFinancialTransactionsForReceivedAmount(supabase, {
+            orderId: order.id,
             orderNumber: order.order_number,
             partnerId,
             totalAmount: Number(order.total_amount || 0),
-            paymentMethod: paymentMethodSummary,
-            paymentProvider: order.payment_provider,
-            paymentBreakdown: adjustedPaymentBreakdown,
+            newBreakdown: adjustedPaymentBreakdown,
+            oldBreakdown: [],
             customerId: order.customer_id || order.buyer_id || null,
             customerName: order.customer_name,
-            paymentDate: new Date().toISOString(),
             financeAccountId: order.finance_account_id || data.financeAccountId,
             orderSource: order.order_source || "manual",
         })
+    }
+
+    if (paymentState.situation === "paid") {
         await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
         await createSellerCommissionForPaidOrder({
             supabase,
@@ -2219,20 +2287,22 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const orderError = orderUpdateResult.error
     if (orderError) return { error: orderError.message }
 
-    if (currentOrder.situation !== "paid" && paymentState.situation === "paid") {
-        await createFinancialTransactionsForPaidOrder(supabase, {
+    if (paymentState.paidAmount > (currentOrder.paid_amount || 0) + 0.009) {
+        await createFinancialTransactionsForReceivedAmount(supabase, {
+            orderId: orderId,
             orderNumber: currentOrder.order_number || orderId,
             partnerId: data.partnerId,
             totalAmount: Number(updateServerTotal || 0),
-            paymentMethod: paymentMethodSummary,
-            paymentProvider: null,
-            paymentBreakdown: adjustedPaymentBreakdown,
+            newBreakdown: adjustedPaymentBreakdown,
+            oldBreakdown: currentOrder.payment_breakdown || [],
             customerId: data.customerId || null,
             customerName: data.customerName || null,
-            paymentDate: new Date().toISOString(),
             financeAccountId: data.financeAccountId,
             orderSource: currentOrder.order_source || "manual",
         })
+    }
+
+    if (currentOrder.situation !== "paid" && paymentState.situation === "paid") {
         await fulfillMarketplaceOrderIfNeeded(supabase, orderId)
         await createSellerCommissionForPaidOrder({
             supabase,
@@ -2533,6 +2603,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
     userName?: string
     changeReason?: string
     paidAmount?: number
+    paymentBreakdown?: any[]
+    mpPaymentId?: string
 }) {
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
@@ -2882,6 +2954,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 .update({
                     situation: paymentState.situation,
                     paid_amount: paymentState.paidAmount,
+                    ...(payload.paymentBreakdown ? { payment_breakdown: payload.paymentBreakdown } : {}),
+                    ...(payload.mpPaymentId ? { mp_payment_id: payload.mpPaymentId } : {}),
                 })
                 .eq("id", order.id)
                 .eq("partner_id", payload.partnerId)
@@ -2889,20 +2963,28 @@ export async function updateOrdersStatusInBatchAction(payload: {
             if (error) return { error: error.message }
             paymentProcessedCount += 1
 
-            if (order.situation !== "paid" && paymentState.situation === "paid") {
-                await createFinancialTransactionsForPaidOrder(supabase, {
+            if (paymentState.paidAmount > (order.paid_amount || 0) + 0.009) {
+                const oldBreakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+                const newBreakdown = payload.paymentBreakdown || (
+                    paymentState.situation === "paid"
+                        ? [{ method: order.payment_method || "Dinheiro", amount: order.total_amount, amountReceived: order.total_amount }]
+                        : [{ method: order.payment_method || "Dinheiro", amount: order.total_amount, amountReceived: paymentState.paidAmount }]
+                )
+                await createFinancialTransactionsForReceivedAmount(supabase, {
+                    orderId: order.id,
                     orderNumber: order.order_number || order.id,
                     partnerId: payload.partnerId,
                     totalAmount: Number(order.total_amount || 0),
-                    paymentMethod: order.payment_method || null,
-                    paymentProvider: order.payment_provider || null,
-                    paymentBreakdown: order.payment_breakdown || null,
+                    newBreakdown,
+                    oldBreakdown,
                     customerId: order.customer_id || order.buyer_id || null,
                     customerName: order.customer_name || null,
-                    paymentDate: new Date().toISOString(),
                     financeAccountId: order.finance_account_id || null,
                     orderSource: order.order_source || "manual",
                 })
+            }
+
+            if (order.situation !== "paid" && paymentState.situation === "paid") {
                 await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
                 await createSellerCommissionForPaidOrder({
                     supabase,

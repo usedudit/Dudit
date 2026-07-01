@@ -23,6 +23,7 @@ export type AppointmentStatus =
   | "Reservado"
   | "Confirmado"
   | "Aguardando"
+  | "Em andamento"
   | "Iniciado"
   | "Concluído"
   | "Pago"
@@ -37,6 +38,15 @@ export type AppointmentServiceInfo = {
   name: string
   price: number
   categoryId?: string | null
+}
+
+export type AppointmentItemInput = {
+  product_id?: string | null
+  variant_id?: string | null
+  service_id?: string | null
+  name: string
+  quantity: number
+  usage_type: 'consumed' | 'returnable' | 'reference'
 }
 
 export type AppointmentInput = {
@@ -62,6 +72,7 @@ export type AppointmentInput = {
   fulfillmentMode?: string | null
   salesChannel?: string | null
   services?: AppointmentServiceInfo[]
+  items?: AppointmentItemInput[]
 }
 
 function safeRevalidateTag(tag: string) {
@@ -909,6 +920,32 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       )
     }
 
+    // Insert appointment items from payload
+    const itemsToInsert: any[] = []
+    for (let i = 0; i < createdRows.length; i++) {
+      const row = createdRows[i]
+      const payloadItems = payload[i]?.items
+      if (payloadItems && payloadItems.length > 0) {
+        for (const item of payloadItems) {
+          itemsToInsert.push({
+            appointment_id: row.id,
+            product_id: item.product_id || null,
+            variant_id: item.variant_id || null,
+            service_id: item.service_id || null,
+            name: item.name,
+            quantity: item.quantity,
+            usage_type: item.usage_type,
+          })
+        }
+      }
+    }
+    if (itemsToInsert.length > 0) {
+      const { error: itemsError } = await supabase.from("appointment_items").insert(itemsToInsert)
+      if (itemsError) {
+        console.error("createAppointmentsAction items insert error:", itemsError)
+      }
+    }
+
     // Audit logs - run in parallel (each is an independent insert)
     await Promise.all(
       createdRows.map((row: any) =>
@@ -1128,10 +1165,10 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
 
     // -- Stock Movement Integration --
     try {
-      await handleAppointmentStockMovement({
-        supabase,
+      const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
+      await handleAppointmentItemsStockMovement({
+        appointmentId: updated.id,
         partnerId,
-        appointment: syncedAppointment || updated,
         oldStatus: current.status,
         newStatus: normalizedStatus,
         userId: user.id,

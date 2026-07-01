@@ -66,6 +66,16 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
         price: item.unit_price
     }))
 
+    const meta = quoteDetails.metadata || {}
+    const preview = meta.preview || {}
+    const previewMeta = {
+        primaryColor: preview.primaryColor || undefined,
+        secondaryColor: preview.secondaryColor || undefined,
+        quoteTitle: preview.quoteTitle || undefined,
+        quoteSubtitle: preview.quoteSubtitle || undefined,
+        showDecoration: preview.showDecoration !== false,
+    }
+
     return (
         <PrintLayout>
             <QuotePreview
@@ -84,6 +94,12 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
                 partnerAddress={partnerAddress}
                 partnerAvatar={partnerAvatar}
                 printMode={true}
+                primaryColor={previewMeta.primaryColor}
+                secondaryColor={previewMeta.secondaryColor}
+                quoteTitle={previewMeta.quoteTitle}
+                quoteSubtitle={previewMeta.quoteSubtitle}
+                showDecoration={previewMeta.showDecoration}
+                salespersonName={quoteDetails.user_profiles?.full_name || undefined}
             />
         </PrintLayout>
     )

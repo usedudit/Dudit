@@ -175,7 +175,21 @@ export async function resolveCustomerUserId(params: {
       .select("user_id")
       .eq("id", params.customerId)
       .maybeSingle()
-    if (customer?.user_id) return customer.user_id
+
+    if (customer?.user_id) {
+      const { data: profile } = await admin
+        .from("user_profiles")
+        .select("user_id")
+        .eq("user_id", customer.user_id)
+        .maybeSingle()
+
+      if (profile?.user_id) return profile.user_id
+
+      console.warn("[notifications] customer.user_id does not exist in user_profiles", {
+        customerId: params.customerId,
+        user_id: customer.user_id,
+      })
+    }
   }
 
   return null

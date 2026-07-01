@@ -22,6 +22,7 @@ export type SystemResourceId =
   | "serviceCadastros"
   | "coupons"
   | "campaigns"
+  | "productivity"
 
 export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing"
 
@@ -169,6 +170,13 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     module: "marketing",
     minimumPlan: "escalar",
   },
+  {
+    id: "productivity",
+    label: "Produtividade",
+    description: "Dashboard de produtividade, metas e comissões da equipe.",
+    module: "management",
+    minimumPlan: "escalar",
+  },
 ]
 
 export const SYSTEM_RESOURCE_IDS: SystemResourceId[] = [
@@ -201,6 +209,7 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
       "marketing",
       "coupons",
       "campaigns",
+      "productivity",
     ]
   }
   const allowed = new Set<SystemResourceId>(SYSTEM_RESOURCE_IDS)
@@ -230,6 +239,7 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: st
     "marketing",
     "coupons",
     "campaigns",
+    "productivity",
   ]
   if (sells.includes("products")) {
     defaults.push("products")

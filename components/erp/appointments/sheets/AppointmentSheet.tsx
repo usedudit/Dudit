@@ -3,11 +3,15 @@ import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
-import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon } from '@/lib/icons';
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge } from '@/components/reusable';
+import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package, AlertTriangleIcon } from '@/lib/icons';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector } from '@/components/reusable';
 import { getAvailableTimeSlotsAction, getAppointmentOrderDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { getAppointmentItemsAction, saveAppointmentItemsAction } from '@/app/actions/erp/appointment-items';
+import { AppointmentItemsStep, resolveResourcesFromServices } from './AppointmentItemsStep';
+import AddItemSheet from './AddItemSheet';
+import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 
 
 import { usePermissions } from '@/lib/permission-context';
@@ -78,7 +82,7 @@ export const AppointmentSheet = ({
     const clientsSource = clientsCatalog || [];
     const staffSource = staffCatalog || [];
     const { canEdit, hasSpecific, canDelete } = usePermissions();
-    const [currentView, setCurrentView] = useState<'summary' | 'services' | 'client' | 'datetime' | 'activity' | 'edit-service' | 'recurrence' | 'notes'>(() => {
+    const [currentView, setCurrentView] = useState<'summary' | 'services' | 'client' | 'datetime' | 'items' | 'activity' | 'edit-service' | 'recurrence' | 'notes'>(() => {
         if (mode === 'create') {
             return 'services';
         }
@@ -98,6 +102,13 @@ export const AppointmentSheet = ({
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
     const [notifyClientOnCancel, setNotifyClientOnCancel] = useState(true);
     const [cancelNote, setCancelNote] = useState('');
+
+    // Items state (for service resources)
+    const [selectedItems, setSelectedItems] = useState<any[]>([]);
+    const [isAddItemSheetOpen, setIsAddItemSheetOpen] = useState(false);
+    const [savedAppointmentItems, setSavedAppointmentItems] = useState<any[]>([]);
+    const [activeDetailTab, setActiveDetailTab] = useState<'general' | 'stock'>('general');
+    const [isLoadingItems, setIsLoadingItems] = useState(false);
 
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
@@ -272,10 +283,24 @@ export const AppointmentSheet = ({
 
             const hasStaffChanged = (selectedServices[0]?.staffId || '') !== appointment.staffId;
 
-            return hasStatusChanged || hasNotesChanged || hasServicesChanged || hasClientChanged || hasDateChanged || hasTimeChanged || hasStaffChanged;
+            const hasItemsChanged = savedAppointmentItems.length > 0 && (() => {
+                // Check if items were added from the sheet (no DB id)
+                const hasNewItems = savedAppointmentItems.some((item: any) => !item.id || item.id.startsWith('new-'));
+                if (hasNewItems) return true;
+                // Check if any item quantity differs from original
+                const origItemMap = new Map((appointment as any)._originalItems?.map((i: any) => [i.id, i]) || []);
+                if (origItemMap.size === 0 && savedAppointmentItems.length > 0) return true;
+                for (const item of savedAppointmentItems) {
+                    const orig = origItemMap.get(item.id) as any;
+                    if (!orig || orig.quantity !== item.quantity) return true;
+                }
+                return false;
+            })();
+
+            return hasStatusChanged || hasNotesChanged || hasServicesChanged || hasClientChanged || hasDateChanged || hasTimeChanged || hasStaffChanged || hasItemsChanged;
         }
         return false;
-    }, [mode, selectedServices, selectedClient, notes, status, appointment, selectedCalDate, editTime, selectedTimeSlot]);
+    }, [mode, selectedServices, selectedClient, notes, status, appointment, selectedCalDate, editTime, selectedTimeSlot, savedAppointmentItems]);
 
     const handleCloseAttempt = () => {
         if (hasChanges) {
@@ -679,6 +704,9 @@ export const AppointmentSheet = ({
             // If adding more services, go straight back to summary
             if (isAddingMore) {
                 setIsAddingMore(false);
+                // Re-resolve items with updated services
+                const resolvedItems = resolveResourcesFromServices(selectedServices);
+                setSelectedItems(resolvedItems);
                 setCurrentView('summary');
             } else {
                 // Normal Flow: Services -> Client inline step
@@ -715,7 +743,15 @@ export const AppointmentSheet = ({
             });
             setSelectedServices(updatedServices);
 
-            // Flow: Datetime -> Summary
+            // Resolve items from services
+            const resolvedItems = resolveResourcesFromServices(updatedServices);
+            setSelectedItems(resolvedItems);
+
+            // Flow: Datetime -> Items -> Summary
+            setCurrentView('items');
+        }
+        else if (currentView === 'items') {
+            // Flow: Items -> Summary
             setCurrentView('summary');
         }
         else if (currentView === 'summary') {
@@ -764,6 +800,14 @@ export const AppointmentSheet = ({
             pricingUnit: selectedServices[0]?.pricingUnit || 'Por Serviço',
             notes: finalNotes,
             status: status,
+            items: selectedItems.map(item => ({
+                product_id: item.productId || null,
+                variant_id: item.variantId || null,
+                service_id: item.serviceId || null,
+                name: item.name,
+                quantity: item.quantity,
+                usage_type: item.usageType,
+            })),
         };
 
         if (recurrenceFreq === 'Não se repete') {
@@ -891,13 +935,16 @@ export const AppointmentSheet = ({
                 setCurrentView('client');
             }
         }
+        else if (currentView === 'items') {
+            setCurrentView('datetime');
+        }
         else if (currentView === 'summary') {
             if (mode === 'create') {
                 if (initialTimeSlot) {
                     setCurrentView('client');
                 } else {
-                    // Creating: Go back to Datetime
-                    setCurrentView('datetime');
+                    // Creating: Go back to Items
+                    setCurrentView('items');
                 }
             } else {
                 // Viewing: Close sheet
@@ -955,6 +1002,15 @@ export const AppointmentSheet = ({
             serviceId: selectedServices[0]?.id || null,
             categoryId: selectedServices[0]?.category_id || null,
             services: selectedServices.map(s => ({ id: s.id, name: s.name, price: getEffectiveServicePrice(s), categoryId: s.category_id })),
+            appointmentItems: savedAppointmentItems.map(item => ({
+                id: item.id,
+                product_id: item.productId || null,
+                variant_id: item.variantId || null,
+                service_id: item.serviceId || null,
+                name: item.name,
+                quantity: item.quantity,
+                usage_type: item.usageType,
+            })),
         };
         onSave(updatedApp);
     };
@@ -964,6 +1020,7 @@ export const AppointmentSheet = ({
             case 'services': return 'Selecionar Serviços';
             case 'client': return 'Selecionar Cliente';
             case 'datetime': return 'Data e Horário';
+            case 'items': return 'Itens dos Serviços';
             case 'summary': return mode === 'view' ? 'Detalhes do Agendamento' : 'Resumo do Agendamento';
             case 'activity': return 'Atividade';
             case 'edit-service': return 'Editar serviço';
@@ -997,7 +1054,7 @@ export const AppointmentSheet = ({
         if (s === 'pending' || s === 'aguardando') return 'bg-orange-500';
         if (s === 'ausência' || s === 'absent' || s === 'ausencia') return 'bg-red-500';
         if (s === 'cancelado' || s === 'canceled' || s === 'cancelar') return 'bg-red-600';
-        if (s === 'iniciado' || s === 'in progress') return 'bg-[#003229]';
+        if (s === 'em andamento' || s === 'iniciado' || s === 'in progress') return 'bg-[#003229]';
         if (s === 'pago' || s === 'paid' || s === 'parcialmente pago') return 'bg-green-600';
         if (s === 'finalizado' || s === 'finished') return 'bg-gray-700';
         return 'bg-blue-600';
@@ -1052,13 +1109,37 @@ export const AppointmentSheet = ({
         return () => { cancelled = true }
     }, [linkedOrderId, partnerId, mode])
 
-
+    // Load appointment items when in view mode
+    useEffect(() => {
+        if (!appointment?.id || mode !== 'view') {
+            setSavedAppointmentItems([])
+            return
+        }
+        let cancelled = false
+        setIsLoadingItems(true)
+        getAppointmentItemsAction(appointment.id).then(res => {
+            if (!cancelled && res.success) {
+                const items = res.data || [];
+                setSavedAppointmentItems(items);
+                // Store original items for change detection
+                (appointment as any)._originalItems = items;
+            }
+        }).catch(() => {
+            if (!cancelled) setSavedAppointmentItems([])
+        }).finally(() => {
+            if (!cancelled) setIsLoadingItems(false)
+        })
+        return () => { cancelled = true }
+    }, [appointment?.id, mode])
 
     const VIEW_STATUS_OPTIONS = [
         { value: 'Reservado', label: 'Reservado' },
         { value: 'Confirmado', label: 'Confirmado' },
         { value: 'Aguardando', label: 'Aguardando' },
+        { value: 'Em andamento', label: 'Em andamento' },
+        { value: 'Iniciado', label: 'Iniciado' },
         { value: 'Concluído', label: 'Concluído' },
+        { value: 'Pago', label: 'Pago' },
         { value: 'Ausência', label: 'Ausência' },
     ] as const;
 
@@ -1563,6 +1644,15 @@ export const AppointmentSheet = ({
                         </motion.div>
                     )}
 
+                    {/* ITEMS STEP */}
+                    {currentView === 'items' && (
+                        <AppointmentItemsStep
+                            items={selectedItems}
+                            onItemsChange={setSelectedItems}
+                            services={selectedServices}
+                        />
+                    )}
+
                     {/* VIEW: SUMMARY */}
                     {currentView === 'summary' && (() => {
                         const isCompletedStatus = (status || '').toLowerCase() === 'concluído' || (status || '').toLowerCase() === 'concluido';
@@ -1585,8 +1675,10 @@ export const AppointmentSheet = ({
                             status: status
                         } as Appointment, appointmentsList) : false;
 
-                        return (
-                            <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                        const isViewMode = mode === 'view';
+
+                        const renderGeneralTab = () => (
+                            <div className="space-y-6">
 
                                 {/* Info Header Card - Adjusted for Ranges */}
                                 {headerDateObj && (
@@ -1769,6 +1861,42 @@ export const AppointmentSheet = ({
                                     )}
                                 </div>
 
+                                {/* Items Section */}
+                                {mode === 'create' && selectedItems.length > 0 && (
+                                    <div>
+                                        <div className="flex justify-between items-center mb-3 px-1">
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Itens Utilizados</h3>
+                                            <button
+                                                onClick={() => {
+                                                    const resolvedItems = resolveResourcesFromServices(selectedServices);
+                                                    setSelectedItems(resolvedItems);
+                                                    setCurrentView('items');
+                                                }}
+                                                className="text-sm font-bold text-brand-green hover:underline"
+                                                type="button"
+                                            >
+                                                Alterar
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {selectedItems.map((item: any) => (
+                                                <div key={item.key} className="flex items-center justify-between p-3 rounded-xl border border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center">
+                                                            <Package size={14} className="text-brand-inactive-text" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{item.name}</p>
+                                                            <p className="text-[11px] text-brand-inactive-text">{item.serviceName} • {item.usageType === 'consumed' ? 'Consumido' : item.usageType === 'returnable' ? 'Retornável' : 'Referência'}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading shrink-0 ml-3">Qtd: {item.quantity}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Products Section */}
                                 {orderItems && orderItems.filter(i => i.lineType !== 'service_booking').length > 0 && (
                                     <div>
@@ -1812,7 +1940,131 @@ export const AppointmentSheet = ({
                                     </div>
                                 </div>
 
+                            </div>
+                        );
 
+                        const renderStockTab = () => {
+                            const isStockLocked = isCompletedStatus;
+                            return (
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Controle de Estoque</h3>
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                Gerencie os itens utilizados neste agendamento
+                                            </p>
+                                        </div>
+                                        {!isStockLocked && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setIsAddItemSheetOpen(true)}
+                                                className="shrink-0"
+                                            >
+                                                <PlusIcon size={16} className="mr-1" /> Adicionar Item
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {isLoadingItems ? (
+                                        <ThreeDotsLoader />
+                                    ) : savedAppointmentItems.length === 0 ? (
+                                        <IconPlaceholder
+                                            icon={Package}
+                                            title="Nenhum item"
+                                            subtitle="Este agendamento não possui itens de estoque."
+                                            itemButton={!isStockLocked ? {
+                                                text: "Adicionar Item",
+                                                action: () => setIsAddItemSheetOpen(true),
+                                                variant: "outline",
+                                            } : undefined}
+                                        />
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {savedAppointmentItems.map((item: any) => {
+                                                const usageTypeLabel = item.usageType === 'consumed' ? 'Consumido' : item.usageType === 'returnable' ? 'Retornável' : 'Referência';
+                                                const usageTypeColor = item.usageType === 'consumed' ? 'text-red-600 bg-red-50 border-red-100' : item.usageType === 'returnable' ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-gray-500 bg-gray-50 border-gray-200';
+                                                return (
+                                                    <div key={item.id} className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                            {item.product?.image ? (
+                                                                <img src={getR2ImageUrl(item.product.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                                            ) : (
+                                                                <Package size={18} className="text-brand-inactive-text" />
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">{item.name}</div>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                {item.serviceName && (
+                                                                    <span className="text-[11px] text-brand-inactive-text truncate">{item.serviceName}</span>
+                                                                )}
+                                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${usageTypeColor}`}>
+                                                                    {usageTypeLabel}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                            {!isStockLocked ? (
+                                                                <QuantitySelector
+                                                                    value={item.quantity}
+                                                                    onChange={(val) => {
+                                                                        const updated = savedAppointmentItems.map((i: any) =>
+                                                                            i.id === item.id ? { ...i, quantity: val } : i
+                                                                        );
+                                                                        setSavedAppointmentItems(updated);
+                                                                    }}
+                                                                    size="sm"
+                                                                />
+                                                            ) : (
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Qtd: {item.quantity}</span>
+                                                            )}
+                                                            {!isStockLocked && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const updated = savedAppointmentItems.filter((i: any) => i.id !== item.id);
+                                                                        setSavedAppointmentItems(updated);
+                                                                    }}
+                                                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-brand-inactive-text hover:text-red-500 transition-colors"
+                                                                >
+                                                                    <XIcon size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        };
+
+                        if (isViewMode) {
+                            return (
+                                <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                                    <Tabs value={activeDetailTab} onValueChange={(v) => setActiveDetailTab(v as any)}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                            <TabsTrigger value="general" className="px-0 pb-3 text-sm">
+                                                Dados Gerais
+                                            </TabsTrigger>
+                                            <TabsTrigger value="stock" className="px-0 pb-3 text-sm">
+                                                Controle de Estoque
+                                            </TabsTrigger>
+                                        </TabsList>
+                                        <TabsContent value="general" className="mt-0">
+                                            {renderGeneralTab()}
+                                        </TabsContent>
+                                        <TabsContent value="stock" className="mt-0">
+                                            {renderStockTab()}
+                                        </TabsContent>
+                                    </Tabs>
+                                </motion.div>
+                            );
+                        }
+
+                        return (
+                            <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                                {renderGeneralTab()}
                             </motion.div>
                         );
                     })()}
@@ -2423,7 +2675,7 @@ export const AppointmentSheet = ({
         </div>
     );
 
-    const isNestedSheetOpen = isNewClientOpen || isNewServiceSheetOpen || isEditServiceOpen || isClientOverlayOpen || isHistoryOverlayOpen || isNotesOverlayOpen || isRecurrenceOverlayOpen;
+    const isNestedSheetOpen = isNewClientOpen || isNewServiceSheetOpen || isEditServiceOpen || isClientOverlayOpen || isHistoryOverlayOpen || isNotesOverlayOpen || isRecurrenceOverlayOpen || isAddItemSheetOpen;
 
     return (
         <>
@@ -2800,8 +3052,27 @@ export const AppointmentSheet = ({
                 )}
             </AnimatePresence>
 
-            <AnimatePresence>
-            </AnimatePresence>
+            <AddItemSheet
+                isOpen={isAddItemSheetOpen}
+                onClose={() => setIsAddItemSheetOpen(false)}
+                onConfirm={(newItem) => {
+                    const item = {
+                        ...newItem,
+                        id: `new-${crypto.randomUUID()}`,
+                        appointmentId: appointment?.id || null,
+                        serviceId: null,
+                        serviceName: null,
+                        usageType: newItem.usage_type,
+                        quantity: newItem.quantity,
+                        product: newItem.product_id ? {
+                            name: newItem.name,
+                            image: newItem.image || null,
+                            stock: 0,
+                        } : null,
+                    }
+                    setSavedAppointmentItems(prev => [...prev, item])
+                }}
+            />
         </>
     )
 }

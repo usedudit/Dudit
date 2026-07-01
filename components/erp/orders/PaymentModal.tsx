@@ -496,13 +496,37 @@ const PaymentModal = ({
         // Não depender de `total`: se o pai zerar o carrinho (ex.: PDV) o total cai e apagava a tela de sucesso.
     }, [isOpen]);
 
-    // Marketplace orders: auto-navigate directly to the original payment method view (skip method selection)
+    // Marketplace orders or orders with existing payments: auto-navigate directly to the original/existing method view (skip method selection)
     useEffect(() => {
-        if (!isOpen || !isMarketplaceOrder || !originalPaymentMethod || isLoadingMethods) return;
+        if (!isOpen || isLoadingMethods) return;
         // Only auto-navigate if we're on the initial methods screen
         if (view !== 'methods') return;
 
-        const normalizedOriginal = normalizePaymentMethodLabel(originalPaymentMethod);
+        const hasExistingPaid = existingPaidAmount > 0.009;
+        const isMarketplace = isMarketplaceOrder && !!originalPaymentMethod;
+
+        if (!isMarketplace && !hasExistingPaid) return;
+
+        if (hasExistingPaid && existingPaymentBreakdown && existingPaymentBreakdown.length > 1) {
+            // Split payment restore
+            const initialSplitLegs = existingPaymentBreakdown.map((entry: any, index: number) => ({
+                id: index + 1,
+                method: entry.method,
+                paymentMethodId: entry.paymentMethodId || null,
+                amount: entry.amount,
+                installmentNumber: entry.installmentNumber || 1,
+            }));
+            setPayments(initialSplitLegs);
+            setView('split');
+            return;
+        }
+
+        // Single method restore/lock
+        const targetMethodLabel = hasExistingPaid
+            ? (existingPaymentBreakdown?.[0]?.method || originalPaymentMethod || 'Dinheiro')
+            : (originalPaymentMethod || 'Dinheiro');
+
+        const normalizedOriginal = normalizePaymentMethodLabel(targetMethodLabel);
         const methodType = (() => {
             if (normalizedOriginal === 'Dinheiro') return 'cash';
             if (normalizedOriginal === 'Pix') return 'pix';
@@ -512,13 +536,19 @@ const PaymentModal = ({
             return 'other';
         })();
 
-        // Find and auto-select the matching method
         const matchingMethods = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === methodType);
-        if (matchingMethods.length === 1) {
+        const restoredMethodId = hasExistingPaid ? (existingPaymentBreakdown?.[0]?.paymentMethodId || null) : null;
+
+        if (restoredMethodId) {
+            setSelectedMethodId(restoredMethodId);
+            const matchingObj = activeMethods.find((m: PartnerPaymentMethod) => m.id === restoredMethodId);
+            if (matchingObj) {
+                setFeeBearerOverride((matchingObj.fee_bearer || 'merchant') as 'merchant' | 'customer');
+            }
+        } else if (matchingMethods.length === 1) {
             setSelectedMethodId(matchingMethods[0].id);
             setFeeBearerOverride((matchingMethods[0].fee_bearer || 'merchant') as 'merchant' | 'customer');
         } else if (matchingMethods.length > 1) {
-            // Try to find exact match by name
             const exactMatch = matchingMethods.find((m: PartnerPaymentMethod) =>
                 normalizePaymentMethodLabel(m.name) === normalizedOriginal
             );
@@ -531,9 +561,9 @@ const PaymentModal = ({
             }
         }
 
-        // Navigate directly to the correct view
+        setSelectedMethodType(methodType);
         setView(getTargetViewForMethodType(methodType));
-    }, [isOpen, isMarketplaceOrder, originalPaymentMethod, isLoadingMethods, activeMethods, view]);
+    }, [isOpen, isMarketplaceOrder, originalPaymentMethod, existingPaidAmount, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
 
     // Fetch MP connection status
     useEffect(() => {
@@ -1372,63 +1402,61 @@ const PaymentModal = ({
                 ? splitPreview.finalTotal
                 : null;
 
-        const newPaymentBreakdown = isPendingPayment
-            ? []
-            : view === 'split'
-                ? payments
-                    .filter((payment) => payment.method && payment.amount > 0.009)
-                    .map((payment, i) => {
-                        const pr = splitPreview && 'success' in splitPreview && splitPreview.success
-                            ? splitPreview.rows[i]
-                            : null
-                        const finalAmt = Number(pr?.finalAmount ?? payment.amount ?? 0)
-                        return {
-                            method: payment.method,
-                            amount: finalAmt,
-                            amountReceived: Number(pr?.amountReceived ?? payment.amount ?? 0),
-                            adjustmentType: pr?.adjustmentType || 'none',
-                            adjustmentPercent: Number(pr?.adjustmentPercent || 0),
-                            adjustmentAmount: Number(pr?.adjustmentAmount || 0),
-                            effectiveAmount: Number(pr?.effectiveAmount ?? finalAmt),
-                            netAmount: Number(pr?.netAmount ?? finalAmt),
-                            feeBearer: pr?.feeBearer || null,
-                            paymentMethodId: payment.paymentMethodId || null,
-                            installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
-                        }
-                    })
-                : [{
-                    method: (() => {
-                        if (isMarketplaceOrder && originalPaymentMethod) {
-                            return formatPaymentMethodToFullLabel(originalPaymentMethod);
-                        }
-                        const selectedMethodObj = activeMethods.find((method: any) => method.id === selectedMethodId);
-                        if (selectedMethodObj) {
-                            return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
-                        }
-                        const fallbackName = view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
-                        const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
-                        return getFormattedMethodLabel(fallbackName, fallbackType);
-                    })(),
-                    amount: Number(totalPaidCalculated || 0),
-                    amountReceived: Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0),
-                    adjustmentType: paymentCalculation?.adjustmentType || 'none',
-                    adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
-                    adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
-                    effectiveAmount: Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0),
-                    netAmount: Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0),
-                    feeBearer: paymentCalculation?.feeBearer || null,
-                    paymentMethodId: selectedMethodId || null,
-                    installmentNumber: Math.max(1, Number(installments || 1)),
-                }];
+        const rawPaymentBreakdown = view === 'split'
+            ? payments
+                .filter((payment) => payment.method && payment.amount > 0.009)
+                .map((payment, i) => {
+                    const pr = splitPreview && 'success' in splitPreview && splitPreview.success
+                        ? splitPreview.rows[i]
+                        : null
+                    const finalAmt = Number(pr?.finalAmount ?? payment.amount ?? 0)
+                    return {
+                        method: payment.method,
+                        amount: finalAmt,
+                        amountReceived: isPendingPayment ? 0 : Number(pr?.amountReceived ?? payment.amount ?? 0),
+                        adjustmentType: pr?.adjustmentType || 'none',
+                        adjustmentPercent: Number(pr?.adjustmentPercent || 0),
+                        adjustmentAmount: Number(pr?.adjustmentAmount || 0),
+                        effectiveAmount: Number(pr?.effectiveAmount ?? finalAmt),
+                        netAmount: Number(pr?.netAmount ?? finalAmt),
+                        feeBearer: pr?.feeBearer || null,
+                        paymentMethodId: payment.paymentMethodId || null,
+                        installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
+                    }
+                })
+            : [{
+                method: (() => {
+                    if (isMarketplaceOrder && originalPaymentMethod) {
+                        return formatPaymentMethodToFullLabel(originalPaymentMethod);
+                    }
+                    const selectedMethodObj = activeMethods.find((method: any) => method.id === selectedMethodId);
+                    if (selectedMethodObj) {
+                        return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
+                    }
+                    const fallbackName = view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
+                    const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
+                    return getFormattedMethodLabel(fallbackName, fallbackType);
+                })(),
+                amount: Number(totalPaidCalculated || 0),
+                amountReceived: isPendingPayment ? 0 : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0),
+                adjustmentType: paymentCalculation?.adjustmentType || 'none',
+                adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
+                adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
+                effectiveAmount: Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0),
+                netAmount: Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0),
+                feeBearer: paymentCalculation?.feeBearer || null,
+                paymentMethodId: selectedMethodId || null,
+                installmentNumber: Math.max(1, Number(installments || 1)),
+            }];
+
+        const newPaymentBreakdown = rawPaymentBreakdown;
 
         const validExistingBreakdown = existingPaidAmount > 0.009 ? (existingPaymentBreakdown || []) : [];
 
         const mergedPaymentBreakdown = [...validExistingBreakdown, ...newPaymentBreakdown]
             .filter((entry: any) => entry?.method && Number(entry?.amount || 0) > 0.009);
 
-        const paymentMethod = isPendingPayment
-            ? 'Método não definido'
-            : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ');
+        const paymentMethod = Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ') || 'Método não definido';
 
         const singleRegisterAmount =
             view !== 'split' ? totalPaidCalculated : 0;
@@ -1661,7 +1689,7 @@ const PaymentModal = ({
                     {paymentStatus === 'input' && (
                         <div className="px-6 py-6 md:px-10 md:pt-10 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                {view !== 'methods' && (
+                                {view !== 'methods' && !isMarketplaceOrder && !(existingPaidAmount > 0.009) && (
                                     <motion.button
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
@@ -2050,7 +2078,7 @@ const PaymentModal = ({
                                                         const adjPct = Number(pr?.adjustmentPercent || 0)
                                                         const showAdjustment = adjType !== 'none' && adjAmt > 0.005
                                                         return (
-                                                            <div key={p.id} onClick={() => { setEditingPaymentIndex(idx); setView('split_method_select'); }}
+                                                            <div key={p.id} onClick={() => { if (isMarketplaceOrder || existingPaidAmount > 0.009) return; setEditingPaymentIndex(idx); setView('split_method_select'); }}
                                                                 className="border border-brand-border dark:border-dark-border rounded-lg p-4 cursor-pointer hover:bg-brand-light-bg dark:hover:bg-dark-card-bg transition-colors">
                                                                 <div className="flex items-center gap-2 mb-2">
                                                                     {getIconForMethod(p.method, p.paymentMethodId)({})}
@@ -2482,11 +2510,7 @@ const PaymentModal = ({
                         <div className="relative">
                             {/* 1. Main View (Methods) Footer Logic */}
                             {view === 'methods' && (
-                                isPendingPayment ? (
-                                    <ActionFooter showConfirm={true} />
-                                ) : (
-                                    <ActionFooter showConfirm={false} />
-                                )
+                                <ActionFooter showConfirm={false} />
                             )}
 
                             {/* 2. Split View Footer Logic */}

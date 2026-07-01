@@ -799,9 +799,9 @@ export async function getServiceOrderByTokenAction(
       .select(`
         id, order_number, status, title, description, expected_completion_date, completed_at,
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
-        customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id,
+        customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
         partners (
-          id, store_name, store_image_url
+          id, store_name, store_image_url, address, phone
         )
       `)
       .eq("public_token", token)
@@ -814,9 +814,9 @@ export async function getServiceOrderByTokenAction(
         .select(`
           id, order_number, status, title, description, expected_completion_date, completed_at,
           total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
-          customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id,
+          customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
           partners (
-            id, store_name, store_image_url
+            id, store_name, store_image_url, address, phone
           )
         `)
         .eq("id", token)
@@ -856,6 +856,16 @@ export async function getServiceOrderByTokenAction(
     const plan = await getPartnerPlan(row.partner_id)
     const planTier = plan?.slug || "free"
 
+    let assignedUserName = null
+    if (row.assigned_user_id) {
+      const { data: profile } = await admin
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", row.assigned_user_id)
+        .maybeSingle()
+      assignedUserName = profile?.full_name || null
+    }
+
     const serviceOrder = {
       id: row.id,
       partner_id: row.partner_id,
@@ -876,6 +886,7 @@ export async function getServiceOrderByTokenAction(
       specifications,
       metadata: row.metadata,
       lockout_until: row.lockout_until,
+      assigned_user_name: assignedUserName,
       partners: row.partners ? {
         ...(Array.isArray(row.partners) ? row.partners[0] : row.partners),
         plan_tier: planTier,
@@ -1577,7 +1588,7 @@ export async function signPublicServiceOrderAction(
     // 1. Fetch OS by token
     const { data: order, error } = await admin
       .from("service_orders")
-      .select("id, status, assigned_user_id, partner_id")
+      .select("id, status, assigned_user_id, partner_id, customer_snapshot")
       .eq("public_token", token)
       .maybeSingle()
 
@@ -1585,38 +1596,86 @@ export async function signPublicServiceOrderAction(
       return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
     }
 
-    // 2. Determine auth method
-    let method = "code"
+    // 2. Determine auth method and check permission
     let loggedUser: any = null
     try {
       const { getCurrentUser } = await import("@/lib/auth/server-user")
       loggedUser = await getCurrentUser()
-      if (loggedUser) {
+    } catch {
+      // Not logged in
+    }
+
+    const customerEmail = (order.customer_snapshot as any)?.email || null
+    let isAuthorized = false
+    let method = "code"
+
+    if (loggedUser) {
+      if (customerEmail && loggedUser.email && loggedUser.email.toLowerCase() === customerEmail.toLowerCase()) {
+        isAuthorized = true
         method = "auth"
       }
-    } catch {
-      // Not logged in or error getting user
     }
 
-    // 3. Call DB function to verify and sign
-    const { data: rpcRes, error: rpcErr } = await admin.rpc("sign_public_service_order", {
-      p_so_id: order.id,
-      p_name: method === "auth" ? (loggedUser?.email || "Usuário Autenticado") : (approverName || "Cliente").trim().substring(0, 100),
-      p_code: method === "code" ? approvalCode.trim() : "",
-      p_signature_key: signatureImageKey,
-      p_ip: ip || null,
-      p_ua: userAgent || null,
-      p_method: method
-    })
-
-    if (rpcErr) {
-      console.error("[signPublicServiceOrderAction] RPC Error:", rpcErr)
-      return { success: false, error: rpcErr.message || "Erro ao assinar ordem de serviço" }
+    if (!isAuthorized) {
+      if (!approvalCode || !approvalCode.trim()) {
+        return { success: false, error: "Código de assinatura é obrigatório." }
+      }
+      method = "code"
     }
 
-    const result = rpcRes as { success: boolean; error?: string }
-    if (!result.success) {
-      return { success: false, error: result.error || "Erro ao processar assinatura" }
+    if (method === "auth") {
+      // Direct update for client signature to avoid creator/professional database RPC restriction
+      const { error: updateErr } = await admin
+        .from("service_orders")
+        .update({
+          signature_image_key: signatureImageKey,
+          signed_at: new Date().toISOString(),
+          failed_attempts: 0,
+          lockout_until: null,
+          lockout_count: 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", order.id)
+
+      if (updateErr) {
+        return { success: false, error: updateErr.message || "Erro ao assinar ordem de serviço" }
+      }
+
+      await admin.from("audit_logs").insert({
+        partner_id: order.partner_id,
+        entity_type: 'service_order',
+        entity_id: order.id,
+        action_type: 'signed',
+        change_lines: ['OS assinada pelo cliente via portal público (autenticado por e-mail)'],
+        source: 'system',
+        metadata: {
+          ipAddress: ip || null,
+          userAgent: userAgent || null,
+          timestamp: new Date().toISOString(),
+          approver_name: loggedUser.email || "Cliente"
+        }
+      })
+    } else {
+      // Call DB function for code signature validation
+      const { data: rpcRes, error: rpcErr } = await admin.rpc("sign_public_service_order", {
+        p_so_id: order.id,
+        p_name: "Cliente",
+        p_code: approvalCode.trim(),
+        p_signature_key: signatureImageKey,
+        p_ip: ip || null,
+        p_ua: userAgent || null,
+        p_method: "code"
+      })
+
+      if (rpcErr) {
+        console.error("[signPublicServiceOrderAction] RPC Error:", rpcErr)
+        return { success: false, error: rpcErr.message || "Erro ao assinar ordem de serviço" }
+      }
+
+      const result = rpcRes as { success: boolean; error?: string }
+      if (!result.success) {
+        return { success: false, error: result.error || "Erro ao processar assinatura" }
+      }
     }
 
     revalidatePath("/erp/service-orders")
