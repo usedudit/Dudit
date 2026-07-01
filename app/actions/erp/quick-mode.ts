@@ -7,6 +7,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { getDashboardLayout } from "@/lib/dashboard-engine/engine"
 
 export async function getQuickModeHomeDataAction(partnerId: string) {
     try {
@@ -229,4 +230,20 @@ export async function getOnboardingStatusAction(partnerId: string) {
         return { success: false, error: e.message || "Erro ao obter status de onboarding" }
     }
 }
+
+export async function getUnifiedDashboardAction(partnerId: string) {
+    try {
+        const user = await requireUser()
+        if (!user) return { success: false, error: "Não autenticado" }
+
+        // Basic check for view permission on general modules
+        await requirePermission(partnerId, "products", "view")
+
+        const layout = await getDashboardLayout(partnerId)
+        return { success: true, data: layout }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Erro ao carregar o dashboard inteligente" }
+    }
+}
+
 

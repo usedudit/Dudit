@@ -16,7 +16,7 @@ import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
-import { checkoutCartAction, updateCartItemFulfillmentModeAction } from "@/app/actions/marketplace/cart"
+import { checkoutCartAction, updateCartItemFulfillmentModeAction, deleteCartItemsAction } from "@/app/actions/marketplace/cart"
 import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -446,10 +446,14 @@ export function CheckoutPageClient() {
     const pickupPolicyFromContext = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
     const isPickupRequiringOnline = formData.deliveryType === "pickup" && pickupPolicyFromContext === "require_online_payment"
     useEffect(() => {
+        if (checkoutContext?.partner?.orderFlow === "whatsapp") {
+            setPaymentOption("traditional")
+            return
+        }
         if (!contextLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null && !isPickupRequiringOnline) {
             setPaymentOption("traditional")
         }
-    }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline])
+    }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline, checkoutContext?.partner?.orderFlow])
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
@@ -692,19 +696,19 @@ export function CheckoutPageClient() {
             ? "Pagar na Retirada"
             : "Pagar na Entrega"
 
-    const pickupRequiresOnlinePayment = isPickup && (checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment") === "require_online_payment"
+    const pickupRequiresOnlinePayment = checkoutContext?.partner?.orderFlow !== "whatsapp" && isPickup && (checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment") === "require_online_payment"
     const isOnlyServicesWithDeposit = Boolean(
         checkoutContext?.deposit.available &&
         requirements?.hasServiceLines &&
         !requirements?.hasProductLines &&
         !requirements?.hasSubscriptionLines
     )
-    const showTraditionalPaymentOption = !pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
+    const showTraditionalPaymentOption = checkoutContext?.partner?.orderFlow === "whatsapp" || (!pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||
         requirements?.hasServiceLines ||
         (requirements?.hasProductLines && !requirements?.hasServiceLines),
-    )
+    ))
 
     const schedulingLines = useMemo(
         () =>
@@ -1422,7 +1426,14 @@ export function CheckoutPageClient() {
                     disabled={disableCheckoutSubmit}
                     className="w-full h-[46px]"
                 >
-                    {isLoading ? "Processando..." : paymentPreviewLoading ? "Calculando pagamento..." : `Finalizar pedido • ${formatCurrency(checkoutTotalToCharge)}`}
+                    {isLoading
+                        ? "Direcionando..."
+                        : paymentPreviewLoading
+                            ? "Calculando pagamento..."
+                            : checkoutContext?.partner?.orderFlow === "whatsapp"
+                                ? `Fazer pedido via WhatsApp • ${formatCurrency(checkoutTotalToCharge)}`
+                                : `Finalizar pedido • ${formatCurrency(checkoutTotalToCharge)}`
+                    }
                 </Button>
             )}
         </>
@@ -1550,6 +1561,102 @@ export function CheckoutPageClient() {
         setCouponPartialWarning(false)
     }
 
+    const formatBRDate = (dateStr: string) => {
+        if (!dateStr) return ""
+        const parts = dateStr.split("-")
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`
+        }
+        return dateStr
+    }
+
+    const buildWhatsAppMessage = () => {
+        let msg = `Olá! Gostaria de fazer o seguinte pedido:\n\n`
+
+        msg += `*👤 CLIENTE*\n`
+        msg += `- Nome: ${userName || "Não informado"}\n\n`
+
+        msg += `*📦 ITENS DO PEDIDO*\n`
+        const lines = checkoutContext?.lines || []
+        lines.forEach((line) => {
+            const isGiftLabel = line.isGift ? `[BRINDE] ` : ""
+            const variantLabel = line.variantName ? ` (${line.variantName})` : ""
+            const priceLabel = line.unitPrice > 0 ? formatCurrency(line.unitPrice) : "Grátis"
+            const totalLabel = line.lineTotal > 0 ? formatCurrency(line.lineTotal) : "Grátis"
+            
+            msg += `- ${line.quantity}x ${isGiftLabel}${line.displayName}${variantLabel} - ${priceLabel} (Total: ${totalLabel})\n`
+            
+            if (line.lineKind === "service_booking" && line.bookingMetadata) {
+                const dateBR = formatBRDate(line.bookingMetadata.date)
+                const locationLabel = line.fulfillmentMode === "on_site" ? "No estabelecimento" : "No endereço do cliente"
+                msg += `  - Agendamento: ${dateBR} às ${line.bookingMetadata.time}\n`
+                msg += `  - Local: ${locationLabel}\n`
+                if (line.fulfillmentMode === "customer_location" && formData.deliveryAddress) {
+                    msg += `  - Endereço do agendamento: ${formData.deliveryAddress}\n`
+                }
+            }
+        })
+        msg += `\n`
+
+        msg += `*🛵 ENTREGA / RETIRADA*\n`
+        if (formData.deliveryType === "delivery") {
+            msg += `- Tipo: Entrega\n`
+            msg += `- Endereço: ${formData.deliveryAddress || "Não informado"}\n`
+        } else {
+            msg += `- Tipo: Retirada no estabelecimento\n`
+            if (checkoutContext?.partner?.address) {
+                msg += `- Endereço para retirada: ${formatPartnerAddress(checkoutContext.partner.address)}\n`
+            }
+        }
+        msg += `\n`
+
+        msg += `*💳 PAGAMENTO*\n`
+        const methodType = selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Não informado"
+        const installmentAmount = paymentPreview?.installmentAmounts?.[formData.installments - 1] || (checkoutTotalToCharge / formData.installments)
+        const installmentText = formData.installments > 1
+            ? ` (${formData.installments}x de ${formatCurrency(installmentAmount)})`
+            : ""
+        const changeText = isCashPayment && wantsChange && payWithAmount
+            ? ` (Precisa de troco para ${formatCurrency(payWithAmount)})`
+            : isCashPayment && wantsChange === false
+                ? " (Não precisa de troco)"
+                : ""
+        msg += `- Meio de Pagamento: ${methodType}${installmentText}${changeText}\n\n`
+
+        msg += `*💰 RESUMO FINANCEIRO*\n`
+        const subtotal = (checkoutContext?.productsSubtotal || 0) + (checkoutContext?.servicesSubtotal || 0) + (checkoutContext?.subscriptionsSubtotal || 0)
+        msg += `- Subtotal: ${formatCurrency(subtotal)}\n`
+        if (couponCode) {
+            msg += `- Cupom (${couponCode}): -${formatCurrency(couponDiscount)}\n`
+        }
+        if (paymentPreview?.success) {
+            const methodDiscount = Number(paymentPreview.paymentMethodDiscountAmount || 0)
+            const methodInterest = Number(paymentPreview.interestAmount || 0)
+            const methodFee = Number(paymentPreview.feeAmount || 0)
+            
+            if (methodDiscount > 0) {
+                msg += `- Desconto de Pagamento: -${formatCurrency(methodDiscount)}\n`
+            }
+            if (methodInterest > 0) {
+                msg += `- Juros: +${formatCurrency(methodInterest)}\n`
+            }
+            if (methodFee > 0) {
+                msg += `- Taxas: +${formatCurrency(methodFee)}\n`
+            }
+        }
+        if (formData.deliveryType === "delivery") {
+            msg += `- Taxa de Entrega: ${deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}\n`
+        }
+        msg += `- *Total do Pedido: ${formatCurrency(checkoutTotalToCharge)}*\n\n`
+
+        if (formData.notes?.trim()) {
+            msg += `*📝 OBSERVAÇÕES*\n`
+            msg += `- ${formData.notes.trim()}\n`
+        }
+
+        return msg
+    }
+
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
         setDeliveryError(null)
@@ -1644,6 +1751,35 @@ export function CheckoutPageClient() {
         }
 
         try {
+            if (checkoutContext?.partner?.orderFlow === "whatsapp") {
+                const message = buildWhatsAppMessage()
+                const phone = checkoutContext?.partner?.phone || partnerInfo.phone
+                let cleanPhone = phone ? phone.replace(/\D/g, "") : ""
+                if (cleanPhone && !cleanPhone.startsWith("55") && cleanPhone.length <= 11) {
+                    cleanPhone = "55" + cleanPhone
+                }
+
+                if (!cleanPhone) {
+                    setPaymentError("O vendedor não possui um número de WhatsApp cadastrado para receber o pedido.")
+                    setIsLoading(false)
+                    return
+                }
+
+                if (sessionData?.source === "cart" && cartItemIds.length > 0) {
+                    await deleteCartItemsAction(cartItemIds)
+                }
+
+                sessionStorage.removeItem("checkout_session")
+                invalidateCartCache()
+
+                const encodedText = encodeURIComponent(message)
+                window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, "_blank")
+
+                setIsLoading(false)
+                router.push("/")
+                return
+            }
+
             if (paymentOption === "mercadopago") {
                 const amount = checkoutTotalWithDelivery
                 setPixPaymentData({
@@ -2023,7 +2159,7 @@ export function CheckoutPageClient() {
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
-                                    {partnerInfo.mpConnected ? (
+                                    {partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
                                         <>
                                             <div className="space-y-1 mb-4">
                                                 <ListItem
@@ -2386,7 +2522,7 @@ export function CheckoutPageClient() {
                                 {renderFreeDeliveryProgressCard()}
                                 {/* Payment Selector */}
                                 <FormSection title="Forma de Pagamento">
-                                    {partnerInfo.mpConnected ? (
+                                    {partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
                                         <div className="space-y-1">
                                             <ListItem
                                                 icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
@@ -2677,7 +2813,10 @@ export function CheckoutPageClient() {
                                         disabled={disableCheckoutSubmit}
                                         className="flex-1 h-12"
                                     >
-                                        Finalizar • {formatCurrency(checkoutTotalToCharge)}
+                                        {checkoutContext?.partner?.orderFlow === "whatsapp"
+                                            ? `Fazer pedido via WhatsApp • ${formatCurrency(checkoutTotalToCharge)}`
+                                            : `Finalizar • ${formatCurrency(checkoutTotalToCharge)}`
+                                        }
                                     </Button>
                                 </div>
                             </div>
@@ -2748,7 +2887,12 @@ export function CheckoutPageClient() {
                             disabled={disableCheckoutSubmit}
                             className="flex-1 h-12"
                         >
-                            {isLoading ? "Processando..." : "Fazer pedido"}
+                            {isLoading
+                                ? "Processando..."
+                                : checkoutContext?.partner?.orderFlow === "whatsapp"
+                                    ? "Fazer pedido via WhatsApp"
+                                    : "Fazer pedido"
+                            }
                         </Button>
                     </div>
                 }

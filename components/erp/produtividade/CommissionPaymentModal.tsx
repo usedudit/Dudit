@@ -33,11 +33,11 @@ export default function CommissionPaymentModal({
 
   const handleSubmit = async () => {
     if (amount <= 0) {
-      toast({ title: "Valor inválido", description: "Informe um valor maior que zero.", variant: "error" })
+      toast({ title: "Valor inválido", description: "Informe um valor maior que zero.", variant: "destructive" })
       return
     }
     if (amount > maxAmount) {
-      toast({ title: "Valor excede o permitido", description: `O valor máximo é ${formatCurrency(maxAmount)}.`, variant: "error" })
+      toast({ title: "Valor excede o permitido", description: `O valor máximo é ${formatCurrency(maxAmount)}.`, variant: "destructive" })
       return
     }
 
@@ -50,7 +50,7 @@ export default function CommissionPaymentModal({
       onSuccess()
       onClose()
     } else {
-      toast({ title: "Erro", description: result.error || "Erro ao registrar pagamento.", variant: "error" })
+      toast({ title: "Erro", description: result.error || "Erro ao registrar pagamento.", variant: "destructive" })
     }
   }
 

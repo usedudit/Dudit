@@ -356,7 +356,7 @@ export const BusinessDataSubPage = ({
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                             {/* Identificação */}
-                                            <FormSection title="Identificação">
+                                            <FormSection title="Identificação" className="mb-8">
                                                 <div className="grid grid-cols-12 gap-5">
                                                     <div className="col-span-12 md:col-span-6">
                                                         <Input
@@ -395,9 +395,8 @@ export const BusinessDataSubPage = ({
                                                 </div>
                                             </FormSection>
 
-
                                             {/* Dados Tributários */}
-                                            <FormSection title="Dados tributários">
+                                            <FormSection hasSeparator title="Dados tributários">
                                                 <div className="space-y-6">
                                                     <div>
                                                         <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
@@ -431,10 +430,7 @@ export const BusinessDataSubPage = ({
                                                 </div>
                                             </FormSection>
 
-                                            {/* O que você oferece? */}
-                                            <div className="mt-8">
-                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">O que você oferece?</h3>
+                                            <FormSection hasSeparator title="O que você oferece?">
                                                 <div className="grid gap-3">
                                                     {SELLS_OPTIONS.map(opt => (
                                                         <ListItem
@@ -453,8 +449,7 @@ export const BusinessDataSubPage = ({
                                                         />
                                                     ))}
                                                 </div>
-                                            </div>
-
+                                            </FormSection>
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
@@ -630,11 +625,11 @@ export const BusinessDataSubPage = ({
 
                                 <TabsContent value="hours" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Horários de Funcionamento</h3>
-                                        <BusinessHoursSelector value={hours as any} onChange={setHours} />
+                                        <FormSection title="Horários de Funcionamento">
+                                            <BusinessHoursSelector value={hours as any} onChange={setHours} />
+                                        </FormSection>
                                     </motion.div>
                                 </TabsContent>
-
                             </AnimatePresence>
                         </div>
                     </div>

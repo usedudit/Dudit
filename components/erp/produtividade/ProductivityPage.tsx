@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { IconPlaceholder } from "@/components/reusable/IconPlaceholder"
+import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import {
   ResponsiveContainer,
   BarChart,
@@ -288,7 +288,7 @@ export default function ProductivityPage({ overview, ranking }: Props) {
             {sortedRanking.length === 0 ? (
               <IconPlaceholder
                 title="Nenhum vendedor encontrado"
-                message="Os dados dos vendedores aparecerão aqui conforme as vendas forem realizadas."
+                subtitle="Os dados dos vendedores aparecerão aqui conforme as vendas forem realizadas."
               />
             ) : (
               <div className="space-y-3">

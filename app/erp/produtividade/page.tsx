@@ -21,6 +21,9 @@ export default async function ProdutividadePage() {
   const routePermissions = normalizeToRoutePermissions(role, context.permissions)
   if (!canAccessRoute(routePermissions, "productivity_overview")) return <AccessDenied />
 
+  const overviewRes = await getProductivityOverviewAction(partnerId)
+  const rankingRes = await getProductivityRankingAction(partnerId)
+
   const overview = overviewRes.success
     ? {
         totalSold: overviewRes.totalSold || 0,

@@ -1259,3 +1259,23 @@ export async function updateCartItemFulfillmentModeAction(cartItemId: string, mo
   await revalidateCart(user.id)
   return { success: true }
 }
+
+export async function deleteCartItemsAction(cartItemIds: string[]) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+  const { error } = await supabase
+    .from("cart_items")
+    .delete()
+    .in("id", cartItemIds)
+    .eq("user_id", user.id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  await revalidateCart(user.id)
+  return { success: true }
+}
+

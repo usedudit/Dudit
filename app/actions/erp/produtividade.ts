@@ -148,7 +148,7 @@ async function calculateEstimatedCommission(admin: any, partnerId: string, order
     .neq("commission_type", "none")
 
   if (!configs || configs.length === 0) return 0
-  const configMap = new Map(configs.map((c: any) => [c.user_id, c]))
+  const configMap = new Map<string, any>(configs.map((c: any) => [c.user_id, c]))
 
   let total = 0
   for (const order of orders) {
@@ -202,7 +202,7 @@ export async function getProductivityRankingAction(
     .select("user_id, full_name, avatar_url")
     .in("user_id", userIds)
 
-  const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]))
+  const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]))
 
   const { data: ordersData } = await admin
     .from("orders")
@@ -229,7 +229,7 @@ export async function getProductivityRankingAction(
     .eq("partner_id", partnerId)
     .eq("role", "seller")
 
-  const configMap = new Map((configs || []).map((c: any) => [c.user_id, c]))
+  const configMap = new Map<string, any>((configs || []).map((c: any) => [c.user_id, c]))
 
   const sellerOrders = new Map<string, { total: number; count: number }>()
   for (const order of ordersData || []) {
@@ -339,7 +339,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
     .select("user_id, full_name, avatar_url")
     .in("user_id", userIds)
 
-  const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]))
+  const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]))
 
   const { data: configs } = await admin
     .from("employee_commissions")
@@ -347,7 +347,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
     .eq("partner_id", partnerId)
     .eq("role", "seller")
 
-  const configMap = new Map((configs || []).map((c: any) => [c.user_id, c]))
+  const configMap = new Map<string, any>((configs || []).map((c: any) => [c.user_id, c]))
 
   const { data: allCommissions } = await admin
     .from("transactions")
@@ -559,6 +559,6 @@ export async function recordCommissionPaymentAction(
     })
   } catch { }
 
-  revalidateTag(`productivity_${partnerId}`)
+  revalidateTag(`productivity_${partnerId}`, "max")
   return { success: true, transactionId: txData.id }
 }

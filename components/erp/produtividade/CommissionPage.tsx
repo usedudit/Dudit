@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { IconPlaceholder } from "@/components/reusable/IconPlaceholder"
+import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { Badge } from "@/components/reusable/Badge"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import { formatCurrency } from "@/lib/utils"
@@ -30,12 +30,12 @@ const STATUS_BADGE: Record<string, "green" | "orange" | "red" | "blue" | "gray">
 }
 
 const COLUMNS = [
-  { id: "seller", label: "Vendedor", align: "left", width: "300px" },
-  { id: "pending", label: "Pendente", align: "right", width: "120px" },
-  { id: "paid", label: "Pago", align: "right", width: "120px" },
-  { id: "bonus", label: "Bônus", align: "right", width: "120px" },
-  { id: "total", label: "Total", align: "right", width: "120px" },
-  { id: "actions", label: "Ações", align: "center", width: "120px" },
+  { id: "seller", label: "Vendedor", align: "left" as const, width: "300px" },
+  { id: "pending", label: "Pendente", align: "right" as const, width: "120px" },
+  { id: "paid", label: "Pago", align: "right" as const, width: "120px" },
+  { id: "bonus", label: "Bônus", align: "right" as const, width: "120px" },
+  { id: "total", label: "Total", align: "right" as const, width: "120px" },
+  { id: "actions", label: "Ações", align: "center" as const, width: "120px" },
 ]
 
 type Props = {
@@ -67,7 +67,7 @@ function MetricCard({
         <p className="text-xl font-extrabold text-brand-dark dark:text-dark-heading tracking-tight">{value}</p>
       </div>
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${toneMap[tone]}`}>
-        <icon size={20} />
+        <Icon size={20} />
       </div>
     </div>
   )
@@ -224,7 +224,7 @@ export default function CommissionPage({ partnerId, overview }: Props) {
               >
                 <IconPlaceholder
                   title="Nenhum vendedor encontrado"
-                  message={
+                  subtitle={
                     search.trim()
                       ? "Tente ajustar o termo de busca."
                       : "Configure as comissões dos vendedores nas configurações do sistema."
