@@ -1846,7 +1846,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     />
                 )}
 
-                <SavingStatusModal isOpen={isSaving} text="Salvando pedido..." />
+                <SavingStatusModal isOpen={isSaving && !isPaymentModalOpen} text="Salvando pedido..." />
 
                 <AlertModal
                     isOpen={showValidationModal}
@@ -1879,6 +1879,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             role={role}
                             originalPaymentMethod={originalPaymentMethod}
                             onConfirm={handleConfirmPayment}
+                            deliveryMethod={deliveryMethod}
                         />
                     )}
                 </AnimatePresence>

@@ -20,7 +20,7 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard } from '@/components/reusable';
+import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { calculatePaymentMethodAmountsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
@@ -255,6 +255,7 @@ export type PaymentModalProps = {
     lockPaymentCompletion?: boolean
     /** Oculta "Pendente de entrega" e usa layout de coluna única (ex.: checkout de agendamento). */
     hidePendingDelivery?: boolean
+    deliveryMethod?: 'delivery' | 'pickup'
     /** Texto abaixo do nome do cliente (desktop e mobile). */
     headerSubtitle?: string
     isMarketplaceOrder?: boolean
@@ -280,6 +281,7 @@ const PaymentModal = ({
     existingPaymentBreakdown = [],
     lockPaymentCompletion = false,
     hidePendingDelivery = false,
+    deliveryMethod = 'delivery',
     headerSubtitle = PAYMENT_MODAL_HEADER_SUBTITLE,
     isMarketplaceOrder = false,
     role = 'staff',
@@ -306,8 +308,10 @@ const PaymentModal = ({
     const [isPixGenerated, setIsPixGenerated] = useState(false);
 
     // Toggles
-    const [isPendingPayment, setIsPendingPayment] = useState(false);
+    const [paymentPendingType, setPaymentPendingType] = useState<'none' | 'unpaid' | 'pending_stock'>('none');
     const [isPendingDelivery, setIsPendingDelivery] = useState(false);
+    const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
+    const [showDeliveryStatusModal, setShowDeliveryStatusModal] = useState(false);
     const [cashCalculatorInput, setCashCalculatorInput] = useState("");
 
     // Mercado Pago State
@@ -456,7 +460,7 @@ const PaymentModal = ({
             setPaymentBaseAmount(0);
             setInstallments('1');
             setIsReceiptOpen(false);
-            setIsPendingPayment(false);
+            setPaymentPendingType('none');
             setIsPendingDelivery(false);
             setEditingPaymentIndex(null);
             setIsPixGenerated(false);
@@ -775,17 +779,6 @@ const PaymentModal = ({
                 if (pix?.qrCode && pix?.qrCodeBase64) {
                     setMpPixData({ qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64 });
                     setMpStep("pix");
-                    handleStartProcessing({
-                        paymentMethod: "Pix (Mercado Pago)",
-                        paymentProvider: "Mercado Pago",
-                        mpPaymentId: responseData.mpPaymentId,
-                        paymentStatus: "unpaid",
-                        paidAmount: 0,
-                        paymentBreakdown: [],
-                        splitPayments: [],
-                        isPendingDelivery,
-                        isPreCreate: true,
-                    });
                 } else {
                     setMpBrickError("Dados do Pix não retornados pelo provedor.");
                 }
@@ -794,17 +787,6 @@ const PaymentModal = ({
                 if (boleto?.barcode || boleto?.ticketUrl) {
                     setMpBoletoData(boleto);
                     setMpStep("boleto");
-                    handleStartProcessing({
-                        paymentMethod: "Boleto (Mercado Pago)",
-                        paymentProvider: "Mercado Pago",
-                        mpPaymentId: responseData.mpPaymentId,
-                        paymentStatus: "unpaid",
-                        paidAmount: 0,
-                        paymentBreakdown: [],
-                        splitPayments: [],
-                        isPendingDelivery,
-                        isPreCreate: true,
-                    });
                 } else {
                     setMpBrickError("Dados do Boleto não retornados pelo provedor.");
                 }
@@ -1413,7 +1395,7 @@ const PaymentModal = ({
                     return {
                         method: payment.method,
                         amount: finalAmt,
-                        amountReceived: isPendingPayment ? 0 : Number(pr?.amountReceived ?? payment.amount ?? 0),
+                        amountReceived: paymentPendingType !== 'none' ? 0 : Number(pr?.amountReceived ?? payment.amount ?? 0),
                         adjustmentType: pr?.adjustmentType || 'none',
                         adjustmentPercent: Number(pr?.adjustmentPercent || 0),
                         adjustmentAmount: Number(pr?.adjustmentAmount || 0),
@@ -1438,7 +1420,7 @@ const PaymentModal = ({
                     return getFormattedMethodLabel(fallbackName, fallbackType);
                 })(),
                 amount: Number(totalPaidCalculated || 0),
-                amountReceived: isPendingPayment ? 0 : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0),
+                amountReceived: paymentPendingType !== 'none' ? 0 : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0),
                 adjustmentType: paymentCalculation?.adjustmentType || 'none',
                 adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
                 adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
@@ -1462,7 +1444,7 @@ const PaymentModal = ({
             view !== 'split' ? totalPaidCalculated : 0;
 
         const paidToRegister =
-            isPendingPayment
+            paymentPendingType !== 'none'
                 ? existingPaidAmount
                 : (existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : singleRegisterAmount));
 
@@ -1470,7 +1452,7 @@ const PaymentModal = ({
             paymentMethod: paymentMethod || 'Método não definido',
             paymentBreakdown: mergedPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
-            paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
+            paymentStatus: paymentPendingType !== 'none' ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
             isPendingDelivery,
             paidAmount: paidToRegister
         };
@@ -1832,33 +1814,47 @@ const PaymentModal = ({
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
 
                                             {!lockPaymentCompletion && (
-                                                <div className={`grid ${hidePendingDelivery ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} gap-4 mb-4`}>
+                                                <div className="grid grid-cols-1 gap-4 mb-4">
                                                     <div
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingPayment ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
-                                                        onClick={() => setIsPendingPayment(!isPendingPayment)}
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${paymentPendingType !== 'none' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
+                                                        onClick={() => setShowPaymentStatusModal(true)}
                                                     >
                                                         <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                                                             <ClockIcon size={18} className="text-brand-dark dark:text-dark-heading" />
                                                         </div>
                                                         <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de pagamento</span>
-                                                        <div className="ml-auto pointer-events-none">
-                                                            <Checkbox checked={isPendingPayment} onChange={() => { }} name="pendingPay" />
-                                                        </div>
+                                                        {paymentPendingType !== 'none' && (
+                                                            <Badge variant={paymentPendingType === 'pending_stock' ? 'orange' : 'gray'}>
+                                                                {paymentPendingType === 'pending_stock' ? 'A receber' : 'Pendente'}
+                                                            </Badge>
+                                                        )}
+                                                        <ChevronRightIcon className="ml-auto text-brand-inactive-text shrink-0" size={18} />
                                                     </div>
 
                                                     {!hidePendingDelivery && (
                                                         <div
                                                             className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
-                                                            onClick={() => setIsPendingDelivery(!isPendingDelivery)}
+                                                            onClick={() => setShowDeliveryStatusModal(true)}
                                                         >
                                                             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                                                                 <TruckIcon size={18} className="text-brand-dark dark:text-dark-heading" />
                                                             </div>
-                                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de entrega</span>
-                                                            <div className="ml-auto pointer-events-none">
-                                                                <Checkbox checked={isPendingDelivery} onChange={() => { }} name="pendingDel" />
-                                                            </div>
+                                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                {deliveryMethod === 'pickup' ? 'Retirada pendente' : 'Entrega pendente'}
+                                                            </span>
+                                                            {isPendingDelivery && (
+                                                                <Badge variant="orange">
+                                                                    {deliveryMethod === 'pickup' ? 'Não preparado' : 'Não enviado'}
+                                                                </Badge>
+                                                            )}
+                                                            <ChevronRightIcon className="ml-auto text-brand-inactive-text shrink-0" size={18} />
                                                         </div>
+                                                    )}
+
+                                                    {paymentPendingType !== 'none' && (
+                                                        <Button variant="filled" className="w-full h-12" onClick={() => handleStartProcessing()}>
+                                                            Registrar venda {paymentPendingType === 'pending_stock' ? '(pendente)' : '(não pago)'}
+                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
@@ -2007,10 +2003,18 @@ const PaymentModal = ({
                                                     <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
                                                         <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
                                                         <div className="font-bold text-brand-dark dark:text-dark-heading">
-                                                            {installmentOptions.length > 0
-                                                                ? (() => { const opt = installmentOptions.find(o => String(o.installments) === installments) || installmentOptions[0]; return `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}` })()
-                                                                : `1x de ${formatCurrency(paymentBaseAmount)}`
-                                                            }
+                                                            {(() => {
+                                                                if (installmentOptions.length > 0) {
+                                                                    const opt = installmentOptions.find(o => String(o.installments) === installments) || installmentOptions[0];
+                                                                    return `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`;
+                                                                }
+                                                                const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
+                                                                if (view === 'card' && maxInst > 1) {
+                                                                    const num = Math.min(maxInst, Math.max(1, Number(installments)));
+                                                                    return `${num}x de ${formatCurrency(paymentBaseAmount / num)}`;
+                                                                }
+                                                                return `1x de ${formatCurrency(paymentBaseAmount)}`;
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -2019,12 +2023,25 @@ const PaymentModal = ({
                                                         value={String(installments)}
                                                         setValue={(value) => setInstallments(value)}
                                                         options={
-                                                            installmentOptions.length > 0
-                                                                ? installmentOptions.map(opt => ({
-                                                                    value: String(opt.installments),
-                                                                    label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
-                                                                }))
-                                                                : [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) }]
+                                                            (() => {
+                                                                if (installmentOptions.length > 0) {
+                                                                    return installmentOptions.map(opt => ({
+                                                                        value: String(opt.installments),
+                                                                        label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
+                                                                    }));
+                                                                }
+                                                                const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
+                                                                if (view === 'card' && maxInst > 1) {
+                                                                    return Array.from({ length: maxInst }, (_, i) => {
+                                                                        const num = i + 1;
+                                                                        return {
+                                                                            value: String(num),
+                                                                            label: `${num}x de ${formatCurrency(paymentBaseAmount / num)}`
+                                                                        };
+                                                                    });
+                                                                }
+                                                                return [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) }];
+                                                            })()
                                                         }
                                                     />
                                                 )}
@@ -2626,6 +2643,62 @@ const PaymentModal = ({
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Payment Status Selection Modal */}
+            <DefaultModal
+                isOpen={showPaymentStatusModal}
+                onClose={() => setShowPaymentStatusModal(false)}
+                title="Status do pagamento"
+                maxWidth="sm"
+            >
+                <div className="flex flex-col gap-3">
+                    <ListItem
+                        icon={CancelCircleIcon}
+                        title="Pagamento não realizado"
+                        description="quero deixar o estoque sem alterações"
+                        showChevron={false}
+                        onClick={() => {
+                            setPaymentPendingType(prev => prev === 'unpaid' ? 'none' : 'unpaid');
+                            setShowPaymentStatusModal(false);
+                        }}
+                        right={paymentPendingType === 'unpaid' ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
+                        className={paymentPendingType === 'unpaid' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}
+                    />
+                    <ListItem
+                        icon={ClockIcon}
+                        title="Pagamento pendente"
+                        description="Ainda não recebi, mas quero reservar o estoque para meu cliente"
+                        showChevron={false}
+                        onClick={() => {
+                            setPaymentPendingType(prev => prev === 'pending_stock' ? 'none' : 'pending_stock');
+                            setShowPaymentStatusModal(false);
+                        }}
+                        right={paymentPendingType === 'pending_stock' ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
+                        className={paymentPendingType === 'pending_stock' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}
+                    />
+                </div>
+            </DefaultModal>
+
+            {/* Delivery Status Selection Modal */}
+            <DefaultModal
+                isOpen={showDeliveryStatusModal}
+                onClose={() => setShowDeliveryStatusModal(false)}
+                title={deliveryMethod === 'pickup' ? 'Status da retirada' : 'Status da entrega'}
+                maxWidth="sm"
+            >
+                <ListItem
+                    icon={TruckIcon}
+                    title={deliveryMethod === 'pickup' ? 'Cliente vai retirar no local' : 'Entrega vai ser realizada ainda'}
+                    description={deliveryMethod === 'pickup' ? 'Cliente retirará o pedido pessoalmente' : 'A entrega será realizada em breve'}
+                    showChevron={false}
+                    onClick={() => {
+                        setIsPendingDelivery(prev => !prev);
+                        setShowDeliveryStatusModal(false);
+                    }}
+                    right={isPendingDelivery ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
+                    className={isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}
+                />
+            </DefaultModal>
 
             {printOrderId && (
                 <SaleReceiptPrintModal

@@ -538,7 +538,7 @@ export async function getCustomerByIdAction(customerId: string) {
       cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
       store_credit, notes, birth_date, mother_name, father_name, website,
       created_at, zip_code, street, number, complement, neighborhood,
-      city, state, country, user_id
+      city, state, country, user_id, marketplace_user_id
     `)
     .eq("id", customerId)
     .maybeSingle()
@@ -563,6 +563,35 @@ export async function getCustomerByIdAction(customerId: string) {
   // Dynamically add mobile property for compatibility with frontend components
   ;(customer as any).mobile = customer.phone
 
+  // Aggregate order stats for KPI display (by customer id AND user_id)
+  const buyerIds = [customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean)
+  const { data: orderAgg } = await supabase
+    .from("orders")
+    .select("total_amount, created_at")
+    .in("buyer_id", buyerIds)
+    .neq("situation", "cancelled")
+
+  if (orderAgg) {
+    const totalOrders = orderAgg.length
+    const totalSpent = orderAgg.reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0)
+    const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0
+    let lastOrderDate: string | null = null
+    for (const o of orderAgg) {
+      if (o.created_at && (!lastOrderDate || o.created_at > lastOrderDate)) {
+        lastOrderDate = o.created_at
+      }
+    }
+    ;(customer as any).orders_count = totalOrders
+    ;(customer as any).total_spent = totalSpent
+    ;(customer as any).avg_order_value = avgOrder
+    ;(customer as any).last_order_at = lastOrderDate
+  } else {
+    ;(customer as any).orders_count = 0
+    ;(customer as any).total_spent = 0
+    ;(customer as any).avg_order_value = 0
+    ;(customer as any).last_order_at = null
+  }
+
   return { customer }
 }
 
@@ -574,7 +603,7 @@ export async function getCustomerOrdersAction(customerId: string) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, user_id")
+    .select("id, user_id, marketplace_user_id")
     .eq("id", customerId)
     .maybeSingle()
 
@@ -582,7 +611,7 @@ export async function getCustomerOrdersAction(customerId: string) {
     return { orders: [] }
   }
 
-  const buyerIds = [customer.user_id, customer.id].filter(Boolean)
+  const buyerIds = [customer.user_id, customer.id, customer.marketplace_user_id].filter(Boolean)
 
   if (buyerIds.length === 0) {
     return { orders: [], stats: null }

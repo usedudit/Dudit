@@ -287,6 +287,14 @@ export function resolveActiveResources(businessInfo: { sells?: string[]; activeR
         }
       }
     }
+    if (version < 6) {
+      const v6Resources: SystemResourceId[] = ["productivity"]
+      for (const r of v6Resources) {
+        if (!current.includes(r)) {
+          current.push(r)
+        }
+      }
+    }
     return current
   }
   return defaultActiveResourcesForBusinessInfo(businessInfo)

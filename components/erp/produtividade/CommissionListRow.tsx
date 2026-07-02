@@ -2,8 +2,9 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown } from "@/components/reusable"
+import { ActionsDropdown, DropdownItem } from "@/components/reusable"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { MoneyIcon, EyeIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import type { SellerCommissionRow } from "@/app/actions/erp/produtividade"
 
@@ -17,20 +18,18 @@ interface ColumnDef {
 interface CommissionListItemProps {
   seller: SellerCommissionRow
   columns: ColumnDef[]
-  isExpanded: boolean
-  onToggleExpand: () => void
   canPayCommission: boolean
   onPay: () => void
+  onDetails: () => void
 }
 
 const CommissionListItem = React.memo(
   ({
     seller,
     columns,
-    isExpanded,
-    onToggleExpand,
     canPayCommission,
     onPay,
+    onDetails,
   }: CommissionListItemProps) => {
     const renderCellContent = (colId: string) => {
       switch (colId) {
@@ -87,34 +86,17 @@ const CommissionListItem = React.memo(
 
         case "actions":
           return (
-            <div className="flex items-center justify-center gap-1 action-btn" onClick={(e) => e.stopPropagation()}>
-              {canPayCommission && seller.pendingAmount > 0 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onPay()
-                  }}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors whitespace-nowrap"
-                >
-                  Pagar
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleExpand()
-                }}
-                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors"
-              >
-                <svg
-                  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                  className={`text-brand-inactive-text transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
+            <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+              <ActionsDropdown>
+                {canPayCommission && seller.pendingAmount > 0 && (
+                  <DropdownItem onClick={onPay}>
+                    <MoneyIcon size={18} /> Pagar comissão
+                  </DropdownItem>
+                )}
+                <DropdownItem onClick={onDetails}>
+                  <EyeIcon size={18} /> Ver detalhes
+                </DropdownItem>
+              </ActionsDropdown>
             </div>
           )
 
@@ -140,7 +122,7 @@ const CommissionListItem = React.memo(
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
-        onClick={onToggleExpand}
+        onClick={onDetails}
       >
         {columns.map((col) => (
           <td
@@ -161,7 +143,6 @@ const CommissionListItem = React.memo(
     prev.seller.paidAmount === next.seller.paidAmount &&
     prev.seller.bonusAmount === next.seller.bonusAmount &&
     prev.seller.totalAccumulated === next.seller.totalAccumulated &&
-    prev.isExpanded === next.isExpanded &&
     prev.canPayCommission === next.canPayCommission &&
     prev.columns === next.columns
 )

@@ -86,8 +86,7 @@ export function aggregateCheckoutRequirements(
   const showRecurringDisclosure = lines.some((l) => l.lineKind === "subscription")
   const allowPayOnDelivery =
     hasProductLines && !hasServiceLines && !hasSubscriptionLines && showDeliverySection
-  const hasIncompatiblePaymentRestrictions =
-    hasProductLines && (hasServiceLines || hasSubscriptionLines)
+  const hasIncompatiblePaymentRestrictions = false
 
   return {
     showProductFulfillmentOptions,

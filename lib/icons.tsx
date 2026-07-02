@@ -55,6 +55,7 @@ import {
     Search01Icon,
     BankIcon as BankIcon01,
     Cashier02Icon,
+    Route01Icon,
     BitcoinWalletIcon as BitcoinWalletIcon01,
     FilterIcon as CoreFilterIcon,
     ParagraphBulletsPoint01Icon,
@@ -136,6 +137,9 @@ import {
     Key01Icon,
     Xls01Icon,
     MoneyBag02Icon,
+    Clock04Icon,
+    ClockCheckIcon as ClockCheckIcon01,
+    ClockArrowUpIcon as ClockArrowUpIcon01
 } from "@hugeicons/core-free-icons"
 
 
@@ -354,7 +358,11 @@ export const SunIcon = CreateIcon(Sun03Icon)
 export const TextFirstlineRightIcon = CreateIcon(TextFirstlineRightIcon01)
 
 export const ClockIcon = CreateIcon(Clock01Icon)
+export const ClockCheckIcon = CreateIcon(ClockCheckIcon01)
+export const ClockArrowUpIcon = CreateIcon(ClockArrowUpIcon01)
+export const EstimateTimeIcon = CreateIcon(Clock04Icon)
 export const MapPinIcon = CreateIcon(Location01Icon)
+export const RouteIcon = CreateIcon(Route01Icon)
 
 export const QRCodeIcon = CreateIcon(QrCodeIcon01)
 

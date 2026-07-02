@@ -2,18 +2,15 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle } from 'lucide-react';
-import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package, AlertTriangleIcon } from '@/lib/icons';
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector } from '@/components/reusable';
+import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package } from '@/lib/icons';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal } from '@/components/reusable';
 import { getAvailableTimeSlotsAction, getAppointmentOrderDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
-import { getAppointmentItemsAction, saveAppointmentItemsAction } from '@/app/actions/erp/appointment-items';
+import { getAppointmentItemsAction } from '@/app/actions/erp/appointment-items';
 import { AppointmentItemsStep, resolveResourcesFromServices } from './AppointmentItemsStep';
 import AddItemSheet from './AddItemSheet';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-
-
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
 import { Appointment } from '../types';
@@ -582,12 +579,12 @@ export const AppointmentSheet = ({
     }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, defaultDate, initialStaffId, staffSource]);
 
     // Calculate Price dynamically for Time-Based Services
-    const isMarketplaceOrder = useMemo(() => 
+    const isMarketplaceOrder = useMemo(() =>
         mode === 'view' && (marketplaceOrderData?.orderSource === "Online Store" || marketplaceOrderData?.orderSource === "Marketplace"),
         [mode, marketplaceOrderData?.orderSource]
     )
 
-    const effectivePromotions = useMemo(() => 
+    const effectivePromotions = useMemo(() =>
         isMarketplaceOrder ? aptPromotions : [],
         [isMarketplaceOrder, aptPromotions]
     )
@@ -1954,15 +1951,6 @@ export const AppointmentSheet = ({
                                                 Gerencie os itens utilizados neste agendamento
                                             </p>
                                         </div>
-                                        {!isStockLocked && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => setIsAddItemSheetOpen(true)}
-                                                className="shrink-0"
-                                            >
-                                                <PlusIcon size={16} className="mr-1" /> Adicionar Item
-                                            </Button>
-                                        )}
                                     </div>
 
                                     {isLoadingItems ? (
@@ -2695,99 +2683,81 @@ export const AppointmentSheet = ({
                         <BottomSheet isOpen={true} onClose={() => setIsCancelConfirmOpen(false)}>
                             <div className="p-6 space-y-5">
                                 <div className="text-center">
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento?</h3>
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento</h3>
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
                                         Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading block mb-1">Observação (opcional)</label>
-                                    <textarea
-                                        className="w-full h-20 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900/50 p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-brand-primary"
+                                    <FormTextarea
+                                        label="Observação (opcional)"
+                                        name="cancelNote"
                                         placeholder="Motivo do cancelamento..."
                                         value={cancelNote}
                                         onChange={(e) => setCancelNote(e.target.value)}
                                     />
                                 </div>
-                                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-zinc-900/50 rounded-xl justify-center">
+                                <div className="flex items-center gap-2 justify-center">
                                     <Checkbox
                                         label="Notificar o cliente sobre o cancelamento"
                                         checked={notifyClientOnCancel}
                                         onChange={(checked) => setNotifyClientOnCancel(!!checked)}
                                     />
                                 </div>
-                                <div className="flex gap-3">
-                                    <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
-                                        <Button variant="destructive" className="flex-1 h-12 rounded-xl" onClick={async () => {
-                                            setIsCancelConfirmOpen(false);
-                                            if (appointment?.id && onDelete) {
-                                                const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
-                                                if (success) {
-                                                    toast.success("Cancelado", "Agendamento cancelado com sucesso.");
-                                                } else {
-                                                    toast.error("Erro", "Não foi possível cancelar o agendamento.");
-                                                }
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
+                                    <Button variant="destructive" onClick={async () => {
+                                        setIsCancelConfirmOpen(false);
+                                        if (appointment?.id && onDelete) {
+                                            const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
+                                            if (success) {
+                                                toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                                            } else {
+                                                toast.error("Erro", "Não foi possível cancelar o agendamento.");
                                             }
-                                        }}>Cancelar agendamento</Button>
+                                        }
+                                    }}>Cancelar agendamento</Button>
                                 </div>
                             </div>
                         </BottomSheet>
                     ) : (
-                        <Portal>
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center"
-                                onClick={() => setIsCancelConfirmOpen(false)}
-                            >
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                                    className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <div className="text-center sm:text-left">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento?</h3>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
-                                            Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading block mb-1">Observação (opcional)</label>
-                                        <textarea
-                                            className="w-full h-20 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900/50 p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-brand-primary"
-                                            placeholder="Motivo do cancelamento..."
-                                            value={cancelNote}
-                                            onChange={(e) => setCancelNote(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-zinc-900/50 rounded-xl justify-center sm:justify-start">
-                                        <Checkbox
-                                            label="Notificar o cliente sobre o cancelamento"
-                                            checked={notifyClientOnCancel}
-                                            onChange={(checked) => setNotifyClientOnCancel(!!checked)}
-                                        />
-                                    </div>
-                                    <div className="flex gap-3 flex-col sm:flex-row">
-                                        <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
-                                        <Button variant="destructive" className="flex-1 h-12 rounded-xl" onClick={async () => {
-                                            setIsCancelConfirmOpen(false);
-                                            if (appointment?.id && onDelete) {
-                                                const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
-                                                if (success) {
-                                                    toast.success("Cancelado", "Agendamento cancelado com sucesso.");
-                                                } else {
-                                                    toast.error("Erro", "Não foi possível cancelar o agendamento.");
-                                                }
-                                            }
-                                        }}>Cancelar agendamento</Button>
-                                    </div>
-                                </motion.div>
-                            </motion.div>
-                        </Portal>
+                        <DefaultModal isOpen={true} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
+                            <div className="text-center sm:text-left">
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                                    Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
+                                </p>
+                            </div>
+                            <div>
+                                <FormTextarea
+                                    label="Observação (opcional)"
+                                    name="cancelNote"
+                                    placeholder="Motivo do cancelamento..."
+                                    value={cancelNote}
+                                    onChange={(e) => setCancelNote(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2 justify-center sm:justify-start">
+                                <Checkbox
+                                    label="Notificar o cliente sobre o cancelamento"
+                                    checked={notifyClientOnCancel}
+                                    onChange={(checked) => setNotifyClientOnCancel(!!checked)}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
+                                <Button variant="destructive" onClick={async () => {
+                                    setIsCancelConfirmOpen(false);
+                                    if (appointment?.id && onDelete) {
+                                        const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
+                                        if (success) {
+                                            toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                                        } else {
+                                            toast.error("Erro", "Não foi possível cancelar o agendamento.");
+                                        }
+                                    }
+                                }}>Cancelar agendamento</Button>
+                            </div>
+                        </DefaultModal>
                     )
                 )}
             </AnimatePresence>

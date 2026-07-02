@@ -28,6 +28,19 @@ export async function getBirthdayCouponCodeAction(partnerId: string): Promise<st
   return "ANIVERSARIO10"
 }
 
+export async function canCustomerReceiveNotificationAction(
+  customerId: string,
+): Promise<{ canReceive: boolean; error?: string }> {
+  try {
+    await requireUser()
+    await requireCustomerOwnership(customerId)
+    const userId = await resolveCustomerUserId({ customerId })
+    return { canReceive: !!userId }
+  } catch {
+    return { canReceive: false, error: "Erro ao verificar permissão" }
+  }
+}
+
 export async function sendBirthdayNotificationAction(
   customerId: string,
   partnerId: string,

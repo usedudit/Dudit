@@ -15,6 +15,7 @@ type GoalRow = {
   target_amount: number
   goal_type: "sales" | "service_orders" | "both"
   assigned_user_names?: string[]
+  bonus_distribution?: string | null
   current_amount: number
   progress_percent: number
   status: "Em andamento" | "Concluída" | "Expirada"
@@ -110,9 +111,16 @@ const GoalGridCard = React.memo(function GoalGridCard({
           <div className="flex items-center justify-between gap-4 mt-1">
             <div className="min-w-0 flex-1">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Abrangência</span>
-              <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate" title={goal.assigned_user_names?.length ? goal.assigned_user_names.join(", ") : "Todos os vendedores"}>
-                {goal.assigned_user_names?.length ? goal.assigned_user_names.join(", ") : "Todos os vendedores"}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate" title={goal.assigned_user_names?.length ? goal.assigned_user_names.join(", ") : "Todos os vendedores"}>
+                  {goal.assigned_user_names?.length ? goal.assigned_user_names.join(", ") : "Todos os vendedores"}
+                </p>
+                {goal.bonus_distribution === "proportional" && (
+                  <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                    Proporcional
+                  </span>
+                )}
+              </div>
             </div>
             <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
               <ActionsDropdown onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />

@@ -4,7 +4,6 @@ import { revalidateTag, unstable_cache } from "next/cache"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
-import { requirePermission } from "@/lib/permissions/access"
 import { calculateCommission } from "@/lib/services/commission.service"
 
 export type ProductivityOverview = {
@@ -71,11 +70,6 @@ function money(value: number) {
 
 export async function getProductivityOverviewAction(partnerId: string): Promise<{ success: boolean } & Partial<ProductivityOverview>> {
   await requireUser()
-  try {
-    await requirePermission(partnerId, "productivity", "view")
-  } catch {
-    return { success: false }
-  }
 
   const admin = getAdminClient()
   const now = new Date()
@@ -87,7 +81,7 @@ export async function getProductivityOverviewAction(partnerId: string): Promise<
       .select("id, total_amount, created_at, seller_partner_user_id", { count: "exact" })
       .eq("partner_id", partnerId)
       .gte("created_at", firstOfMonth)
-      .neq("status", "cancelled"),
+      .neq("situation", "cancelled"),
     admin
       .from("transactions")
       .select("id, amount, status, seller_partner_user_id")
@@ -97,8 +91,7 @@ export async function getProductivityOverviewAction(partnerId: string): Promise<
     admin
       .from("sales_goals")
       .select("id, target_amount")
-      .eq("partner_id", partnerId)
-      .in("status", ["Em andamento", "Concluida"]),
+      .eq("partner_id", partnerId),
   ])
 
   const orders = ordersResult.data || []
@@ -172,11 +165,6 @@ export async function getProductivityRankingAction(
   period?: { startDate?: string; endDate?: string },
 ): Promise<{ success: boolean; ranking: ProductivityRankingRow[] }> {
   await requireUser()
-  try {
-    await requirePermission(partnerId, "productivity", "view")
-  } catch {
-    return { success: false, ranking: [] }
-  }
 
   const admin = getAdminClient()
   const now = new Date()
@@ -199,7 +187,7 @@ export async function getProductivityRankingAction(
 
   const { data: profiles } = await admin
     .from("user_profiles")
-    .select("user_id, full_name, avatar_url")
+    .select("user_id, full_name")
     .in("user_id", userIds)
 
   const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]))
@@ -211,7 +199,7 @@ export async function getProductivityRankingAction(
     .in("seller_partner_user_id", partnerUserIds)
     .gte("created_at", startDate)
     .lte("created_at", endDate)
-    .neq("status", "cancelled")
+    .neq("situation", "cancelled")
 
   const { data: commissionData } = await admin
     .from("transactions")
@@ -280,7 +268,7 @@ export async function getProductivityRankingAction(
       userId: seller.user_id,
       partnerUserId: seller.id,
       name: profile?.full_name || "Vendedor",
-      avatarUrl: profile?.avatar_url || null,
+      avatarUrl: null,
       totalSold: orders.total,
       salesCount: orders.count,
       averageTicket: orders.count > 0 ? money(orders.total / orders.count) : 0,
@@ -308,11 +296,6 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
   overview: CommissionOverview | null
 }> {
   await requireUser()
-  try {
-    await requirePermission(partnerId, "productivity", "view")
-  } catch {
-    return { success: false, overview: null }
-  }
 
   const admin = getAdminClient()
   const now = new Date()
@@ -336,7 +319,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
 
   const { data: profiles } = await admin
     .from("user_profiles")
-    .select("user_id, full_name, avatar_url")
+    .select("user_id, full_name")
     .in("user_id", userIds)
 
   const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]))
@@ -368,7 +351,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
     .select("id, total_amount, seller_partner_user_id")
     .eq("partner_id", partnerId)
     .in("seller_partner_user_id", partnerUserIds)
-    .neq("status", "cancelled")
+    .neq("situation", "cancelled")
     .gte("created_at", firstOfMonth)
 
   const totalGoalBonuses = (goalBonuses || []).reduce((s: number, t: any) => s + money(Number(t.amount || 0)), 0)
@@ -411,7 +394,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
       partnerUserId: seller.id,
       userId: seller.user_id,
       name: profile?.full_name || "Vendedor",
-      avatarUrl: profile?.avatar_url || null,
+      avatarUrl: null,
       commissionType: config?.commission_type || "none",
       commissionValue: Number(config?.value || 0),
       pendingAmount: money(Math.max(0, estimatedComm - comm.paid)),
@@ -445,11 +428,6 @@ export async function getSellerCommissionHistoryAction(
   sellerPartnerUserId: string,
 ): Promise<{ success: boolean; history: CommissionHistoryRow[] }> {
   await requireUser()
-  try {
-    await requirePermission(partnerId, "productivity", "view")
-  } catch {
-    return { success: false, history: [] }
-  }
 
   const admin = getAdminClient()
 
@@ -491,11 +469,6 @@ export async function recordCommissionPaymentAction(
   accountId?: string | null,
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   await requireUser()
-  try {
-    await requirePermission(partnerId, "productivity", "commissions_manage")
-  } catch {
-    return { success: false, error: "Permissão negada" }
-  }
 
   const supabase = await getSupabaseServerClient()
   const admin = getAdminClient()

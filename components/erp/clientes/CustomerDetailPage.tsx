@@ -14,7 +14,7 @@ import { useMediaQuery } from '../hooks';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatDate, checkBirthday, formatDateToBR } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
-import { getBirthdayCouponCodeAction, sendBirthdayNotificationAction } from '@/app/actions/erp/birthday';
+import { getBirthdayCouponCodeAction, sendBirthdayNotificationAction, canCustomerReceiveNotificationAction } from '@/app/actions/erp/birthday';
 import { usePlanUpgrade, planStarIconForTarget } from '@/components/erp/subscription/PlanUpgradeModal';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { usePermissions } from '@/lib/permission-context';
@@ -68,6 +68,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [page, setPage] = useState(1);
     const bdayInfo = useMemo(() => checkBirthday(customer.birth_date), [customer.birth_date]);
     const [isSendingNotification, setIsSendingNotification] = useState(false);
+    const [canReceiveNotification, setCanReceiveNotification] = useState(false);
 
     const handleCreateBirthdayCoupon = useCallback(async () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -167,7 +168,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                             )}
                         </span>
                     </Button>
-                    {customer.user_id && (
+                    {canReceiveNotification && (
                         <Button
                             size="sm"
                             variant="outline"
@@ -263,6 +264,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [isLoadingReviews, setIsLoadingReviews] = useState(false);
 
     useEffect(() => {
+        canCustomerReceiveNotificationAction(realCustomerId).then(res => {
+            setCanReceiveNotification(res.canReceive);
+        }).catch(() => {
+            setCanReceiveNotification(false);
+        });
+    }, [realCustomerId]);
+
+    useEffect(() => {
         setFetchedReviews(null);
     }, [realCustomerId]);
 
@@ -307,6 +316,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             return { totalOrders, totalSpent, avgOrder, lastOrderDate };
         }
 
+        if (customer.orders_count != null) {
+            const totalOrders = customer.orders_count;
+            const totalSpent = customer.total_spent || 0;
+            const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0;
+            const lastOrderDate = customer.last_order_at ? formatDate(customer.last_order_at) : '-';
+            return { totalOrders, totalSpent, avgOrder, lastOrderDate };
+        }
+
         const nonCancelledOrders = fetchedOrders.filter(o => o.situation !== "cancelled");
         const totalOrders = nonCancelledOrders.length;
         const totalSpent = nonCancelledOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
@@ -315,7 +332,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             ? formatDate(nonCancelledOrders[0].createdAt)
             : '-';
         return { totalOrders, totalSpent, avgOrder, lastOrderDate };
-    }, [fetchedOrders, customer.orders, customer.totalOrderValue, customer.lastOrderDate, orderStats]);
+    }, [fetchedOrders, customer.orders, customer.totalOrderValue, customer.lastOrderDate, customer.orders_count, customer.total_spent, customer.last_order_at, orderStats]);
 
     const formattedOrders = useMemo(() => {
         let result = fetchedOrders.map((o: any) => ({

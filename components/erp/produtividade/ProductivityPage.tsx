@@ -28,65 +28,37 @@ import {
 
 const COLORS = ["#10B981", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#14B8A6", "#F97316"]
 
+const iconsList = [MoneyIcon, ShoppingCartIcon, TrendingUpIcon, TargetIcon, AwardIcon, ChartIcon, MoneyIcon, MoneyIcon]
+
+const toneMap = [
+  "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
+  "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
+  "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
+  "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
+  "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400",
+  "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400",
+  "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
+  "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+]
+
 type Props = {
   overview: ProductivityOverview
   ranking: ProductivityRankingRow[]
-}
-
-function MetricCard({
-  title,
-  value,
-  subtext,
-  icon: Icon,
-  iconBgColor,
-  iconColor,
-}: {
-  title: string
-  value: string | number
-  subtext: string
-  icon: React.ComponentType<{ className?: string; size?: number }>
-  iconBgColor: string
-  iconColor: string
-}) {
-  return (
-    <div className="group rounded-2xl border border-brand-border dark:border-dark-border p-6 bg-white dark:bg-dark-surface shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-300 flex items-center justify-between gap-4">
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1">
-          {title}
-        </p>
-        <p className="text-2xl font-extrabold text-brand-dark dark:text-dark-heading tracking-tight truncate">
-          {value}
-        </p>
-        <p className="text-[13px] font-medium text-brand-inactive-text/80 dark:text-dark-body/60 mt-1">
-          {subtext}
-        </p>
-      </div>
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ${iconBgColor}`}>
-        <Icon className={iconColor} size={22} />
-      </div>
-    </div>
-  )
 }
 
 function ChartTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[170px]">
-        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[200px]">
-          {label}
-        </p>
+        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[200px]">{label}</p>
         <div className="flex flex-col gap-1.5 border-t border-brand-border dark:border-dark-border/40 pt-1.5 mt-0.5">
           {payload.map((entry: any, index: number) => (
             <div key={index} className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-sm bg-current shrink-0" style={{ color: entry.fill }} />
-                <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                  {entry.name}
-                </span>
+                <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">{entry.name}</span>
               </div>
-              <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
-                {formatCurrency(entry.value)}
-              </span>
+              <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(entry.value)}</span>
             </div>
           ))}
         </div>
@@ -104,7 +76,7 @@ export default function ProductivityPage({ overview, ranking }: Props) {
   const barChartData = useMemo(
     () =>
       sortedRanking.slice(0, 10).map((r) => ({
-        name: r.name,
+        name: r.name.split(" ")[0],
         "Valor Vendido": r.totalSold,
         "Comissão": r.commissionGenerated,
       })),
@@ -121,76 +93,50 @@ export default function ProductivityPage({ overview, ranking }: Props) {
     [sortedRanking],
   )
 
+  const cardData = useMemo(
+    () => [
+      { title: "Total Vendido", value: formatCurrency(overview.totalSold) },
+      { title: "Qtd de Vendas", value: String(overview.totalSalesCount) },
+      { title: "Ticket Médio", value: formatCurrency(overview.averageTicket) },
+      { title: "Meta Geral", value: formatCurrency(overview.generalGoal) },
+      { title: "Meta Atingida", value: `${overview.goalAchievedPercent.toFixed(1)}%` },
+      { title: "Comissão Prevista", value: formatCurrency(overview.estimatedCommission) },
+      { title: "Comissão Paga", value: formatCurrency(overview.paidCommission) },
+      { title: "Comissão Pendente", value: formatCurrency(overview.pendingCommission) },
+    ],
+    [overview],
+  )
+
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
       <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-10 space-y-8">
-          {/* Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MetricCard
-              title="Total Vendido"
-              value={formatCurrency(overview.totalSold)}
-              subtext="Este mês"
-              icon={MoneyIcon}
-              iconBgColor="bg-emerald-100 dark:bg-emerald-900/30"
-              iconColor="text-emerald-600 dark:text-emerald-400"
-            />
-            <MetricCard
-              title="Quantidade de Vendas"
-              value={overview.totalSalesCount}
-              subtext="Pedidos realizados"
-              icon={ShoppingCartIcon}
-              iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-              iconColor="text-blue-600 dark:text-blue-400"
-            />
-            <MetricCard
-              title="Ticket Médio"
-              value={formatCurrency(overview.averageTicket)}
-              subtext="Valor médio por venda"
-              icon={TrendingUpIcon}
-              iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-              iconColor="text-purple-600 dark:text-purple-400"
-            />
-            <MetricCard
-              title="Meta Geral"
-              value={formatCurrency(overview.generalGoal)}
-              subtext="Metas ativas do período"
-              icon={TargetIcon}
-              iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-              iconColor="text-orange-600 dark:text-orange-400"
-            />
-            <MetricCard
-              title="Meta Atingida"
-              value={`${overview.goalAchievedPercent.toFixed(1)}%`}
-              subtext="Progresso das metas"
-              icon={AwardIcon}
-              iconBgColor="bg-yellow-100 dark:bg-yellow-900/30"
-              iconColor="text-yellow-600 dark:text-yellow-400"
-            />
-            <MetricCard
-              title="Comissão Prevista"
-              value={formatCurrency(overview.estimatedCommission)}
-              subtext="Comissão estimada"
-              icon={ChartIcon}
-              iconBgColor="bg-cyan-100 dark:bg-cyan-900/30"
-              iconColor="text-cyan-600 dark:text-cyan-400"
-            />
-            <MetricCard
-              title="Comissão Paga"
-              value={formatCurrency(overview.paidCommission)}
-              subtext="Já quitada"
-              icon={MoneyIcon}
-              iconBgColor="bg-green-100 dark:bg-green-900/30"
-              iconColor="text-green-600 dark:text-green-400"
-            />
-            <MetricCard
-              title="Comissão Pendente"
-              value={formatCurrency(overview.pendingCommission)}
-              subtext="Aguardando pagamento"
-              icon={MoneyIcon}
-              iconBgColor="bg-red-100 dark:bg-red-900/30"
-              iconColor="text-red-600 dark:text-red-400"
-            />
+          {/* Cards - exato estilo do dashboard SummaryCards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+            {cardData.map((card, i) => {
+              const Icon = iconsList[i % iconsList.length]
+              const toneClass = toneMap[i % toneMap.length]
+              return (
+                <div
+                  key={card.title}
+                  className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${toneClass}`}>
+                        <Icon size={18} />
+                      </div>
+                      <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{card.title}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-baseline mt-2">
+                    <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                      {card.value}
+                    </h2>
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {/* Charts */}
@@ -223,7 +169,6 @@ export default function ProductivityPage({ overview, ranking }: Props) {
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Bar Chart */}
               <div className="rounded-2xl border border-brand-border dark:border-dark-border p-6 bg-white dark:bg-dark-surface">
                 {barChartData.length === 0 ? (
                   <div className="h-[300px] flex items-center justify-center">
@@ -246,7 +191,6 @@ export default function ProductivityPage({ overview, ranking }: Props) {
                 )}
               </div>
 
-              {/* Pie Chart - Participação */}
               <div className="rounded-2xl border border-brand-border dark:border-dark-border p-6 bg-white dark:bg-dark-surface">
                 <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Participação por Vendedor</h3>
                 {pieData.length === 0 ? (
@@ -270,9 +214,7 @@ export default function ProductivityPage({ overview, ranking }: Props) {
                         <div key={entry.name} className="flex items-center gap-2 text-xs">
                           <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
                           <span className="text-brand-inactive-text dark:text-dark-body truncate flex-1">{entry.name}</span>
-                          <span className="font-bold text-brand-dark dark:text-dark-heading">
-                            {formatCurrency(entry.value)}
-                          </span>
+                          <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(entry.value)}</span>
                         </div>
                       ))}
                     </div>
@@ -295,7 +237,7 @@ export default function ProductivityPage({ overview, ranking }: Props) {
                 {sortedRanking.map((seller, index) => (
                   <div
                     key={seller.partnerUserId}
-                    className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface hover:shadow-md hover:scale-[1.005] transition-all duration-300 flex items-center gap-4"
+                    className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface flex items-center gap-4"
                   >
                     <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-brand-page-bg dark:bg-dark-background text-brand-inactive-text dark:text-dark-body">
                       {index < 3 ? (

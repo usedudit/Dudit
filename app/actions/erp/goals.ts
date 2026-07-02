@@ -22,6 +22,7 @@ type GoalInput = {
   goalType: "sales" | "service_orders" | "both"
   autoLaunchBonus?: boolean
   bonusAccountId?: string | null
+  bonusDistribution?: "equal" | "proportional"
 }
 
 type RankingPeriodFilter = {
@@ -158,6 +159,7 @@ export async function upsertSalesGoalAction(input: GoalInput) {
     goal_type: input.goalType || "sales",
     auto_launch_bonus: Boolean(input.autoLaunchBonus),
     bonus_account_id: input.autoLaunchBonus ? input.bonusAccountId || null : null,
+    bonus_distribution: input.bonusDistribution || "equal",
     updated_at: new Date().toISOString(),
   }
 

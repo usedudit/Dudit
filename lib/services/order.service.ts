@@ -53,7 +53,7 @@ export class OrderService {
 
   async updateStatus(orderId: string, partnerId: string, status: string): Promise<{ success: boolean; error?: string }> {
     const supabase = await this.getSupabase()
-    const { error } = await supabase.from("orders").update({ status }).eq("id", orderId).eq("partner_id", partnerId)
+    const { error } = await supabase.from("orders").update({ situation: status }).eq("id", orderId).eq("partner_id", partnerId)
 
     if (error) {
       return { success: false, error: error.message }

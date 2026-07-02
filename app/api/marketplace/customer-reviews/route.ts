@@ -14,11 +14,11 @@ export async function GET(request: NextRequest) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("user_id")
+    .select("user_id, marketplace_user_id")
     .eq("id", customerId)
     .maybeSingle()
 
-  const userId = customer?.user_id
+  const userId = customer?.user_id || customer?.marketplace_user_id
   if (!userId) {
     return NextResponse.json({ reviews: [] })
   }

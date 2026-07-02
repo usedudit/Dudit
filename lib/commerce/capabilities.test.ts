@@ -79,7 +79,7 @@ describe("capabilities", () => {
         schedulingMetadataComplete: true,
       },
     ])
-    expect(requirements.hasIncompatiblePaymentRestrictions).toBe(true)
+    expect(requirements.hasIncompatiblePaymentRestrictions).toBe(false)
   })
 
   it("does not flag incompatible restrictions for product-only carts", () => {

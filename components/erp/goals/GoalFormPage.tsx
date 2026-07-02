@@ -76,6 +76,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
     goalType: (initialGoal?.goal_type || "sales") as "sales" | "service_orders" | "both",
     autoLaunchBonus: Boolean(initialGoal?.auto_launch_bonus),
     bonusAccountId: String(initialGoal?.bonus_account_id || ""),
+    bonusDistribution: (initialGoal?.bonus_distribution || "equal") as "equal" | "proportional",
   })
 
   const pageTitle = mode === "edit" ? "Editar meta" : mode === "duplicate" ? "Duplicar meta" : "Nova meta"
@@ -99,6 +100,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
         goalType: String(initialGoal?.goal_type || "sales"),
         autoLaunchBonus: Boolean(initialGoal?.auto_launch_bonus),
         bonusAccountId: String(initialGoal?.bonus_account_id || ""),
+        bonusDistribution: String(initialGoal?.bonus_distribution || "equal"),
       }),
     [initialGoal, mode],
   )
@@ -228,6 +230,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
       goalType: form.goalType,
       autoLaunchBonus: form.autoLaunchBonus,
       bonusAccountId: form.autoLaunchBonus ? form.bonusAccountId || null : null,
+      bonusDistribution: form.bonusDistribution,
     })
     setSaving(false)
 
@@ -445,6 +448,41 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                           />
                         ))}
                         {fieldErrors.assignedUserIds && <p className="text-xs text-brand-red">{fieldErrors.assignedUserIds}</p>}
+                      </div>
+                    )}
+
+                    {(form.appliesTo === "all" || form.assignedUserIds.length > 1) && (
+                      <div className="border-t border-brand-border dark:border-dark-border pt-4 mt-4">
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Distribuição do bônus</p>
+                        <div className="flex rounded-lg border border-brand-border dark:border-dark-border overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setForm((prev) => ({ ...prev, bonusDistribution: "equal" }))}
+                            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                              form.bonusDistribution === "equal"
+                                ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
+                            }`}
+                          >
+                            Igual para todos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setForm((prev) => ({ ...prev, bonusDistribution: "proportional" }))}
+                            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors border-l border-brand-border dark:border-dark-border ${
+                              form.bonusDistribution === "proportional"
+                                ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
+                            }`}
+                          >
+                            Proporcional ao valor
+                          </button>
+                        </div>
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">
+                          {form.bonusDistribution === "equal"
+                            ? "Bônus dividido igualmente entre todos os vendedores da meta."
+                            : "Cada vendedor recebe um valor proporcional ao que vendeu."}
+                        </p>
                       </div>
                     )}
                   </div>
