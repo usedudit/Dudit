@@ -31,6 +31,7 @@ import { getMercadoPagoStatusAction, type MpAcceptedPaymentMethods } from '@/app
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
+import { useStore } from '@/lib/store-context';
 
 
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -59,45 +60,8 @@ const getFormattedMethodLabel = (name: string, type?: string | null) => {
 
 
 
-// --- HELPER COMPONENTS ---
-
-const CompactPaymentStatusAlert = React.memo(({ totalPaid, totalNeed }: { totalPaid: number, totalNeed: number }) => {
-    const diff = totalPaid - totalNeed;
-    const absDiff = Math.abs(diff);
-
-    let bgClass = "bg-gray-100 dark:bg-dark-border/20";
-    let textClass = "text-gray-600 dark:text-dark-body";
-    let message = "";
-    let barClass = "bg-gray-400";
-
-    if (diff < -0.005) {
-        bgClass = "bg-red-50 dark:bg-red-900/20";
-        textClass = "text-red-600 dark:text-red-400";
-        message = `Falta Pagar: ${formatCurrency(absDiff)}`;
-        barClass = "bg-red-500";
-    } else if (diff > 0.005) {
-        bgClass = "bg-green-50 dark:bg-green-900/20";
-        textClass = "text-green-700 dark:text-green-400";
-        message = `Troco: ${formatCurrency(absDiff)}`;
-        barClass = "bg-green-500";
-    } else {
-        bgClass = "bg-green-100 dark:bg-green-900/30";
-        textClass = "text-green-800 dark:text-green-300";
-        message = "Valor total atingido!";
-        barClass = "bg-green-600";
-    }
-
-    return (
-        <div className={`w-full py-3 px-4 mb-4 rounded-lg flex items-center gap-3 transition-colors duration-300 ${bgClass}`}>
-            <div className={`w-1 h-4 rounded-full ${barClass}`}></div>
-            <span className={`font-bold text-sm flex-1 ${textClass}`}>
-                {message}
-            </span>
-        </div>
-    );
-});
-
-// Success Action Card
+import { CompactPaymentStatusAlert } from '@/components/erp/payments/shared/CompactPaymentStatusAlert';
+import { PaymentAmountLabel } from '@/components/erp/payments/shared/PaymentAmountLabel';
 const SuccessActionCard = React.memo(({ icon: Icon, label, onClick }: { icon: any, label: string, onClick?: () => void }) => (
     <div
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
@@ -187,27 +151,6 @@ const PaymentPricingTooltipBadge = React.memo(({ calculation, baseAllocated }: {
     );
 });
 
-const PaymentAmountLabel = React.memo(({
-    label,
-    calculation,
-    baseAllocated,
-}: {
-    label: string;
-    calculation: any;
-    baseAllocated: number;
-}) => {
-    return (
-        <div className="mb-2 flex items-center gap-2">
-            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{label}</span>
-            {calculation?.success && baseAllocated > 0.009 ? (
-                <PaymentPricingTooltipBadge calculation={calculation} baseAllocated={baseAllocated} />
-            ) : null}
-        </div>
-    );
-});
-
-// --- MAIN COMPONENT ---
-
 type PartnerPaymentMethod = {
     id: string;
     name: string;
@@ -261,6 +204,9 @@ export type PaymentModalProps = {
     isMarketplaceOrder?: boolean
     role?: string
     originalPaymentMethod?: string
+    /** Quando o pedido tem serviços, permite gerar cobrança de sinal via MP antes do pagamento integral. */
+    allowDepositCharge?: boolean
+    depositChargeAmount?: number
 }
 
 /** Mesmo texto em PDV e venda manual - importe nos pais para garantir paridade. */
@@ -286,8 +232,11 @@ const PaymentModal = ({
     isMarketplaceOrder = false,
     role = 'staff',
     originalPaymentMethod,
+    allowDepositCharge = false,
+    depositChargeAmount = 0,
 }: PaymentModalProps) => {
     const { toast } = useToast();
+    const { selectedStore } = useStore();
     // Views: methods (main) | method_type_select | money | card | pix | split | split_method_select
     const [view, setView] = useState<string>('methods');
     /** Valor base alocado ao pedido neste meio (antes de desconto/juros/taxa do método); servidor recalcula o líquido a cobrar. */
@@ -334,6 +283,41 @@ const PaymentModal = ({
     const mpBrickIdRef = useRef<any>(null);
     const mpBrickInitializedRef = useRef(false);
 
+
+    const [depositMpPixData, setDepositMpPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
+    const [depositMpPaymentId, setDepositMpPaymentId] = useState<string | null>(null);
+    const [generatingDepositPix, setGeneratingDepositPix] = useState(false);
+
+    const handleGenerateDepositCharge = async () => {
+        if (depositChargeAmount <= 0.009) {
+            toast({ title: "Sinal indisponível", description: "Configure o valor do sinal para este pedido.", variant: "destructive" });
+            return;
+        }
+        setGeneratingDepositPix(true);
+        try {
+            const res = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
+                method: "POST",
+                body: {
+                    paymentFormData: { payment_method_id: "pix" },
+                    partnerId,
+                    amount: depositChargeAmount,
+                    description: `Sinal - ${customer?.name || "Cliente"}`,
+                },
+            });
+            if (res?.pixData?.qrCode) {
+                setDepositMpPixData({ qrCode: res.pixData.qrCode, qrCodeBase64: res.pixData.qrCodeBase64 });
+                setDepositMpPaymentId(res.mpPaymentId);
+                toast({ title: "Pix gerado", description: "Cobrança de sinal criada via Mercado Pago." });
+            } else {
+                toast({ title: "Erro", description: res?.error || "Falha ao gerar Pix.", variant: "destructive" });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Não foi possível gerar a cobrança de sinal.", variant: "destructive" });
+        } finally {
+            setGeneratingDepositPix(false);
+        }
+    };
 
     // Split: user-defined base amount per method (not weights / percentages)
     const [payments, setPayments] = useState<{
@@ -1743,6 +1727,43 @@ const PaymentModal = ({
                                                     ))}
                                                 </div>
                                             ) : (
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && (
+                                                        <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-border/20 space-y-3">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal</p>
+                                                                    <p className="text-xs text-brand-inactive-text">Pix Mercado Pago — {formatCurrency(depositChargeAmount)}</p>
+                                                                </div>
+                                                                <Button variant="filled" onClick={handleGenerateDepositCharge} isLoading={generatingDepositPix}>
+                                                                    Gerar Pix
+                                                                </Button>
+                                                            </div>
+                                                            {depositMpPixData && (
+                                                                <div className="flex flex-col items-center gap-2 pt-2 border-t border-dashed border-brand-border">
+                                                                    <img src={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`} alt="QR Code sinal" className="w-36 h-36" />
+                                                                    <div className="w-full flex gap-2">
+                                                                        <input readOnly value={depositMpPixData.qrCode} className="flex-1 px-3 py-2 rounded-lg bg-gray-50 text-xs border border-brand-border truncate" />
+                                                                        <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(depositMpPixData.qrCode)}>
+                                                                            <CopyIcon size={16} />
+                                                                        </Button>
+                                                                    </div>
+                                                                    {selectedStore?.phone && (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            className="w-full text-xs"
+                                                                            onClick={() => {
+                                                                                const msg = encodeURIComponent(`Olá! Segue o Pix para pagamento do sinal: ${depositMpPixData.qrCode}`);
+                                                                                window.open(`https://wa.me/55${String(selectedStore.phone).replace(/\D/g, "")}?text=${msg}`, "_blank");
+                                                                            }}
+                                                                        >
+                                                                            Enviar via WhatsApp
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 <div className="grid grid-cols-2 gap-4">
                                                     {availableMethodTypes.has("cash") && (
                                                         <PaymentMethodCard
@@ -1809,6 +1830,7 @@ const PaymentModal = ({
                                                             <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">Mercado Pago</span>
                                                         </button>
                                                     )}
+                                                </div>
                                                 </div>)}
 
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>

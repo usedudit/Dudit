@@ -369,6 +369,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
     }, [items])
 
+    const serviceSubtotal = useMemo(
+        () => items.filter((item) => item.isService).reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
+        [items],
+    )
+    const depositChargeAmount = Math.round(serviceSubtotal * 0.5 * 100) / 100
+
     const hasWinningDiscount = useMemo(() => {
         return items.some((item) => {
             if (item.isManual) return false
@@ -1880,6 +1886,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             originalPaymentMethod={originalPaymentMethod}
                             onConfirm={handleConfirmPayment}
                             deliveryMethod={deliveryMethod}
+                            allowDepositCharge={serviceSubtotal > 0.009 && !isMarketplaceOrder}
+                            depositChargeAmount={depositChargeAmount}
                         />
                     )}
                 </AnimatePresence>

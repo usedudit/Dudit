@@ -157,7 +157,7 @@ async function processWebhookWithRetry(
     // ── Idempotency check: has this payment already been processed? ──
     const { data: existingOrderData, error: checkError } = await supabase
       .from("orders")
-      .select("id, situation, total_amount, partner_id, payment_expires_at, cancelled_at, payment_breakdown, finance_account_id")
+      .select("id, situation, total_amount, paid_amount, partner_id, payment_expires_at, cancelled_at, payment_breakdown, finance_account_id, checkout_fulfillment")
       .eq("mp_payment_id", paymentId.toString())
       .limit(1)
       .single()
@@ -257,7 +257,7 @@ async function processWebhookWithRetry(
     if (!orderData) {
       const { data: order, error: orderError } = await supabase
         .from("orders")
-        .select("id, situation, total_amount, partner_id, payment_breakdown, finance_account_id")
+        .select("id, situation, total_amount, paid_amount, partner_id, payment_breakdown, finance_account_id, checkout_fulfillment")
         .eq("mp_payment_id", paymentId.toString())
         .limit(1)
         .single()
@@ -278,45 +278,26 @@ async function processWebhookWithRetry(
 
     // ── Validate payment amount (fraud detection) ──
     if (paymentInfo.status === "approved" && paymentInfo.transaction_amount != null) {
-      const paidAmount = Number(paymentInfo.transaction_amount)
-      const orderAmount = Number(orderData.total_amount)
-
-      if (Math.abs(paidAmount - orderAmount) > AMOUNT_TOLERANCE) {
+      const { validateMpTransactionAmount } = await import("@/lib/payments/mp-order-payment-update")
+      const validation = validateMpTransactionAmount(orderData, Number(paymentInfo.transaction_amount))
+      if (!validation.ok) {
         SecureLogger.error("[WEBHOOK] FRAUD ALERT: Payment amount mismatch", {
-          paidAmount,
-          orderAmount,
+          paidAmount: paymentInfo.transaction_amount,
+          orderAmount: validation.expectedAmount,
           paymentId: paymentId.toString(),
           orderId,
           partnerId,
         })
         return
       }
-      console.log("[WEBHOOK] Payment amount validated:", { paidAmount, orderAmount })
+      console.log("[WEBHOOK] Payment amount validated:", {
+        paidAmount: paymentInfo.transaction_amount,
+        expectedAmount: validation.expectedAmount,
+      })
     }
 
     // ── Determine new order status from MP payment status ──
     let orderStatus = "pending"
-    if (paymentInfo.status === "approved") {
-      orderStatus = "paid"
-    } else if (paymentInfo.status === "in_process") {
-      orderStatus = "in_process"
-    } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(paymentInfo.status)) {
-      orderStatus = "cancelled"
-    }
-
-    console.log(`[WEBHOOK] Status mapping: MP "${paymentInfo.status}" → order "${orderStatus}"`)
-
-    // ── Status regression guard ──
-    const finalStatuses = ["paid", "shipped", "delivered"]
-    if (finalStatuses.includes(orderData.situation) && !finalStatuses.includes(orderStatus)) {
-      if (orderStatus !== "cancelled") {
-        console.log(`[WEBHOOK] Skipping: order already in final status "${orderData.situation}"`)
-        return
-      }
-    }
-
-    const previousSituation = orderData.situation
-
     let paymentMethodName = "Desconhecido"
     const mpPaymentMethodId = String(paymentInfo.payment_method_id || "").toLowerCase()
     const mpPaymentTypeId = String(paymentInfo.payment_type_id || paymentInfo.payment_method?.type || "").toLowerCase()
@@ -337,32 +318,57 @@ async function processWebhookWithRetry(
       paymentMethodName = formatPaymentMethodLabel(paymentInfo.payment_method?.type || paymentInfo.payment_method_id)
     }
 
-    // ── Update order ──
-    const oldBreakdown = Array.isArray(orderData.payment_breakdown) ? orderData.payment_breakdown : []
-    const newBreakdown = oldBreakdown.map((entry: any) => {
-      const isMpPix = String(entry.method).toLowerCase().includes("mercado pago") && String(entry.method).toLowerCase().includes("pix")
-      if (isMpPix || oldBreakdown.length <= 1) {
-        return { ...entry, amountReceived: entry.amount }
-      }
-      return entry
-    })
-
-    const updateData: any = {
-      situation: orderStatus,
-      payment_method: paymentMethodName,
-      payment_provider: "Mercado Pago",
-      mp_payment_id: paymentId.toString(),
+    let updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
-      payment_breakdown: newBreakdown,
     }
 
-    if (paymentInfo.status === "approved" && paymentInfo.date_approved) {
-      updateData.mp_date_approved = paymentInfo.date_approved
+    if (paymentInfo.status === "approved") {
+      const { buildMpApprovedPaymentUpdate } = await import("@/lib/payments/mp-order-payment-update")
+      const approvedUpdate = buildMpApprovedPaymentUpdate({
+        order: orderData,
+        transactionAmount: Number(paymentInfo.transaction_amount || 0),
+        paymentMethodName,
+        mpPaymentId: paymentId.toString(),
+        mpDateApproved: paymentInfo.date_approved,
+        existingBreakdown: orderData.payment_breakdown,
+      })
+      orderStatus = approvedUpdate.situation
+      updateData = { ...updateData, ...approvedUpdate }
+    } else if (paymentInfo.status === "in_process") {
+      orderStatus = "in_process"
+    } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(paymentInfo.status)) {
+      orderStatus = "cancelled"
     }
 
-    if (orderStatus === "paid") {
-      updateData.amount_paid = orderData.total_amount
-      updateData.paid_amount = orderData.total_amount
+    console.log(`[WEBHOOK] Status mapping: MP "${paymentInfo.status}" → order "${orderStatus}"`)
+
+    // ── Status regression guard ──
+    const finalStatuses = ["paid", "shipped", "delivered"]
+    if (finalStatuses.includes(orderData.situation) && !finalStatuses.includes(orderStatus)) {
+      if (orderStatus !== "cancelled") {
+        console.log(`[WEBHOOK] Skipping: order already in final status "${orderData.situation}"`)
+        return
+      }
+    }
+
+    const previousSituation = orderData.situation
+    const previousPaidAmount = Number(orderData.paid_amount || 0)
+
+    if (paymentInfo.status === "in_process") {
+      updateData = {
+        ...updateData,
+        situation: orderStatus,
+        payment_method: paymentMethodName,
+        payment_provider: "Mercado Pago",
+        mp_payment_id: paymentId.toString(),
+      }
+    } else if (orderStatus === "cancelled") {
+      updateData = {
+        ...updateData,
+        situation: orderStatus,
+        payment_provider: "Mercado Pago",
+        mp_payment_id: paymentId.toString(),
+      }
     }
 
     console.log(`[WEBHOOK] Updating order ${orderId}: "${previousSituation}" → "${orderStatus}"`)
@@ -403,17 +409,17 @@ async function processWebhookWithRetry(
       }
     }
 
-    // ── Create revenue transaction when paid ──
-    if (orderStatus === "paid") {
+    // ── Create revenue transaction when payment approved ──
+    if (paymentInfo.status === "approved") {
       try {
         const { createFinancialTransactionsForReceivedAmount } = await import("@/app/actions/erp/orders")
         const { data: fullOrder } = await supabase
           .from("orders")
-          .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
+          .select("order_number, partner_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
           .eq("id", orderId)
           .single()
 
-        if (fullOrder) {
+        if (fullOrder && Number(fullOrder.paid_amount || 0) > previousPaidAmount + 0.009) {
           await createFinancialTransactionsForReceivedAmount(supabase, {
             orderId: orderId,
             orderNumber: fullOrder.order_number,

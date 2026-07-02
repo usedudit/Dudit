@@ -280,7 +280,8 @@ export async function getMarketplaceCheckoutContextAction(input: {
     depositAllowed &&
     depositEnabled &&
     servicesSubtotal > 0 &&
-    (serviceDepositManualEnabled || (serviceDepositMpEnabled && mpConnected))
+    serviceDepositMpEnabled &&
+    mpConnected
 
   const previewAmount =
     depositAvailable ? Math.round(originalServicesSubtotal * (depositPercent / 100) * 100) / 100 : 0

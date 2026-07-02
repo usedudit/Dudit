@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id, payment_expires_at, payment_breakdown, finance_account_id")
+      .select("id, order_number, situation, total_amount, paid_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id, payment_expires_at, payment_breakdown, finance_account_id, checkout_fulfillment")
       .eq("id", orderId)
       .single()
 
@@ -104,13 +104,12 @@ export async function POST(request: NextRequest) {
     const paymentData = await mpResponse.json()
 
     if (paymentData.status === "approved" && paymentData.transaction_amount != null) {
-      const paidAmount = Number(paymentData.transaction_amount)
-      const orderAmount = Number(order.total_amount)
-
-      if (Math.abs(paidAmount - orderAmount) > AMOUNT_TOLERANCE) {
-        SecureLogger.error("Payment amount mismatch â€” possible fraud", {
-          paidAmount,
-          orderAmount,
+      const { validateMpTransactionAmount } = await import("@/lib/payments/mp-order-payment-update")
+      const validation = validateMpTransactionAmount(order, Number(paymentData.transaction_amount))
+      if (!validation.ok) {
+        SecureLogger.error("Payment amount mismatch — possible fraud", {
+          paidAmount: paymentData.transaction_amount,
+          orderAmount: validation.expectedAmount,
           orderId,
         })
         return NextResponse.json({ error: "Payment amount does not match order" }, { status: 400 })
@@ -119,8 +118,24 @@ export async function POST(request: NextRequest) {
 
     let newOrderStatus = "pending"
 
+    const previousPaidAmount = Number(order.paid_amount || 0)
+    let approvedUpdate: Record<string, unknown> | null = null
+
     if (paymentData.status === "approved") {
-      newOrderStatus = "paid"
+      const { buildMpApprovedPaymentUpdate } = await import("@/lib/payments/mp-order-payment-update")
+      const paymentMethodName =
+        String(paymentData.payment_method_id || "").toLowerCase() === "pix"
+          ? "Pix"
+          : paymentData.payment_method?.type || order.payment_method || "Mercado Pago"
+      approvedUpdate = buildMpApprovedPaymentUpdate({
+        order,
+        transactionAmount: Number(paymentData.transaction_amount || 0),
+        paymentMethodName: String(paymentMethodName),
+        mpPaymentId: String(order.mp_payment_id),
+        mpDateApproved: paymentData.date_approved,
+        existingBreakdown: order.payment_breakdown,
+      })
+      newOrderStatus = approvedUpdate.situation as string
     } else if (paymentData.status === "in_process") {
       newOrderStatus = "in_process"
     } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(paymentData.status)) {
@@ -143,45 +158,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (newOrderStatus !== order.situation) {
+    const nextPaidAmount = approvedUpdate ? Number(approvedUpdate.paid_amount || 0) : previousPaidAmount
+    const shouldUpdate =
+      newOrderStatus !== order.situation ||
+      (paymentData.status === "approved" && nextPaidAmount > previousPaidAmount + 0.009)
+
+    if (shouldUpdate) {
       SecureLogger.info("Syncing payment status", {
         orderId,
         from: order.situation,
         to: newOrderStatus,
       })
 
-      const oldBreakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
-      const newBreakdown = oldBreakdown.map((entry: any) => {
-        const isMpPix = String(entry.method).toLowerCase().includes("mercado pago") && String(entry.method).toLowerCase().includes("pix")
-        if (isMpPix || oldBreakdown.length <= 1) {
-          return { ...entry, amountReceived: entry.amount }
-        }
-        return entry
-      })
-
-      const updateData: any = {
-        situation: newOrderStatus,
-        payment_method: paymentData.payment_method?.type || order.payment_method,
-        payment_provider: "Mercado Pago",
-        updated_at: new Date().toISOString(),
-        payment_breakdown: newBreakdown,
-      }
-
-      if (paymentData.status === "approved" && paymentData.date_approved) {
-        updateData.mp_date_approved = paymentData.date_approved
-      }
-
-      if (newOrderStatus === "paid") {
-        updateData.amount_paid = order.total_amount
-        updateData.paid_amount = order.total_amount
-      }
+      const updateData: Record<string, unknown> = approvedUpdate
+        ? { ...approvedUpdate, updated_at: new Date().toISOString() }
+        : {
+            situation: newOrderStatus,
+            payment_method: paymentData.payment_method?.type || order.payment_method,
+            payment_provider: "Mercado Pago",
+            updated_at: new Date().toISOString(),
+          }
 
       const { data: updatedOrder, error: updateError } = await supabaseAdmin
         .from("orders")
         .update(updateData)
         .eq("id", orderId)
-        .neq("situation", newOrderStatus)
-        .select("situation")
+        .select("situation, paid_amount")
         .maybeSingle()
 
       if (updateError) {
@@ -206,13 +208,13 @@ export async function POST(request: NextRequest) {
 
       SecureLogger.info("Order status updated", { orderId, newStatus: newOrderStatus })
 
-      if (newOrderStatus === "paid") {
+      if (paymentData.status === "approved" && nextPaidAmount > previousPaidAmount + 0.009) {
         try {
           const { createFinancialTransactionsForReceivedAmount } = await import("@/app/actions/erp/orders")
 
           const { data: fullOrder } = await supabaseAdmin
             .from("orders")
-            .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
+            .select("order_number, partner_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
             .eq("id", orderId)
             .single()
 

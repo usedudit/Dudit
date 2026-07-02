@@ -196,6 +196,10 @@ async function handler(request: NextRequest) {
       quantity: number
     }> = []
 
+    let depositCheckoutMeta: Record<string, unknown> | null = null
+    let fullOrderTotal = 0
+    let cartPmtConfig: import("@/lib/services/pricing-engine").PricingInput["paymentMethod"] = null
+
     const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
 
     if (useUnifiedCart) {
@@ -250,7 +254,9 @@ async function handler(request: NextRequest) {
         return NextResponse.json({ error: "Itens não pertencem a este vendedor" }, { status: 400 })
       }
 
+      cartPmtConfig = pmtConfig
       totalAmount = priced.data.totalAmount
+      fullOrderTotal = priced.data.totalAmount
       deliveryFee = priced.data.deliveryFee
       couponIdToSave = priced.data.couponId
       couponDiscountAmount = priced.data.couponDiscountAmount
@@ -264,6 +270,53 @@ async function handler(request: NextRequest) {
       reserveItems = priced.data.reserveItems
       productIdsForCache = priced.data.productIds
       orderItemsForInsert = priced.data.orderItems
+
+      if (Boolean(payDepositOnly)) {
+        await adminClient
+          .from("cart_items")
+          .update({ pay_deposit_only: false, updated_at: new Date().toISOString() })
+          .in("id", cartItemIds!)
+          .eq("user_id", buyerId)
+          .eq("item_type", "service_booking")
+
+        const fullPriced = await priceMarketplaceCartCheckout(adminClient, {
+          userId: buyerId,
+          cartItemIds: cartItemIds!,
+          deliveryType: normalizedDeliveryType,
+          deliveryAddress: deliveryAddress || "",
+          couponCode,
+          paymentMethod: pmtConfig,
+        })
+
+        await adminClient
+          .from("cart_items")
+          .update({ pay_deposit_only: true, updated_at: new Date().toISOString() })
+          .in("id", cartItemIds!)
+          .eq("user_id", buyerId)
+          .eq("item_type", "service_booking")
+
+        if (fullPriced.success) {
+          fullOrderTotal = fullPriced.data.totalAmount
+          const serviceDepositAmount = (priced.data.resolvedLines || [])
+            .filter((line) => line.payDepositOnly && line.depositAmount != null)
+            .reduce((sum, line) => sum + Number(line.depositAmount || 0) * Number(line.quantity || 1), 0)
+
+          depositCheckoutMeta = {
+            depositCheckout: true,
+            payDepositOnly: true,
+            depositAmount: serviceDepositAmount,
+            fullOrderTotal,
+            initialChargeAmount: totalAmount,
+          }
+
+          if (checkoutFulfillment) {
+            checkoutFulfillment = {
+              ...checkoutFulfillment,
+              depositCheckout: depositCheckoutMeta,
+            }
+          }
+        }
+      }
 
       for (const row of orderItemsForInsert) {
         if (!row.product_id) continue
@@ -483,6 +536,9 @@ async function handler(request: NextRequest) {
       SecureLogger.error("Invalid total amount calculated", { totalAmount })
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
     }
+
+    const chargeAmount = totalAmount
+    if (!fullOrderTotal) fullOrderTotal = totalAmount
 
     // Buscar dados do usuário para pegar o nome completo
     const { data: userProfile } = await supabase
@@ -722,6 +778,17 @@ async function handler(request: NextRequest) {
       payment_status: paymentStatus,
     })
 
+    const { resolveSituationFromPaid } = await import("@/lib/payments/order-financial-state")
+    const approvedPaidAmount = paymentStatus === "approved" ? chargeAmount : 0
+    const orderSituation =
+      paymentStatus === "approved"
+        ? resolveSituationFromPaid(approvedPaidAmount, fullOrderTotal)
+        : paymentStatus === "in_process"
+          ? "in_process"
+          : paymentStatus === "rejected"
+            ? "cancelled"
+            : "pending"
+
     const { data: newOrder, error: orderError } = await adminClient
       .from("orders")
       .insert({
@@ -732,11 +799,8 @@ async function handler(request: NextRequest) {
         delivery_type: resolvedOrderDeliveryType,
         delivery_address: resolvedOrderDeliveryAddress,
         notes: notes,
-        total_amount: totalAmount,
-        situation: paymentStatus === "approved" ? "paid"
-          : paymentStatus === "in_process" ? "in_process"
-          : paymentStatus === "rejected" ? "cancelled"
-          : "pending",
+        total_amount: fullOrderTotal,
+        situation: orderSituation,
         payment_method: paymentMethodDisplayName,
         payment_provider: "Mercado Pago",
         mp_payment_id: mpPaymentId.toString(),
@@ -747,8 +811,11 @@ async function handler(request: NextRequest) {
         delivery_fee: deliveryFee,
         payment_breakdown: [{
           method: paymentMethodDisplayName,
-          amount: totalAmount,
+          amount: chargeAmount,
+          effectiveAmount: chargeAmount,
+          amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
           provider: "Mercado Pago",
+          adjustmentType: "none",
           checkoutPricing: checkoutPricing || {
             subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
             couponDiscount: couponDiscountAmount,
@@ -756,15 +823,15 @@ async function handler(request: NextRequest) {
             paymentMethodInterest: 0,
             paymentMethodFee: paymentMethodExtraAmount,
             deliveryFee,
-            finalTotal: totalAmount,
+            finalTotal: fullOrderTotal,
           },
         }],
         checkout_fulfillment: checkoutFulfillment,
         order_source: "Vitrine Online",
         promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,
         pricing_version: "2.0",
-        amount_paid: paymentStatus === "approved" ? totalAmount : 0,
-        paid_amount: paymentStatus === "approved" ? totalAmount : 0,
+        amount_paid: approvedPaidAmount,
+        paid_amount: approvedPaidAmount,
         paid_at: paymentStatus === "approved" ? new Date().toISOString() : null,
         payment_expires_at: paymentExpiresAt,
       })

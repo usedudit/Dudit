@@ -215,11 +215,12 @@ async function applyPaymentMethodPricingToTotal(
     partnerId: string,
     baseTotal: number,
     paymentBreakdown: PaymentBreakdownEntry[],
+    options?: { skipPricing?: boolean },
 ): Promise<ApplyPaymentMethodPricingResult> {
     const safeBase = Math.max(0, Math.round(Number(baseTotal || 0) * 100) / 100)
     const breakdown = paymentBreakdown || []
-    if (breakdown.length === 0) {
-        return { ok: true, finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: [] as PaymentBreakdownEntry[] }
+    if (options?.skipPricing || breakdown.length === 0) {
+        return { ok: true, finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: breakdown as PaymentBreakdownEntry[] }
     }
 
     for (const row of breakdown) {

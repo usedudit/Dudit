@@ -703,12 +703,12 @@ export function CheckoutPageClient() {
         !requirements?.hasProductLines &&
         !requirements?.hasSubscriptionLines
     )
-    const showTraditionalPaymentOption = checkoutContext?.partner?.orderFlow === "whatsapp" || (!pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
+    const showTraditionalPaymentOption = !checkoutContext?.deposit.available && (checkoutContext?.partner?.orderFlow === "whatsapp" || (!pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||
         requirements?.hasServiceLines ||
         (requirements?.hasProductLines && !requirements?.hasServiceLines),
-    ))
+    )))
 
     const schedulingLines = useMemo(
         () =>
@@ -2002,41 +2002,15 @@ export function CheckoutPageClient() {
         bypassDepositModalRef.current = true
         setShowDepositChoiceModal(false)
 
-        let targetPaymentOption = paymentOption
-        let targetPaymentMethod = formData.paymentMethod
-
-        if (paymentOption === "mercadopago") {
-            if (!checkoutContext?.deposit.mpEnabled) {
-                targetPaymentOption = "traditional"
-                const pixMethod = visibleStorefrontMethods.find((m) => m.type === "pix")
-                if (pixMethod) {
-                    targetPaymentMethod = pixMethod.id
-                }
-            }
-        } else {
-            if (!checkoutContext?.deposit.manualEnabled) {
-                targetPaymentOption = "mercadopago"
-                targetPaymentMethod = "mercadopago"
-            } else {
-                const pixMethod = visibleStorefrontMethods.find((m) => m.type === "pix")
-                if (pixMethod) {
-                    targetPaymentMethod = pixMethod.id
-                }
-            }
+        if (!checkoutContext?.deposit.mpEnabled || !checkoutContext?.partner?.mpConnected) {
+            setPaymentError("Pagamento do sinal disponível somente via Mercado Pago.")
+            return
         }
 
-        const optionChanged = paymentOption !== targetPaymentOption
-        const methodChanged = formData.paymentMethod !== targetPaymentMethod
-        const depositChanged = !payDepositOnly
-
-        if (optionChanged || methodChanged || depositChanged) {
-            bypassSubmitRef.current = true
-            if (optionChanged) setPaymentOption(targetPaymentOption)
-            if (methodChanged) setFormData(prev => ({ ...prev, paymentMethod: targetPaymentMethod }))
-            if (depositChanged) setPayDepositOnly(true)
-        } else {
-            void handleSubmit()
-        }
+        bypassSubmitRef.current = true
+        setPaymentOption("mercadopago")
+        setPayDepositOnly(true)
+        void handleSubmit()
     }
 
     if (pageLoading || !sessionData) {
