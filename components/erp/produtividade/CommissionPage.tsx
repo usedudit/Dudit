@@ -20,7 +20,7 @@ import {
   TargetIcon,
 } from "@/lib/icons"
 
-const COLUMNS = [
+const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
   { id: "seller", label: "Vendedor", align: "left", width: "300px" },
   { id: "pending", label: "Pendente", align: "right", width: "120px" },
   { id: "paid", label: "Pago", align: "right", width: "120px" },

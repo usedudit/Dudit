@@ -99,7 +99,7 @@ export function BalancePaymentCollector({
 
   const openMethodType = (type: string) => {
     setSelectedMethodType(type)
-    const matches = activeMethods.filter((m) => normalizeMethodType(m.type) === type)
+    const matches = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === type)
     if (matches.length === 1) {
       selectSingleMethod(matches[0])
       return
@@ -145,7 +145,7 @@ export function BalancePaymentCollector({
     const legs = splitLegs
       .filter((leg) => leg.method && leg.paymentMethodId && leg.amount > 0.009)
       .map((leg) => {
-        const method = activeMethods.find((m) => m.id === leg.paymentMethodId)
+        const method = activeMethods.find((m: PartnerPaymentMethod) => m.id === leg.paymentMethodId)
         if (!method) return null
         return buildFlatLeg(method, leg.amount, leg.installmentNumber)
       })
@@ -231,7 +231,7 @@ export function BalancePaymentCollector({
 
       {view === "method_type_select" && selectedMethodType && (
         <MethodGridForPartnerMethods
-          methods={activeMethods.filter((m) => normalizeMethodType(m.type) === selectedMethodType)}
+          methods={activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === selectedMethodType)}
           onSelect={selectSingleMethod}
         />
       )}

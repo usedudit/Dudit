@@ -1748,13 +1748,13 @@ const PaymentModal = ({
                                                                             <CopyIcon size={16} />
                                                                         </Button>
                                                                     </div>
-                                                                    {selectedStore?.phone && (
+                                                                    {customer?.phone && (
                                                                         <Button
                                                                             variant="outline"
                                                                             className="w-full text-xs"
                                                                             onClick={() => {
                                                                                 const msg = encodeURIComponent(`Olá! Segue o Pix para pagamento do sinal: ${depositMpPixData.qrCode}`);
-                                                                                window.open(`https://wa.me/55${String(selectedStore.phone).replace(/\D/g, "")}?text=${msg}`, "_blank");
+                                                                                window.open(`https://wa.me/55${String(customer.phone).replace(/\D/g, "")}?text=${msg}`, "_blank");
                                                                             }}
                                                                         >
                                                                             Enviar via WhatsApp
