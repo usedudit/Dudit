@@ -2,6 +2,7 @@ import {
   getExpectedMpChargeAmount,
   getOrderPaidAmount,
   getOrderTotalAmount,
+  patchDepositCheckoutOnPayment,
   resolveSituationFromPaid,
   type OrderFinancialSnapshot,
 } from "@/lib/payments/order-financial-state"
@@ -35,6 +36,7 @@ export function buildMpApprovedPaymentUpdate(params: {
   payment_provider: string
   mp_payment_id: string
   mp_date_approved?: string
+  checkout_fulfillment?: Record<string, unknown> | null
 } {
   const totalAmount = getOrderTotalAmount(params.order)
   const currentPaid = getOrderPaidAmount(params.order)
@@ -73,6 +75,12 @@ export function buildMpApprovedPaymentUpdate(params: {
         )
       : [...oldBreakdown, mpLeg]
 
+  const checkout_fulfillment = patchDepositCheckoutOnPayment(
+    params.order.checkout_fulfillment ?? null,
+    nextPaid,
+    totalAmount,
+  )
+
   return {
     situation,
     paid_amount: nextPaid,
@@ -81,6 +89,7 @@ export function buildMpApprovedPaymentUpdate(params: {
     payment_method: params.paymentMethodName,
     payment_provider: "Mercado Pago",
     mp_payment_id: params.mpPaymentId,
+    ...(checkout_fulfillment ? { checkout_fulfillment } : {}),
     ...(params.mpDateApproved ? { mp_date_approved: params.mpDateApproved } : {}),
   }
 }

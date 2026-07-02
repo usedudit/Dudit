@@ -5,6 +5,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getOrderPaidAmount } from "@/lib/payments/order-financial-state"
 import { ensureMarketplaceCustomer } from "@/lib/services/marketplace-customer"
 import type {
   CheckoutFulfillmentPayload,
@@ -17,6 +18,19 @@ import { syncAppointmentReceivable } from "@/lib/services/appointment-receivable
 import { onMarketplaceOrderPaid } from "@/lib/services/marketplace-metrics.service"
 
 const STOREFRONT_CHANNEL = "online_storefront"
+
+function isPaymentConfirmedForFulfillment(order: {
+  situation?: string | null
+  paid_amount?: number | null
+  amount_paid?: number | null
+}): boolean {
+  const situation = String(order.situation || "").toLowerCase()
+  if (situation === "paid" || situation === "approved") return true
+  if (getOrderPaidAmount(order) > 0.009 && (situation === "partially_paid" || situation === "pending" || situation === "in_process")) {
+    return true
+  }
+  return false
+}
 
 function computeEndTime(time: string, durationMinutes: number): string {
   const [h, m] = time.split(":").map(Number)
@@ -276,7 +290,8 @@ export async function fulfillMarketplaceOrder(
     .from("orders")
     .select(`
       id, partner_id, buyer_id, situation, checkout_fulfillment,
-      finance_account_id, customer_name, delivery_type, delivery_address, payment_method
+      finance_account_id, customer_name, delivery_type, delivery_address, payment_method,
+      paid_amount, amount_paid
     `)
     .eq("id", orderId)
     .single()
@@ -303,9 +318,11 @@ export async function fulfillMarketplaceOrder(
       line.bookingMetadata.staffId,
   ).length
 
+  const paymentConfirmed = isPaymentConfirmedForFulfillment(order)
+
   if (existingFulfillment?.status === "completed") {
     const appointmentIds = (existingFulfillment.result as CheckoutFulfillmentResult)?.appointmentIds || []
-    if (situation === "paid" || situation === "approved") {
+    if (paymentConfirmed) {
       if (appointmentIds.length >= expectedScheduledServices && payload?.lines) {
         for (const line of payload.lines) {
           if (line.itemType === "service_booking" && line.bookingMetadata) {
@@ -354,19 +371,19 @@ export async function fulfillMarketplaceOrder(
       }
     }
     if (appointmentIds.length >= expectedScheduledServices) {
-      if (situation === "paid" || situation === "approved") {
+      if (paymentConfirmed) {
         await onMarketplaceOrderPaid(supabase, orderId)
       }
       return { success: true, result: (existingFulfillment.result || {}) as CheckoutFulfillmentResult, skipped: true }
     }
   }
 
-  if (!options?.force && situation !== "paid" && situation !== "approved") {
+  if (!options?.force && !paymentConfirmed) {
     return { success: false, error: "Pedido ainda não está pago." }
   }
 
   if (!payload?.lines?.length) {
-    if (situation === "paid" || situation === "approved") {
+    if (paymentConfirmed) {
       await onMarketplaceOrderPaid(supabase, orderId)
     }
     return { success: true, skipped: true }
@@ -411,16 +428,17 @@ export async function fulfillMarketplaceOrder(
         !line.bookingMetadata.instantPurchase &&
         line.bookingMetadata.staffId
       ) {
-        const isOrderPaid = situation === "paid" || situation === "approved"
         const fullPrice = line.fullPrice ?? line.bookingMetadata.price
-        const paidAmount = isOrderPaid
+        const paidAmount = paymentConfirmed
           ? (line.payDepositOnly
               ? (line.depositAmount ?? line.unitPrice * line.quantity)
               : line.unitPrice * line.quantity)
           : 0
-        const paymentStatus = isOrderPaid
-          ? (line.payDepositOnly ? "partially_paid" : "paid")
-          : "unpaid"
+        const paymentStatus = !paymentConfirmed
+          ? "unpaid"
+          : (line.payDepositOnly || situation === "partially_paid")
+            ? "partially_paid"
+            : "paid"
 
         const bookingResult = await createBookingFromMetadata(supabase, {
           partnerId: order.partner_id,
@@ -498,7 +516,7 @@ export async function fulfillMarketplaceOrder(
       })
       .eq("idempotency_key", idempotencyKey)
 
-    if (situation === "paid" || situation === "approved") {
+    if (paymentConfirmed) {
       await onMarketplaceOrderPaid(supabase, orderId)
     }
 

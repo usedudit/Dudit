@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Tabs, TabsList, TabsTrigger, TabsContent, FormSection, FormDropdown, IconPlaceholder, SavingStatusModal } from "@/components/reusable"
+import { Button, Tabs, TabsList, TabsTrigger, TabsContent, FormSection, FormDropdown, IconPlaceholder, SavingStatusModal, InfoCard } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -85,19 +85,16 @@ export function PaymentsPage({
         }
 
         if (depositEnabled) {
-            if (!depositManualEnabled && !depositMpEnabled) {
-                notifyError("Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual).")
-                return
-            }
-            if (!mpConnected && !depositManualEnabled) {
-                notifyError("O sinal manual é obrigatório já que a loja não possui conexão com o Mercado Pago.")
+            if (!mpConnected) {
+                notifyError("Para cobrar sinal obrigatório, conecte o Mercado Pago nas integrações.")
                 return
             }
         }
 
         setIsSaving(true)
         try {
-            const pickupRes = await updatePickupPaymentPolicyAction(pickupPaymentPolicy)
+            const effectivePickupPolicy = depositEnabled ? "require_online_payment" : pickupPaymentPolicy
+            const pickupRes = await updatePickupPaymentPolicyAction(effectivePickupPolicy)
             if (!pickupRes.success) {
                 notifyError("Erro ao salvar", pickupRes.error || "Erro ao salvar política de pagamento na retirada.")
                 setIsSaving(false)
@@ -108,8 +105,8 @@ export function PaymentsPage({
                 partnerId: partner.id,
                 depositEnabled: depositFeatureAllowed ? depositEnabled : false,
                 depositPercentage: Number(depositPercentage) as 10 | 20 | 30 | 50,
-                depositManualEnabled: depositEnabled ? depositManualEnabled : false,
-                depositMpEnabled: depositEnabled ? depositMpEnabled : false,
+                depositManualEnabled: false,
+                depositMpEnabled: depositEnabled ? true : depositMpEnabled,
             })
 
             if (!svcRes.success) {
@@ -228,6 +225,7 @@ export function PaymentsPage({
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
                                             {/* Pagamento na retirada */}
+                                            {!depositEnabled && (
                                             <FormSection title="Pagamento na retirada / entrega">
                                                 <div className="flex items-center justify-between py-3">
                                                     <div>
@@ -242,6 +240,14 @@ export function PaymentsPage({
                                                     />
                                                 </div>
                                             </FormSection>
+                                            )}
+
+                                            {depositEnabled && (
+                                                <InfoCard
+                                                    color="orange"
+                                                    message="Com sinal obrigatório ativo, o pagamento na retirada/entrega fica indisponível. O checkout aceita apenas Mercado Pago."
+                                                />
+                                            )}
 
                                             {/* Entrada (sinal) */}
                                             <FormSection title="Entrada (down payment)">
@@ -257,10 +263,9 @@ export function PaymentsPage({
                                                                 if (depositFeatureAllowed) {
                                                                     setDepositEnabled(v)
                                                                     if (v) {
-                                                                        if (!depositManualEnabled && !depositMpEnabled) {
-                                                                            setDepositManualEnabled(true)
-                                                                            if (mpConnected) setDepositMpEnabled(true)
-                                                                        }
+                                                                        setDepositManualEnabled(false)
+                                                                        if (mpConnected) setDepositMpEnabled(true)
+                                                                        setPickupPaymentPolicy("require_online_payment")
                                                                     }
                                                                 }
                                                             }}
@@ -287,11 +292,12 @@ export function PaymentsPage({
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Meios de recebimento</h3>
                                                 <p className="text-xs text-brand-inactive-text mb-6">
-                                                    Selecione as formas de pagamento disponíveis para o sinal dos agendamentos.
+                                                    {depositEnabled
+                                                        ? "Com sinal obrigatório, o recebimento é feito exclusivamente via Mercado Pago no checkout."
+                                                        : "Selecione as formas de pagamento disponíveis para o sinal dos agendamentos."}
                                                 </p>
 
                                                 <div className="space-y-6">
-                                                    {/* Mercado Pago (Online) */}
                                                     <div className="flex items-center justify-between">
                                                         <div>
                                                             <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Online (Mercado Pago)</p>
@@ -302,20 +308,17 @@ export function PaymentsPage({
                                                             )}
                                                         </div>
                                                         <Switch
-                                                            checked={depositMpEnabled && mpConnected && depositEnabled}
+                                                            checked={depositEnabled ? mpConnected : (depositMpEnabled && mpConnected && depositEnabled)}
                                                             onCheckedChange={(v) => {
-                                                                if (mpConnected && depositEnabled) {
+                                                                if (mpConnected && depositEnabled && !depositEnabled) {
                                                                     setDepositMpEnabled(v)
-                                                                    if (!v && !depositManualEnabled) {
-                                                                        setDepositManualEnabled(true)
-                                                                    }
                                                                 }
                                                             }}
-                                                            disabled={!mpConnected || !depositEnabled}
+                                                            disabled={!mpConnected || !depositEnabled || depositEnabled}
                                                         />
                                                     </div>
 
-                                                    {/* Sinal Manual (Pix) */}
+                                                    {!depositEnabled && (
                                                     <div className="flex items-center justify-between">
                                                         <div>
                                                             <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Manual (Pix)</p>
@@ -339,6 +342,7 @@ export function PaymentsPage({
                                                             disabled={!depositEnabled}
                                                         />
                                                     </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

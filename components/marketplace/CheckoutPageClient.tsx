@@ -31,6 +31,8 @@ import { validateMarketplaceCheckoutPayment } from "@/lib/commerce/validate-mark
 import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/CheckoutFulfillmentPanel"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
+import { getMarketplaceCheckoutAmountsAction } from "@/app/actions/marketplace/checkout-amounts"
+import type { MarketplaceCheckoutAmounts } from "@/lib/services/marketplace-checkout-amounts"
 
 interface ProductItem {
     id: string
@@ -270,6 +272,8 @@ export function CheckoutPageClient() {
 
     const requirements: CheckoutRequirements | undefined = checkoutContext?.requirements
     const [payDepositOnly, setPayDepositOnly] = useState(false)
+    const [checkoutAmounts, setCheckoutAmounts] = useState<MarketplaceCheckoutAmounts | null>(null)
+    const [checkoutAmountsLoading, setCheckoutAmountsLoading] = useState(false)
     const [showDepositChoiceModal, setShowDepositChoiceModal] = useState(false)
     const bypassDepositModalRef = useRef(false)
     const bypassSubmitRef = useRef(false)
@@ -652,18 +656,14 @@ export function CheckoutPageClient() {
         () => products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0),
         [products, quantities],
     )
-    const checkoutBaseTotal = useMemo(() => {
-        if (payDepositOnly && checkoutContext?.deposit.available) {
-            const nonServiceSubtotal = (checkoutContext.productsSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0)
-            const serviceDeposit = checkoutContext.deposit.previewAmount || 0
-            return Math.max(0, nonServiceSubtotal + serviceDeposit - couponDiscount)
-        }
-        return Math.max(0, totalAmount - couponDiscount)
-    }, [payDepositOnly, checkoutContext, totalAmount, couponDiscount])
-    const checkoutTotalWithDelivery = useMemo(
-        () => checkoutBaseTotal + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0),
-        [checkoutBaseTotal, showDeliveryFeeRow, isPickup, deliveryFee],
-    )
+
+    const depositAvailable = Boolean(checkoutContext?.deposit.available)
+    const checkoutFullTotal = checkoutAmounts?.fullOrderTotal ?? 0
+    const checkoutDepositChargeTotal = checkoutAmounts?.depositChargeTotal ?? 0
+    const checkoutServiceDepositAmount = checkoutAmounts?.serviceDepositAmount ?? 0
+    const checkoutChargeTotal = checkoutAmounts?.chargeTotal ?? 0
+    const checkoutDeliveryFee = checkoutAmounts?.deliveryFee ?? (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
+    const checkoutAmountsReady = Boolean(checkoutAmounts && !checkoutAmountsLoading)
     const paymentTypeLabelMap: Record<string, string> = {
         pix: "Pix",
         credit_card: "Cartão de crédito",
@@ -937,6 +937,51 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         let active = true
+        if (!cartItemIds.length || !checkoutContext) {
+            setCheckoutAmounts(null)
+            setCheckoutAmountsLoading(false)
+            return
+        }
+
+        setCheckoutAmountsLoading(true)
+        const timer = window.setTimeout(async () => {
+            const result = await getMarketplaceCheckoutAmountsAction({
+                cartItemIds,
+                deliveryType: formData.deliveryType === "pickup" ? "pickup" : "delivery",
+                deliveryAddress: formData.deliveryAddress || "",
+                couponCode: couponCode || null,
+                payDepositOnly,
+                depositPercent: checkoutContext.deposit?.percent ?? 50,
+                depositAvailable,
+            })
+
+            if (!active) return
+
+            if (result.success) {
+                setCheckoutAmounts(result.data)
+            } else {
+                setCheckoutAmounts(null)
+            }
+            setCheckoutAmountsLoading(false)
+        }, 220)
+
+        return () => {
+            active = false
+            window.clearTimeout(timer)
+        }
+    }, [
+        cartItemIds,
+        checkoutContext,
+        formData.deliveryType,
+        formData.deliveryAddress,
+        couponCode,
+        payDepositOnly,
+        depositAvailable,
+        refreshTrigger,
+    ])
+
+    useEffect(() => {
+        let active = true
 
         if (!shouldPreviewTraditionalPayment) {
             setPaymentPreview(null)
@@ -954,7 +999,7 @@ export function CheckoutPageClient() {
             const result = await previewMarketplacePaymentAction({
                 partnerId,
                 paymentMethodId: formData.paymentMethod,
-                originalAmount: checkoutTotalWithDelivery,
+                originalAmount: checkoutChargeTotal,
                 installmentNumber: Math.max(1, Number(formData.installments || 1)),
             })
 
@@ -981,7 +1026,7 @@ export function CheckoutPageClient() {
         paymentOption,
         formData.paymentMethod,
         formData.installments,
-        checkoutTotalWithDelivery,
+        checkoutChargeTotal,
         isPickup,
         deliveryFee,
     ])
@@ -997,10 +1042,10 @@ export function CheckoutPageClient() {
 
 
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
-        ? Number(paymentPreview.finalAmount || checkoutTotalWithDelivery)
-        : checkoutTotalWithDelivery
+        ? Number(paymentPreview.finalAmount || checkoutChargeTotal)
+        : checkoutChargeTotal
     const checkoutPricingSnapshot = useMemo(() => {
-        const chargedBase = checkoutTotalWithDelivery
+        const chargedBase = checkoutChargeTotal
         const methodDiscount = paymentOption === "traditional" && paymentPreview?.success
             ? Number(paymentPreview.paymentMethodDiscountAmount || 0)
             : 0
@@ -1011,31 +1056,36 @@ export function CheckoutPageClient() {
             checkoutTotalToCharge - (chargedBase - methodDiscount + methodInterest)
         ).toFixed(2)))
 
-        const snapshotSubtotal = payDepositOnly && checkoutContext?.deposit.available
-            ? (checkoutContext.productsSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0) + (checkoutContext.deposit.previewAmount || 0)
+        const snapshotSubtotal = checkoutAmounts
+            ? (payDepositOnly && depositAvailable
+                ? checkoutDepositChargeTotal - checkoutDeliveryFee + (checkoutAmounts.couponDiscountAmount || 0)
+                : checkoutFullTotal - checkoutDeliveryFee + (checkoutAmounts.couponDiscountAmount || 0))
             : contextTotalSubtotal
 
         return {
             subtotal: snapshotSubtotal,
-            couponDiscount,
+            couponDiscount: checkoutAmounts?.couponDiscountAmount ?? couponDiscount,
             paymentMethodDiscount: methodDiscount,
             paymentMethodInterest: methodInterest,
             paymentMethodFee: chargedFee,
-            deliveryFee: showDeliveryFeeRow && !isPickup ? deliveryFee : 0,
+            deliveryFee: checkoutDeliveryFee,
             finalTotal: checkoutTotalToCharge,
         }
     }, [
-        totalAmount,
         couponDiscount,
         paymentOption,
         paymentPreview,
         showDeliveryFeeRow,
         isPickup,
         deliveryFee,
-        checkoutTotalWithDelivery,
+        checkoutChargeTotal,
         checkoutTotalToCharge,
         payDepositOnly,
-        checkoutContext,
+        depositAvailable,
+        checkoutAmounts,
+        checkoutFullTotal,
+        checkoutDepositChargeTotal,
+        checkoutDeliveryFee,
         contextTotalSubtotal,
     ])
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
@@ -1055,7 +1105,7 @@ export function CheckoutPageClient() {
         : null
     const paymentPreviewTooltipRows = paymentOption === "traditional" && paymentPreview?.success
         ? [
-            { label: "Subtotal", value: formatCurrency(checkoutBaseTotal) },
+            { label: "Subtotal", value: formatCurrency(checkoutChargeTotal - checkoutDeliveryFee) },
             Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0
                 ? { label: "Desconto", value: `- ${formatCurrency(paymentPreview.paymentMethodDiscountAmount)}` }
                 : null,
@@ -1670,6 +1720,12 @@ export function CheckoutPageClient() {
         }
         bypassDepositModalRef.current = false
 
+        if (cartItemIds.length > 0 && !checkoutAmountsReady) {
+            notifyError("Aguarde", "Calculando valores do checkout. Tente novamente em instantes.")
+            setIsLoading(false)
+            return
+        }
+
         if (isCashPayment && !isPickup) {
             if (wantsChange === null) {
                 setPaymentError("Por favor, informe se precisa de troco.")
@@ -1781,7 +1837,7 @@ export function CheckoutPageClient() {
             }
 
             if (paymentOption === "mercadopago") {
-                const amount = checkoutTotalWithDelivery
+                const amount = checkoutChargeTotal
                 setPixPaymentData({
                     orderId: "temp-" + Date.now(),
                     amount,
@@ -1910,7 +1966,7 @@ export function CheckoutPageClient() {
                         itemId: sessionData?.itemId || products[0]?.id || "",
                         itemType: sessionData?.itemType || "product",
                         quantity: quantities[products[0]?.id] || products[0]?.quantity || 1,
-                        totalAmount: checkoutTotalWithDelivery,
+                        totalAmount: checkoutChargeTotal,
                         deliveryType: formData.deliveryType,
                         deliveryAddress: formData.deliveryAddress,
                         paymentMethod: formData.paymentMethod,
@@ -2169,7 +2225,7 @@ export function CheckoutPageClient() {
                                                                 checked={!payDepositOnly}
                                                                 onChange={() => setPayDepositOnly(false)}
                                                             />
-                                                            <span>Pagar valor integral ({formatCurrency(checkoutTotalWithDelivery)})</span>
+                                                            <span>Pagar valor integral ({formatCurrency(checkoutFullTotal)})</span>
                                                         </label>
                                                         <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
                                                             <RadioButton
@@ -2178,7 +2234,7 @@ export function CheckoutPageClient() {
                                                                 checked={payDepositOnly}
                                                                 onChange={() => setPayDepositOnly(true)}
                                                             />
-                                                            <span>Pagar sinal / entrada ({formatCurrency(checkoutContext.deposit.previewAmount)})</span>
+                                                            <span>Pagar sinal / entrada ({formatCurrency(checkoutDepositChargeTotal)})</span>
                                                         </label>
                                                     </div>
                                                 )}
@@ -2531,7 +2587,7 @@ export function CheckoutPageClient() {
                                                             checked={!payDepositOnly}
                                                             onChange={() => setPayDepositOnly(false)}
                                                         />
-                                                        <span>Valor integral ({formatCurrency(checkoutTotalWithDelivery)})</span>
+                                                        <span>Valor integral ({formatCurrency(checkoutFullTotal)})</span>
                                                     </label>
                                                     <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
                                                         <RadioButton
@@ -2540,7 +2596,7 @@ export function CheckoutPageClient() {
                                                             checked={payDepositOnly}
                                                             onChange={() => setPayDepositOnly(true)}
                                                         />
-                                                        <span>Sinal / entrada ({formatCurrency(checkoutContext.deposit.previewAmount)})</span>
+                                                        <span>Sinal / entrada ({formatCurrency(checkoutDepositChargeTotal)})</span>
                                                     </label>
                                                 </div>
                                             )}
@@ -3160,23 +3216,13 @@ export function CheckoutPageClient() {
                                     <div className="flex justify-between items-baseline mb-1">
                                         <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
                                         <span className="text-xl font-black text-brand-green">
-                                            {formatCurrency(
-                                                Math.max(0,
-                                                    (checkoutContext.productsSubtotal || 0) +
-                                                    (checkoutContext.subscriptionsSubtotal || 0) +
-                                                    (checkoutContext.deposit.previewAmount || 0) +
-                                                    (showDeliveryFeeRow && !isPickup ? deliveryFee : 0) -
-                                                    couponDiscount
-                                                )
-                                            )}
+                                            {formatCurrency(checkoutDepositChargeTotal || checkoutChargeTotal)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-baseline">
-                                        <span className="text-xs text-brand-inactive-text">Pagar no atendimento:</span>
+                                        <span className="text-xs text-brand-inactive-text">Saldo restante:</span>
                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(
-                                                Math.max(0, (checkoutContext.servicesSubtotal || 0) - (checkoutContext.deposit.previewAmount || 0))
-                                            )}
+                                            {formatCurrency(checkoutAmounts?.remainingAfterDeposit ?? Math.max(0, checkoutFullTotal - checkoutDepositChargeTotal))}
                                         </span>
                                     </div>
                                 </div>
@@ -3202,9 +3248,7 @@ export function CheckoutPageClient() {
                                     <div className="flex justify-between items-baseline mb-1">
                                         <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
                                         <span className="text-xl font-black text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(
-                                                Math.max(0, totalAmount + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0) - couponDiscount)
-                                            )}
+                                            {formatCurrency(checkoutFullTotal || checkoutChargeTotal)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-baseline">

@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { updateOrdersStatusInBatchAction } from '@/app/actions/erp/orders';
 import {
     FINANCIAL_FREEZE_INFO_MESSAGE,
+    getOrderDepositSummary,
     getOrderPaidAmount,
     getOrderRemainingBalance,
     getOrderTotalAmount,
@@ -17,7 +18,15 @@ import {
 import { PaymentSummary } from '@/components/erp/payments/shared/PaymentSummary';
 import { DepositReceiptsSection } from '@/components/erp/payments/shared/DepositReceiptsSection';
 import { BalancePaymentCollector } from '@/components/erp/payments/BalancePaymentCollector';
+import { formatCurrency } from '@/lib/utils';
 import type { PaymentBreakdownLeg } from '@/components/erp/payments/shared/payment-utils';
+
+const DEPOSIT_STATUS_LABELS: Record<string, string> = {
+    pending: "Sinal pendente",
+    partially_paid: "Sinal pago — saldo pendente",
+    paid: "Quitado",
+    not_required: "Sem sinal",
+};
 
 interface PaymentStatusModalProps {
     isOpen: boolean;
@@ -62,9 +71,12 @@ export default function PaymentStatusModal({
     }, [isOpen, order?.id]);
 
     const breakdown = order ? normalizeBreakdown(order) : [];
-    const totalOrder = order ? getOrderTotalAmount(order) : 0;
-    const totalPaid = order ? getOrderPaidAmount(order) : 0;
-    const totalRemaining = order ? getOrderRemainingBalance(order) : 0;
+    const depositSummary = order ? getOrderDepositSummary(order) : null;
+    const totalOrder = order
+        ? (depositSummary?.usesDeposit ? depositSummary.fullOrderTotal : getOrderTotalAmount(order))
+        : 0;
+    const totalPaid = order ? (depositSummary?.paidAmount ?? getOrderPaidAmount(order)) : 0;
+    const totalRemaining = order ? (depositSummary?.remainingBalance ?? getOrderRemainingBalance(order)) : 0;
     const frozen = order ? isOrderFinanciallyFrozen(order) : false;
     const displayId = order
         ? order.order_number || `#${String(order.id || order.originalId || "").substring(0, 8)}`
@@ -188,6 +200,12 @@ export default function PaymentStatusModal({
             <div className="flex flex-col gap-4 mb-4">
                 {frozen && (
                     <InfoCard color="orange" message={FINANCIAL_FREEZE_INFO_MESSAGE} />
+                )}
+                {depositSummary?.usesDeposit && (
+                    <InfoCard
+                        color="blue"
+                        message={`Sinal (${depositSummary.depositPercent}%): ${formatCurrency(depositSummary.depositAmount)} · Cobrança inicial: ${formatCurrency(depositSummary.initialChargeAmount)} · ${DEPOSIT_STATUS_LABELS[depositSummary.depositStatus] || depositSummary.depositStatus} · Restante: ${formatCurrency(depositSummary.remainingBalance)}${depositSummary.paymentProvider ? ` · via ${depositSummary.paymentProvider}` : ""}`}
+                    />
                 )}
             </div>
 

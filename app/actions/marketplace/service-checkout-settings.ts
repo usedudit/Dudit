@@ -67,22 +67,21 @@ export async function updateServiceCheckoutSettingsAction(input: {
     return { success: false, error: "Entrada disponível apenas nos planos Crescer e Escalar." }
   }
 
+  let depositManualEnabled = input.depositManualEnabled
+  let depositMpEnabled = input.depositMpEnabled
+
   if (input.depositEnabled) {
-    if (!input.depositManualEnabled && !input.depositMpEnabled) {
-      return { success: false, error: "Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual)." }
-    }
     const { data: partnerRow } = await supabase
       .from("partners")
       .select("mp_user_id")
       .eq("id", input.partnerId)
       .single()
     const mpConnected = !!partnerRow?.mp_user_id
-    if (!mpConnected && !input.depositManualEnabled) {
-      return { success: false, error: "O sinal manual é obrigatório já que a loja não possui conexão com o Mercado Pago." }
+    if (!mpConnected) {
+      return { success: false, error: "Para cobrar sinal obrigatório, conecte o Mercado Pago nas integrações." }
     }
-    if (!mpConnected && input.depositMpEnabled) {
-      return { success: false, error: "Não é possível habilitar o Mercado Pago para o sinal, pois o Mercado Pago não está conectado." }
-    }
+    depositMpEnabled = true
+    depositManualEnabled = false
   }
 
   const { error } = await supabase
@@ -91,8 +90,8 @@ export async function updateServiceCheckoutSettingsAction(input: {
       service_deposit_enabled: input.depositEnabled,
       service_deposit_type: "percentage",
       service_deposit_percentage: input.depositPercentage,
-      service_deposit_manual_enabled: input.depositManualEnabled,
-      service_deposit_mp_enabled: input.depositMpEnabled,
+      service_deposit_manual_enabled: depositManualEnabled,
+      service_deposit_mp_enabled: depositMpEnabled,
     })
     .eq("id", input.partnerId)
 

@@ -75,12 +75,8 @@ export function ServiceCheckoutSettingsSubPage({
 
   async function handleSave() {
     if (depositEnabled) {
-      if (!depositManualEnabled && !depositMpEnabled) {
-        notifyError("Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual).")
-        return
-      }
-      if (!mpConnected && !depositManualEnabled) {
-        notifyError("O sinal manual é obrigatório já que a loja não possui conexão com o Mercado Pago.")
+      if (!mpConnected) {
+        notifyError("Para cobrar sinal obrigatório, conecte o Mercado Pago nas integrações.")
         return
       }
     }
@@ -90,8 +86,8 @@ export function ServiceCheckoutSettingsSubPage({
       partnerId,
       depositEnabled: depositFeatureAllowed ? depositEnabled : false,
       depositPercentage: Number(depositPercentage) as 10 | 20 | 30 | 50,
-      depositManualEnabled: depositEnabled ? depositManualEnabled : false,
-      depositMpEnabled: depositEnabled ? depositMpEnabled : false,
+      depositManualEnabled: false,
+      depositMpEnabled: depositEnabled ? true : depositMpEnabled,
     })
     setSaving(false)
     if (res.success) {
@@ -211,10 +207,8 @@ export function ServiceCheckoutSettingsSubPage({
                         if (depositFeatureAllowed) {
                           setDepositEnabled(v)
                           if (v) {
-                            if (!depositManualEnabled && !depositMpEnabled) {
-                              setDepositManualEnabled(true)
-                              if (mpConnected) setDepositMpEnabled(true)
-                            }
+                            setDepositManualEnabled(false)
+                            if (mpConnected) setDepositMpEnabled(true)
                           }
                         }
                       }}
@@ -240,7 +234,9 @@ export function ServiceCheckoutSettingsSubPage({
               <SidebarCard hasTopStrip>
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Meios de recebimento</h3>
                 <p className="text-xs text-brand-inactive-text mb-6">
-                  Selecione as formas de pagamento disponíveis para o sinal dos agendamentos.
+                  {depositEnabled
+                    ? "Com sinal obrigatório, o recebimento é feito exclusivamente via Mercado Pago no checkout."
+                    : "Selecione as formas de pagamento disponíveis para o sinal dos agendamentos."}
                 </p>
 
                 <div className="space-y-6">
@@ -255,43 +251,41 @@ export function ServiceCheckoutSettingsSubPage({
                       )}
                     </div>
                     <Switch
-                      checked={depositMpEnabled && mpConnected && depositEnabled}
+                      checked={depositEnabled ? mpConnected : (depositMpEnabled && mpConnected && depositEnabled)}
                       onCheckedChange={(v) => {
-                        if (mpConnected && depositEnabled) {
+                        if (mpConnected && depositEnabled && !depositEnabled) {
                           setDepositMpEnabled(v)
-                          if (!v && !depositManualEnabled) {
-                            setDepositManualEnabled(true)
-                          }
                         }
                       }}
-                      disabled={!mpConnected || !depositEnabled}
+                      disabled={!mpConnected || !depositEnabled || depositEnabled}
                     />
                   </div>
 
-                  {/* Sinal Manual (Pix) */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Manual (Pix)</p>
-                      <p className="text-xs text-brand-inactive-text">Gera QR Code Pix com chave padrão do parceiro</p>
+                  {!depositEnabled && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Manual (Pix)</p>
+                        <p className="text-xs text-brand-inactive-text">Gera QR Code Pix com chave padrão do parceiro</p>
+                      </div>
+                      <Switch
+                        checked={depositManualEnabled && depositEnabled}
+                        onCheckedChange={(v) => {
+                          if (depositEnabled) {
+                            if (!mpConnected && !v) {
+                              notifyError("O Sinal Manual é obrigatório pois a loja não está conectada ao Mercado Pago.")
+                              return
+                            }
+                            if (!v && !depositMpEnabled) {
+                              notifyError("Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual).")
+                              return
+                            }
+                            setDepositManualEnabled(v)
+                          }
+                        }}
+                        disabled={!depositEnabled}
+                      />
                     </div>
-                    <Switch
-                      checked={depositManualEnabled && depositEnabled}
-                      onCheckedChange={(v) => {
-                        if (depositEnabled) {
-                          if (!mpConnected && !v) {
-                            notifyError("O Sinal Manual é obrigatório pois a loja não está conectada ao Mercado Pago.")
-                            return
-                          }
-                          if (!v && !depositMpEnabled) {
-                            notifyError("Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual).")
-                            return
-                          }
-                          setDepositManualEnabled(v)
-                        }
-                      }}
-                      disabled={!depositEnabled}
-                    />
-                  </div>
+                  )}
                 </div>
               </SidebarCard>
             </div>

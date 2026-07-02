@@ -17,6 +17,8 @@ import {
   priceMarketplaceCartCheckout,
   mapOrderItemsForPaymentInsert,
 } from "@/lib/services/marketplace-cart-checkout"
+import { buildDepositCheckoutMeta } from "@/lib/services/marketplace-checkout-amounts"
+import { patchDepositCheckoutOnPayment } from "@/lib/payments/order-financial-state"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -198,6 +200,7 @@ async function handler(request: NextRequest) {
 
     let depositCheckoutMeta: Record<string, unknown> | null = null
     let fullOrderTotal = 0
+    let depositPercent = 50
     let cartPmtConfig: import("@/lib/services/pricing-engine").PricingInput["paymentMethod"] = null
 
     const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
@@ -272,6 +275,13 @@ async function handler(request: NextRequest) {
       orderItemsForInsert = priced.data.orderItems
 
       if (Boolean(payDepositOnly)) {
+        const { data: partnerDepositRow } = await adminClient
+          .from("partners")
+          .select("service_deposit_enabled, service_deposit_percentage")
+          .eq("id", partnerId)
+          .single()
+        depositPercent = Number(partnerDepositRow?.service_deposit_percentage || 50)
+
         await adminClient
           .from("cart_items")
           .update({ pay_deposit_only: false, updated_at: new Date().toISOString() })
@@ -301,13 +311,14 @@ async function handler(request: NextRequest) {
             .filter((line) => line.payDepositOnly && line.depositAmount != null)
             .reduce((sum, line) => sum + Number(line.depositAmount || 0) * Number(line.quantity || 1), 0)
 
-          depositCheckoutMeta = {
-            depositCheckout: true,
+          depositCheckoutMeta = buildDepositCheckoutMeta({
             payDepositOnly: true,
-            depositAmount: serviceDepositAmount,
+            depositPercent,
+            serviceDepositAmount,
             fullOrderTotal,
             initialChargeAmount: totalAmount,
-          }
+            paymentProvider: "Mercado Pago",
+          })
 
           if (checkoutFulfillment) {
             checkoutFulfillment = {
@@ -540,7 +551,6 @@ async function handler(request: NextRequest) {
     const chargeAmount = totalAmount
     if (!fullOrderTotal) fullOrderTotal = totalAmount
 
-    // Buscar dados do usuário para pegar o nome completo
     const { data: userProfile } = await supabase
       .from("user_profiles")
       .select("full_name, phone")
@@ -552,9 +562,9 @@ async function handler(request: NextRequest) {
     const payerFirstName = customerNameParts[0] || "Cliente"
     const payerLastName = customerNameParts.slice(1).join(" ") || "Comprador"
 
-    // SEGURANÃ‡A: Montar requisição para API do MP usando totalAmount do SERVIDOR
+    // SEGURANÇA: Montar requisição para API do MP usando chargeAmount do SERVIDOR
     const mpPaymentRequest: Record<string, any> = {
-      transaction_amount: totalAmount, // âœ… Valor calculado pelo servidor, não do frontend
+      transaction_amount: chargeAmount,
       payment_method_id: paymentFormData.payment_method_id,
       payer: {
         email: paymentFormData.payer?.email || user.email,
@@ -789,6 +799,14 @@ async function handler(request: NextRequest) {
             ? "cancelled"
             : "pending"
 
+    if (checkoutFulfillment && approvedPaidAmount > 0) {
+      checkoutFulfillment = patchDepositCheckoutOnPayment(
+        checkoutFulfillment,
+        approvedPaidAmount,
+        fullOrderTotal,
+      ) as Record<string, unknown>
+    }
+
     const { data: newOrder, error: orderError } = await adminClient
       .from("orders")
       .insert({
@@ -893,11 +911,11 @@ async function handler(request: NextRequest) {
         await createTransactionFromOrder(adminClient, {
           order_number: newOrder.order_number || newOrder.id,
           partner_id: partnerId,
-          total_amount: totalAmount,
+          total_amount: chargeAmount,
           payment_method: paymentMethodDisplayName,
           payment_provider: "Mercado Pago",
           payment_date: new Date().toISOString(),
-          payment_breakdown: [{ method: paymentMethodDisplayName, amount: totalAmount }],
+          payment_breakdown: [{ method: paymentMethodDisplayName, amount: chargeAmount }],
           customer_id: resolvedCustomerId,
           customer_name: customerName,
         })
