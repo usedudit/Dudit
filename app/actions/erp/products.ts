@@ -132,6 +132,40 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     return { sanitized, partnerId, user }
 }
 
+/**
+ * Authorizes a batch of already-fetched product variants.
+ *
+ * SECURITY: Prevents cross-tenant BOLA/IDOR on batch variant mutations. It rejects
+ * batches that span more than one partner and requires the caller to hold the
+ * `products.edit` permission on that single partner (honoring partner_users, not
+ * just the legacy owner). Callers MUST also verify that every requested id was
+ * resolved before calling this (to avoid silent partial operations).
+ *
+ * @returns the single partner_id all variants belong to.
+ * @throws ForbiddenError via requirePermission if the caller lacks access.
+ */
+const verifyVariantBatchOwnership = async (
+    variants: Array<{ products?: { partner_id?: string | null } | null }>,
+    user: any,
+): Promise<string> => {
+    const partnerIds = Array.from(
+        new Set(
+            variants
+                .map((v) => v?.products?.partner_id)
+                .filter((id): id is string => typeof id === "string" && id.length > 0),
+        ),
+    )
+
+    if (partnerIds.length !== 1) {
+        // Zero partners resolved OR variants span multiple stores -> deny.
+        throw new Error("Variantes de parceiros diferentes")
+    }
+
+    const partnerId = partnerIds[0]
+    await requirePermission(partnerId, "products", "edit", user)
+    return partnerId
+}
+
 
 
 // ============================================================================
@@ -1068,28 +1102,14 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
 
         if (!variants || variants.length === 0) return errorResponse("Variantes não encontradas")
 
-        // Check access via partner_users first, then fallback to partners.user_id
-        const productPartnerId = variants[0]?.products?.partner_id
-        if (productPartnerId) {
-            const admin = getAdminClient()
-            const { data: puAccess } = await admin
-                .from("partner_users")
-                .select("id")
-                .eq("partner_id", productPartnerId)
-                .eq("user_id", user?.id)
-                .maybeSingle()
-            if (!puAccess) {
-                const { data: partner } = await admin
-                    .from("partners")
-                    .select("user_id")
-                    .eq("id", productPartnerId)
-                    .single()
-                if (!partner || partner.user_id !== user?.id) {
-                    return errorResponse("Sem permissão")
-                }
-            }
-            await requirePermission(productPartnerId, "products", "edit", user)
+        // SECURITY (BOLA/IDOR fix): authorize EVERY requested variant, not just variants[0].
+        // 1) Every requested id must have been resolved (no silent partial sets).
+        const uniqueRequestedIds = Array.from(new Set(variantIds))
+        if (variants.length !== uniqueRequestedIds.length) {
+            return errorResponse("Uma ou mais variantes não foram encontradas")
         }
+        // 2) All variants must belong to a single partner (reject cross-tenant batches).
+        const productPartnerId = await verifyVariantBatchOwnership(variants, user)
 
         const { error } = await supabase.from("product_variants").delete().in("id", variantIds)
         if (error) return errorResponse(error.message)
@@ -1121,30 +1141,14 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
             .select("id, product_id, variant_options, products!inner(partner_id, partners!inner(user_id))")
             .in("id", variantIds)
 
-        if (!variants) return errorResponse("Variantes não encontradas")
+        if (!variants || variants.length === 0) return errorResponse("Variantes não encontradas")
 
-        // Check access via partner_users first, then fallback to partners.user_id
-        const productPartnerId = (variants[0] as any)?.products?.partner_id
-        if (productPartnerId) {
-            const admin = getAdminClient()
-            const { data: puAccess } = await admin
-                .from("partner_users")
-                .select("id")
-                .eq("partner_id", productPartnerId)
-                .eq("user_id", user?.id)
-                .maybeSingle()
-            if (!puAccess) {
-                const { data: partner } = await admin
-                    .from("partners")
-                    .select("user_id")
-                    .eq("id", productPartnerId)
-                    .single()
-                if (!partner || partner.user_id !== user?.id) {
-                    return errorResponse("Sem permissão")
-                }
-            }
-            await requirePermission(productPartnerId, "products", "edit", user)
+        // SECURITY (BOLA/IDOR fix): authorize EVERY requested variant, not just variants[0].
+        const uniqueRequestedIds = Array.from(new Set(variantIds))
+        if (variants.length !== uniqueRequestedIds.length) {
+            return errorResponse("Uma ou mais variantes não foram encontradas")
         }
+        const productPartnerId = await verifyVariantBatchOwnership(variants, user)
 
         await Promise.all(updates.map(update => {
             const current = variants.find((v: any) => v.id === update.id)
