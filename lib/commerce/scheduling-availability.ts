@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { OpeningHoursData } from "@/lib/utils/opening-hours"
 import { normalizeOpeningHours, parseTimeToMinutes } from "@/lib/utils/opening-hours"
+import { getTodayYmd, getDateComponents } from "@/lib/date"
 
 function timeToMinutes(time: string): number {
   const [h, m] = String(time || "").split(":").map(Number)
@@ -36,9 +37,10 @@ export async function isStaffSlotAvailable(
   const slotStart = timeToMinutes(params.startTime)
   const slotEnd = slotStart + params.durationMinutes + buffer
 
-  const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  // Use timezone-aware date/time to avoid UTC vs BRT mismatch on the server
+  const today = getTodayYmd()
+  const { hour, minute } = getDateComponents(new Date())
+  const currentMinutes = hour * 60 + minute
 
   if (params.date < today || (params.date === today && slotEnd <= currentMinutes)) {
     return false
