@@ -48,7 +48,6 @@ export function PaymentsPage({
     const [depositFeatureAllowed, setDepositFeatureAllowed] = useState(false)
     const [depositEnabled, setDepositEnabled] = useState(false)
     const [depositPercentage, setDepositPercentage] = useState("50")
-    const [depositManualEnabled, setDepositManualEnabled] = useState(false)
     const [depositMpEnabled, setDepositMpEnabled] = useState(false)
     const [mpConnected, setMpConnected] = useState(!!partner.mp_user_id)
     const [isLoading, setIsLoading] = useState(true)
@@ -66,7 +65,6 @@ export function PaymentsPage({
                     setDepositFeatureAllowed(svcRes.depositFeatureAllowed)
                     setDepositEnabled(svcRes.settings.depositEnabled)
                     setDepositPercentage(String(svcRes.settings.depositPercentage))
-                    setDepositManualEnabled(svcRes.settings.depositManualEnabled)
                     setDepositMpEnabled(svcRes.settings.depositMpEnabled)
                     setMpConnected(svcRes.settings.mpConnected)
                 }
@@ -105,7 +103,6 @@ export function PaymentsPage({
                 partnerId: partner.id,
                 depositEnabled: depositFeatureAllowed ? depositEnabled : false,
                 depositPercentage: Number(depositPercentage) as 10 | 20 | 30 | 50,
-                depositManualEnabled: false,
                 depositMpEnabled: depositEnabled ? true : depositMpEnabled,
             })
 
@@ -225,7 +222,6 @@ export function PaymentsPage({
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
                                             {/* Pagamento na retirada */}
-                                            {!depositEnabled && (
                                             <FormSection title="Pagamento na retirada / entrega">
                                                 <div className="flex items-center justify-between py-3">
                                                     <div>
@@ -233,14 +229,16 @@ export function PaymentsPage({
                                                         <p className="text-xs text-brand-inactive-text">Cliente pode pagar ao retirar o pedido</p>
                                                     </div>
                                                     <Switch
-                                                        checked={pickupPaymentPolicy === "allow_pickup_payment"}
+                                                        checked={depositEnabled ? false : pickupPaymentPolicy === "allow_pickup_payment"}
                                                         onCheckedChange={(checked) => {
-                                                            setPickupPaymentPolicy(checked ? "allow_pickup_payment" : "require_online_payment")
+                                                            if (!depositEnabled) {
+                                                                setPickupPaymentPolicy(checked ? "allow_pickup_payment" : "require_online_payment")
+                                                            }
                                                         }}
+                                                        disabled={depositEnabled}
                                                     />
                                                 </div>
                                             </FormSection>
-                                            )}
 
                                             {depositEnabled && (
                                                 <InfoCard
@@ -258,12 +256,15 @@ export function PaymentsPage({
                                                             <p className="text-xs text-brand-inactive-text">Cliente pode pagar apenas o sinal no checkout</p>
                                                         </div>
                                                         <Switch
-                                                            checked={depositEnabled && depositFeatureAllowed}
+                                                            checked={depositEnabled && depositFeatureAllowed && mpConnected}
                                                             onCheckedChange={(v) => {
+                                                                if (v && !mpConnected) {
+                                                                    notifyError("Mercado Pago não conectado", "Para cobrar sinal obrigatório, conecte o Mercado Pago nas integrações.")
+                                                                    return
+                                                                }
                                                                 if (depositFeatureAllowed) {
                                                                     setDepositEnabled(v)
                                                                     if (v) {
-                                                                        setDepositManualEnabled(false)
                                                                         if (mpConnected) setDepositMpEnabled(true)
                                                                         setPickupPaymentPolicy("require_online_payment")
                                                                     }
@@ -272,6 +273,15 @@ export function PaymentsPage({
                                                             disabled={!depositFeatureAllowed}
                                                         />
                                                     </div>
+
+                                                    {!mpConnected && (
+                                                        <div className="p-3 bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 rounded-xl text-xs text-amber-600 dark:text-amber-400">
+                                                            Para cobrar sinal, é necessário ter o Mercado Pago conectado.{" "}
+                                                            <a href="/erp/settings?tab=integracoes" className="underline font-bold hover:text-amber-700 dark:hover:text-amber-300">
+                                                                Clique aqui para conectar o Mercado Pago
+                                                            </a>.
+                                                        </div>
+                                                    )}
 
                                                     {depositEnabled && (
                                                         <FormDropdown
@@ -292,57 +302,20 @@ export function PaymentsPage({
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Meios de recebimento</h3>
                                                 <p className="text-xs text-brand-inactive-text mb-6">
-                                                    {depositEnabled
-                                                        ? "Com sinal obrigatório, o recebimento é feito exclusivamente via Mercado Pago no checkout."
-                                                        : "Selecione as formas de pagamento disponíveis para o sinal dos agendamentos."}
+                                                    O recebimento do sinal é feito exclusivamente online via Mercado Pago no checkout.
                                                 </p>
 
                                                 <div className="space-y-6">
                                                     <div className="flex items-center justify-between">
                                                         <div>
-                                                            <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Online (Mercado Pago)</p>
+                                                            <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Integração Mercado Pago</p>
                                                             {mpConnected ? (
                                                                 <p className="text-xs text-brand-green font-medium">Conectado</p>
                                                             ) : (
                                                                 <p className="text-xs text-amber-500 font-medium">Requer conexão nas integrações</p>
                                                             )}
                                                         </div>
-                                                        <Switch
-                                                            checked={depositEnabled ? mpConnected : (depositMpEnabled && mpConnected && depositEnabled)}
-                                                            onCheckedChange={(v) => {
-                                                                if (mpConnected && depositEnabled && !depositEnabled) {
-                                                                    setDepositMpEnabled(v)
-                                                                }
-                                                            }}
-                                                            disabled={!mpConnected || !depositEnabled || depositEnabled}
-                                                        />
                                                     </div>
-
-                                                    {!depositEnabled && (
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading">Sinal Manual (Pix)</p>
-                                                            <p className="text-xs text-brand-inactive-text">Gera QR Code Pix com chave padrão do parceiro</p>
-                                                        </div>
-                                                        <Switch
-                                                            checked={depositManualEnabled && depositEnabled}
-                                                            onCheckedChange={(v) => {
-                                                                if (depositEnabled) {
-                                                                    if (!mpConnected && !v) {
-                                                                        notifyError("O Sinal Manual é obrigatório pois a loja não está conectada ao Mercado Pago.")
-                                                                        return
-                                                                    }
-                                                                    if (!v && !depositMpEnabled) {
-                                                                        notifyError("Selecione pelo menos um meio de recebimento do sinal (Mercado Pago ou Sinal Manual).")
-                                                                        return
-                                                                    }
-                                                                    setDepositManualEnabled(v)
-                                                                }
-                                                            }}
-                                                            disabled={!depositEnabled}
-                                                        />
-                                                    </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>

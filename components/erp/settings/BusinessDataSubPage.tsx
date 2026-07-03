@@ -24,7 +24,7 @@ import {
 } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
-import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon, ChevronRightIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon, ChevronRightIcon, UserIcon, StoreIcon } from "@/lib/icons"
 import PartnerCategoryModal from "./PartnerCategoryModal"
 import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
 import { useNotification } from "@/hooks/use-notification"
@@ -396,24 +396,40 @@ export const BusinessDataSubPage = ({
                                             </FormSection>
 
                                             {/* Dados Tributários */}
-                                            <FormSection hasSeparator title="Dados tributários">
+                                            <FormSection hasSeparator title="Dados tributários" className="mb-8">
                                                 <div className="space-y-6">
                                                     <div>
                                                         <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
-                                                        <div className="flex gap-8">
-                                                            <RadioButton
-                                                                name="businessType"
-                                                                value="pf"
-                                                                checked={generalInfo.businessType === "pf"}
-                                                                onChange={() => setGeneralInfo({ ...generalInfo, businessType: "pf" })}
-                                                                label="Pessoa Física"
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <ListItem
+                                                                icon={UserIcon}
+                                                                title="Pessoa Física"
+                                                                description="Usado para pessoas"
+                                                                onClick={() => setGeneralInfo({ ...generalInfo, businessType: "pf" })}
+                                                                className={`px-4 py-3 gap-4 ${generalInfo.businessType === "pf" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                                                right={
+                                                                    <RadioButton
+                                                                        name="businessType"
+                                                                        value="pf"
+                                                                        checked={generalInfo.businessType === "pf"}
+                                                                        onChange={() => setGeneralInfo({ ...generalInfo, businessType: "pf" })}
+                                                                    />
+                                                                }
                                                             />
-                                                            <RadioButton
-                                                                name="businessType"
-                                                                value="pj"
-                                                                checked={generalInfo.businessType === "pj"}
-                                                                onChange={() => setGeneralInfo({ ...generalInfo, businessType: "pj" })}
-                                                                label="Pessoa Jurídica"
+                                                            <ListItem
+                                                                icon={StoreIcon}
+                                                                title="Pessoa Jurídica"
+                                                                description="Usado para empresas"
+                                                                onClick={() => setGeneralInfo({ ...generalInfo, businessType: "pj" })}
+                                                                className={`px-4 py-3 gap-4 ${generalInfo.businessType === "pj" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                                                right={
+                                                                    <RadioButton
+                                                                        name="businessType"
+                                                                        value="pj"
+                                                                        checked={generalInfo.businessType === "pj"}
+                                                                        onChange={() => setGeneralInfo({ ...generalInfo, businessType: "pj" })}
+                                                                    />
+                                                                }
                                                             />
                                                         </div>
                                                     </div>

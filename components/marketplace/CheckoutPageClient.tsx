@@ -657,11 +657,26 @@ export function CheckoutPageClient() {
         [products, quantities],
     )
 
+    const orderSubtotal = useMemo(
+        () => checkoutContext?.productsSubtotal !== undefined ? checkoutContext.productsSubtotal : totalAmount,
+        [checkoutContext?.productsSubtotal, totalAmount],
+    )
+    const contextTotalSubtotal = useMemo(
+        () => checkoutContext?.productsSubtotal !== undefined
+            ? (checkoutContext.productsSubtotal || 0) + (checkoutContext.servicesSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0)
+            : totalAmount,
+        [checkoutContext?.productsSubtotal, checkoutContext?.servicesSubtotal, checkoutContext?.subscriptionsSubtotal, totalAmount],
+    )
+
     const depositAvailable = Boolean(checkoutContext?.deposit.available)
     const checkoutFullTotal = checkoutAmounts?.fullOrderTotal ?? 0
     const checkoutDepositChargeTotal = checkoutAmounts?.depositChargeTotal ?? 0
     const checkoutServiceDepositAmount = checkoutAmounts?.serviceDepositAmount ?? 0
-    const checkoutChargeTotal = checkoutAmounts?.chargeTotal ?? 0
+    const checkoutChargeTotal = useMemo(() => {
+        if (!checkoutAmounts) return contextTotalSubtotal
+        const usesDeposit = depositAvailable && payDepositOnly
+        return usesDeposit ? checkoutAmounts.depositChargeTotal : checkoutAmounts.fullOrderTotal
+    }, [checkoutAmounts, depositAvailable, payDepositOnly, contextTotalSubtotal])
     const checkoutDeliveryFee = checkoutAmounts?.deliveryFee ?? (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
     const checkoutAmountsReady = Boolean(checkoutAmounts && !checkoutAmountsLoading)
     const paymentTypeLabelMap: Record<string, string> = {
@@ -875,16 +890,7 @@ export function CheckoutPageClient() {
     )
     const hasFreeDeliveryCoupon = Boolean(appliedCoupon?.freeShipping || appliedCoupon?.discountType === "free_shipping")
 
-    const orderSubtotal = useMemo(
-        () => checkoutContext?.productsSubtotal !== undefined ? checkoutContext.productsSubtotal : totalAmount,
-        [checkoutContext?.productsSubtotal, totalAmount],
-    )
-    const contextTotalSubtotal = useMemo(
-        () => checkoutContext?.productsSubtotal !== undefined
-            ? (checkoutContext.productsSubtotal || 0) + (checkoutContext.servicesSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0)
-            : totalAmount,
-        [checkoutContext?.productsSubtotal, checkoutContext?.servicesSubtotal, checkoutContext?.subscriptionsSubtotal, totalAmount],
-    )
+
 
     useEffect(() => {
         let active = true
@@ -2064,7 +2070,6 @@ export function CheckoutPageClient() {
         bypassSubmitRef.current = true
         setPaymentOption("mercadopago")
         setPayDepositOnly(true)
-        void handleSubmit()
     }
 
     if (pageLoading || !sessionData) {

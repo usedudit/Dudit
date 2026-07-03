@@ -1346,7 +1346,7 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
               order_number,
               customer_name,
               total_amount,
-              subtotal_value,
+
               delivery_fee,
               delivery_address,
               buyer_id,
@@ -1386,6 +1386,20 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
 
   const hydrated = {
     ...data,
+    delivery_orders: (data?.delivery_orders || []).map((doItem: any) => {
+      const order = doItem.orders
+      if (!order) return doItem
+      const subtotalValue = Number((order.order_items || []).reduce((acc: number, item: any) => {
+        return acc + Number(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.product_price || 0)))
+      }, 0))
+      return {
+        ...doItem,
+        orders: {
+          ...order,
+          subtotal_value: subtotalValue,
+        }
+      }
+    }),
     partner_users: data?.delivery_person_id
       ? { id: data.delivery_person_id, user_profiles: { full_name: deliveryPersonNameById.get(String(data.delivery_person_id)) || "Entregador" } }
       : null,

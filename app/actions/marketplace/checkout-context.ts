@@ -22,8 +22,6 @@ export type MarketplaceCheckoutDepositConfig = {
   available: boolean
   percent: number
   previewAmount: number
-  manualOnly: boolean
-  manualEnabled: boolean
   mpEnabled: boolean
 }
 
@@ -118,7 +116,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "id, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, pickup_payment_policy, order_flow, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, pickup_payment_policy, order_flow, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
@@ -271,7 +269,6 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const depositAllowed = hasMinimumPlan(plan?.slug || "free", "crescer")
   const depositPercent = Number(partnerRow?.service_deposit_percentage || 50)
   const depositEnabled = Boolean(partnerRow?.service_deposit_enabled)
-  const serviceDepositManualEnabled = Boolean(partnerRow?.service_deposit_manual_enabled)
   const serviceDepositMpEnabled = Boolean(partnerRow?.service_deposit_mp_enabled)
   const mpConnected = Boolean(input.mpConnected ?? partnerRow?.mp_user_id)
 
@@ -329,8 +326,6 @@ export async function getMarketplaceCheckoutContextAction(input: {
       available: depositAvailable,
       percent: depositPercent,
       previewAmount,
-      manualOnly: depositAvailable && (!mpConnected || !serviceDepositMpEnabled),
-      manualEnabled: serviceDepositManualEnabled,
       mpEnabled: serviceDepositMpEnabled,
     },
     partner: {

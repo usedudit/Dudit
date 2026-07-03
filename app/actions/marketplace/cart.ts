@@ -911,18 +911,23 @@ export async function checkoutCartAction(
 
   const normalizedSnapshot = normalizeCheckoutPricingSnapshot(checkoutPricingSnapshot)
   if (checkoutPricingSnapshot && !normalizedSnapshot) {
-    return { error: "Os valores do checkout nÃ£o conferem. Atualize a pÃ¡gina e tente novamente." }
+    return { error: "Os valores do checkout não conferem. Atualize a página e tente novamente." }
   }
 
-  const persistedSubtotal = normalizedSnapshot?.subtotal ?? pricingResult.subtotal
-  const persistedDeliveryFee = normalizedSnapshot?.deliveryFee ?? deliveryFee
-  const persistedCouponDiscount = normalizedSnapshot?.couponDiscount ?? couponDiscountAmount
-  const persistedPaymentMethodDiscount = normalizedSnapshot?.paymentMethodDiscount ?? paymentMethodDiscountAmount
-  const persistedPaymentMethodExtra = normalizedSnapshot
-    ? roundMoney(normalizedSnapshot.paymentMethodInterest + normalizedSnapshot.paymentMethodFee)
-    : paymentMethodExtraAmount
-  const persistedTotal = normalizedSnapshot?.finalTotal ?? totalAmount
-  const persistedCheckoutPricing = normalizedSnapshot || {
+  // When deposit is active, the client snapshot may have been computed before the deposit
+  // choice was confirmed. Always use server-calculated values in this case.
+  const useServerValues = Boolean(payDepositOnly)
+  const persistedSubtotal = useServerValues ? pricingResult.subtotal : (normalizedSnapshot?.subtotal ?? pricingResult.subtotal)
+  const persistedDeliveryFee = useServerValues ? deliveryFee : (normalizedSnapshot?.deliveryFee ?? deliveryFee)
+  const persistedCouponDiscount = useServerValues ? couponDiscountAmount : (normalizedSnapshot?.couponDiscount ?? couponDiscountAmount)
+  const persistedPaymentMethodDiscount = useServerValues ? paymentMethodDiscountAmount : (normalizedSnapshot?.paymentMethodDiscount ?? paymentMethodDiscountAmount)
+  const persistedPaymentMethodExtra = useServerValues
+    ? paymentMethodExtraAmount
+    : (normalizedSnapshot
+      ? roundMoney(normalizedSnapshot.paymentMethodInterest + normalizedSnapshot.paymentMethodFee)
+      : paymentMethodExtraAmount)
+  const persistedTotal = useServerValues ? totalAmount : (normalizedSnapshot?.finalTotal ?? totalAmount)
+  const persistedCheckoutPricing = (useServerValues ? null : normalizedSnapshot) || {
     subtotal: persistedSubtotal,
     couponDiscount: persistedCouponDiscount,
     paymentMethodDiscount: persistedPaymentMethodDiscount,
@@ -932,7 +937,7 @@ export async function checkoutCartAction(
     finalTotal: persistedTotal,
   }
 
-  if (normalizedSnapshot) {
+  if (normalizedSnapshot && !useServerValues) {
     console.info("[CHECKOUT_PRICING_AUDIT]", {
       source: "checkoutCartAction",
       checkout: normalizedSnapshot,
@@ -1040,6 +1045,21 @@ export async function checkoutCartAction(
           paymentMethodId: bestMethod.id,
           installmentNumber: Math.max(1, Number(installments || 1)),
           checkoutPricing: persistedCheckoutPricing,
+          ...(payDepositOnly ? (() => {
+            const serviceDepositTotal = resolvedLines
+              .filter((l) => l.itemType === "service_booking" && l.payDepositOnly && l.depositAmount != null)
+              .reduce((sum, l) => sum + Number(l.depositAmount || 0) * l.quantity, 0)
+            const fullServiceTotal = resolvedLines
+              .filter((l) => l.itemType === "service_booking")
+              .reduce((sum, l) => sum + Number(l.fullPrice || l.unitPrice) * l.quantity, 0)
+            return {
+              isDeposit: true,
+              depositPercent: Math.round((serviceDepositTotal / (fullServiceTotal || 1)) * 100),
+              depositAmount: serviceDepositTotal,
+              fullOrderTotal: resolvedLines.reduce((sum, l) => sum + Number(l.fullPrice || l.unitPrice) * l.quantity, 0) + deliveryFee,
+              remainingAfterDeposit: Math.max(0, fullServiceTotal - serviceDepositTotal),
+            }
+          })() : {}),
           ...(chosenType === "cash" && deliveryType === "delivery" ? {
             wantsChange,
             payWithAmount: wantsChange ? payWithAmount : null,
