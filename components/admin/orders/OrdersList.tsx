@@ -15,6 +15,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { toast } from "@/hooks/use-notification"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -292,8 +293,16 @@ function OrderDetailsSheet({ order, isOpen, onClose }: OrderDetailsSheetProps) {
                         <InfoIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                         <div>
                             <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Pagamento</span>
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                {order.situation || "-"} - {order.payment_method || order.payment_provider || "-"}
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                {(() => {
+                                    let pmLabel = order.payment_method || null
+                                    if (order.payment_provider === "Mercado Pago" && pmLabel) {
+                                        pmLabel = `Mercado Pago (${pmLabel})`
+                                    }
+                                    return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} />
+                                })()}
+                                <span className="text-brand-inactive-text">-</span>
+                                <span>{order.situation === "paid" ? "Pago" : order.situation === "pending" ? "Pendente" : order.situation === "cancelled" ? "Cancelado" : order.situation || "-"}</span>
                             </span>
                         </div>
                     </div>

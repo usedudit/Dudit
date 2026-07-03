@@ -1,9 +1,8 @@
 "use client"
 
 import React, { useState, useMemo } from "react"
-import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { IconPlaceholder } from "@/components/reusable"
+import { IconPlaceholder, FormDropdown } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { usePermissions } from "@/lib/permission-context"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -43,6 +42,8 @@ type Props = {
   overview: CommissionOverview
 }
 
+type SortKey = "name" | "pending" | "paid" | "bonus" | "total"
+
 export default function CommissionPage({ partnerId, overview }: Props) {
   const { hasSpecific } = usePermissions()
 
@@ -51,6 +52,8 @@ export default function CommissionPage({ partnerId, overview }: Props) {
 
   const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
   const [search, setSearch] = useState("")
+  const [sortKey, setSortKey] = useState<SortKey>("total")
+  const [page, setPage] = useState(0)
   const [paymentModal, setPaymentModal] = useState<{
     partnerUserId: string
     name: string
@@ -58,24 +61,51 @@ export default function CommissionPage({ partnerId, overview }: Props) {
   } | null>(null)
   const [detailSeller, setDetailSeller] = useState<SellerCommissionRow | null>(null)
 
+  const PER_PAGE = 20
+
   const effectiveViewMode = isTablet ? "grid" : viewMode
   const canPayCommission = hasSpecific("productivity_commissions", "can_pay_commission")
 
-  const filteredSellers = useMemo(() => {
-    if (!search.trim()) return overview.sellers
-    const q = search.toLowerCase().trim()
-    return overview.sellers.filter((s) => s.name.toLowerCase().includes(q))
-  }, [overview.sellers, search])
+  const sortedSellers = useMemo(() => {
+    const list = [...overview.sellers]
+    switch (sortKey) {
+      case "name":
+        list.sort((a, b) => a.name.localeCompare(b.name))
+        break
+      case "pending":
+        list.sort((a, b) => b.pendingAmount - a.pendingAmount)
+        break
+      case "paid":
+        list.sort((a, b) => b.paidAmount - a.paidAmount)
+        break
+      case "bonus":
+        list.sort((a, b) => b.bonusAmount - a.bonusAmount)
+        break
+      default:
+        list.sort((a, b) => b.totalAccumulated - a.totalAccumulated)
+    }
+    return list
+  }, [overview.sellers, sortKey])
 
-  if (detailSeller) {
-    return (
-      <CommissionDetailView
-        seller={detailSeller}
-        partnerId={partnerId}
-        onBack={() => setDetailSeller(null)}
-      />
-    )
-  }
+  const filteredSellers = useMemo(() => {
+    if (!search.trim()) return sortedSellers
+    const q = search.toLowerCase().trim()
+    return sortedSellers.filter((s) => s.name.toLowerCase().includes(q))
+  }, [sortedSellers, search])
+
+  const pagedSellers = useMemo(() => {
+    return filteredSellers.slice(0, (page + 1) * PER_PAGE)
+  }, [filteredSellers, page])
+
+  const hasMore = pagedSellers.length < filteredSellers.length
+
+  const sortOptions = [
+    { value: "total", label: "Total" },
+    { value: "name", label: "Nome" },
+    { value: "pending", label: "Pendente" },
+    { value: "paid", label: "Pago" },
+    { value: "bonus", label: "Bônus" },
+  ]
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -101,15 +131,24 @@ export default function CommissionPage({ partnerId, overview }: Props) {
           </div>
         </div>
 
-        <CommissionPageControls
-          search={search}
-          onSearchChange={setSearch}
-          viewMode={effectiveViewMode}
-          onViewModeChange={setViewModeState}
-        />
+        <div className="flex items-center gap-3 flex-none px-4 md:px-8 mb-4">
+          <CommissionPageControls
+            search={search}
+            onSearchChange={(v) => { setSearch(v); setPage(0) }}
+            viewMode={effectiveViewMode}
+            onViewModeChange={setViewModeState}
+          />
+          <div className="w-40 shrink-0">
+            <FormDropdown
+              label=""
+              value={sortKey}
+              setValue={(v) => setSortKey(v as SortKey)}
+              options={sortOptions}
+            />
+          </div>
+        </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-          {/* Metric Cards - estilo dashboard */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
             {[
               { title: "Total Pendente", value: formatCurrency(overview.totalPending) },
@@ -143,90 +182,115 @@ export default function CommissionPage({ partnerId, overview }: Props) {
             })}
           </div>
 
-          <AnimatePresence mode="wait">
-            {filteredSellers.length === 0 ? (
-              <FadeIn
-                key="empty"
-                className="flex flex-col items-center justify-center h-[400px] text-center p-8 w-full"
-              >
-                <IconPlaceholder
-                  title="Nenhum vendedor encontrado"
-                  subtitle={
-                    search.trim()
-                      ? "Tente ajustar o termo de busca."
-                      : "Configure as comissões dos vendedores nas configurações do sistema."
-                  }
-                />
-              </FadeIn>
-            ) : (
-              <FadeIn key={effectiveViewMode} className="w-full">
-                {effectiveViewMode === "grid" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                    {filteredSellers.map((seller) => (
-                      <CommissionGridCard
-                        key={seller.partnerUserId}
-                        seller={seller}
-                        canPayCommission={canPayCommission}
-                        onPay={() =>
-                          setPaymentModal({
-                            partnerUserId: seller.partnerUserId,
-                            name: seller.name,
-                            maxAmount: seller.pendingAmount,
-                          })
-                        }
-                        onDetails={() => setDetailSeller(seller)}
-                      />
-                    ))}
+          {filteredSellers.length === 0 ? (
+            <FadeIn
+              key="empty"
+              className="flex flex-col items-center justify-center h-[400px] text-center p-8 w-full"
+            >
+              <IconPlaceholder
+                title="Nenhum vendedor encontrado"
+                subtitle={
+                  search.trim()
+                    ? "Tente ajustar o termo de busca."
+                    : "Configure as comissões dos vendedores nas configurações do sistema."
+                }
+              />
+            </FadeIn>
+          ) : (
+            <FadeIn className="w-full">
+              {effectiveViewMode === "grid" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                  {pagedSellers.map((seller) => (
+                    <CommissionGridCard
+                      key={seller.partnerUserId}
+                      seller={seller}
+                      canPayCommission={canPayCommission}
+                      onPay={() =>
+                        setPaymentModal({
+                          partnerUserId: seller.partnerUserId,
+                          name: seller.name,
+                          maxAmount: seller.pendingAmount + seller.bonusPending,
+                        })
+                      }
+                      onDetails={() => setDetailSeller(seller)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="w-full overflow-hidden rounded-xl relative">
+                  <div className="overflow-x-auto pb-4 custom-scrollbar">
+                    <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                      <thead>
+                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                          {COLUMNS.map((col, idx) => {
+                            const isLast = idx === COLUMNS.length - 1
+                            return (
+                              <th
+                                key={col.id}
+                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isLast ? "rounded-r-lg" : idx === 0 ? "rounded-l-lg" : ""}`}
+                                style={{ width: col.width }}
+                              >
+                                <div className={`flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                  {col.label}
+                                </div>
+                              </th>
+                            )
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedSellers.map((seller) => (
+                          <CommissionListItem
+                            key={seller.partnerUserId}
+                            seller={seller}
+                            columns={COLUMNS}
+                            canPayCommission={canPayCommission}
+                            onPay={() =>
+                              setPaymentModal({
+                                partnerUserId: seller.partnerUserId,
+                                name: seller.name,
+                                maxAmount: seller.pendingAmount + seller.bonusPending,
+                              })
+                            }
+                            onDetails={() => setDetailSeller(seller)}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ) : (
-                  <div className="w-full overflow-hidden rounded-xl relative">
-                    <div className="overflow-x-auto pb-4 custom-scrollbar">
-                      <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
-                        <thead>
-                          <tr className="bg-brand-gray dark:bg-dark-border/50">
-                            {COLUMNS.map((col, idx) => {
-                              const isLast = idx === COLUMNS.length - 1
-                              return (
-                                <th
-                                  key={col.id}
-                                  className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isLast ? "rounded-r-lg" : idx === 0 ? "rounded-l-lg" : ""}`}
-                                  style={{ width: col.width }}
-                                >
-                                  <div className={`flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                    {col.label}
-                                  </div>
-                                </th>
-                              )
-                            })}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredSellers.map((seller) => (
-                            <CommissionListItem
-                              key={seller.partnerUserId}
-                              seller={seller}
-                              columns={COLUMNS}
-                              canPayCommission={canPayCommission}
-                              onPay={() =>
-                                setPaymentModal({
-                                  partnerUserId: seller.partnerUserId,
-                                  name: seller.name,
-                                  maxAmount: seller.pendingAmount,
-                                })
-                              }
-                              onDetails={() => setDetailSeller(seller)}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </FadeIn>
-            )}
-          </AnimatePresence>
+                </div>
+              )}
+
+              {hasMore && (
+                <div className="flex justify-center py-6">
+                  <button
+                    onClick={() => setPage((p) => p + 1)}
+                    className="text-sm font-bold text-brand-dark dark:text-dark-heading hover:text-brand-inactive-text transition-colors"
+                  >
+                    Carregar mais ({filteredSellers.length - pagedSellers.length} restantes)
+                  </button>
+                </div>
+              )}
+            </FadeIn>
+          )}
         </div>
       </div>
+
+      <CommissionDetailView
+        isOpen={!!detailSeller}
+        seller={detailSeller}
+        partnerId={partnerId}
+        onClose={() => setDetailSeller(null)}
+        onPay={() => {
+          if (detailSeller) {
+            setPaymentModal({
+              partnerUserId: detailSeller.partnerUserId,
+              name: detailSeller.name,
+              maxAmount: detailSeller.pendingAmount + detailSeller.bonusPending,
+            })
+          }
+        }}
+      />
 
       {paymentModal && (
         <CommissionPaymentModal
@@ -236,6 +300,8 @@ export default function CommissionPage({ partnerId, overview }: Props) {
           sellerName={paymentModal.name}
           sellerPartnerUserId={paymentModal.partnerUserId}
           maxAmount={paymentModal.maxAmount}
+          pendingAmount={overview.sellers.find((s) => s.partnerUserId === paymentModal.partnerUserId)?.pendingAmount || 0}
+          bonusAmount={overview.sellers.find((s) => s.partnerUserId === paymentModal.partnerUserId)?.bonusPending || 0}
           onSuccess={() => window.location.reload()}
         />
       )}

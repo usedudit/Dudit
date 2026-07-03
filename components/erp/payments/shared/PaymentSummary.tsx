@@ -36,7 +36,7 @@ export function PaymentSummary({
       </div>
 
       <div className="space-y-4">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">Resumo Financeiro</h4>
+        <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Resumo Financeiro</h4>
         <div className="space-y-3">
           <div className="flex justify-between items-center text-sm">
             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total</span>
@@ -44,11 +44,11 @@ export function PaymentSummary({
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Recebido</span>
-            <span className="font-bold text-green-600">{formatCurrency(paidAmount)}</span>
+            <span className="font-bold text-brand-green">{formatCurrency(paidAmount)}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Restante</span>
-            <span className="font-bold text-amber-600">{formatCurrency(remaining)}</span>
+            <span className="font-bold text-brand-orange">{formatCurrency(remaining)}</span>
           </div>
         </div>
       </div>

@@ -33,6 +33,8 @@ async function createGoalBonusExpense(params: {
   referenceNote?: string
   createdByUserId?: string | null
   accountId?: string | null
+  status?: "paid" | "pending"
+  sellerPartnerUserId?: string | null
 }) {
   const bonusAmount = money(Math.max(0, Number(params.amount || 0)))
   if (bonusAmount <= 0.009) return
@@ -47,6 +49,7 @@ async function createGoalBonusExpense(params: {
     .maybeSingle()
   if (existing?.id) return
 
+  const status = params.status || "paid"
   const now = new Date().toISOString()
   const payload: Record<string, unknown> = {
     partner_id: params.partnerId,
@@ -54,8 +57,8 @@ async function createGoalBonusExpense(params: {
     category: "Metas e Bônus",
     amount: bonusAmount,
     original_amount: bonusAmount,
-    status: "paid",
-    payment_date: now,
+    status,
+    payment_date: status === "paid" ? now : null,
     transaction_date: now,
     payment_type: "Bônus meta",
     transaction_type: "expense",
@@ -64,6 +67,7 @@ async function createGoalBonusExpense(params: {
     reference_note: referenceNote,
     account_id: params.accountId || null,
     created_by_user_id: params.createdByUserId || null,
+    seller_partner_user_id: params.sellerPartnerUserId || null,
   }
 
   let insertRes = await params.supabase.from("transactions").insert(payload)
@@ -169,6 +173,20 @@ async function getActiveGoalsForSeller(params: {
   return (data || []) as GoalRow[]
 }
 
+async function getUserToPartnerUserMap(supabase: SupabaseClient, partnerId: string, userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, string>()
+  const { data } = await supabase
+    .from("partner_users")
+    .select("id, user_id")
+    .eq("partner_id", partnerId)
+    .in("user_id", userIds)
+  const map = new Map<string, string>()
+  for (const row of data || []) {
+    map.set(String(row.user_id), String(row.id))
+  }
+  return map
+}
+
 async function processGoalBonus(params: {
   supabase: SupabaseClient
   partnerId: string
@@ -183,7 +201,7 @@ async function processGoalBonus(params: {
   const wasTotalAchieved = params.prevTotal >= target
   const isTotalJustAchieved = !wasTotalAchieved && params.newTotal >= target
 
-  if (!isTotalJustAchieved || !Boolean(params.goal.auto_launch_bonus)) return
+  if (!isTotalJustAchieved) return
 
   const teamRefNote = `goal-bonus-team:${params.goal.id}`
   const { data: existingTeamBonus } = await params.supabase
@@ -217,35 +235,36 @@ async function processGoalBonus(params: {
 
   const totalProgress = Array.from(eligible.values()).reduce((s, v) => s + v, 0)
   const distribution = params.goal.bonus_distribution || "equal"
+  const autoLaunch = Boolean(params.goal.auto_launch_bonus)
+
+  const userIds = Array.from(eligible.keys())
+  const partnerUserMap = autoLaunch ? new Map<string, string>() : await getUserToPartnerUserMap(params.supabase, params.partnerId, userIds)
+
+  const createFn = (uid: string, share: number) => {
+    if (share <= 0.009) return
+    return createGoalBonusExpense({
+      supabase: params.supabase,
+      partnerId: params.partnerId,
+      goalId: params.goal.id,
+      userId: uid,
+      referenceNote: `${teamRefNote}:${uid}`,
+      amount: share,
+      createdByUserId: params.createdByUserId || null,
+      accountId: params.goal.bonus_account_id || params.accountId || null,
+      status: autoLaunch ? "paid" : "pending",
+      sellerPartnerUserId: autoLaunch ? null : partnerUserMap.get(uid) || null,
+    })
+  }
 
   if (distribution === "equal") {
     const share = money(totalBonus / eligible.size)
     for (const [uid] of eligible) {
-      await createGoalBonusExpense({
-        supabase: params.supabase,
-        partnerId: params.partnerId,
-        goalId: params.goal.id,
-        userId: uid,
-        referenceNote: `${teamRefNote}:${uid}`,
-        amount: share,
-        createdByUserId: params.createdByUserId || null,
-        accountId: params.goal.bonus_account_id || params.accountId || null,
-      })
+      await createFn(uid, share)
     }
   } else {
     for (const [uid, userAmount] of eligible) {
       const share = money((userAmount / totalProgress) * totalBonus)
-      if (share <= 0.009) continue
-      await createGoalBonusExpense({
-        supabase: params.supabase,
-        partnerId: params.partnerId,
-        goalId: params.goal.id,
-        userId: uid,
-        referenceNote: `${teamRefNote}:${uid}`,
-        amount: share,
-        createdByUserId: params.createdByUserId || null,
-        accountId: params.goal.bonus_account_id || params.accountId || null,
-      })
+      await createFn(uid, share)
     }
   }
 }

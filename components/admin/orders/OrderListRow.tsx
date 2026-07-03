@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { StoreIcon, ReturnIcon } from "@/lib/icons"
+import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 
 interface OrderListRowProps {
     order: any
@@ -65,9 +66,13 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex flex-col items-center gap-1">
                     {situationBadge(order.situation)}
-                    <span className="text-[10px] font-medium text-brand-inactive-text">
-                        {order.payment_method || order.payment_provider || "-"}
-                    </span>
+                    {(() => {
+                        let pmLabel = order.payment_method || null
+                        if (order.payment_provider === "Mercado Pago" && pmLabel) {
+                            pmLabel = `Mercado Pago (${pmLabel})`
+                        }
+                        return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} />
+                    })()}
                 </div>
             </td>
 

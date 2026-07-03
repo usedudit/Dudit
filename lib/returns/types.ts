@@ -89,6 +89,17 @@ export type ReturnRequestListItem = {
   paymentProvider?: string
   mpPaymentId?: string | null
   refundPaymentMethod?: string
+  exchangeOrderId?: string | null
+  exchangeSubstatus?: string | null
+  exchangeShortfallAmount?: number
+  exchangeSurplusAmount?: number
+  exchangeItemsSnapshot?: Array<{
+    product_id: string
+    variant_id?: string | null
+    quantity: number
+    unit_price: number
+  }> | null
+  exchangeBalanceResolution?: "store_credit" | "refund" | null
   items: Array<{
     id: string
     orderItemId: string

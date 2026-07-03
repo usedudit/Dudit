@@ -22,7 +22,7 @@ export function DepositReceiptsSection({ legs, onSyncMp, syncing = false }: Depo
 
   return (
     <div className="space-y-3">
-      <h4 className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+      <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
         Recebimentos confirmados
       </h4>
       {receivedLegs.map((entry, index) => {
@@ -39,10 +39,10 @@ export function DepositReceiptsSection({ legs, onSyncMp, syncing = false }: Depo
                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{methodLabel}</span>
                 <Badge variant="green">Recebido</Badge>
               </div>
-              <span className="text-sm font-bold text-green-600 shrink-0">{formatCurrency(received)}</span>
+              <span className="text-sm font-bold text-brand-green shrink-0">{formatCurrency(received)}</span>
             </div>
             {mp && onSyncMp && (
-              <Button variant="outline" className="w-full text-xs h-9" onClick={onSyncMp} isLoading={syncing}>
+              <Button variant="outline" className="w-full h-9" onClick={onSyncMp} isLoading={syncing}>
                 Confirmar pagamento manualmente (fallback)
               </Button>
             )}

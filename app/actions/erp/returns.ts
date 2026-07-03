@@ -116,7 +116,10 @@ const processReturnSchema = z.object({
     refundStatus: z.enum(["PENDING", "PROCESSING", "APPROVED", "FAILED", "MANUAL"]).default("PENDING"),
     refundPaymentMethod: z.string().max(120).optional().nullable(),
     returnToInventory: z.boolean().default(false),
-    returnToInventoryItems: z.array(z.string().uuid()).optional().nullable(),
+    returnToInventoryItems: z.array(z.object({
+        id: z.string().uuid(),
+        quantity: z.number().int().positive(),
+    })).optional().nullable(),
     customerId: z.string().uuid().optional().nullable(),
     storeCreditAmount: z.number().nonnegative().max(99999999).default(0),
     exchangeItems: z.array(z.object({
@@ -194,6 +197,18 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         }
     })
 
+    const exchangeItems = (() => {
+        if (row.exchange_items_snapshot && Array.isArray(row.exchange_items_snapshot)) {
+            return row.exchange_items_snapshot.map((ei: any) => ({
+                product_id: ei.product_id,
+                variant_id: ei.variant_id || null,
+                quantity: ei.quantity || 1,
+                unit_price: ei.unit_price || 0,
+            }))
+        }
+        return undefined
+    })()
+
     return {
         id: row.id,
         partnerId: row.partner_id,
@@ -232,6 +247,14 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         paymentProvider: row.orders?.payment_provider || undefined,
         mpPaymentId: row.orders?.mp_payment_id || undefined,
         refundPaymentMethod: (row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].payment_method : undefined,
+        exchangeOrderId: row.exchange_order_id || undefined,
+        exchangeSubstatus: row.exchange_substatus || undefined,
+        exchangeShortfallAmount: toNumber(row.exchange_shortfall_amount),
+        exchangeSurplusAmount: toNumber(row.exchange_surplus_amount),
+        exchangeItemsSnapshot: exchangeItems,
+        exchangeBalanceResolution: ((row.approved_resolution === "exchange" || row.desired_resolution === "exchange") && toNumber(row.exchange_surplus_amount) > 0
+            ? (toNumber(row.store_credit_amount) > 0 ? "store_credit" : toNumber(row.refund_amount) > 0 ? "refund" : undefined)
+            : undefined) as any,
         items,
         returnEvents: row.return_events || undefined,
     }
@@ -446,6 +469,20 @@ export async function createReturnRequestAction(input: unknown) {
         if (error) throw error
         const requestId = String((created as any)?.id || "")
 
+        // Save exchange items snapshot on creation so they persist even if process is deferred
+        if (data.exchangeItems && data.exchangeItems.length > 0) {
+            const { error: updateErr } = await supabase
+                .from("return_requests")
+                .update({
+                    exchange_items_snapshot: data.exchangeItems as any,
+                })
+                .eq("id", requestId)
+
+            if (updateErr) {
+                console.error("[createReturnRequestAction] Failed to save exchange items snapshot:", updateErr)
+            }
+        }
+
         await logAuditEvent({
             partnerId: data.partnerId,
             actorUserId: user.id,
@@ -453,7 +490,7 @@ export async function createReturnRequestAction(input: unknown) {
             entityId: requestId,
             actionType: "created",
             changeLines: ["criou solicitação de troca/devolução."],
-            metadata: { orderId: data.orderId, resolution: data.resolution },
+            metadata: { orderId: data.orderId, resolution: data.resolution, exchangeItems: data.exchangeItems?.length || 0 },
             source: "manual",
         })
 
@@ -874,18 +911,20 @@ export async function processReturnRequestAction(input: unknown) {
         // Selective inventory return handling
         let returnToStockItems: { product_id: string; variant_id: string | null; quantity: number }[] = []
         if (useSelectiveReturn && data.returnToInventoryItems && data.returnToInventoryItems.length > 0) {
+            const itemIds = data.returnToInventoryItems.map(i => i.id)
             const { data: dbItems, error: dbItemsErr } = await supabase
                 .from("return_items")
-                .select("product_id, variant_id, quantity")
+                .select("id, product_id, variant_id")
                 .eq("return_request_id", data.requestId)
-                .in("id", data.returnToInventoryItems)
+                .in("id", itemIds)
 
             if (dbItemsErr) throw dbItemsErr
 
+            const qtyMap = new Map(data.returnToInventoryItems.map(i => [i.id, i.quantity]))
             returnToStockItems = (dbItems || []).map((item: any) => ({
                 product_id: item.product_id,
                 variant_id: item.variant_id || null,
-                quantity: item.quantity,
+                quantity: qtyMap.get(item.id) || 1,
             }))
         } else if (data.returnToInventory && !useSelectiveReturn) {
             const { data: dbItems, error: dbItemsErr } = await supabase

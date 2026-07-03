@@ -11,7 +11,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
-import { getPartnerUrl } from "@/lib/utils/url-generator"
+import { getPartnerUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
@@ -1236,36 +1236,34 @@ export function CheckoutPageClient() {
                                                 {line.bookingSummary}
                                             </div>
                                         )}
-                                        {serviceAvailability[line.lineId]?.checked && !serviceAvailability[line.lineId]?.available && (
-                                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-900/30">
-                                                    ⚠ Este horário não está mais disponível
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const p = checkoutContext?.partner
-                                                        if (p) window.location.href = getPartnerUrl(p)
-                                                    }}
-                                                    className="text-xs font-semibold text-brand-blue hover:text-blue-700 underline"
-                                                >
-                                                    Remarcar
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={async () => {
-                                                        await fetch("/api/cart/remove", { method: "POST", body: JSON.stringify({ cartItemId: line.lineId }) })
-                                                        window.location.reload()
-                                                    }}
-                                                    className="text-xs font-semibold text-brand-red hover:text-red-700 underline"
-                                                >
-                                                    Remover
-                                                </button>
-                                            </div>
-                                        )}
                                         <div className="text-xs text-brand-inactive-text mt-0.5">
                                             Qtd: {line.quantity}
                                         </div>
+                                        {serviceAvailability[line.lineId]?.checked && !serviceAvailability[line.lineId]?.available && (
+                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                <InfoCard message="Este horário não está mais disponível" color="orange" />
+                                                <Button
+                                                    onClick={() => {
+                                                        const service = { id: line.serviceId, name: line.baseName || line.displayName }
+                                                        const p = checkoutContext?.partner
+                                                        if (service.id && p) window.location.href = getServiceUrl(service, p)
+                                                    }}
+                                                    variant="link"
+                                                >
+                                                    Remarcar
+                                                </Button>
+                                                <Button
+                                                    onClick={async () => {
+                                                        await deleteCartItemsAction([line.lineId])
+                                                        window.location.reload()
+                                                    }}
+                                                    variant="link"
+                                                    className="text-brand-red"
+                                                >
+                                                    Remover
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
                                         {line.isGift ? (
@@ -1633,9 +1631,9 @@ export function CheckoutPageClient() {
             const variantLabel = line.variantName ? ` (${line.variantName})` : ""
             const priceLabel = line.unitPrice > 0 ? formatCurrency(line.unitPrice) : "Grátis"
             const totalLabel = line.lineTotal > 0 ? formatCurrency(line.lineTotal) : "Grátis"
-            
+
             msg += `- ${line.quantity}x ${isGiftLabel}${line.displayName}${variantLabel} - ${priceLabel} (Total: ${totalLabel})\n`
-            
+
             if (line.lineKind === "service_booking" && line.bookingMetadata) {
                 const dateBR = formatBRDate(line.bookingMetadata.date)
                 const locationLabel = line.fulfillmentMode === "on_site" ? "No estabelecimento" : "No endereço do cliente"
@@ -1683,7 +1681,7 @@ export function CheckoutPageClient() {
             const methodDiscount = Number(paymentPreview.paymentMethodDiscountAmount || 0)
             const methodInterest = Number(paymentPreview.interestAmount || 0)
             const methodFee = Number(paymentPreview.feeAmount || 0)
-            
+
             if (methodDiscount > 0) {
                 msg += `- Desconto de Pagamento: -${formatCurrency(methodDiscount)}\n`
             }

@@ -109,6 +109,9 @@ const OrderListItem = React.memo(
                                                 pmLabel = methods.join(", ")
                                             }
                                         }
+                                        if (order.payment_provider === "Mercado Pago" && pmLabel) {
+                                            pmLabel = `Mercado Pago (${pmLabel})`
+                                        }
                                         return <PaymentMethodIndicator label={pmLabel} />
                                     })()}
                                 </div>

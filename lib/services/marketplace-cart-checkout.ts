@@ -11,7 +11,7 @@ import {
   buildFulfillmentPayload,
   type ResolvedCartLine,
 } from "@/lib/services/marketplace-cart-resolver"
-import { cachedResolveCheckoutCartLines } from "@/lib/cache/checkout-cache"
+import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolver"
 import type { CheckoutFulfillmentPayload } from "@/lib/types/marketplace-cart"
 
 export type MarketplaceCartCheckoutPricing = {
@@ -48,7 +48,7 @@ export async function priceMarketplaceCartCheckout(
     paymentMethod?: PricingInput["paymentMethod"]
   },
 ): Promise<{ success: true; data: MarketplaceCartCheckoutPricing } | { success: false; error: string }> {
-  const resolved = await cachedResolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
+  const resolved = await resolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
   if (!resolved.success) return { success: false, error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved

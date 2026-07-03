@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, Fragment } from "react"
+import { useState, useRef, Fragment, useEffect } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -19,6 +19,8 @@ import { formatCurrency, formatDateToBR } from "@/lib/utils"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
+import { InfoCard } from "@/components/reusable"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -34,6 +36,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const [deleteModal, setDeleteModal] = useState<{ open: boolean; cartItemId: string | null }>({ open: false, cartItemId: null })
     const [showErrorModal, setShowErrorModal] = useState(false)
     const isActionInProgress = useRef(false)
+    const [serviceAvailability, setServiceAvailability] = useState<Record<string, { available: boolean; checked: boolean }>>({})
 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
@@ -184,6 +187,34 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         const { token } = await (await fetch("/api/csrf-token")).json()
         return token
     }
+
+    useEffect(() => {
+        const serviceItems: Array<{ cartItemId: string; partnerId: string; staffId: string; date: string; time: string; durationMinutes: number }> = []
+        for (const [, data] of Object.entries(itemsByPartner)) {
+            const partnerData = data as any
+            for (const item of (partnerData.services || [])) {
+                const meta = item.booking_metadata
+                if (meta?.staffId && meta?.date && meta?.time) {
+                    serviceItems.push({
+                        cartItemId: item.id,
+                        partnerId: partnerData.partner?.id,
+                        staffId: meta.staffId,
+                        date: meta.date,
+                        time: meta.time,
+                        durationMinutes: meta.durationMinutes || 60,
+                    })
+                }
+            }
+        }
+        if (serviceItems.length === 0) return
+        validateServiceBookingAvailabilityAction(serviceItems).then((results) => {
+            const map: Record<string, { available: boolean; checked: boolean }> = {}
+            serviceItems.forEach((item, i) => {
+                map[item.cartItemId] = { available: results[i]?.available ?? true, checked: true }
+            })
+            setServiceAvailability(map)
+        })
+    }, [itemsByPartner])
 
     const updateQty = async (cartItemId: string, newQty: number, currentQty: number) => {
         if (loading || isActionInProgress.current || newQty === currentQty) return
@@ -546,11 +577,28 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     </p>
                                                                                                 )}
 
-                                                                                                {item.item_type === "service_booking" && getItemBooking(item) && (
-                                                                                                    <p className="text-[12px] text-brand-inactive-text mt-0.5">{getItemBooking(item)}</p>
-                                                                                                )}
+                                {item.item_type === "service_booking" && getItemBooking(item) && (
+                                    <p className="text-[12px] text-brand-inactive-text mt-0.5">{getItemBooking(item)}</p>
+                                )}
+                                {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        <InfoCard message="Este horário não está mais disponível" color="orange" />
+                                        <Link
+                                            href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                            className="text-xs font-semibold text-brand-green hover:underline"
+                                        >
+                                            Remarcar
+                                        </Link>
+                                        <button
+                                            onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                            className="text-xs font-semibold text-brand-red hover:underline"
+                                        >
+                                            Remover
+                                        </button>
+                                    </div>
+                                )}
 
-                                                                                                <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center justify-between mt-2">
                                                                                                     {isOutOfStock ? (
                                                                                                         <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-100 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50">
                                                                                                             Esgotado
@@ -656,17 +704,34 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
                                                                                                     )}
-                                                                                                    {item.item_type === "service_booking" && getItemBooking(item) && (
-                                                                                                        <p className="text-[13px] text-brand-inactive-text mb-1">{getItemBooking(item)}</p>
-                                                                                                    )}
-                                                                                                    {(() => {
-                                                                                                        const ctx = getItemPricingContext(item, partnerPromos)
-                                                                                                        return (
-                                                                                                            <div className="flex items-center gap-2">
-                                                                                                                <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(ctx.bestPrice)}</p>
-                                                                                                            </div>
-                                                                                                        )
-                                                                                                    })()}
+                                    {item.item_type === "service_booking" && getItemBooking(item) && (
+                                        <p className="text-[13px] text-brand-inactive-text mb-1">{getItemBooking(item)}</p>
+                                    )}
+                                    {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                            <InfoCard message="Este horário não está mais disponível" color="orange" />
+                                            <Link
+                                                href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                                className="text-xs font-semibold text-brand-green hover:underline"
+                                            >
+                                                Remarcar
+                                            </Link>
+                                            <button
+                                                onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                                className="text-xs font-semibold text-brand-red hover:underline"
+                                            >
+                                                Remover
+                                            </button>
+                                        </div>
+                                    )}
+                                    {(() => {
+                                        const ctx = getItemPricingContext(item, partnerPromos)
+                                        return (
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(ctx.bestPrice)}</p>
+                                            </div>
+                                        )
+                                    })()}
                                                                                                 </div>
 
                                                                                                 <div className="flex items-center justify-end gap-4">

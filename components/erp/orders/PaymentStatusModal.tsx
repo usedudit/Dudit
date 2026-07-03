@@ -38,7 +38,14 @@ interface PaymentStatusModalProps {
 
 function normalizeBreakdown(order: any): PaymentBreakdownLeg[] {
     if (Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0) {
-        return order.payment_breakdown;
+        const paidAmount = Number(order.paid_amount ?? 0);
+        return order.payment_breakdown.map((leg: any) => {
+            const legReceived = Number(leg.amountReceived ?? 0);
+            if (legReceived > paidAmount + 0.01) {
+                return { ...leg, amountReceived: 0 };
+            }
+            return leg;
+        });
     }
     return [{
         method: order.payment_method || "Dinheiro",
@@ -72,15 +79,19 @@ export default function PaymentStatusModal({
 
     const breakdown = order ? normalizeBreakdown(order) : [];
     const depositSummary = order ? getOrderDepositSummary(order) : null;
-    const totalOrder = order
-        ? (depositSummary?.usesDeposit ? depositSummary.fullOrderTotal : getOrderTotalAmount(order))
-        : 0;
-    const totalPaid = order ? (depositSummary?.paidAmount ?? getOrderPaidAmount(order)) : 0;
-    const totalRemaining = order ? (depositSummary?.remainingBalance ?? getOrderRemainingBalance(order)) : 0;
+    const totalOrder = order ? getOrderTotalAmount(order) : 0;
+    const totalPaid = order ? getOrderPaidAmount(order) : 0;
+    const totalRemaining = order ? getOrderRemainingBalance(order) : 0;
     const frozen = order ? isOrderFinanciallyFrozen(order) : false;
     const displayId = order
         ? order.order_number || `#${String(order.id || order.originalId || "").substring(0, 8)}`
         : "";
+
+    const lockedMethod = useMemo(() => {
+        if (order?.situation !== "partially_paid") return null;
+        const paidLeg = breakdown.find((leg) => Number(leg.amountReceived ?? 0) > 0.009);
+        return paidLeg?.method || order?.payment_method || null;
+    }, [order, breakdown]);
 
     const pendingNewAmount = useMemo(
         () => pendingLegs.reduce((sum, leg) => sum + Number(leg.amountReceived ?? leg.amount ?? 0), 0),
@@ -124,8 +135,14 @@ export default function PaymentStatusModal({
         }
     };
 
+    const isFullyPaid = order?.situation === "paid" || totalRemaining <= 0.009;
+
     const handleSubmit = async () => {
         const targetOrderId = order.id || order.originalId;
+        if (isFullyPaid) {
+            toast({ title: "Aviso", description: "Este pedido já está pago.", variant: "warning" });
+            return;
+        }
         if (pendingNewAmount <= 0.009) {
             toast({ title: "Aviso", description: "Informe o valor recebido.", variant: "warning" });
             return;
@@ -185,7 +202,7 @@ export default function PaymentStatusModal({
                     <Button variant="outline" onClick={onClose} disabled={loading || syncing}>
                         Cancelar
                     </Button>
-                    {totalRemaining > 0.009 && (
+                    {!isFullyPaid && totalRemaining > 0.009 && (
                         <Button
                             onClick={handleSubmit}
                             disabled={loading || syncing || !canSubmitBalance}
@@ -227,13 +244,14 @@ export default function PaymentStatusModal({
                         syncing={syncing}
                     />
 
-                    {totalRemaining > 0.009 && (
+                    {!isFullyPaid && totalRemaining > 0.009 && (
                         <BalancePaymentCollector
                             partnerId={partnerId}
                             remainingBalance={totalRemaining}
                             disabled={loading || syncing}
                             onLegsReady={onLegsReady}
                             onValidityChange={setCanSubmitBalance}
+                            lockedMethodLabel={lockedMethod}
                         />
                     )}
                 </div>

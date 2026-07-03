@@ -25,8 +25,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
-
-
+import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 
 function formatLocalISODate(date: Date) {
     const y = date.getFullYear()
@@ -131,6 +130,7 @@ interface OrderGeneralTabProps {
     isMarketplaceLocked?: boolean
     isPaidOrder?: boolean
     originalPaymentMethod?: string
+    originalPaymentProvider?: string
     originalPaymentBreakdown?: Array<{ method: string; amount: number }>
     originalPaidAmount?: number
     paymentMethodDiscountAmount?: number
@@ -159,6 +159,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     isMarketplaceLocked: passedIsMarketplaceLocked = false,
     isPaidOrder = false,
     originalPaymentMethod = "Não informado",
+    originalPaymentProvider = "",
     originalPaymentBreakdown = [],
     originalPaidAmount = 0,
     paymentMethodDiscountAmount = 0,
@@ -183,7 +184,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
     const payStatusMeta = useMemo(() => getPaymentStatusMeta(paymentStatus), [paymentStatus])
     const pendingSuffix = payStatusMeta.label !== "Pago" ? ` (${payStatusMeta.label})` : ""
-    const paymentMethodLabel = `${originalPaymentMethod || "Não informado"}${pendingSuffix}`
+    const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && originalPaymentMethod && originalPaymentMethod !== "Não informado"
+        ? `Mercado Pago (${originalPaymentMethod})${pendingSuffix}`
+        : `${originalPaymentMethod || "Não informado"}${pendingSuffix}`
 
     const paymentBreakdown = useMemo(() => {
         return Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
@@ -253,7 +256,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             </FormSection>
                         </section>
                     ) : (
-                        <FormSection title="Itens do Pedido" hasSeparator={false}>
+                        <FormSection title="Itens do Pedido" hasSeparator={false} className="mb-8">
                             <div ref={searchRef} className={`relative mb-6 ${isMarketplaceLocked ? 'pointer-events-none opacity-60' : ''}`}>
                                 <Input
                                     label=""
@@ -427,7 +430,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             </div>
                                                         </td>
                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                             <div className="flex justify-center items-center gap-1.5">
+                                                            <div className="flex justify-center items-center gap-1.5">
                                                                 <QuantitySelector
                                                                     value={item.quantity}
                                                                     disabled={isMarketplaceLocked}
@@ -731,6 +734,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         </div>
                     )}
 
+                    {isPaidOrder && (
+                        <div className="mb-6">
+                            <InfoCard color="orange" title="Edição Restrita (Pedido Pago)" message="Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas observações podem ser atualizadas." />
+                        </div>
+                    )}
+
                     {/* --- 1. CUSTOMER CARD --- */}
                     {!isQuickMode && (
                         <div>
@@ -774,9 +783,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     label="Método de Pagamento"
                                     value={
                                         <div className="flex items-center gap-2">
-                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                {paymentMethodLabel}
-                                            </span>
+                                            <PaymentMethodIndicator label={paymentMethodLabel} />
                                         </div>
                                     }
                                 />

@@ -434,6 +434,20 @@ export async function validateServiceBookingAvailabilityAction(
 ) {
   const { isStaffSlotAvailable } = await import("@/lib/commerce/scheduling-availability")
   const supabase = getAdminClient()
+
+  const partnerIds = [...new Set(items.map((i) => i.partnerId))]
+  const { data: partners } = await supabase
+    .from("partners")
+    .select("id, opening_hours")
+    .in("id", partnerIds)
+
+  const hoursMap: Record<string, any> = {}
+  if (partners) {
+    for (const p of partners) {
+      hoursMap[p.id] = p.opening_hours
+    }
+  }
+
   const results: Array<{ available: boolean; staffId: string; date: string; time: string }> = []
   for (const item of items) {
     const ok = await isStaffSlotAvailable(supabase, {
@@ -442,6 +456,7 @@ export async function validateServiceBookingAvailabilityAction(
       date: item.date,
       startTime: item.time,
       durationMinutes: item.durationMinutes,
+      openingHours: hoursMap[item.partnerId] || null,
     })
     results.push({ available: ok, staffId: item.staffId, date: item.date, time: item.time })
   }

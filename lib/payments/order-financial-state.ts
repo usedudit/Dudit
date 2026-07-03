@@ -45,7 +45,7 @@ export type DepositCheckoutMeta = {
   initialChargeAmount?: number
   remainingAfterDeposit?: number
   remainingBalance?: number
-  depositStatus?: "pending" | "paid" | "not_required"
+  depositStatus?: "pending" | "paid" | "partially_paid" | "not_required"
   paymentProvider?: string
   mpInitialPayment?: boolean
 }
@@ -121,12 +121,12 @@ export function patchDepositCheckoutOnPayment(
   const total = Math.max(0, Number(totalAmount || 0))
   const remainingBalance = Math.max(0, total - paid)
 
-  let depositStatus: DepositCheckoutMeta["depositStatus"] = "pending"
-  if (paid >= total - 0.005 && total > 0.005) {
-    depositStatus = "paid"
-  } else if (paid > 0.005) {
-    depositStatus = "paid"
-  }
+    let depositStatus: DepositCheckoutMeta["depositStatus"] = "pending"
+    if (paid >= total - 0.005 && total > 0.005) {
+        depositStatus = "paid"
+    } else if (paid > 0.005) {
+        depositStatus = "partially_paid"
+    }
 
   return {
     ...checkoutFulfillment,

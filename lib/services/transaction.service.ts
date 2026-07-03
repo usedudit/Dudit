@@ -99,7 +99,7 @@ function buildEntries(orderData: OrderDataForTransaction): Array<{ method: strin
     const fromBreakdown = (orderData.payment_breakdown || [])
         .map((entry) => ({
             method: normalizePaymentLabel(entry.method),
-            amount: Number(entry.amount || 0),
+            amount: Number(entry.effectiveAmount ?? entry.amount ?? 0),
             paymentMethodId: entry.paymentMethodId || null,
             installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
         }))

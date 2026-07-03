@@ -34,6 +34,8 @@ import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useR2Upload } from "@/hooks/use-r2-upload"
 import { calculateReturnNetTotal } from "@/lib/returns/calculations"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { useNotification } from "@/hooks/use-notification"
@@ -201,7 +203,7 @@ export default function CreateReturnPage({
     const [exchangeStatus, setExchangeStatus] = useState("pending")
     const [pendingSaveData, setPendingSaveData] = useState<(Partial<ReturnRequest> & Record<string, any>) | null>(null)
     const [isInventoryRestoreModalOpen, setIsInventoryRestoreModalOpen] = useState(false)
-    const [selectedInventoryItems, setSelectedInventoryItems] = useState<string[]>([])
+    const [inventoryRestoreQuantities, setInventoryRestoreQuantities] = useState<Record<string, number>>({})
     const [isMpWarningModalOpen, setIsMpWarningModalOpen] = useState(false)
     const [mpWarningChecked, setMpWarningChecked] = useState(false)
     const [evidenceImages, setEvidenceImages] = useState<(string | File)[]>([])
@@ -209,6 +211,15 @@ export default function CreateReturnPage({
     const [observations, setObservations] = useState("")
     const [returnEvents, setReturnEvents] = useState<ReturnEvent[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
+
+    const [promotions, setPromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        if (!partnerId) return
+        listActivePromotionsForMarketplaceAction(partnerId).then(res => {
+            if (Array.isArray(res)) setPromotions(res)
+        }).catch(() => { })
+    }, [partnerId])
 
     const { error: notifyError } = useNotification()
     const [showImageCropper, setShowImageCropper] = useState(false)
@@ -293,7 +304,7 @@ export default function CreateReturnPage({
                 mpPaymentId: returnRequest.mpPaymentId,
             })
 
-            // Setup items checklist
+            // Setup items checklist - use orderedQuantity for max if available
             const items = returnRequest.items.map(item => ({
                 id: item.id,
                 orderItemId: item.orderItemId || item.id,
@@ -304,12 +315,46 @@ export default function CreateReturnPage({
                 price: item.price,
                 netItemValue: item.netItemValue ?? item.price,
                 quantity: item.quantity,
-                maxQuantity: item.quantity, // cap at quantity saved
+                maxQuantity: item.orderedQuantity || item.quantity,
                 checked: true,
                 reason: mapToLegacyReason(item.reason || "outro"),
                 condition: mapToLegacyCondition(item.condition || "aberto"),
             }))
             setReturnItems(items)
+
+            // Setup exchange items from snapshot
+            if (returnRequest.exchangeItemsSnapshot && returnRequest.exchangeItemsSnapshot.length > 0) {
+                // Proactively load product bucket to enrich exchange item names
+                productBucket.loadBucket()
+
+                const snapItems: ReplacementItemState[] = returnRequest.exchangeItemsSnapshot.map((ei: any) => ({
+                    product: {
+                        id: ei.product_id,
+                        name: "",
+                        sku: "",
+                        gtin: null,
+                        price: ei.unit_price || 0,
+                        stock: 0,
+                        allow_sell_without_stock: false,
+                        image: null,
+                        has_variants: false,
+                    },
+                    quantity: ei.quantity || 1,
+                }))
+                // Try to enrich with product names from the bucket
+                if (productBucket.bucket.length > 0) {
+                    const enriched = snapItems.map((si) => {
+                        const found = productBucket.bucket.find((p) => p.id === si.product.id)
+                        if (found) {
+                            return { ...si, product: { ...found } }
+                        }
+                        return si
+                    })
+                    setReplacementItems(enriched)
+                } else {
+                    setReplacementItems(snapItems)
+                }
+            }
 
             // Setup details
             setReturnDate(new Date(returnRequest.returnDate || returnRequest.createdAt))
@@ -319,12 +364,14 @@ export default function CreateReturnPage({
             setRefundValue(returnRequest.refundValue)
             setRefundPaymentMethod(returnRequest.refundPaymentMethod || "")
             setCreditValue(returnRequest.storeCreditValue || 0)
+            setExchangeStatus(returnRequest.exchangeSubstatus || "pending")
+            setExchangeBalanceResolution(returnRequest.exchangeBalanceResolution || "store_credit")
             setReplacementProduct((returnRequest as any).replacementProduct || "")
             setEvidenceImages(returnRequest.evidenceImages || [])
             setEvidenceUploads((returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
             setObservations(returnRequest.sellerNotes || "")
         }
-    }, [mode, returnRequest])
+    }, [mode, returnRequest, productBucket.bucket])
 
     useEffect(() => {
         setReplacementProduct(replacementItems.map(item => item.product.name).join(", "))
@@ -472,7 +519,7 @@ export default function CreateReturnPage({
         setReplacementItems(prev => prev.filter((_, itemIndex) => itemIndex !== index))
     }, [])
 
-    const completeSave = useCallback((returnToInventoryItems: string[] | null) => {
+    const completeSave = useCallback((returnToInventoryItems: { id: string; quantity: number }[] | null) => {
         if (!pendingSaveData) return
         onSave({
             ...pendingSaveData,
@@ -507,21 +554,20 @@ export default function CreateReturnPage({
         if (!pendingSaveData) return
 
         const shouldAskInventoryRestore =
-            mode === "edit" &&
-            returnRequest &&
-            pendingSaveData.status === "APPROVED" &&
-            returnRequest.status !== "APPROVED" &&
-            ["cancellation", "return", "exchange"].includes(returnRequest.requestType || "return")
+            checkedItems.length > 0 &&
+            resolutionType !== "rejected"
 
         if (shouldAskInventoryRestore) {
-            setSelectedInventoryItems(checkedItems.map(i => i.id))
+            const initialQty: Record<string, number> = {}
+            checkedItems.forEach(i => { initialQty[i.id] = i.quantity })
+            setInventoryRestoreQuantities(initialQty)
             setIsInventoryRestoreModalOpen(true)
             return
         }
 
         onSave({ ...pendingSaveData, returnToInventory: false, returnToInventoryItems: null })
         setPendingSaveData(null)
-    }, [mode, returnRequest, pendingSaveData, onSave, checkedItems])
+    }, [pendingSaveData, onSave, checkedItems, resolutionType, returnRequest])
 
     const handleFormSubmit = async () => {
         if (checkedItems.length === 0) return
@@ -636,15 +682,14 @@ export default function CreateReturnPage({
             }
 
             const shouldAskInventoryRestore =
-                mode === "edit" &&
-                returnRequest &&
-                returnStatus === "APPROVED" &&
-                returnRequest.status !== "APPROVED" &&
-                ["cancellation", "return", "exchange"].includes(returnRequest.requestType || "return")
+                checkedItems.length > 0 &&
+                resolutionType !== "rejected"
 
             if (shouldAskInventoryRestore) {
                 setPendingSaveData(payload)
-                setSelectedInventoryItems(checkedItems.map(i => i.id))
+                const initialQty: Record<string, number> = {}
+                checkedItems.forEach(i => { initialQty[i.id] = i.quantity })
+                setInventoryRestoreQuantities(initialQty)
                 setIsInventoryRestoreModalOpen(true)
                 return
             }
@@ -1335,7 +1380,7 @@ export default function CreateReturnPage({
                                                                     { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
                                                                     { value: "APPROVED", label: "Aprovada" },
                                                                     { value: "REJECTED", label: "Recusada" },
-                                            ]}
+                                                                ]}
                                                             />
 
                                                             <FormDropdown
@@ -1348,7 +1393,7 @@ export default function CreateReturnPage({
                                                                     { value: "store_credit", label: "Vale-compra" },
                                                                     { value: "exchange", label: "Troca" },
                                                                     { value: "none", label: "Sem resolução" },
-                                                            ]}
+                                                                ]}
                                                             />
 
                                                             {isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")) && (
@@ -1471,39 +1516,64 @@ export default function CreateReturnPage({
                                                                                         }
                                                                                     }}
                                                                                 >
-                                                                                    {productBucket.isLoading ? (
-                                                                                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
-                                                                                    ) : productBucket.filteredResults.length > 0 ? (
-                                                                                        productBucket.filteredResults.map((product) => {
-                                                                                            const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
-                                                                                            return (
-                                                                                                <div
-                                                                                                    key={product.id}
-                                                                                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
-                                                                                                    onClick={() => !alreadyAdded && addReplacementProduct(product)}
-                                                                                                >
-                                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                                        <img
-                                                                                                            src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                                                            alt={product.name}
-                                                                                                            className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
-                                                                                                        />
-                                                                                                    </div>
-                                                                                                    <div className="flex-1 min-w-0">
-                                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku || "Sem SKU"}</div>
-                                                                                                    </div>
-                                                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                                                            {formatCurrency(product.price || 0)}
-                                                                                                        </div>
-                                                                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                                                            {product.stock} em estoque
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            )
-                                                                                        })
+                    {productBucket.isLoading ? (
+                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
+                    ) : productBucket.filteredResults.length > 0 ? (
+                        productBucket.filteredResults.map((product) => {
+                            const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
+                            const prodAny = product as any
+                            const promoPrice = prodAny.promotional_price
+                            const categoryId = prodAny.category_id
+                            const pr = computeItemDisplayPrice(
+                                Number(product.price || 0),
+                                promoPrice && Number(promoPrice) < Number(product.price || 0) ? Number(promoPrice) : null,
+                                promotions,
+                                { productId: product.id, categoryId: categoryId || undefined }
+                            )
+                            const displayStock = product.has_variants
+                                ? (product.variants || []).reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0)
+                                : product.stock
+                            return (
+                                <div
+                                    key={product.id}
+                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
+                                    onClick={() => !alreadyAdded && addReplacementProduct({
+                                        ...product,
+                                        price: pr.bestPrice,
+                                    })}
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                        <img
+                                            src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku || "Sem SKU"}</div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                        <div className="flex items-center gap-1.5">
+                                            {pr.referencePrice && (
+                                                <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>
+                                            )}
+                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(pr.bestPrice)}
+                                            </div>
+                                            {pr.badgeVariant && (
+                                                <Badge variant={pr.badgeVariant} icon={null} className="whitespace-nowrap text-[10px] px-1.5 py-0.5">
+                                                    -{pr.discountPercent}%
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                            {displayStock} em estoque
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })
                                                                                     ) : (
                                                                                         <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Nenhum produto encontrado.</div>
                                                                                     )}
@@ -1554,7 +1624,7 @@ export default function CreateReturnPage({
                                                                     )}
 
                                                                     <FormDropdown
-                                                                        label="Exchange status"
+                                                                        label="Status da troca"
                                                                         disabled={isViewOnly}
                                                                         value={exchangeStatus}
                                                                         setValue={setExchangeStatus}
@@ -1562,7 +1632,7 @@ export default function CreateReturnPage({
                                                                             { value: "pending", label: "Pendente" },
                                                                             { value: "reserved", label: "Reservado" },
                                                                             { value: "sent", label: "Enviado" },
-                                                                            { value: "completed", label: "Concluido" }
+                                                                            { value: "completed", label: "Concluído" }
                                                                         ]}
                                                                     />
                                                                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
@@ -1571,11 +1641,11 @@ export default function CreateReturnPage({
                                                                             <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(replacementTotal)}</p>
                                                                         </div>
                                                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
-                                                                            <p className="text-brand-inactive-text dark:text-dark-body">Credito disponivel</p>
+                                                                            <p className="text-brand-inactive-text dark:text-dark-body">Crédito disponível</p>
                                                                             <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedRefundValue)}</p>
                                                                         </div>
                                                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
-                                                                            <p className="text-brand-inactive-text dark:text-dark-body">{exchangeDifference > 0 ? "Diferenca a cobrar" : "Saldo restante"}</p>
+                                                                            <p className="text-brand-inactive-text dark:text-dark-body">{exchangeDifference > 0 ? "Diferença a cobrar" : "Saldo restante"}</p>
                                                                             <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(exchangeDifference > 0 ? exchangeDifference : exchangeSurplus)}</p>
                                                                         </div>
                                                                     </div>
@@ -1750,7 +1820,7 @@ export default function CreateReturnPage({
             >
                 <div className="flex flex-col gap-4">
                     <p className="text-brand-inactive-text dark:text-dark-body text-sm leading-relaxed">
-                        Selecione quais dos itens devolvidos devem retornar ao estoque.
+                        Selecione quantos itens devolvidos devem retornar ao estoque.
                     </p>
 
                     {/* Table-like list of items */}
@@ -1758,36 +1828,18 @@ export default function CreateReturnPage({
                         {/* Header */}
                         <div className="bg-brand-gray dark:bg-dark-border/20 px-4 py-3 flex items-center justify-between border-b border-brand-border/40 dark:border-dark-border/40 text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
                             <div className="flex items-center gap-3">
-                                <Checkbox
-                                    checked={checkedItems.length > 0 && selectedInventoryItems.length === checkedItems.length}
-                                    onChange={(checked) => {
-                                        if (checked) {
-                                            setSelectedInventoryItems(checkedItems.map(i => i.id))
-                                        } else {
-                                            setSelectedInventoryItems([])
-                                        }
-                                    }}
-                                />
                                 <span>Item</span>
                             </div>
-                            <span className="pr-2">Quantidade</span>
+                            <span className="pr-2">Voltar ao estoque</span>
                         </div>
 
                         {/* Rows */}
                         <div className="divide-y divide-brand-border/40 dark:divide-dark-border/40 max-h-[300px] overflow-y-auto custom-scrollbar">
                             {checkedItems.map((item) => {
-                                const isChecked = selectedInventoryItems.includes(item.id)
+                                const currentQty = inventoryRestoreQuantities[item.id] ?? 0
                                 return (
                                     <div key={item.id} className="px-4 py-3 flex items-center justify-between hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            <Checkbox
-                                                checked={isChecked}
-                                                onChange={(checked) => {
-                                                    setSelectedInventoryItems(prev =>
-                                                        checked ? [...prev, item.id] : prev.filter(id => id !== item.id)
-                                                    )
-                                                }}
-                                            />
                                             <div className="w-10 h-10 rounded-lg overflow-hidden border border-brand-border/40 dark:border-dark-border/40 shrink-0 bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center">
                                                 <img
                                                     src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
@@ -1800,12 +1852,23 @@ export default function CreateReturnPage({
                                                     {item.productName}
                                                 </p>
                                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                                    SKU: {item.sku || "Sem SKU"}
+                                                    SKU: {item.sku || "Sem SKU"} &bull; {item.quantity} devolvido(s)
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading px-3 py-1 bg-brand-gray dark:bg-dark-border/30 rounded-lg shrink-0">
-                                            {item.quantity} {item.quantity === 1 ? "unidade" : "unidades"}
+                                        <div className="shrink-0">
+                                            <QuantitySelector
+                                                value={currentQty}
+                                                onChange={(val) => {
+                                                    setInventoryRestoreQuantities(prev => ({
+                                                        ...prev,
+                                                        [item.id]: val,
+                                                    }))
+                                                }}
+                                                min={0}
+                                                max={item.quantity}
+                                                size="sm"
+                                            />
                                         </div>
                                     </div>
                                 )
@@ -1833,7 +1896,12 @@ export default function CreateReturnPage({
                             Não retornar nenhum
                         </Button>
                         <Button
-                            onClick={() => completeSave(selectedInventoryItems)}
+                            onClick={() => {
+                                const items = Object.entries(inventoryRestoreQuantities)
+                                    .filter(([_, qty]) => qty > 0)
+                                    .map(([id, quantity]) => ({ id, quantity }))
+                                completeSave(items)
+                            }}
                             disabled={isSaving}
                         >
                             {isSaving ? "Salvando..." : "Confirmar e salvar"}

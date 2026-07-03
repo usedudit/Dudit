@@ -223,11 +223,11 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                     returnToInventory: Boolean(data.returnToInventory),
                     returnToInventoryItems: data.returnToInventoryItems || null,
                     customerId: data.customerId || null,
-                    storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
-                    exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
-                    exchangeBalanceResolution: data.exchangeBalanceResolution || null,
-                    notes: data.observations || "",
-                    idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
+                        storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
+                        exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
+                        exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                        notes: data.observations || "",
+                        idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
                 }
                 const response = await processReturnRequestAction(processPayload)
                 if (!response.success) throw new Error(response.error)

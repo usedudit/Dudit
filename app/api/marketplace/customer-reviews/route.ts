@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/auth/authorization"
 
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ reviews: [] })
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: customer } = await supabase
     .from("customers")

@@ -49,6 +49,7 @@ export type SellerCommissionRow = {
   pendingAmount: number
   paidAmount: number
   bonusAmount: number
+  bonusPending: number
   totalAccumulated: number
 }
 
@@ -341,7 +342,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
 
   const { data: goalBonuses } = await admin
     .from("transactions")
-    .select("amount")
+    .select("amount, status, seller_partner_user_id")
     .eq("partner_id", partnerId)
     .eq("category", "Metas e Bônus")
     .gte("created_at", firstOfMonth)
@@ -355,6 +356,16 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
     .gte("created_at", firstOfMonth)
 
   const totalGoalBonuses = (goalBonuses || []).reduce((s: number, t: any) => s + money(Number(t.amount || 0)), 0)
+
+  const sellerBonusMap = new Map<string, { pending: number; paid: number }>()
+  for (const b of goalBonuses || []) {
+    const sid = b.seller_partner_user_id
+    if (!sid) continue
+    const existing = sellerBonusMap.get(sid) || { pending: 0, paid: 0 }
+    if (b.status === "paid") existing.paid += money(Number(b.amount || 0))
+    else existing.pending += money(Number(b.amount || 0))
+    sellerBonusMap.set(sid, existing)
+  }
 
   const sellerCommissions = new Map<string, { pending: number; paid: number }>()
   for (const tx of allCommissions || []) {
@@ -377,6 +388,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
     const profile = profileMap.get(seller.user_id)
     const config = configMap.get(seller.id)
     const comm = sellerCommissions.get(seller.id) || { pending: 0, paid: 0 }
+    const bonus = sellerBonusMap.get(seller.id) || { pending: 0, paid: 0 }
     const orderTotal = sellerOrders.get(seller.id) || 0
 
     let estimatedComm = 0
@@ -390,6 +402,8 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
       })
     }
 
+    const totalAccumulated = money(comm.paid + estimatedComm + bonus.paid + bonus.pending)
+
     return {
       partnerUserId: seller.id,
       userId: seller.user_id,
@@ -399,8 +413,9 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
       commissionValue: Number(config?.value || 0),
       pendingAmount: money(Math.max(0, estimatedComm - comm.paid)),
       paidAmount: comm.paid,
-      bonusAmount: 0,
-      totalAccumulated: money(comm.paid + estimatedComm),
+      bonusAmount: money(bonus.pending + bonus.paid),
+      bonusPending: money(bonus.pending),
+      totalAccumulated,
     }
   })
 
@@ -436,7 +451,7 @@ export async function getSellerCommissionHistoryAction(
     .select("id, description, amount, status, payment_date, created_at, reference_note")
     .eq("partner_id", partnerId)
     .eq("seller_partner_user_id", sellerPartnerUserId)
-    .eq("category", "Comissões")
+    .in("category", ["Comissões", "Metas e Bônus"])
     .order("created_at", { ascending: false })
     .limit(50)
 
@@ -467,6 +482,7 @@ export async function recordCommissionPaymentAction(
   sellerPartnerUserId: string,
   amount: number,
   accountId?: string | null,
+  category?: string | null,
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   await requireUser()
 
@@ -498,23 +514,28 @@ export async function recordCommissionPaymentAction(
     }
   }
 
+  const isBonus = category === "Metas e Bônus"
+  const description = isBonus ? "Pagamento de bônus de meta" : "Pagamento de comissão"
+  const paymentType = isBonus ? "Bônus meta" : "Comissão"
+  const notes = isBonus ? "Pagamento manual de bônus de meta." : "Pagamento manual de comissão."
+
   const now = new Date().toISOString()
   const { data: txData, error: txError } = await admin
     .from("transactions")
     .insert({
       partner_id: partnerId,
-      description: "Pagamento de comissão",
-      category: "Comissões",
+      description,
+      category: category || "Comissões",
       amount: money(amount),
       original_amount: money(amount),
       fee_amount: 0,
       status: "paid",
       payment_date: now,
       transaction_date: now,
-      payment_type: "Comissão",
+      payment_type: paymentType,
       transaction_type: "expense",
       origin: "manual",
-      notes: "Pagamento manual de comissão.",
+      notes,
       account_id: resolvedAccountId,
       seller_partner_user_id: sellerPartnerUserId,
     })

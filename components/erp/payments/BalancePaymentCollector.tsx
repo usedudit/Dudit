@@ -31,6 +31,7 @@ type BalancePaymentCollectorProps = {
   disabled?: boolean
   onLegsReady: (legs: PaymentBreakdownLeg[]) => void
   onValidityChange?: (valid: boolean) => void
+  lockedMethodLabel?: string | null
 }
 
 function buildFlatLeg(method: PartnerPaymentMethod, amount: number, installmentNumber = 1): PaymentBreakdownLeg {
@@ -54,6 +55,7 @@ export function BalancePaymentCollector({
   disabled = false,
   onLegsReady,
   onValidityChange,
+  lockedMethodLabel,
 }: BalancePaymentCollectorProps) {
   const { selectedStore } = useStore()
   const { methods, isLoading } = usePaymentMethods(partnerId)
@@ -77,6 +79,7 @@ export function BalancePaymentCollector({
   const [generatingPix, setGeneratingPix] = useState(false)
 
   useEffect(() => {
+    if (lockedMethodLabel) return
     setAmount(remainingBalance)
     setView("methods")
     setSelectedMethod(null)
@@ -86,7 +89,18 @@ export function BalancePaymentCollector({
       { id: 1, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
       { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
     ])
-  }, [remainingBalance, partnerId])
+  }, [remainingBalance, partnerId, lockedMethodLabel])
+
+  useEffect(() => {
+    if (!lockedMethodLabel || activeMethods.length === 0 || isLoading) return
+    const methodType = normalizeMethodType(lockedMethodLabel)
+    const matches = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === methodType)
+    if (matches.length > 0) {
+      selectSingleMethod(matches[0])
+    }
+  }, [lockedMethodLabel, activeMethods, isLoading])
+
+  const isLocked = Boolean(lockedMethodLabel)
 
   const emitLegs = useCallback(
     (legs: PaymentBreakdownLeg[]) => {
@@ -191,7 +205,7 @@ export function BalancePaymentCollector({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        {view !== "methods" && (
+        {!isLocked && view !== "methods" && (
           <Button
             variant="outline"
             size="icon"
@@ -209,12 +223,12 @@ export function BalancePaymentCollector({
             <ChevronLeftIcon size={18} />
           </Button>
         )}
-        <h4 className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
-          Receber saldo ({view === "methods" ? "escolha o método" : selectedMethod?.name || "registrar"})
+        <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+          {isLocked ? `Receber saldo (${selectedMethod?.name || lockedMethodLabel})` : `Receber saldo (${view === "methods" ? "escolha o método" : selectedMethod?.name || "registrar"})`}
         </h4>
       </div>
 
-      {view === "methods" && (
+      {!isLocked && view === "methods" && (
         <PaymentMethodSelector
           availableMethodTypes={availableMethodTypes}
           isLoading={isLoading}
@@ -229,7 +243,7 @@ export function BalancePaymentCollector({
         />
       )}
 
-      {view === "method_type_select" && selectedMethodType && (
+      {!isLocked && view === "method_type_select" && selectedMethodType && (
         <MethodGridForPartnerMethods
           methods={activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === selectedMethodType)}
           onSelect={selectSingleMethod}
@@ -277,7 +291,7 @@ export function BalancePaymentCollector({
         />
       )}
 
-      {view === "split" && (
+      {!isLocked && view === "split" && (
         <div className="space-y-4">
           <SplitPaymentView
             legs={splitLegs}
@@ -306,7 +320,7 @@ export function BalancePaymentCollector({
         </div>
       )}
 
-      {view === "split_method_select" && (
+      {!isLocked && view === "split_method_select" && (
         <SplitMethodSelector methods={activeMethods} onSelect={handleSplitMethodSelect} />
       )}
     </div>

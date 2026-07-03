@@ -190,7 +190,7 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
             return {
                 method: normalizePaymentMethodLabel(entry?.method),
                 amount: effectiveAmt,
-                amountReceived: Math.max(0, Number(entry?.amountReceived ?? entry?.amount ?? 0)),
+                amountReceived: Math.max(0, Number(entry?.amountReceived ?? 0)),
                 adjustmentType: entry?.adjustmentType || 'none',
                 adjustmentPercent: Math.max(0, Number(entry?.adjustmentPercent || 0)),
                 adjustmentAmount: Math.max(0, Number(entry?.adjustmentAmount || 0)),
@@ -760,14 +760,14 @@ export async function createFinancialTransactionsForReceivedAmount(
             const newEntry = newBreakdown[i]
             if (!newEntry?.method) continue
 
-            const newReceived = Number(newEntry.amountReceived || 0)
+            const newReceived = Number(newEntry.effectiveAmount ?? newEntry.amount ?? newEntry.amountReceived ?? 0)
 
             const oldEntry = oldBreakdown.find((old: any) => 
                 old?.method === newEntry.method && 
                 old?.paymentMethodId === newEntry.paymentMethodId
             ) || oldBreakdown[i]
 
-            const oldReceived = oldEntry ? Number(oldEntry.amountReceived || 0) : 0
+            const oldReceived = oldEntry ? Number(oldEntry.effectiveAmount ?? oldEntry.amount ?? oldEntry.amountReceived ?? 0) : 0
             const delta = newReceived - oldReceived
 
             if (delta > 0.009) {

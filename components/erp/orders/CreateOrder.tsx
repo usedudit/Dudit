@@ -246,6 +246,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [originalPaymentStatus, setOriginalPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
     const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
+    const [originalPaymentProvider, setOriginalPaymentProvider] = useState("")
     const [originalPaymentBreakdown, setOriginalPaymentBreakdown] = useState<PaymentBreakdownEntry[]>([])
     const [originalOrderSource, setOriginalOrderSource] = useState<string | null>(null)
     const [paymentMethodDiscountAmount, setPaymentMethodDiscountAmount] = useState(0)
@@ -499,6 +500,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOriginalPaymentStatus(normalizedStatus)
                 setOriginalPaidAmount(Number(order.paid_amount || 0))
                 setOriginalPaymentMethod(order.payment_method || "Não informado")
+                setOriginalPaymentProvider(order.payment_provider || "")
                 setOriginalPaymentBreakdown(loadedPaymentBreakdown)
                 setDeliveryStatus(order.delivery_status || "not_sent")
                 setOriginalDeliveryStatus(order.delivery_status || "not_sent")
@@ -985,6 +987,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setFinanceAccountId("")
         setOriginalPaidAmount(0)
         setOriginalPaymentMethod("Não informado")
+        setOriginalPaymentProvider("")
         setOriginalPaymentBreakdown([])
         setOriginalOrderSource(null)
         setInventoryAlreadyDeducted(false)
@@ -1430,11 +1433,6 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         </div>
 
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            {isPaidOrder && (
-                                <div className="mb-6 flex flex-col md:flex-row md:items-center">
-                                    <InfoCard color="orange" title="Edição Restrita (Pedido Pago)" message="Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas observações podem ser atualizadas." />
-                                </div>
-                            )}
                             <TabsContent value="general" className="mt-0">
                                 <FadeIn key="general">
                                     <div>
@@ -1519,6 +1517,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             isMarketplaceLocked={isMarketplaceLocked}
                                             isPaidOrder={isPaidOrder}
                                             originalPaymentMethod={originalPaymentMethod}
+                                            originalPaymentProvider={originalPaymentProvider}
                                             originalPaymentBreakdown={originalPaymentBreakdown}
                                             originalPaidAmount={originalPaidAmount}
                                             paymentMethodDiscountAmount={paymentMethodDiscountAmount}
@@ -1536,7 +1535,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                                         {(() => {
                                             const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
-                                            const paymentMethodLabel = `${originalPaymentMethod || "Não informado"}${pendingSuffix}`;
+                                            const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && originalPaymentMethod && originalPaymentMethod !== "Não informado"
+                                                ? `Mercado Pago (${originalPaymentMethod})${pendingSuffix}`
+                                                : `${originalPaymentMethod || "Não informado"}${pendingSuffix}`;
                                             const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
                                                 ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
                                                 : Number(originalPaidAmount || 0) > 0 && originalPaymentMethod

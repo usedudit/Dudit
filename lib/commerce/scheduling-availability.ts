@@ -1,23 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-
-const DEFAULT_BUSINESS_HOURS = { startHour: 8, startMinute: 0, endHour: 19, endMinute: 0 }
-const SLOT_INCREMENT_MINUTES = 15
+import type { OpeningHoursData } from "@/lib/utils/opening-hours"
+import { normalizeOpeningHours, parseTimeToMinutes } from "@/lib/utils/opening-hours"
 
 function timeToMinutes(time: string): number {
   const [h, m] = String(time || "").split(":").map(Number)
   return (h || 0) * 60 + (m || 0)
 }
 
-function addMinutesToTime(time: string, minutes: number): string {
-  const total = timeToMinutes(time) + minutes
-  const h = Math.floor(total / 60)
-  const m = total % 60
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+
+function getDayOfWeek(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number)
+  const dateObj = new Date(year, month - 1, day)
+  return DAYS_OF_WEEK[dateObj.getDay()]
 }
 
 /**
  * Revalidates staff slot at booking creation (no cart holds).
- * Returns false if another non-cancelled appointment blocks the window.
+ * Returns false if another non-cancelled appointment blocks the window,
+ * if the date/time is already in the past, or if outside business hours.
  */
 export async function isStaffSlotAvailable(
   supabase: SupabaseClient,
@@ -28,11 +29,34 @@ export async function isStaffSlotAvailable(
     startTime: string
     durationMinutes: number
     bufferMinutes?: number
+    openingHours?: OpeningHoursData | null
   },
 ): Promise<boolean> {
   const buffer = params.bufferMinutes ?? 0
   const slotStart = timeToMinutes(params.startTime)
   const slotEnd = slotStart + params.durationMinutes + buffer
+
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+
+  if (params.date < today || (params.date === today && slotEnd <= currentMinutes)) {
+    return false
+  }
+
+  if (params.openingHours) {
+    const normalized = normalizeOpeningHours(params.openingHours)
+    const daySchedule = normalized[getDayOfWeek(params.date)]
+    if (!daySchedule?.enabled || !daySchedule.from || !daySchedule.to) {
+      return false
+    }
+    const openMin = parseTimeToMinutes(daySchedule.from)
+    let closeMin = parseTimeToMinutes(daySchedule.to)
+    if (closeMin <= openMin) closeMin += 24 * 60
+    if (slotStart < openMin || slotEnd > closeMin) {
+      return false
+    }
+  }
 
   const { data: existingAppts, error } = await supabase
     .from("appointments")
@@ -60,15 +84,6 @@ export async function isStaffSlotAvailable(
   )
 
   if (hasConflict) return false
-
-  const dayStartMin = DEFAULT_BUSINESS_HOURS.startHour * 60 + DEFAULT_BUSINESS_HOURS.startMinute
-  const dayEndMin = DEFAULT_BUSINESS_HOURS.endHour * 60 + DEFAULT_BUSINESS_HOURS.endMinute
-  if (slotStart < dayStartMin || slotStart + params.durationMinutes > dayEndMin) {
-    return false
-  }
-
-  const endTime = addMinutesToTime(params.startTime, params.durationMinutes)
-  void endTime
 
   return true
 }

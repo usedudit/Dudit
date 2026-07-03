@@ -49,6 +49,7 @@ export type MarketplaceCheckoutDisplayLine = {
   bestPrice?: number
   isGift?: boolean
   originalPrice?: number
+  serviceId?: string | null
 }
 
 export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): MarketplaceCheckoutDisplayLine[] {
@@ -74,6 +75,7 @@ export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): Marketpl
       baseName: line.baseName,
       variantName: line.variantName,
       bookingMetadata: line.bookingMetadata,
+      serviceId: line.serviceId,
     }
   })
 }

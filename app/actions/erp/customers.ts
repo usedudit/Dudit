@@ -1,6 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { revalidateCustomers } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
@@ -600,6 +601,7 @@ export async function getCustomerOrdersAction(customerId: string) {
   if (!user) return { error: "NÃ£o autenticado" }
 
   const supabase = await getSupabaseServerClient()
+  const adminDb = createAdminClient()
 
   const { data: customer } = await supabase
     .from("customers")
@@ -617,7 +619,7 @@ export async function getCustomerOrdersAction(customerId: string) {
     return { orders: [], stats: null }
   }
 
-  const { data: orders, error } = await supabase
+  const { data: orders, error } = await adminDb
     .from("orders")
     .select(`
       id,
@@ -644,7 +646,7 @@ export async function getCustomerOrdersAction(customerId: string) {
   }
 
   // Aggregate stats across ALL orders (no limit) for accurate KPIs
-  const { data: statsRaw } = await supabase
+  const { data: statsRaw } = await adminDb
     .from("orders")
     .select("total_amount, created_at, situation")
     .in("buyer_id", buyerIds)
