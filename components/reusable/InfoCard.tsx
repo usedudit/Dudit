@@ -58,7 +58,7 @@ const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; b
 export function InfoCard({ title, message, color = "orange", className = "", rightElement }: InfoCardProps) {
   const c = colorMap[color]
   return (
-    <div className={`${c.bg} ${c.border} rounded-lg px-4 py-3 flex gap-3 items-start justify-between ${className} border`}>
+    <div className={`${c.bg} ${c.border} rounded-lg px-4 py-3 flex flex-col sm:flex-row gap-3 sm:items-center justify-between ${className} border`}>
       <div className="flex gap-3 items-start flex-1">
         <div className={`${c.bar} w-1 rounded-full self-stretch shrink-0 min-h-5`} />
         <div className="flex-1">
@@ -67,7 +67,7 @@ export function InfoCard({ title, message, color = "orange", className = "", rig
         </div>
       </div>
       {rightElement && (
-        <div className="shrink-0 flex items-center justify-end self-center pl-2">
+        <div className="shrink-0 flex items-center justify-start sm:justify-end self-start sm:self-center pl-4 sm:pl-2">
           {rightElement}
         </div>
       )}

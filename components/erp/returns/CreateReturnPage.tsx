@@ -1398,23 +1398,21 @@ export default function CreateReturnPage({
                                                             />
 
                                                             {isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")) && (
-                                                                <div className="md:col-span-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl">
-                                                                    <InfoCard
-                                                                        title="Cliente não cadastrado"
-                                                                        message="Este pedido está vinculado a um 'Consumidor Final'. Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema."
-                                                                        color="orange"
-                                                                        rightElement={
-                                                                            <Button
-                                                                                variant="link"
-                                                                                className="text-orange-700 dark:text-orange-300/80"
-                                                                                onClick={() => setIsCustomerSheetOpen(true)}
-                                                                                type="button"
-                                                                            >
-                                                                                Vincular Cliente
-                                                                            </Button>
-                                                                        }
-                                                                    />
-                                                                </div>
+                                                                <InfoCard
+                                                                    title="Cliente não cadastrado"
+                                                                    message="Este pedido está vinculado a um 'Consumidor Final'. Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema."
+                                                                    color="orange"
+                                                                    rightElement={
+                                                                        <Button
+                                                                            variant="link"
+                                                                            className="text-orange-700 dark:text-orange-300/80"
+                                                                            onClick={() => setIsCustomerSheetOpen(true)}
+                                                                            type="button"
+                                                                        >
+                                                                            Vincular Cliente
+                                                                        </Button>
+                                                                    }
+                                                                />
                                                             )}
 
                                                             {resolutionType === "refund" && (

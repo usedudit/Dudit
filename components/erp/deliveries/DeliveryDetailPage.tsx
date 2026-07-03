@@ -353,10 +353,10 @@ export default function DeliveryDetailPage({
                         {/* Delivery Info Metrics Grid */}
                         <FormSection title="Informações da Entrega" hasSeparator className="mb-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <ListItem icon={RouteIcon} title="Distância" description={`${Number(delivery.distance_km || 0).toFixed(2)} km`} />
-                                <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={`${delivery.estimated_duration_minutes || 0} min`} />
-                                <ListItem icon={ClockArrowUpIcon} title="Saída" description={delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-")} />
-                                <ListItem icon={ClockCheckIcon} title="Conclusão" description={delivery.completed_at ? formatDateTime(delivery.completed_at) : (delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-")} />
+                                <ListItem icon={RouteIcon} title="Distância" description={`${Number(delivery.distance_km || 0).toFixed(2)} km`} className="px-4 py-3 gap-4" />
+                                <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={`${delivery.estimated_duration_minutes || 0} min`} className="px-4 py-3 gap-4" />
+                                <ListItem icon={ClockArrowUpIcon} title="Saída" description={delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-")} className="px-4 py-3 gap-4" />
+                                <ListItem icon={ClockCheckIcon} title="Conclusão" description={delivery.completed_at ? formatDateTime(delivery.completed_at) : (delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-")} className="px-4 py-3 gap-4" />
                             </div>
                         </FormSection>
 
