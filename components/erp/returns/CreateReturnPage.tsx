@@ -20,6 +20,7 @@ import {
     Separator,
     FormSection,
     DefaultModal,
+    InfoCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon } from "@/lib/icons"
@@ -1398,25 +1399,21 @@ export default function CreateReturnPage({
 
                                                             {isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")) && (
                                                                 <div className="md:col-span-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl">
-                                                                    <div className="flex items-start gap-3 min-w-0">
-                                                                        <AlertCircleIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                                                                        <div className="min-w-0">
-                                                                            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
-                                                                                Cliente não cadastrado
-                                                                            </p>
-                                                                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
-                                                                                Este pedido está vinculado a um "Consumidor Final". Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema.
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-100/50 dark:text-amber-300 dark:border-amber-800"
-                                                                        onClick={() => setIsCustomerSheetOpen(true)}
-                                                                        type="button"
-                                                                    >
-                                                                        Vincular Cliente
-                                                                    </Button>
+                                                                    <InfoCard
+                                                                        title="Cliente não cadastrado"
+                                                                        message="Este pedido está vinculado a um 'Consumidor Final'. Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema."
+                                                                        color="orange"
+                                                                        rightElement={
+                                                                            <Button
+                                                                                variant="link"
+                                                                                className="text-orange-700 dark:text-orange-300/80"
+                                                                                onClick={() => setIsCustomerSheetOpen(true)}
+                                                                                type="button"
+                                                                            >
+                                                                                Vincular Cliente
+                                                                            </Button>
+                                                                        }
+                                                                    />
                                                                 </div>
                                                             )}
 
@@ -1516,64 +1513,64 @@ export default function CreateReturnPage({
                                                                                         }
                                                                                     }}
                                                                                 >
-                    {productBucket.isLoading ? (
-                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
-                    ) : productBucket.filteredResults.length > 0 ? (
-                        productBucket.filteredResults.map((product) => {
-                            const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
-                            const prodAny = product as any
-                            const promoPrice = prodAny.promotional_price
-                            const categoryId = prodAny.category_id
-                            const pr = computeItemDisplayPrice(
-                                Number(product.price || 0),
-                                promoPrice && Number(promoPrice) < Number(product.price || 0) ? Number(promoPrice) : null,
-                                promotions,
-                                { productId: product.id, categoryId: categoryId || undefined }
-                            )
-                            const displayStock = product.has_variants
-                                ? (product.variants || []).reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0)
-                                : product.stock
-                            return (
-                                <div
-                                    key={product.id}
-                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
-                                    onClick={() => !alreadyAdded && addReplacementProduct({
-                                        ...product,
-                                        price: pr.bestPrice,
-                                    })}
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                        <img
-                                            src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                            alt={product.name}
-                                            className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku || "Sem SKU"}</div>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                        <div className="flex items-center gap-1.5">
-                                            {pr.referencePrice && (
-                                                <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>
-                                            )}
-                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(pr.bestPrice)}
-                                            </div>
-                                            {pr.badgeVariant && (
-                                                <Badge variant={pr.badgeVariant} icon={null} className="whitespace-nowrap text-[10px] px-1.5 py-0.5">
-                                                    -{pr.discountPercent}%
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                            {displayStock} em estoque
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        })
+                                                                                    {productBucket.isLoading ? (
+                                                                                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
+                                                                                    ) : productBucket.filteredResults.length > 0 ? (
+                                                                                        productBucket.filteredResults.map((product) => {
+                                                                                            const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
+                                                                                            const prodAny = product as any
+                                                                                            const promoPrice = prodAny.promotional_price
+                                                                                            const categoryId = prodAny.category_id
+                                                                                            const pr = computeItemDisplayPrice(
+                                                                                                Number(product.price || 0),
+                                                                                                promoPrice && Number(promoPrice) < Number(product.price || 0) ? Number(promoPrice) : null,
+                                                                                                promotions,
+                                                                                                { productId: product.id, categoryId: categoryId || undefined }
+                                                                                            )
+                                                                                            const displayStock = product.has_variants
+                                                                                                ? (product.variants || []).reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0)
+                                                                                                : product.stock
+                                                                                            return (
+                                                                                                <div
+                                                                                                    key={product.id}
+                                                                                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
+                                                                                                    onClick={() => !alreadyAdded && addReplacementProduct({
+                                                                                                        ...product,
+                                                                                                        price: pr.bestPrice,
+                                                                                                    })}
+                                                                                                >
+                                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                                                        <img
+                                                                                                            src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                                                            alt={product.name}
+                                                                                                            className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                    <div className="flex-1 min-w-0">
+                                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku || "Sem SKU"}</div>
+                                                                                                    </div>
+                                                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                                                        <div className="flex items-center gap-1.5">
+                                                                                                            {pr.referencePrice && (
+                                                                                                                <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>
+                                                                                                            )}
+                                                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                                                {formatCurrency(pr.bestPrice)}
+                                                                                                            </div>
+                                                                                                            {pr.badgeVariant && (
+                                                                                                                <Badge variant={pr.badgeVariant} icon={null} className="whitespace-nowrap text-[10px] px-1.5 py-0.5">
+                                                                                                                    -{pr.discountPercent}%
+                                                                                                                </Badge>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                                                                            {displayStock} em estoque
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            )
+                                                                                        })
                                                                                     ) : (
                                                                                         <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Nenhum produto encontrado.</div>
                                                                                     )}
@@ -1785,20 +1782,22 @@ export default function CreateReturnPage({
                             </div>
                         </div>
                     </div>
-                </Tabs>
-            </div>
+                </Tabs >
+            </div >
 
             {/* Mobile action bar */}
-            <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3">
+            < div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3" >
                 <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
                     {isViewOnly ? "Voltar" : "Cancelar"}
                 </Button>
-                {!isViewOnly && (
-                    <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>
-                        {isSaving || isUploading ? "Salvando..." : "Salvar"}
-                    </Button>
-                )}
-            </div>
+                {
+                    !isViewOnly && (
+                        <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>
+                            {isSaving || isUploading ? "Salvando..." : "Salvar"}
+                        </Button>
+                    )
+                }
+            </div >
 
             {showImageCropper && selectedImageForCrop && (
                 <ImageCropperModal
@@ -1807,7 +1806,8 @@ export default function CreateReturnPage({
                     onClose={() => setShowImageCropper(false)}
                     onCropComplete={handleImageCropComplete}
                 />
-            )}
+            )
+            }
 
             <DefaultModal
                 isOpen={isInventoryRestoreModalOpen}
@@ -2008,15 +2008,17 @@ export default function CreateReturnPage({
                 description="Você tem alterações na devolução que ainda não foram salvas."
             />
 
-            {isCustomerSheetOpen && (
-                <SelectCustomerSheet
-                    isOpen={isCustomerSheetOpen}
-                    onClose={() => setIsCustomerSheetOpen(false)}
-                    partnerId={partnerId}
-                    onSelect={handleSelectCustomer}
-                    selectedCustomerId={selectedOrder?.buyer_id}
-                />
-            )}
-        </FadeIn>
+            {
+                isCustomerSheetOpen && (
+                    <SelectCustomerSheet
+                        isOpen={isCustomerSheetOpen}
+                        onClose={() => setIsCustomerSheetOpen(false)}
+                        partnerId={partnerId}
+                        onSelect={handleSelectCustomer}
+                        selectedCustomerId={selectedOrder?.buyer_id}
+                    />
+                )
+            }
+        </FadeIn >
     )
 }

@@ -7,6 +7,7 @@ interface InfoCardProps {
   message: React.ReactNode
   color?: InfoCardColor
   className?: string
+  rightElement?: React.ReactNode
 }
 
 const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; border: string }> = {
@@ -54,15 +55,22 @@ const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; b
   },
 }
 
-export function InfoCard({ title, message, color = "orange", className = "" }: InfoCardProps) {
+export function InfoCard({ title, message, color = "orange", className = "", rightElement }: InfoCardProps) {
   const c = colorMap[color]
   return (
-    <div className={`${c.bg} ${c.border} rounded-lg px-4 py-3 flex gap-3 items-start ${className} border`}>
-      <div className={`${c.bar} w-1 rounded-full self-stretch shrink-0 min-h-5`} />
-      <div>
-        {title && <p className={`text-sm font-bold mb-0.5 ${c.text}`}>{title}</p>}
-        <p className={`text-sm ${c.text}`}>{message}</p>
+    <div className={`${c.bg} ${c.border} rounded-lg px-4 py-3 flex gap-3 items-start justify-between ${className} border`}>
+      <div className="flex gap-3 items-start flex-1">
+        <div className={`${c.bar} w-1 rounded-full self-stretch shrink-0 min-h-5`} />
+        <div className="flex-1">
+          {title && <p className={`text-sm font-bold mb-0.5 ${c.text}`}>{title}</p>}
+          <p className={`text-sm ${c.text}`}>{message}</p>
+        </div>
       </div>
+      {rightElement && (
+        <div className="shrink-0 flex items-center justify-end self-center pl-2">
+          {rightElement}
+        </div>
+      )}
     </div>
   )
 }

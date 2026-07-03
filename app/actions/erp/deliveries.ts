@@ -1358,7 +1358,7 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
               payment_breakdown,
               paid_amount,
               discount_amount,
-              coupon_discount_amount,
+
               payment_method_discount_amount,
               payment_method_extra_amount,
               additional_costs,
@@ -1397,6 +1397,7 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
         orders: {
           ...order,
           subtotal_value: subtotalValue,
+          coupon_discount_amount: Number(order.discount_amount || 0),
         }
       }
     }),

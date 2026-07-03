@@ -95,13 +95,26 @@ async function applyAccountBalanceDelta(
     }
 }
 
-function buildEntries(orderData: OrderDataForTransaction): Array<{ method: string; amount: number; paymentMethodId: string | null; installmentNumber: number }> {
+function buildEntries(orderData: OrderDataForTransaction): Array<{
+    method: string;
+    amount: number;
+    paymentMethodId: string | null;
+    installmentNumber: number;
+    amountReceived?: number;
+    adjustmentType?: string;
+    adjustmentAmount?: number;
+    feeBearer?: string | null;
+}> {
     const fromBreakdown = (orderData.payment_breakdown || [])
         .map((entry) => ({
             method: normalizePaymentLabel(entry.method),
             amount: Number(entry.effectiveAmount ?? entry.amount ?? 0),
             paymentMethodId: entry.paymentMethodId || null,
             installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
+            amountReceived: Number(entry.amountReceived ?? entry.effectiveAmount ?? entry.amount ?? 0),
+            adjustmentType: entry.adjustmentType || 'none',
+            adjustmentAmount: Number(entry.adjustmentAmount || 0),
+            feeBearer: entry.feeBearer || null,
         }))
         .filter((entry) => entry.amount > 0.009)
 
@@ -112,6 +125,10 @@ function buildEntries(orderData: OrderDataForTransaction): Array<{ method: strin
         amount: Number(orderData.total_amount || 0),
         paymentMethodId: null,
         installmentNumber: 1,
+        amountReceived: Number(orderData.total_amount || 0),
+        adjustmentType: 'none',
+        adjustmentAmount: 0,
+        feeBearer: null,
     }]
 }
 
@@ -156,9 +173,20 @@ export async function createTransactionFromOrder(
             // Skip if this exact entry was already created (retry/webhook dedup)
             if (existingRefs.has(entry.referenceNote)) continue
 
-            // `payment_breakdown` already carries the net charged amount calculated by checkout.
-            // Reapplying payment-method pricing here causes double discount/fee.
-            const calculated = { finalAmount: amount, interestAmount: 0, feeAmount: 0 }
+            const interestAmount = (entry.adjustmentType === 'interest' || (entry.adjustmentType === 'fee' && entry.feeBearer === 'customer'))
+                ? Number(entry.adjustmentAmount || 0)
+                : 0
+
+            const feeAmount = (entry.adjustmentType === 'fee' && entry.feeBearer === 'merchant')
+                ? Number(entry.adjustmentAmount || 0)
+                : 0
+
+            const discountAmount = entry.adjustmentType === 'discount'
+                ? Number(entry.adjustmentAmount || 0)
+                : 0
+
+            const originalAmount = entry.amountReceived ?? amount
+
             const transactionData = {
                 partner_id: orderData.partner_id,
                 description: orderData.order_number,
@@ -166,16 +194,17 @@ export async function createTransactionFromOrder(
                 contact_id: null,
                 contact_type: "customer",
                 customer_id: orderData.customer_id || null,
-                amount: calculated.finalAmount,
+                amount: amount,
                 due_date: null,
                 payment_date: paymentDate,
                 status: "paid",
                 notes: null,
                 installment_number: entries.length > 1 ? (index + 1) : null,
                 total_installments: entries.length > 1 ? entries.length : null,
-                original_amount: amount,
-                interest_amount: calculated.interestAmount,
-                fee_amount: calculated.feeAmount,
+                original_amount: originalAmount,
+                interest_amount: interestAmount,
+                fee_amount: feeAmount,
+                discount_amount: discountAmount,
                 payment_type: entry.method,
                 payment_method_id: entry.paymentMethodId || null,
                 transaction_type: "income" as const,
@@ -189,7 +218,7 @@ export async function createTransactionFromOrder(
                 console.error(`[TRANSACTION] Erro ao criar transaction do pedido ${orderData.order_number}:`, error.message)
                 continue
             }
-            await applyAccountBalanceDelta(supabase, orderData.partner_id, accountId, calculated.finalAmount)
+            await applyAccountBalanceDelta(supabase, orderData.partner_id, accountId, amount)
         }
     } catch (err: any) {
         console.error("[TRANSACTION] Erro inesperado ao criar transaction:", err.message)
