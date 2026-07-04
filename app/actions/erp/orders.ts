@@ -1446,10 +1446,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const serverShippingCost = pricingResult.shipping
     const breakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
     const hasBreakdown = sanitizedPaymentBreakdown.length > 0
-    const finalTotal = hasBreakdown ? breakdownTotal : serverComputedTotal
+    const finalTotal = hasBreakdown ? breakdownTotal : (Number(data.totalAmount) || serverComputedTotal)
     // Usa o subtotal original do pedido como base do desconto do método,
     // em vez do serverComputedTotal (que pode incluir brindes/promoções).
-    const discountBase = hasBreakdown ? Math.max(0, Number(data.subtotal || 0) || serverComputedTotal) : serverComputedTotal
+    const discountBase = hasBreakdown ? Math.max(0, Number(data.subtotal || 0) || serverComputedTotal) : Math.max(serverComputedTotal, finalTotal)
     const paymentMethodDiscountAmount = Math.max(0, discountBase - finalTotal)
     const paymentMethodExtraAmount = Math.max(0, finalTotal - discountBase)
     let serverTotalAmount = finalTotal
@@ -2227,9 +2227,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     let updateServerTotal = updatePricingResult.finalTotal
     const updateBreakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
     const hasUpdateBreakdown = sanitizedPaymentBreakdown.length > 0
-    const updateFinalTotal = hasUpdateBreakdown ? updateBreakdownTotal : updateServerTotal
-    const updatePaymentMethodDiscountAmount = Math.max(0, updateServerTotal - updateFinalTotal)
-    const updatePaymentMethodExtraAmount = Math.max(0, updateFinalTotal - updateServerTotal)
+    const updateFinalTotal = hasUpdateBreakdown ? updateBreakdownTotal : (Number(data.totalAmount) || updateServerTotal)
+    const updatePricingBase = hasUpdateBreakdown ? updateServerTotal : Math.max(updateServerTotal, updateFinalTotal)
+    const updatePaymentMethodDiscountAmount = Math.max(0, updatePricingBase - updateFinalTotal)
+    const updatePaymentMethodExtraAmount = Math.max(0, updateFinalTotal - updatePricingBase)
     updateServerTotal = updateFinalTotal
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)

@@ -4,21 +4,32 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ReportsPage } from "@/components/erp/reports/ReportsPage"
 import { ReportsSkeleton } from "@/components/erp/reports/ReportsSkeleton"
+import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import {
     getDashboardFinancialData,
-    getDashboardOperationsData,
     getDashboardProductsData,
     getDashboardServicesData,
 } from "@/lib/data/dashboard"
+import {
+    getSalesReportData,
+    getCustomerReportData,
+    getReturnsReportData,
+    getDeliveryReportData,
+    getMarketingReportData,
+    getProductivityReportData,
+} from "@/lib/data/reports"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { checkPermission } from "@/lib/permissions/access"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { redirect } from "next/navigation"
+import type { Period } from "@/lib/period-types"
 
 export const dynamic = "force-dynamic"
 
-export default async function ERPReportsPage() {
+export default async function ERPReportsPage(props: {
+    searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string }>
+}) {
     const context = await getCurrentPartnerContext()
     if (!context) return <AccessDenied />
 
@@ -32,15 +43,22 @@ export default async function ERPReportsPage() {
 
     const allAccess = await getAllUserPartnerAccess()
     const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
-
     const businessInfo = normalizeBusinessInfo(context.businessInfo)
     const sells = businessInfo.sells || ["products"]
 
-    const [productsData, servicesData, financialData, operationsData] = await Promise.all([
+    const searchParams = await props.searchParams
+    const period = (searchParams?.period as Period) || "monthly"
+
+    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData] = await Promise.all([
         checkPermission(partnerId, "products", "view").then(res => res.allowed ? getDashboardProductsData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getDashboardServicesData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "financial", "view").then(res => res.allowed ? getDashboardFinancialData(partnerId).catch(() => null) : null),
-        checkPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDashboardOperationsData(partnerId).catch(() => null) : null)
+        checkPermission(partnerId, "products", "view").then(res => res.allowed ? getSalesReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "customers", "view").then(res => res.allowed ? getCustomerReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "orders", "view").then(res => res.allowed ? getReturnsReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDeliveryReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "products", "view").then(res => res.allowed ? getMarketingReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getProductivityReportData(partnerId, period).catch(() => null) : null),
     ])
 
     return (
@@ -57,15 +75,24 @@ export default async function ERPReportsPage() {
                                 {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                             </p>
                         </div>
+                        <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                            <GlobalPeriodFilter />
+                        </Suspense>
                     </header>
 
                     <Suspense fallback={<ReportsSkeleton />}>
                         <ReportsPage
                             sells={sells}
+                            period={period}
                             productsData={productsData}
                             servicesData={servicesData}
                             financialData={financialData}
-                            operationsData={operationsData}
+                            salesData={salesData}
+                            customerData={customerData}
+                            returnsData={returnsData}
+                            deliveryData={deliveryData}
+                            marketingData={marketingData}
+                            productivityData={productivityData}
                         />
                     </Suspense>
                 </div>

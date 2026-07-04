@@ -28,3 +28,21 @@ export type {
   AlertItem,
   ActivityItem,
 } from "../dashboard"
+
+export { getSalesReportData } from "./vendas"
+export type { SalesReportData } from "./vendas"
+
+export { getCustomerReportData } from "./clientes"
+export type { CustomerReportData } from "./clientes"
+
+export { getReturnsReportData } from "./trocas"
+export type { ReturnsReportData } from "./trocas"
+
+export { getDeliveryReportData } from "./entregas"
+export type { DeliveryReportData } from "./entregas"
+
+export { getMarketingReportData } from "./marketing"
+export type { MarketingReportData } from "./marketing"
+
+export { getProductivityReportData } from "./produtividade"
+export type { ProductivityReportData } from "./produtividade"

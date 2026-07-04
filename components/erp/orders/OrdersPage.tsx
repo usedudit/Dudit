@@ -562,7 +562,7 @@ export default function OrdersPage({
     const handlePaymentStatusClick = useCallback((order: Order) => {
         if (!order.canEdit) return
         const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
-        const hasMethod = Boolean(order.payment_method)
+        const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
         if (isMarketplace || hasMethod) {
             openPaymentStatusModal(order)
         } else {
@@ -782,7 +782,7 @@ export default function OrdersPage({
                             }}
                             onUpdatePaymentStatus={(order: any) => {
                                 const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
-                                const hasMethod = Boolean(order.payment_method)
+                                const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
                                 if (isMarketplace || hasMethod) {
                                     openPaymentStatusModal({
                                         originalId: order.id,

@@ -256,7 +256,7 @@ export default function PaymentStatusModal({
                             lockedMethodLabel={lockedMethod}
                         />
                     ) : isFullyPaid ? (
-                        <div className="rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 p-6">
+                        <div className="my-auto">
                             <IconPlaceholder
                                 icon={CheckCircleIcon}
                                 title="Pedido já está pago"
