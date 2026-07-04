@@ -23,9 +23,9 @@ import {
     InfoCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
-import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction } from "@/app/actions/erp/returns"
+import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
 import { ReturnHistoryTab } from "./ReturnHistoryTab"
@@ -173,6 +173,8 @@ export default function CreateReturnPage({
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
     const [refundValue, setRefundValue] = useState<number>(0)
     const [refundPaymentMethod, setRefundPaymentMethod] = useState<string>("")
+    const [rawReturnRequestData, setRawReturnRequestData] = useState<any>(null)
+    const [isRetryingRefund, setIsRetryingRefund] = useState(false)
 
     const isViewOnly = useMemo(() => {
         return mode === "view" || !!(returnRequest && ["APPROVED", "REJECTED", "RESOLVED", "EXPIRED"].includes(returnRequest.status))
@@ -222,7 +224,7 @@ export default function CreateReturnPage({
         }).catch(() => { })
     }, [partnerId])
 
-    const { error: notifyError } = useNotification()
+    const { success: notifySuccess, error: notifyError } = useNotification()
     const [showImageCropper, setShowImageCropper] = useState(false)
     const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
     const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
@@ -270,8 +272,11 @@ export default function CreateReturnPage({
             setHistoryLoading(true)
             getReturnRequestDetailsAction(partnerId, returnRequest.id)
                 .then((res: any) => {
-                    if (res.success && res.data?.returnEvents) {
-                        setReturnEvents(res.data.returnEvents)
+                    if (res.success && res.data) {
+                        setRawReturnRequestData(res.data)
+                        if (res.data.returnEvents) {
+                            setReturnEvents(res.data.returnEvents)
+                        }
                     }
                 })
                 .catch(console.error)
@@ -377,6 +382,38 @@ export default function CreateReturnPage({
     useEffect(() => {
         setReplacementProduct(replacementItems.map(item => item.product.name).join(", "))
     }, [replacementItems])
+
+    const failedOrPendingRefund = useMemo(() => {
+        if (!rawReturnRequestData?.return_refunds) return null;
+        return rawReturnRequestData.return_refunds.find(
+            (r: any) => (r.status === "FAILED" || r.status === "PENDING") && (r.payment_method === "Mercado Pago" || selectedOrder?.mpPaymentId || selectedOrder?.mp_payment_id)
+        );
+    }, [rawReturnRequestData, selectedOrder]);
+
+    const handleRetryRefund = async () => {
+        if (!failedOrPendingRefund || !returnRequest?.id) return
+        setIsRetryingRefund(true)
+        try {
+            const res = await retryMercadoPagoRefundAction(partnerId, failedOrPendingRefund.id, returnRequest.id)
+            if (res.success) {
+                notifySuccess("Reembolso via Mercado Pago processado com sucesso!")
+                getReturnRequestDetailsAction(partnerId, returnRequest.id).then((detailRes: any) => {
+                    if (detailRes.success && detailRes.data) {
+                        setRawReturnRequestData(detailRes.data)
+                        if (detailRes.data.returnEvents) {
+                            setReturnEvents(detailRes.data.returnEvents)
+                        }
+                    }
+                })
+            } else {
+                notifyError(res.error || "Erro ao reprocessar reembolso.")
+            }
+        } catch (err: any) {
+            notifyError(err?.message || "Erro inesperado ao reprocessar reembolso.")
+        } finally {
+            setIsRetryingRefund(false)
+        }
+    }
 
     const evidenceUploader = useR2Upload({
         endpoint: "/api/r2/returns-evidence",
@@ -757,6 +794,11 @@ export default function CreateReturnPage({
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving || isUploading}>
                                             {isViewOnly ? "Voltar" : "Cancelar"}
                                         </Button>
+                                        {isViewOnly && returnRequest && (
+                                            <Button variant="outline" onClick={() => window.open(`/print/troca/${returnRequest.id}`, "_blank")} leftIcon={<PrinterIcon size={18} />}>
+                                                Imprimir
+                                            </Button>
+                                        )}
                                         {!isViewOnly && (
                                             <Button onClick={handleFormSubmit} disabled={isSaveDisabled} leftIcon={<SaveIcon size={18} />}>
                                                 {isSaving || isUploading ? "Salvando..." : "Salvar"}
@@ -836,6 +878,7 @@ export default function CreateReturnPage({
                                                                                         const imgKey = Array.isArray(item.products?.images) && item.products.images[0]
                                                                                             ? item.products.images[0]
                                                                                             : (item.products?.video_thumbnail || item.products?.images || null)
+                                                                                        const remainingQty = typeof item.remainingQuantity === "number" ? item.remainingQuantity : item.quantity || 1
                                                                                         return {
                                                                                             id: item.id,
                                                                                             productId: item.product_id || item.products?.sku || item.id,
@@ -844,8 +887,8 @@ export default function CreateReturnPage({
                                                                                             image: getR2ImageUrl(imgKey, "thumb") || "",
                                                                                             price: item.product_price || 0,
                                                                                             netItemValue: item.net_item_value || item.subtotal || item.product_price || 0,
-                                                                                            quantity: item.quantity || 1,
-                                                                                            maxQuantity: item.quantity || 1,
+                                                                                            quantity: Math.min(item.quantity || 1, remainingQty),
+                                                                                            maxQuantity: remainingQty,
                                                                                             checked: false,
                                                                                             reason: "defeito" as const,
                                                                                             condition: "aberto" as const,
@@ -1028,7 +1071,7 @@ export default function CreateReturnPage({
                                                                                 <td className="py-4 pl-6 pr-2 border-b border-brand-border dark:border-dark-border align-middle">
                                                                                     <Checkbox
                                                                                         checked={item.checked}
-                                                                                        disabled={isMarketplaceRequest}
+                                                                                        disabled={isMarketplaceRequest || item.maxQuantity <= 0}
                                                                                         onChange={(checked: boolean) => {
                                                                                             setReturnItems(prev => {
                                                                                                 const next = [...prev]
@@ -1056,6 +1099,9 @@ export default function CreateReturnPage({
                                                                                         <div className="flex flex-col text-left min-w-0">
                                                                                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]" title={item.productName}>
                                                                                                 {item.productName}
+                                                                                                {item.maxQuantity <= 0 && (
+                                                                                                    <span className="ml-1.5 text-xs text-red-500 font-bold">(Já devolvido)</span>
+                                                                                                )}
                                                                                             </span>
                                                                                             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                                                                                 {item.sku ? `SKU: ${item.sku}` : "Sem SKU"}
@@ -1145,7 +1191,7 @@ export default function CreateReturnPage({
                                                                         <div className="flex items-center gap-3">
                                                                             <Checkbox
                                                                                 checked={item.checked}
-                                                                                disabled={isMarketplaceRequest}
+                                                                                disabled={isMarketplaceRequest || item.maxQuantity <= 0}
                                                                                 onChange={(checked: boolean) => {
                                                                                     setReturnItems(prev => {
                                                                                         const next = [...prev]
@@ -1168,7 +1214,12 @@ export default function CreateReturnPage({
                                                                                 </div>
                                                                             )}
                                                                             <div className="flex-1 min-w-0">
-                                                                                <p className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">{item.productName}</p>
+                                                                                <p className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                    {item.productName}
+                                                                                    {item.maxQuantity <= 0 && (
+                                                                                        <span className="ml-1.5 text-xs text-red-500 font-bold">(Já devolvido)</span>
+                                                                                    )}
+                                                                                </p>
                                                                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
                                                                                     {item.sku ? `SKU: ${item.sku}` : "Sem SKU"}
                                                                                 </p>
@@ -1292,6 +1343,32 @@ export default function CreateReturnPage({
                                                                     <PaymentRow label="Valor do reembolso" value={formatCurrency(refundValue)} />
                                                                     {refundPaymentMethod && (
                                                                         <PaymentRow label="Método de reembolso" value={refundPaymentMethod} />
+                                                                    )}
+                                                                    {failedOrPendingRefund && (
+                                                                        <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-xl space-y-3">
+                                                                            <div className="flex items-start gap-2.5">
+                                                                                <AlertCircleIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                                                                                <div className="text-xs text-left text-orange-900 dark:text-orange-200">
+                                                                                    <p className="font-bold mb-1">Reembolso via Mercado Pago Pendente/Com Falha</p>
+                                                                                    <p>Houve um erro no reembolso automático ou ele ainda está pendente de processamento no Mercado Pago.</p>
+                                                                                    {failedOrPendingRefund.error_message && (
+                                                                                        <p className="mt-1 font-mono text-[10px] bg-white/50 dark:bg-black/20 p-1.5 rounded">
+                                                                                            Erro: {failedOrPendingRefund.error_message}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="text-orange-700 hover:text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-900 w-full md:w-auto"
+                                                                                onClick={handleRetryRefund}
+                                                                                isLoading={isRetryingRefund}
+                                                                                type="button"
+                                                                            >
+                                                                                Tentar reprocessar reembolso
+                                                                            </Button>
+                                                                        </div>
                                                                     )}
                                                                 </>
                                                             )}
@@ -1788,6 +1865,11 @@ export default function CreateReturnPage({
                 <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
                     {isViewOnly ? "Voltar" : "Cancelar"}
                 </Button>
+                {isViewOnly && returnRequest && (
+                    <Button variant="outline" onClick={() => window.open(`/print/troca/${returnRequest.id}`, "_blank")} className="flex-1" leftIcon={<PrinterIcon size={18} />}>
+                        Imprimir
+                    </Button>
+                )}
                 {
                     !isViewOnly && (
                         <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>

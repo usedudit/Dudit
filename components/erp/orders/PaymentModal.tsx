@@ -411,8 +411,11 @@ const PaymentModal = ({
     const availableMethodTypes = useMemo(() => {
         const types = new Set(activeMethods.map((m: PartnerPaymentMethod) => normalizeMethodType(m.type)));
         types.add("cash"); // Always allow cash
+        if (customer && Number(customer.store_credit || customer.storeCredit || 0) > 0.009) {
+            types.add("store_credit");
+        }
         return types;
-    }, [activeMethods]);
+    }, [activeMethods, customer]);
 
     // Listen for payment methods updates from settings page (create/update/delete)
     useEffect(() => {
@@ -873,7 +876,7 @@ const PaymentModal = ({
 
     // Auto-fill amount logic
     useEffect(() => {
-        if (view === 'money' || view === 'card' || view === 'pix') {
+        if (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit') {
             if (userManuallyChangedRef.current) return;
             setIsPixGenerated(false);
             let initialAmt = 0;
@@ -921,7 +924,7 @@ const PaymentModal = ({
             setIsPaymentCalculationLoading(false);
             return;
         }
-        const currentViewIsCardLike = view === "card" || view === "pix" || view === "money";
+        const currentViewIsCardLike = view === "card" || view === "pix" || view === "money" || view === "store_credit";
         if (!currentViewIsCardLike) {
             setPaymentCalculation(null);
             setInstallmentOptions([]);
@@ -1051,7 +1054,7 @@ const PaymentModal = ({
             const other = payments.reduce((acc, p, idx) => (idx !== editingPaymentIndex ? acc + p.amount : acc), 0);
             return other + paymentBaseAmount;
         }
-        if (view === 'money' || view === 'pix' || view === 'card') {
+        if (view === 'money' || view === 'pix' || view === 'card' || view === 'store_credit') {
             if (isAllocationUnderpaid) {
                 return paymentBaseAmount;
             } else {
@@ -1107,7 +1110,7 @@ const PaymentModal = ({
         ? successSnapshot.displayOrderTotal
         : view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
             ? splitPreview.finalTotal
-            : (view === 'money' || view === 'card' || view === 'pix')
+            : (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit')
                 ? finalTotalWithMethodPricing
                 : total;
 
@@ -1270,7 +1273,7 @@ const PaymentModal = ({
             setMpBoletoData(null);
             setMpPaymentId(null);
             setView('methods');
-        } else if (view === 'money' || view === 'card' || view === 'pix') {
+        } else if (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit') {
             resetSelectedMethodPricing();
             if (editingPaymentIndex !== null) {
                 setView('split_method_select');
@@ -1333,6 +1336,12 @@ const PaymentModal = ({
 
     const openMethodTypeSelection = (methodType: string) => {
         resetSelectedMethodPricing({ clearType: false });
+
+        if (methodType === "store_credit") {
+            setView("store_credit");
+            return;
+        }
+
         const methodsOfType = activeMethods.filter((method: any) => normalizeMethodType(method.type) === methodType);
 
         if (methodsOfType.length === 0 && methodType !== "cash") {
@@ -1392,6 +1401,9 @@ const PaymentModal = ({
                 })
             : [{
                 method: (() => {
+                    if (view === 'store_credit') {
+                        return 'store_credit';
+                    }
                     if (isMarketplaceOrder && originalPaymentMethod) {
                         return formatPaymentMethodToFullLabel(originalPaymentMethod);
                     }
@@ -1550,7 +1562,7 @@ const PaymentModal = ({
         onClose();
     };
     const isSinglePricingBusy =
-        (view === 'money' || view === 'card' || view === 'pix') &&
+        (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit') &&
         !!selectedMethodId &&
         isPaymentCalculationLoading;
     const isSplitPricingBusy = view === 'split' && activeSplitLegs.length > 0 && isSplitPreviewLoading;
@@ -1813,6 +1825,14 @@ const PaymentModal = ({
                                                                 onClick={() => openMethodTypeSelection("other")}
                                                             />
                                                         )}
+                                                        {availableMethodTypes.has("store_credit") && (
+                                                            <PaymentMethodCard
+                                                                icon={TagIcon}
+                                                                label="Vale-compra"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => openMethodTypeSelection("store_credit")}
+                                                            />
+                                                        )}
                                                         <PaymentMethodCard
                                                             icon={SplitIcon}
                                                             label="Dividir"
@@ -1937,6 +1957,37 @@ const PaymentModal = ({
                                                 </div>
                                             )}
                                             <Numpad onInput={handleCashNumpadInput} onDelete={handleCashNumpadDelete} />
+                                        </motion.div>
+                                    )}
+
+                                    {view === 'store_credit' && (
+                                        <motion.div key="store_credit" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
+                                            <div className="w-full max-w-sm space-y-4">
+                                                {isMarketplaceOrder && (
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                )}
+                                                <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
+                                                <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-xl p-4 text-sm mb-2 text-center w-full">
+                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Saldo do Vale-compra disponível: </span>
+                                                    <span className="font-bold text-brand-green">{formatCurrency(customer?.store_credit || customer?.storeCredit || 0)}</span>
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <PaymentAmountLabel
+                                                        label="Valor do vale-compra a utilizar"
+                                                        calculation={paymentCalculation}
+                                                        baseAllocated={calcBaseAmount}
+                                                    />
+                                                    <MoneyInput
+                                                        value={paymentBaseAmount}
+                                                        onChange={(val: any) => {
+                                                            const maxCredit = Number(customer?.store_credit || customer?.storeCredit || 0);
+                                                            const num = Math.min(maxCredit, Number(val || 0));
+                                                            handlePaymentBaseAmountChange(num);
+                                                        }}
+                                                        className="font-bold text-lg"
+                                                    />
+                                                </div>
+                                            </div>
                                         </motion.div>
                                     )}
 
@@ -2571,7 +2622,7 @@ const PaymentModal = ({
                             )}
 
                             {/* 3. Input Views (Money, Card, Pix) Footer Logic */}
-                            {(view === 'money' || view === 'card' || view === 'pix') && (
+                            {(view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit') && (
                                 <ActionFooter
                                     showConfirm={true}
                                     confirmText={

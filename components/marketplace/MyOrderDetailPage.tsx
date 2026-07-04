@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector } from '@/components/reusable';
@@ -525,7 +525,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         };
     });
 
-    const activeReturnRequest = order.return_requests?.find((r: any) => !r.deleted_at);
+    const remainingQuantities = useMemo(() => {
+        const remaining: Record<string, number> = {}
+        const orderItems = order?.order_items || []
+        const returnedQtyMap: Record<string, number> = {}
+        const requests = order?.return_requests || []
+        
+        requests.forEach((rr: any) => {
+            if (rr.deleted_at) return
+            const status = String(rr.status || "").toUpperCase()
+            if (status === "REJECTED" || status === "EXPIRED" || status === "CANCELLED") return
+            const riList = rr.return_items || []
+            riList.forEach((ri: any) => {
+                if (ri.order_item_id) {
+                    returnedQtyMap[ri.order_item_id] = (returnedQtyMap[ri.order_item_id] || 0) + (ri.quantity || 0)
+                }
+            })
+        })
+        
+        orderItems.forEach((item: any) => {
+            const returned = returnedQtyMap[item.id] || 0
+            remaining[item.id] = Math.max(0, (item.quantity || 0) - returned)
+        })
+        
+        return remaining
+    }, [order])
+
+    const hasReturnableItems = useMemo(() => {
+        return Object.values(remainingQuantities).some((qty: number) => qty > 0)
+    }, [remainingQuantities])
+
+    const activeReturnRequest = order.return_requests?.find((r: any) => !r.deleted_at && ["PENDING_REVIEW", "UNDER_ANALYSIS", "APPROVED", "WAITING_CUSTOMER", "WAITING_ITEM_RETURN", "PROCESSING", "ESCALATED"].includes(r.status));
     const hasActiveReturn = !!activeReturnRequest;
     const returnStatusCfg = activeReturnRequest ? getReturnRequestStatusConfig(activeReturnRequest) : null;
 
@@ -580,7 +610,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const canCancelOrder = canRequestOrderCancellation(order) && !hasActiveReturn;
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
     const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
-    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && order.situation !== "cancelled" && !hasActiveReturn;
+    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && order.situation !== "cancelled" && hasReturnableItems;
     const returnButtonLabel = order.delivery_status === "delivered"
         ? "Solicitar troca ou devolução"
         : "Solicitar reembolso ou vale-compra";
@@ -1587,6 +1617,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                                     <Checkbox
                                                         checked={Number(returnItems[item.id] || 0) > 0}
+                                                        disabled={remainingQuantities[item.id] <= 0}
                                                         onChange={(checked) => {
                                                             setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }));
                                                             if (checked) {
@@ -1596,7 +1627,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     />
                                                     <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0" />
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
+                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                            {item.products?.name || item.product_name}
+                                                            {remainingQuantities[item.id] <= 0 && (
+                                                                <span className="ml-1.5 text-xs text-red-500 font-bold">(Já devolvido)</span>
+                                                            )}
+                                                        </p>
                                                         <p className="text-xs text-brand-inactive-text">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
                                                     </div>
                                                 </div>
@@ -1607,8 +1643,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             value={returnItems[item.id] || 1}
                                                             onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
                                                             min={1}
-                                                            max={item.quantity}
-                                                            disabled={!returnItems[item.id]}
+                                                            max={remainingQuantities[item.id] || 1}
+                                                            disabled={!returnItems[item.id] || remainingQuantities[item.id] <= 0}
                                                             size="sm"
                                                         />
                                                     </div>

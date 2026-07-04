@@ -116,7 +116,7 @@ export default function CouponDetailPage({
                                 <TabsContent value="summary" className="mt-0" key="summary">
                                     <FadeIn className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                         <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                            <FormSection title="Detalhes do cupom">
+                                            <FormSection title="Detalhes do cupom" className="mb-8">
                                                 <div className="space-y-3">
                                                     <KeyValueRow label="Tipo de desconto" value={getCouponPrimaryMeta(coupon)} />
                                                     <KeyValueRow label="Aplicar a" value={getCouponApplyScopeLabel(coupon.apply_scope)} />

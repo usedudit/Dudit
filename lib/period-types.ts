@@ -91,3 +91,11 @@ export function compareModeToPeriod(mode: CompareMode): Period | null {
     default: return null
   }
 }
+
+export function getDateRangeWithPrevious(period: Period, todayOverride?: string) {
+  const today = todayOverride || new Date().toISOString().slice(0, 10)
+  const { from } = getPeriodDateRange(period, today)
+  const days = getPeriodDays(period)
+  const previousFrom = addDays(from, -days)
+  return { today, from, previousFrom }
+}

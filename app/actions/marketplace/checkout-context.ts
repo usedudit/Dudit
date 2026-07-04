@@ -172,7 +172,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     const resolvedLine = resolvedLinesMap.get(line.lineId)
     if (!resolvedLine) continue
     const basePrice = Number((resolvedLine.pricingItem as any).basePrice || line.unitPrice)
-    const promoPrice = (resolvedLine.pricingItem as any).promotionalPrice
+    const promoPrice = resolvedLine.variantId ? null : (resolvedLine.pricingItem as any).promotionalPrice
     const hasPromo = promoPrice != null && Number(promoPrice) > 0 && Number(promoPrice) < basePrice
 
     const pricing = computeItemDisplayPrice(

@@ -937,3 +937,22 @@ export async function getERPCustomersPageAction(
     return { success: false, error: e?.message || "Erro ao carregar clientes" }
   }
 }
+
+export async function getCustomerStoreCreditsAction(customerId: string) {
+  const supabase = await getSupabaseServerClient()
+  await requireUser()
+
+  const { data, error } = await supabase
+    .from("store_credits")
+    .select("id, amount, remaining_amount, status, expires_at, created_at")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Erro ao buscar store_credits:", error)
+    return { success: false, error: error.message }
+  }
+
+  return { success: true, storeCredits: data || [] }
+}
+

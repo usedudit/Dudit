@@ -26,6 +26,7 @@ import { formatCurrency } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 
 function formatLocalISODate(date: Date) {
     const y = date.getFullYear()
@@ -184,9 +185,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
     const payStatusMeta = useMemo(() => getPaymentStatusMeta(paymentStatus), [paymentStatus])
     const pendingSuffix = payStatusMeta.label !== "Pago" ? ` (${payStatusMeta.label})` : ""
-    const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && originalPaymentMethod && originalPaymentMethod !== "Não informado"
-        ? `Mercado Pago (${originalPaymentMethod})${pendingSuffix}`
-        : `${originalPaymentMethod || "Não informado"}${pendingSuffix}`
+    const friendlyMethod = originalPaymentMethod && originalPaymentMethod !== "Não informado" ? formatPaymentMethodLabel(originalPaymentMethod, null) : "";
+    const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && friendlyMethod
+        ? `Mercado Pago (${friendlyMethod})${pendingSuffix}`
+        : `${friendlyMethod || "Não informado"}${pendingSuffix}`
 
     const paymentBreakdown = useMemo(() => {
         return Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
@@ -795,7 +797,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                             <div className="flex flex-col gap-1">
                                                 {paymentBreakdown.map((entry: any, index: number) => (
                                                     <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                        {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                        {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
                                                     </span>
                                                 ))}
                                             </div>
@@ -844,7 +846,11 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                                 {paymentMethodDiscountAmount > 0 && (
                                     <PaymentRow
-                                        label="Desconto do Método"
+                                        label={
+                                            originalPaymentMethod === "exchange" ? "Crédito de troca" :
+                                            originalPaymentMethod === "store_credit" ? "Vale-compra utilizado" :
+                                            "Desconto do Método"
+                                        }
                                         value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
                                     />
                                 )}

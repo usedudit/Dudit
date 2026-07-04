@@ -2,8 +2,9 @@
 
 import { revalidateTag, revalidatePath } from "next/cache"
 import { TAGS } from "./revalidation-tags"
-import { redis } from "@/lib/redis"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
+import { REPORT_TAGS } from "@/lib/data/reports/cache"
+import { redis } from "@/lib/redis"
 
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
@@ -131,6 +132,30 @@ export async function revalidateCustomers(partnerId: string) {
 export async function revalidateMarketplace() {
     await safeRevalidateTag(TAGS.marketplace)
     await safeRevalidateTag(TAGS.categories)
+}
+
+/**
+ * Revalida dados de RELATÓRIOS
+ */
+export async function revalidateReports(partnerId: string, categories?: string[]) {
+    if (!partnerId) return
+    const cats = categories || Object.keys(REPORT_TAGS)
+    for (const cat of cats) {
+        const tagFn = (REPORT_TAGS as Record<string, Function>)[cat]
+        if (tagFn) {
+            await safeRevalidateTag(tagFn(partnerId))
+        }
+    }
+    await safeRevalidateTag(`report:${partnerId}`)
+    await safeRevalidateTag(TAGS.report(partnerId, "*"))
+}
+
+export async function revalidateReportCategory(partnerId: string, category: string) {
+    const tagFn = (REPORT_TAGS as Record<string, Function>)[category]
+    if (tagFn) {
+        await safeRevalidateTag(tagFn(partnerId))
+    }
+    await safeRevalidateTag(TAGS.report(partnerId, category))
 }
 
 /**

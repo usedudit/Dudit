@@ -199,8 +199,8 @@ export async function resolveCheckoutCartLines(
           productId: row.product_id,
           unitPrice,
           quantity: qty,
-          promotionalPrice: product.promotional_price,
-          basePrice: Number(product.price) || 0,
+          promotionalPrice: variantId ? null : product.promotional_price,
+          basePrice: variantId ? unitPrice : Number(product.price) || 0,
           categoryId: product.category_id,
         },
         orderItemRow: {

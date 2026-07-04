@@ -39,4 +39,18 @@ export const TAGS = {
 
   // Platform advertising
   advertisements: "advertisements",
+
+  // Reports
+  report: (partnerId: string, category: string) => `report-${category}:${partnerId}`,
+  reportGeneral: (partnerId: string) => `report-visao-geral:${partnerId}`,
+  reportSales: (partnerId: string) => `report-vendas:${partnerId}`,
+  reportProducts: (partnerId: string) => `report-produtos:${partnerId}`,
+  reportServices: (partnerId: string) => `report-servicos:${partnerId}`,
+  reportDeliveries: (partnerId: string) => `report-entregas:${partnerId}`,
+  reportServiceOrders: (partnerId: string) => `report-os:${partnerId}`,
+  reportFinancial: (partnerId: string) => `report-financeiro:${partnerId}`,
+  reportCustomers: (partnerId: string) => `report-clientes:${partnerId}`,
+  reportMarketing: (partnerId: string) => `report-marketing:${partnerId}`,
+  reportProductivity: (partnerId: string) => `report-produtividade:${partnerId}`,
+  reportReturns: (partnerId: string) => `report-trocas:${partnerId}`,
 }

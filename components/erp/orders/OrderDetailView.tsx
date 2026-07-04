@@ -103,6 +103,33 @@ const formatServiceSchedule = (dateStr: string, timeStr: string) => {
     return `${day}/${month}/${year}${timeFormatted}`;
 };
 
+const getReturnStatusMeta = (status: string) => {
+    switch (status) {
+        case "PENDING_REVIEW":
+            return { label: "Pendente", variant: "orange" as const }
+        case "UNDER_ANALYSIS":
+            return { label: "Em análise", variant: "blue" as const }
+        case "WAITING_CUSTOMER":
+            return { label: "Aguardando cliente", variant: "purple" as const }
+        case "WAITING_ITEM_RETURN":
+            return { label: "Aguardando devolução", variant: "purple" as const }
+        case "APPROVED":
+            return { label: "Aprovada", variant: "green" as const }
+        case "REJECTED":
+            return { label: "Recusada", variant: "red" as const }
+        case "PROCESSING":
+            return { label: "Processando", variant: "blue" as const }
+        case "RESOLVED":
+            return { label: "Concluída", variant: "green" as const }
+        case "EXPIRED":
+            return { label: "Expirada", variant: "red" as const }
+        case "ESCALATED":
+            return { label: "Escalada", variant: "red" as const }
+        default:
+            return { label: "Pendente", variant: "orange" as const }
+    }
+};
+
 interface OrderDetailViewProps {
     orderId: string
     partnerId: string
@@ -722,6 +749,53 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                     )}
                                                                                 </span>
                                                                             </div>
+
+                                                                            {/* Return History for this item */}
+                                                                            {(() => {
+                                                                                const itemReturns = (order.return_requests || []).flatMap((rr: any) => {
+                                                                                    const matchingItems = (rr.return_items || []).filter((ri: any) => ri.order_item_id === item.id);
+                                                                                    return matchingItems.map((ri: any) => ({
+                                                                                        ...ri,
+                                                                                        requestStatus: rr.status,
+                                                                                        requestId: rr.id,
+                                                                                        createdAt: rr.created_at || rr.returnDate,
+                                                                                    }));
+                                                                                });
+
+                                                                                if (itemReturns.length === 0) return null;
+
+                                                                                return (
+                                                                                    <div className="mt-3 p-3 bg-brand-gray/40 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
+                                                                                        <h5 className="text-[11px] font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1">
+                                                                                            <span>🔄 Histórico de Devolução / Troca</span>
+                                                                                        </h5>
+                                                                                        <div className="divide-y divide-brand-border/30 dark:divide-dark-border/10">
+                                                                                            {itemReturns.map((ret: any, idx: number) => {
+                                                                                                const statusMeta = getReturnStatusMeta(ret.requestStatus);
+                                                                                                return (
+                                                                                                    <div key={idx} className="py-1.5 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                                                                                        <div className="flex items-center gap-2">
+                                                                                                            <span className="font-medium text-brand-inactive-text">
+                                                                                                                Qtd: <strong className="text-brand-dark dark:text-dark-heading">{ret.quantity} un.</strong>
+                                                                                                            </span>
+                                                                                                            <span className="text-gray-300">&bull;</span>
+                                                                                                            <span className="text-brand-inactive-text">Condição: {ret.condition === "sealed" || ret.condition === "lacrado" ? "Lacrado" : ret.condition === "damaged" || ret.condition === "danificado" ? "Danificado" : "Aberto"}</span>
+                                                                                                            <span className="text-gray-300">&bull;</span>
+                                                                                                            <span className="text-brand-inactive-text">Motivo: {ret.reason || "Não informado"}</span>
+                                                                                                        </div>
+                                                                                                        <div className="flex items-center gap-2">
+                                                                                                            <span className="text-brand-inactive-text font-mono text-[10px] bg-white dark:bg-dark-surface px-1.5 py-0.5 rounded border border-brand-border/50">
+                                                                                                                DVL-{ret.requestId.slice(0, 6).toUpperCase()}
+                                                                                                            </span>
+                                                                                                            <Badge variant={statusMeta.variant} className="scale-90 whitespace-nowrap">{statusMeta.label}</Badge>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                );
+                                                                                            })}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })()}
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -779,7 +853,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             )}
                                                             {paymentMethodDiscountAmount > 0 && (
                                                                 <PaymentRow
-                                                                    label="Desconto do Método"
+                                                                    label={
+                                                                        order.payment_method === "exchange" ? "Crédito de troca" :
+                                                                        order.payment_method === "store_credit" ? "Vale-compra utilizado" :
+                                                                        "Desconto do Método"
+                                                                    }
                                                                     value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                             )}
                                                             {paymentMethodExtraAmount > 0 && (
@@ -985,6 +1063,53 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                 )}
                                                                             </span>
                                                                         </div>
+
+                                                                        {/* Return History for this item */}
+                                                                        {(() => {
+                                                                            const itemReturns = (order.return_requests || []).flatMap((rr: any) => {
+                                                                                const matchingItems = (rr.return_items || []).filter((ri: any) => ri.order_item_id === item.id);
+                                                                                return matchingItems.map((ri: any) => ({
+                                                                                    ...ri,
+                                                                                    requestStatus: rr.status,
+                                                                                    requestId: rr.id,
+                                                                                    createdAt: rr.created_at || rr.returnDate,
+                                                                                }));
+                                                                            });
+
+                                                                            if (itemReturns.length === 0) return null;
+
+                                                                            return (
+                                                                                <div className="mt-3 p-3 bg-brand-gray/40 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
+                                                                                    <h5 className="text-[11px] font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1">
+                                                                                        <span>🔄 Histórico de Devolução / Troca</span>
+                                                                                    </h5>
+                                                                                    <div className="divide-y divide-brand-border/30 dark:divide-dark-border/10">
+                                                                                        {itemReturns.map((ret: any, idx: number) => {
+                                                                                            const statusMeta = getReturnStatusMeta(ret.requestStatus);
+                                                                                            return (
+                                                                                                <div key={idx} className="py-1.5 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                                                                                    <div className="flex items-center gap-2">
+                                                                                                        <span className="font-medium text-brand-inactive-text">
+                                                                                                            Qtd: <strong className="text-brand-dark dark:text-dark-heading">{ret.quantity} un.</strong>
+                                                                                                        </span>
+                                                                                                        <span className="text-gray-300">&bull;</span>
+                                                                                                        <span className="text-brand-inactive-text">Condição: {ret.condition === "sealed" || ret.condition === "lacrado" ? "Lacrado" : ret.condition === "damaged" || ret.condition === "danificado" ? "Danificado" : "Aberto"}</span>
+                                                                                                        <span className="text-gray-300">&bull;</span>
+                                                                                                        <span className="text-brand-inactive-text">Motivo: {ret.reason || "Não informado"}</span>
+                                                                                                    </div>
+                                                                                                    <div className="flex items-center gap-2">
+                                                                                                        <span className="text-brand-inactive-text font-mono text-[10px] bg-white dark:bg-dark-surface px-1.5 py-0.5 rounded border border-brand-border/50">
+                                                                                                            DVL-{ret.requestId.slice(0, 6).toUpperCase()}
+                                                                                                        </span>
+                                                                                                        <Badge variant={statusMeta.variant} className="scale-90 whitespace-nowrap">{statusMeta.label}</Badge>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
                                                                     </div>
                                                                 </div>
                                                             );

@@ -10,6 +10,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/utils"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
 import { toast } from "@/hooks/use-notification"
@@ -510,6 +511,8 @@ export default function DeliveryDetailPage({
                 (() => {
                     const getPaymentTypeLabel = (o: any) => {
                         const pm = String(o.payment_method || "").toLowerCase();
+                        if (pm === "exchange") return "Crédito de troca";
+                        if (pm === "store_credit" || pm === "store-credit") return "Vale-compra utilizado";
                         if (pm === "pix" || pm === "bank_transfer") return "Pix";
                         if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
                         if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
@@ -752,7 +755,7 @@ export default function DeliveryDetailPage({
                                                 <div className="flex flex-col gap-1 text-right">
                                                     {paymentBreakdown.map((entry: any, index: number) => (
                                                         <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
                                                         </span>
                                                     ))}
                                                 </div>
@@ -801,7 +804,11 @@ export default function DeliveryDetailPage({
 
                                         {paymentMethodDiscountAmount > 0 && (
                                             <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Método</span>
+                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                                     {order.payment_method === "exchange" ? "Crédito de troca" :
+                                                      order.payment_method === "store_credit" ? "Vale-compra utilizado" :
+                                                      "Desconto do Método"}
+                                                 </span>
                                                 <span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>
                                             </div>
                                         )}

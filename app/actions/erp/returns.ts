@@ -15,6 +15,7 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import type { ReturnRequestListItem } from "@/lib/returns/types"
+import { getReturnableQuantities } from "@/lib/returns/returnable-quantities"
 import {
     canRequestOrderCancellation,
     canRequestPostFulfillmentResolution,
@@ -256,7 +257,18 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
             ? (toNumber(row.store_credit_amount) > 0 ? "store_credit" : toNumber(row.refund_amount) > 0 ? "refund" : undefined)
             : undefined) as any,
         items,
-        returnEvents: row.return_events || undefined,
+        returnEvents: (row.return_events || []).map((e: any) => ({
+            id: e.id,
+            return_request_id: e.return_request_id,
+            previous_status: e.from_status || null,
+            new_status: e.to_status || null,
+            changed_by: e.actor_user_id || null,
+            actor_name: e.actor_name || undefined,
+            notes: e.message || null,
+            metadata: e.metadata || {},
+            event_type: e.event_type,
+            created_at: e.created_at,
+        })),
     }
 }
 
@@ -383,7 +395,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
         const events = (data as any)?.return_events || []
         let eventsWithActorNames = events
         if (events.length > 0) {
-            const actorIds = Array.from(new Set(events.map((e: any) => e.changed_by).filter(Boolean))) as string[]
+            const actorIds = Array.from(new Set(events.map((e: any) => e.actor_user_id).filter(Boolean))) as string[]
             if (actorIds.length > 0) {
                 const { data: profiles } = await supabase
                     .from("user_profiles")
@@ -392,7 +404,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
                 const nameMap = new Map((profiles || []).map((p: any) => [p.user_id, p.full_name?.trim() || "Usuário"]))
                 eventsWithActorNames = events.map((e: any) => ({
                     ...e,
-                    actor_name: e.changed_by ? nameMap.get(e.changed_by) || "Usuário" : "Sistema",
+                    actor_name: e.actor_user_id ? nameMap.get(e.actor_user_id) || "Usuário" : "Sistema",
                 }))
             }
         }
@@ -438,6 +450,15 @@ export async function createReturnRequestAction(input: unknown) {
             .eq("order_id", data.orderId)
 
         if (itemsError || !orderItems) throw new Error("Erro ao buscar itens do pedido")
+
+        // Validate quantities on the server-side
+        const remainingQuantities = await getReturnableQuantities(data.orderId)
+        for (const item of data.items) {
+            const maxQty = remainingQuantities[item.order_item_id] ?? 0
+            if (item.quantity > maxQty) {
+                throw new Error(`A quantidade solicitada (${item.quantity}) excede a quantidade devolvível disponível (${maxQty}) para o item selecionado.`)
+            }
+        }
 
         const returnedItemIds = new Set(data.items.map((item: any) => item.order_item_id))
         const returnedServices = orderItems.filter((item: any) => returnedItemIds.has(item.id) && (item.service_id || item.line_type === "service_booking"))
@@ -509,17 +530,6 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         await requireOrderAccess(base.orderId)
         const supabase = createAdminClient()
 
-        const { data: existingRequest } = await supabase
-            .from("return_requests")
-            .select("id")
-            .eq("order_id", base.orderId)
-            .is("deleted_at", null)
-            .maybeSingle()
-
-        if (existingRequest) {
-            throw new Error("Já existe uma solicitação de devolução/cancelamento ativa para este pedido.")
-        }
-
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .select("id, partner_id, buyer_id, situation, delivery_status, order_number")
@@ -539,6 +549,15 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             .eq("order_id", base.orderId)
 
         if (itemsError || !orderItems) throw new Error("Erro ao buscar itens do pedido")
+
+        // Validate quantities on the server-side
+        const remainingQuantities = await getReturnableQuantities(base.orderId)
+        for (const item of base.items) {
+            const maxQty = remainingQuantities[item.order_item_id] ?? 0
+            if (item.quantity > maxQty) {
+                throw new Error(`A quantidade solicitada (${item.quantity}) excede a quantidade devolvível disponível (${maxQty}) para o item selecionado.`)
+            }
+        }
 
         const returnedItemIds = new Set(base.items.map((item: any) => item.order_item_id))
         const returnedServices = orderItems.filter((item: any) => returnedItemIds.has(item.id) && (item.service_id || item.line_type === "service_booking"))
@@ -1405,6 +1424,37 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
 
         if (error) throw error
 
+        // Batch query to get returned quantities for all retrieved orders
+        const orderIds = (orders || []).map((o: any) => o.id)
+        const returnedQtyMap: Record<string, number> = {}
+        if (orderIds.length > 0) {
+            const { data: retRequests } = await supabase
+                .from("return_requests")
+                .select(`
+                    order_id,
+                    status,
+                    return_items (
+                        order_item_id,
+                        quantity
+                    )
+                `)
+                .in("order_id", orderIds)
+                .is("deleted_at", null)
+
+            if (retRequests) {
+                retRequests.forEach((rr: any) => {
+                    const status = String(rr.status || "").toUpperCase()
+                    if (status === "REJECTED" || status === "EXPIRED" || status === "CANCELLED") return
+                    const riList = rr.return_items || []
+                    riList.forEach((ri: any) => {
+                        if (ri.order_item_id) {
+                            returnedQtyMap[ri.order_item_id] = (returnedQtyMap[ri.order_item_id] || 0) + (ri.quantity || 0)
+                        }
+                    })
+                })
+            }
+        }
+
         const buyerIds = Array.from(new Set((orders || []).map((o: any) => o.buyer_id).filter(Boolean)))
         const customersMap = new Map<string, any>()
         if (buyerIds.length > 0) {
@@ -1450,9 +1500,12 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                     const fallbackNet = subtotalOriginal > 0
                         ? (getLineSubtotal(item) / subtotalOriginal) * amountPaid
                         : getLineSubtotal(item)
+                    const returnedQty = returnedQtyMap[item.id] || 0
+                    const remainingQty = Math.max(0, (item.quantity || 0) - returnedQty)
                     return {
                         ...item,
                         net_item_value: persistedNet > 0 ? persistedNet : Number(fallbackNet.toFixed(2)),
+                        remainingQuantity: remainingQty,
                     }
                 }),
                 customer: customer || null,
@@ -1479,3 +1532,64 @@ export async function searchOrderForReturnAction(partnerId: string, orderNumber:
         return { success: false, error: e?.message || "Erro ao buscar pedido" }
     }
 }
+
+export async function retryMercadoPagoRefundAction(partnerId: string, refundId: string, requestId: string) {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    try {
+        const user = await requireUser()
+        const access = await requirePermission(partnerId, "orders", "edit")
+        assertRole(access.roleId, MANAGE_ROLES)
+        const supabase = createAdminClient()
+
+        const { data: refund, error: refundError } = await supabase
+            .from("return_refunds")
+            .select("*")
+            .eq("id", refundId)
+            .eq("return_request_id", requestId)
+            .single()
+
+        if (refundError || !refund) throw new Error("Reembolso não encontrado.")
+
+        const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .select("id, mp_payment_id, total_amount, paid_amount, payment_breakdown, payment_method")
+            .eq("id", refund.order_id)
+            .single()
+
+        if (orderError || !order) throw new Error("Pedido correspondente não encontrado.")
+        if (!order.mp_payment_id) throw new Error("Este pedido não foi pago via Mercado Pago (mp_payment_id ausente).")
+
+        await supabase
+            .from("return_refunds")
+            .update({ status: "PENDING", error_message: null, updated_at: new Date().toISOString() })
+            .eq("id", refundId)
+
+        const res = await maybeRefundMercadoPago({
+            partnerId,
+            requestId,
+            refundId,
+            amount: Number(refund.amount),
+            order,
+            idempotencyKey: `retry-return-${requestId}-${refundId}-${Date.now()}`
+        })
+
+        if (!res.success) {
+            throw new Error(res.error || "Erro ao processar reembolso no Mercado Pago.")
+        }
+
+        await supabase.from("return_events").insert({
+            return_request_id: requestId,
+            previous_status: null,
+            new_status: null,
+            actor_user_id: user.id,
+            notes: `Processamento manual de reembolso no Mercado Pago aprovado (ID MP: ${res.mpRefundId}).`,
+            metadata: { refundId, mpRefundId: res.mpRefundId }
+        })
+
+        await revalidateReturns(partnerId, order.id, requestId)
+        return successResponse({ mpRefundId: res.mpRefundId })
+    } catch (e: any) {
+        return errorResponse(e?.message || "Erro ao reprocessar reembolso")
+    }
+}
+

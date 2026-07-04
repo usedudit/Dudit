@@ -7,7 +7,7 @@ import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import { ReviewsSection } from '@/components/marketplace/ReviewsSection';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
-import { getCustomerOrdersAction, deleteCustomerAction } from '@/app/actions/erp/customers';
+import { getCustomerOrdersAction, deleteCustomerAction, getCustomerStoreCreditsAction } from '@/app/actions/erp/customers';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { useMediaQuery } from '../hooks';
@@ -63,6 +63,8 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [billingAddress, setBillingAddress] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [storeCredits, setStoreCredits] = useState<any[]>([]);
+    const [isLoadingStoreCredits, setIsLoadingStoreCredits] = useState(false);
 
     const router = useRouter();
     const [page, setPage] = useState(1);
@@ -256,8 +258,22 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                 console.error("Error fetching address:", e);
             }
         };
+        const fetchStoreCredits = async () => {
+            setIsLoadingStoreCredits(true);
+            try {
+                const res = await getCustomerStoreCreditsAction(realCustomerId);
+                if (res.success && res.storeCredits) {
+                    setStoreCredits(res.storeCredits);
+                }
+            } catch (e) {
+                console.error("Error fetching store credits:", e);
+            } finally {
+                setIsLoadingStoreCredits(false);
+            }
+        };
         fetchOrders();
         fetchAddress();
+        fetchStoreCredits();
     }, [realCustomerId]);
 
     const [fetchedReviews, setFetchedReviews] = useState<any[] | null>(null);
@@ -558,6 +574,65 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             )}
                                                         </div>
                                                     )}
+
+                                                    {/* Vale-compras on tablet/mobile */}
+                                                    <div className="mt-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5">
+                                                        <div className="flex justify-between items-center mb-3">
+                                                            <h3 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Vales-Compra</h3>
+                                                            {Number(customer.store_credit || customer.storeCredit || 0) > 0 && (
+                                                                <Badge variant="green" className="scale-90">
+                                                                    Saldo: {formatCurrency(customer.store_credit || customer.storeCredit || 0)}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {isLoadingStoreCredits ? (
+                                                            <div className="text-center py-2 text-brand-inactive-text dark:text-dark-body text-xs">
+                                                                Carregando vales-compra...
+                                                            </div>
+                                                        ) : storeCredits.length === 0 ? (
+                                                            <div className="text-center py-2 text-brand-inactive-text dark:text-dark-body text-xs font-medium">
+                                                                Nenhum vale-compra gerado para este cliente.
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                                                                {storeCredits.map((credit: any) => {
+                                                                    const usedAmount = Number(credit.amount) - Number(credit.remaining_amount);
+                                                                    const isExpired = credit.expires_at && new Date(credit.expires_at) < new Date();
+                                                                    return (
+                                                                        <div key={credit.id} className="p-3 bg-gray-50 dark:bg-dark-border/10 rounded-xl border border-brand-border dark:border-dark-border/50 text-xs">
+                                                                            <div className="flex justify-between items-center mb-1.5">
+                                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                                    Gerado em {formatDate(credit.created_at)}
+                                                                                </span>
+                                                                                <Badge variant={
+                                                                                    credit.status === 'ACTIVE' && !isExpired ? 'green' :
+                                                                                    credit.status === 'USED' ? 'gray' : 'red'
+                                                                                } className="scale-90">
+                                                                                    {credit.status === 'ACTIVE' && !isExpired ? 'Disponível' :
+                                                                                     credit.status === 'USED' ? 'Utilizado' : 'Expirado'}
+                                                                                </Badge>
+                                                                            </div>
+                                                                            <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-brand-border dark:border-dark-border/30">
+                                                                                <div>
+                                                                                    <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Valor</span>
+                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(credit.amount)}</span>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Utilizado</span>
+                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(usedAmount)}</span>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <span className="block text-brand-inactive-text dark:text-dark-body text-[10px]">Restante</span>
+                                                                                    <span className="font-bold text-brand-green">{formatCurrency(credit.remaining_amount)}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <>
@@ -782,6 +857,77 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             </div>
                                                         )}
                                                     </div>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        {/* Vales-Compra Sidebar Section */}
+                                        <section>
+                                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-green dark:bg-dark-border"></div>
+
+                                                <div className="px-6 pt-5 flex justify-between items-center">
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mt-2">Vales-Compra</h3>
+                                                    {Number(customer.store_credit || customer.storeCredit || 0) > 0 && (
+                                                        <Badge variant="green">
+                                                            Saldo: {formatCurrency(customer.store_credit || customer.storeCredit || 0)}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+
+                                                <div className="p-6 text-left space-y-4">
+                                                    {isLoadingStoreCredits ? (
+                                                        <div className="text-center py-4 text-brand-inactive-text dark:text-dark-body text-sm">
+                                                            Carregando vales-compra...
+                                                        </div>
+                                                    ) : storeCredits.length === 0 ? (
+                                                        <div className="text-center py-4 text-brand-inactive-text dark:text-dark-body text-sm font-medium">
+                                                            Nenhum vale-compra gerado para este cliente.
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
+                                                            {storeCredits.map((credit: any) => {
+                                                                const usedAmount = Number(credit.amount) - Number(credit.remaining_amount);
+                                                                const isExpired = credit.expires_at && new Date(credit.expires_at) < new Date();
+                                                                return (
+                                                                    <div key={credit.id} className="p-3 bg-gray-50 dark:bg-dark-border/10 rounded-xl border border-brand-border dark:border-dark-border/50 text-sm">
+                                                                        <div className="flex justify-between items-start mb-1.5">
+                                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                                Gerado em {formatDate(credit.created_at)}
+                                                                            </span>
+                                                                            <Badge variant={
+                                                                                credit.status === 'ACTIVE' && !isExpired ? 'green' :
+                                                                                credit.status === 'USED' ? 'gray' : 'red'
+                                                                            }>
+                                                                                {credit.status === 'ACTIVE' && !isExpired ? 'Disponível' :
+                                                                                 credit.status === 'USED' ? 'Utilizado' : 'Expirado'}
+                                                                            </Badge>
+                                                                        </div>
+                                                                        
+                                                                        <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-brand-border dark:border-dark-border/30 text-xs">
+                                                                            <div>
+                                                                                <span className="block text-brand-inactive-text dark:text-dark-body">Valor</span>
+                                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(credit.amount)}</span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="block text-brand-inactive-text dark:text-dark-body">Utilizado</span>
+                                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(usedAmount)}</span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="block text-brand-inactive-text dark:text-dark-body">Restante</span>
+                                                                                <span className="font-bold text-brand-green">{formatCurrency(credit.remaining_amount)}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        {credit.expires_at && (
+                                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-2">
+                                                                                Expira em: {formatDate(credit.expires_at)}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </section>

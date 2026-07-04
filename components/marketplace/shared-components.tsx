@@ -662,7 +662,7 @@ export const HorizontalCarousel = ({
                             Ver tudo
                         </button>
                     )}
-                    <div className="flex items-center gap-1.5">
+                    <div className="hidden lg:flex items-center gap-1.5">
                         {showLeftArrow && (
                             <button
                                 onClick={() => scroll('left')}

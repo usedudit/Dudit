@@ -1733,7 +1733,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             stores(name),
             coupons(*),
             appointments(*),
-            return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount)
+            return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, created_at, return_items(*))
         `)
         .eq("partner_id", partnerId)
 
@@ -3196,28 +3196,286 @@ export async function updateOrdersStatusInBatchAction(payload: {
     await revalidateOrders(payload.partnerId)
 
     const dispatchOrderStatusSideEffects = async () => {
-        const [{ onOrderStatusChanged: onWhatsappOrder }, { onOrderStatusChanged: onNotifyOrder }] =
-            await Promise.all([
-                import("@/lib/services/whatsapp-automation.service"),
-                import("@/lib/services/notification-automation.service"),
-            ])
+        const firstOrder = currentOrders?.[0]
+        if (!firstOrder) return
 
-        for (const order of currentOrders || []) {
-            const orderPayload = { ...order, partner_id: payload.partnerId }
-            if (payload.actionType === "payment_status" && payload.statusValue) {
-                const paymentStatusMap: Record<string, string> = {
-                    paid: "paid",
-                    pending: "pending",
-                    partially_paid: "partially_paid",
+        const { data: partner } = await supabase
+            .from("partners")
+            .select("store_name")
+            .eq("id", payload.partnerId)
+            .maybeSingle()
+        const storeName = partner?.store_name || "Vendedor"
+        const customerName = String(firstOrder.customer_name || "cliente")
+
+        if (payload.actionType === "payment_status" && payload.statusValue) {
+            const paymentStatusMap: Record<string, string> = {
+                paid: "paid",
+                pending: "pending",
+                partially_paid: "partially_paid",
+            }
+            const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
+
+            const whatsappMessages: Record<string, string[]> = {
+                paid: [
+                    `✅ *Pagamento confirmado!*`,
+                    ``,
+                    `Oba, ${customerName}! O pagamento de alguns pedidos seus foram aprovados. 🎉`,
+                    ``,
+                    `*Vendedor:* ${storeName}`,
+                    ``,
+                    `Já estamos providenciando tudo. Te manteremos atualizado! 📦`,
+                ],
+                pending: [
+                    `⏳ *Pagamento pendente*`,
+                    ``,
+                    `Olá, ${customerName}! O pagamento de alguns pedidos seus está pendente.`,
+                    ``,
+                    `*Vendedor:* ${storeName}`,
+                    ``,
+                    `Assim que for confirmado, avisamos por aqui. 📲`,
+                ],
+                partially_paid: [
+                    `💳 *Pagamento parcial recebido*`,
+                    ``,
+                    `Olá, ${customerName}! Recebemos um pagamento parcial de alguns pedidos seus.`,
+                    ``,
+                    `*Vendedor:* ${storeName}`,
+                ],
+            }
+
+            const systemTitleMap: Record<string, string> = {
+                paid: "✅ Pagamento confirmado!",
+                pending: "⏳ Pagamento pendente",
+                partially_paid: "💳 Pagamento parcial",
+            }
+
+            const systemMessageMap: Record<string, string> = {
+                paid: `Oba! O pagamento de alguns pedidos seus em ${storeName} foi aprovado. 🎉`,
+                pending: `Olá! O pagamento de alguns pedidos seus em ${storeName} está pendente.`,
+                partially_paid: `Olá! Recebemos um pagamento parcial de alguns pedidos seus em ${storeName}.`,
+            }
+
+            const partnerTitleMap: Record<string, string> = {
+                paid: "💰 Pagamento confirmado!",
+                pending: "⏳ Pagamento pendente",
+                partially_paid: "💳 Pagamento parcial recebido",
+            }
+
+            const partnerMessageMap: Record<string, string> = {
+                paid: `Sucesso! O pagamento de ${currentOrders?.length || 0} pedidos foi confirmado.`,
+                pending: `${currentOrders?.length || 0} pedidos estão com pagamento pendente.`,
+                partially_paid: `${currentOrders?.length || 0} pedidos receberam pagamento parcial.`,
+            }
+
+            const msg = whatsappMessages[situation] || whatsappMessages.pending
+            const sysTitle = systemTitleMap[situation] || systemTitleMap.pending
+            const sysMsg = systemMessageMap[situation] || systemMessageMap.pending
+            const partnerTitle = partnerTitleMap[situation] || partnerTitleMap.pending
+            const partnerMsg = partnerMessageMap[situation] || partnerMessageMap.pending
+
+            // WhatsApp consolidated
+            if (firstOrder.customer_id) {
+                (async () => {
+                    const { normalizePhoneToE164 } = await import("@/lib/whatsapp/phone")
+                    const { data: customer } = await supabase
+                        .from("customers")
+                        .select("phone")
+                        .eq("id", firstOrder.customer_id)
+                        .eq("partner_id", payload.partnerId)
+                        .maybeSingle()
+                    const phone = normalizePhoneToE164(customer?.phone || null)
+
+                    if (phone) {
+                        const { getActiveWhatsappConnection } = await import("@/lib/services/whatsapp-connection.service")
+                        const connection = await getActiveWhatsappConnection(payload.partnerId)
+                        if (connection?.is_active) {
+                            const { queueWhatsappMessage, processWhatsappMessageById } = await import("@/lib/services/whatsapp-dispatch.service")
+                            const queueResult = await queueWhatsappMessage({
+                                partnerId: payload.partnerId,
+                                customerId: firstOrder.customer_id || null,
+                                orderId: firstOrder.id,
+                                phoneNumber: phone,
+                                templateName: undefined,
+                                messageType: "text",
+                                payload: { body: msg.join("\n"), triggerType: "order_payment_approved" },
+                                triggerType: "order_payment_approved",
+                                idempotencyKey: `bulk_payment:${payload.partnerId}:${payload.orderIds.slice(0, 5).join(",")}`,
+                            })
+                            if (queueResult.resultStatus === "queued") {
+                                await processWhatsappMessageById(queueResult.messageId!)
+                            }
+                        }
+                    }
+                })()
+            }
+
+            // System notification consolidated
+            (async () => {
+                const { createNotification, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+                if (firstOrder.buyer_id) {
+                    await createNotification({
+                        userId: String(firstOrder.buyer_id),
+                        type: situation === "paid" ? "order_paid" : "order_created",
+                        title: sysTitle,
+                        message: sysMsg,
+                        entityType: "order",
+                        entityId: firstOrder.id,
+                        data: { audience: "customer", partner_id: payload.partnerId, storeName },
+                        idempotencyKey: `bulk_payment:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
+                        origin: "manual",
+                    })
                 }
-                const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
-                onWhatsappOrder(orderPayload, situation).catch(console.error)
-                onNotifyOrder(orderPayload, situation, undefined, "manual").catch(console.error)
+                const teamUserIds = await getPartnerTeamUserIds(payload.partnerId)
+                for (const userId of teamUserIds) {
+                    await createNotification({
+                        userId,
+                        type: "order_paid",
+                        title: partnerTitle,
+                        message: partnerMsg,
+                        entityType: "order",
+                        entityId: firstOrder.id,
+                        data: { audience: "seller", partner_id: payload.partnerId, count: currentOrders?.length },
+                        idempotencyKey: `bulk_payment:seller:${payload.partnerId}:${userId}:${payload.orderIds.sort().join(",")}`,
+                        origin: "manual",
+                    })
+                }
+            })()
+        }
+
+        if (payload.actionType === "delivery_status" && payload.statusValue) {
+            const deliveryStatus = payload.statusValue
+
+            const deliveryWAMap: Record<string, string[]> = {
+                preparing: [
+                    `📦 *Pedidos em preparação*`,
+                    ``,
+                    `Olá, ${customerName}! Alguns pedidos seus estão sendo preparados.`,
+                    ``,
+                    `*Vendedor:* ${storeName}`,
+                    ``,
+                    `Logo logo estarão prontos! ⏳`,
+                ],
+                sent: [
+                    `🚚 *Pedidos enviados*`,
+                    ``,
+                    `Olá, ${customerName}! Alguns pedidos seus foram enviados para entrega.`,
+                    ``,
+                    `*Vendedor:* ${storeName}`,
+                    ``,
+                    `Fique de olho, eles chegam rapidinho! 🚀`,
+                ],
+                delivered: [
+                    `✅ *Pedidos entregues*`,
+                    ``,
+                    `Tudo certo, ${customerName}! Alguns pedidos seus foram entregues com sucesso.`,
+                    ``,
+                    `*Vendedor:* ${storeName}`,
+                    ``,
+                    `Esperamos que você goste! 😁`,
+                ],
+                pickup_available: [
+                    `📦 *Pedidos prontos para retirada*`,
+                    ``,
+                    `Olá, ${customerName}! Alguns pedidos seus estão prontos e te esperando.`,
+                    `*Local de retirada:* ${storeName}`,
+                    ``,
+                    `Pode vir buscar quando quiser! 🏃‍♂️`,
+                ],
             }
-            if (payload.actionType === "delivery_status" && payload.statusValue) {
-                onWhatsappOrder(orderPayload, undefined, payload.statusValue).catch(console.error)
-                onNotifyOrder(orderPayload, undefined, payload.statusValue, "manual").catch(console.error)
+
+            const deliverySysTitleMap: Record<string, string> = {
+                preparing: "📦 Pedidos em preparação",
+                sent: "🚚 Pedidos enviados",
+                delivered: "✅ Pedidos entregues",
+                pickup_available: "📦 Pedidos prontos para retirada",
             }
+
+            const deliverySysMsgMap: Record<string, string> = {
+                preparing: `Olá! Alguns pedidos seus em ${storeName} estão sendo preparados.`,
+                sent: `Olá! Alguns pedidos seus em ${storeName} foram enviados para entrega.`,
+                delivered: `Tudo certo! Alguns pedidos seus em ${storeName} foram entregues.`,
+                pickup_available: `Olá! Alguns pedidos seus em ${storeName} estão prontos para retirada.`,
+            }
+
+            const deliveryPartnerMsgMap: Record<string, string> = {
+                preparing: `${currentOrders?.length || 0} pedidos estão em preparação.`,
+                sent: `${currentOrders?.length || 0} pedidos foram enviados para entrega.`,
+                delivered: `${currentOrders?.length || 0} pedidos foram entregues.`,
+                pickup_available: `${currentOrders?.length || 0} pedidos estão prontos para retirada.`,
+            }
+
+            const waMsg = deliveryWAMap[deliveryStatus] || deliveryWAMap.preparing
+            const sysTitle = deliverySysTitleMap[deliveryStatus] || deliverySysTitleMap.preparing
+            const sysMsg = deliverySysMsgMap[deliveryStatus] || deliverySysMsgMap.preparing
+            const partnerMsg = deliveryPartnerMsgMap[deliveryStatus] || deliveryPartnerMsgMap.preparing
+
+            // WhatsApp consolidated
+            if (firstOrder.customer_id) {
+                (async () => {
+                    const { normalizePhoneToE164 } = await import("@/lib/whatsapp/phone")
+                    const { data: customer } = await supabase
+                        .from("customers")
+                        .select("phone")
+                        .eq("id", firstOrder.customer_id)
+                        .eq("partner_id", payload.partnerId)
+                        .maybeSingle()
+                    const phone = normalizePhoneToE164(customer?.phone || null)
+
+                    if (phone) {
+                        const { getActiveWhatsappConnection } = await import("@/lib/services/whatsapp-connection.service")
+                        const connection = await getActiveWhatsappConnection(payload.partnerId)
+                        if (connection?.is_active) {
+                            const { queueWhatsappMessage, processWhatsappMessageById } = await import("@/lib/services/whatsapp-dispatch.service")
+                            const queueResult = await queueWhatsappMessage({
+                                partnerId: payload.partnerId,
+                                customerId: firstOrder.customer_id || null,
+                                orderId: firstOrder.id,
+                                phoneNumber: phone,
+                                templateName: undefined,
+                                messageType: "text",
+                                payload: { body: waMsg.join("\n"), triggerType: "order_delivered" },
+                                triggerType: "order_delivered",
+                                idempotencyKey: `bulk_delivery:${payload.partnerId}:${payload.orderIds.slice(0, 5).join(",")}`,
+                            })
+                            if (queueResult.resultStatus === "queued") {
+                                await processWhatsappMessageById(queueResult.messageId!)
+                            }
+                        }
+                    }
+                })()
+            }
+
+            // System notification consolidated
+            (async () => {
+                const { createNotification, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+                if (firstOrder.buyer_id) {
+                    await createNotification({
+                        userId: String(firstOrder.buyer_id),
+                        type: "order_delivered",
+                        title: sysTitle,
+                        message: sysMsg,
+                        entityType: "order",
+                        entityId: firstOrder.id,
+                        data: { audience: "customer", partner_id: payload.partnerId, storeName },
+                        idempotencyKey: `bulk_delivery:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
+                        origin: "manual",
+                    })
+                }
+                const teamUserIds = await getPartnerTeamUserIds(payload.partnerId)
+                for (const userId of teamUserIds) {
+                    await createNotification({
+                        userId,
+                        type: "order_delivered",
+                        title: sysTitle,
+                        message: partnerMsg,
+                        entityType: "order",
+                        entityId: firstOrder.id,
+                        data: { audience: "seller", partner_id: payload.partnerId, count: currentOrders?.length },
+                        idempotencyKey: `bulk_delivery:seller:${payload.partnerId}:${userId}:${payload.orderIds.sort().join(",")}`,
+                        origin: "manual",
+                    })
+                }
+            })()
         }
     }
 

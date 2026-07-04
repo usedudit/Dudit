@@ -497,16 +497,18 @@ function CarouselNav({ targetRef, showSeeAll, onSeeAll }: { targetRef: React.Ref
     return (
         <div className="flex items-center gap-2">
             {showSeeAll && <button onClick={onSeeAll} className="text-[13px] font-bold text-brand-green hover:underline px-2">Ver todos</button>}
-            {canLeft && (
-                <Button variant="filled" onClick={() => scroll(-1)} className="h-9 w-9 p-0 rounded-full bg-brand-gray text-brand-dark hover:bg-gray-200">
-                    <ChevronLeftIcon size={18} />
-                </Button>
-            )}
-            {canRight && (
-                <Button variant="filled" onClick={() => scroll(1)} className="h-9 w-9 p-0 rounded-full">
-                    <ChevronRightIcon size={18} />
-                </Button>
-            )}
+            <div className="hidden lg:flex items-center gap-2">
+                {canLeft && (
+                    <Button variant="filled" onClick={() => scroll(-1)} className="h-9 w-9 p-0 rounded-full bg-brand-gray text-brand-dark hover:bg-gray-200">
+                        <ChevronLeftIcon size={18} />
+                    </Button>
+                )}
+                {canRight && (
+                    <Button variant="filled" onClick={() => scroll(1)} className="h-9 w-9 p-0 rounded-full">
+                        <ChevronRightIcon size={18} />
+                    </Button>
+                )}
+            </div>
         </div>
     )
 }

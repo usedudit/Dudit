@@ -5,14 +5,26 @@ export function formatPaymentMethodLabel(
   name: string | null | undefined,
   paymentType: string | null | undefined,
 ): string {
-  const rawName = (name || "").trim()
-  const rawType = (paymentType || "").trim()
+  let rawName = (name || "").trim()
+  let rawType = (paymentType || "").trim()
 
   if (!rawName && !rawType) return ""
+
+  const normName = rawName.toLowerCase();
+  const normType = rawType.toLowerCase();
+
+  if (normName === "exchange" || normName === "store_credit" || normName === "store-credit" || normName.includes("vale-compra") || normName.includes("vale_compra")) {
+    rawName = normName === "exchange" ? "Crédito de troca" : "Vale-compra utilizado";
+  }
+  if (normType === "exchange" || normType === "store_credit" || normType === "store-credit" || normType.includes("vale-compra") || normType.includes("vale_compra")) {
+    rawType = normType === "exchange" ? "exchange" : "store_credit";
+  }
 
   // Helper to normalize and translate the payment type to a friendly Portuguese label
   const getFriendlyTypeLabel = (typeOrName: string): string => {
     const norm = typeOrName.toLowerCase().trim()
+    if (norm === "exchange") return "Crédito de troca"
+    if (norm === "store_credit" || norm === "store-credit" || norm.includes("vale-compra") || norm.includes("vale_compra")) return "Vale-compra utilizado"
     if (norm.includes("pix")) return "Pix"
     if (norm.includes("credito") || norm.includes("crédito") || norm.includes("credit")) return "Cartão de Crédito"
     if (norm.includes("debito") || norm.includes("débito") || norm.includes("debit")) return "Cartão de Débito"

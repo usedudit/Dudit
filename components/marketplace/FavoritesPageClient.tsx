@@ -317,11 +317,11 @@ function FavoritesEmpty({
                 <IconPlaceholder
                     placeholderType="image"
                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                    imageAlt={`Nenhum ${label} favorito`}
-                    title={`Nenhum ${label} favorito`}
-                    subtitle={`Você ainda não tem ${label} nos seus favoritos. Explore o marketplace e favorite o que gostar!`}
+                    imageAlt={`Sem ${label} favorito`}
+                    title={`Sem ${label} favorito`}
+                    subtitle={`Você ainda não tem ${label} nos seus favoritos. Explore a Dudit e favorite o que gostar!`}
                     itemButton={{
-                        text: "Explorar marketplace",
+                        text: "Explorar Dudit",
                         action: () => window.location.href = "/explorar",
                         variant: "default"
                     }}

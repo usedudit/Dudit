@@ -159,7 +159,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                         sku: item.sku || null,
                     })),
                     evidence: data.evidence || [],
-                    idempotencyKey: `erp:${partnerId}:${data.orderId}`,
+                    idempotencyKey: `erp:${partnerId}:${data.orderId}:${typeof window !== "undefined" ? window.crypto.randomUUID() : crypto.randomUUID()}`,
                     refundValue: Number(data.refundValue || 0),
                     storeCreditValue: Number(data.storeCreditValue || 0),
                     exchangeItems: data.exchangeItems || [],
