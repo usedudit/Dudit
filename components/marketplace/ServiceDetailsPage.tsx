@@ -28,6 +28,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
+import { InfoCard } from "@/components/reusable/InfoCard"
 import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
@@ -935,7 +936,7 @@ export function ServiceDetailsPageClient({
                 {service.name}
             </h1>
 
-            {showPrice && activePromo && !pricing.hasCampaignDiscount && (
+            {showPrice && activePromo && !pricing.hasCampaignDiscount && !pricing.hasManualPromo && (
                 <div className="mb-6 flex">
                     <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
                         {activePromo.name}
@@ -970,53 +971,37 @@ export function ServiceDetailsPageClient({
 
                     // Caso: Campanha (com ou sem Pix) usando o novo design de banner
                     if (hasCampaign) {
-                        const discountBadge = (
-                            <span className="bg-[#ffe082] text-[#e65100] dark:bg-[#e65100]/20 dark:text-[#ffb74d] text-xs font-bold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">
-                                {pricing.campaignDiscountLabel} OFF
-                            </span>
-                        );
-
                         return (
-                            <div className="rounded-xl overflow-hidden border border-orange-100 mb-6">
-                                {/* Banner de Campanha */}
-                                <div className="bg-orange-300 text-white px-4 py-2.5 flex justify-between items-center select-none font-semibold text-xs md:text-sm">
-                                    <span>{activePromo?.name || "Oferta de Campanha"}</span>
-                                </div>
-
-                                {/* Bloco de Preço */}
-                                <div className="bg-[#fff7ed] border border-orange-100 p-4 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-brand-inactive-text line-through font-normal">
-                                            {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix}
-                                        </span>
-                                    </div>
-                                    {hasPix ? (
-                                        <>
-                                            <div className="flex items-baseline gap-2 flex-wrap">
-                                                <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
-                                                    {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
-                                                </p>
-                                                <span className="text-xs md:text-sm font-semibold text-brand-green">no Pix</span>
-                                            </div>
-                                            <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                                                ou {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix} em outros meios
-                                            </p>
-                                        </>
-                                    ) : (
+                            <div className="space-y-1">
+                                <span className="text-sm text-brand-inactive-text line-through font-normal">
+                                    {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix}
+                                </span>
+                                {hasPix ? (
+                                    <>
                                         <div className="flex items-baseline gap-2 flex-wrap">
                                             <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
-                                                {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix}
+                                                {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
                                             </p>
+                                            <span className="text-xs md:text-sm font-semibold text-brand-green">no Pix</span>
                                         </div>
-                                    )}
-                                    <Button
-                                        variant="link"
-                                        onClick={() => setShowPaymentMethodsModal(true)}
-                                        className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left hover:underline"
-                                    >
-                                        Ver opções de pagamento
-                                    </Button>
-                                </div>
+                                        <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                            ou {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix} em outros meios
+                                        </p>
+                                    </>
+                                ) : (
+                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                        <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
+                                            {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix}
+                                        </p>
+                                    </div>
+                                )}
+                                <Button
+                                    variant="link"
+                                    onClick={() => setShowPaymentMethodsModal(true)}
+                                    className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left hover:underline"
+                                >
+                                    Ver opções de pagamento
+                                </Button>
                             </div>
                         );
                     }
@@ -1111,6 +1096,20 @@ export function ServiceDetailsPageClient({
                     </div>
                 )}
             </div>
+
+            {/* Campanha InfoCard */}
+            {showPrice && pricing.hasCampaignDiscount && activePromo && (
+                <InfoCard
+                    color="orange"
+                    className="mb-6"
+                    message={activePromo.name}
+                    rightElement={
+                        <span className="font-bold text-sm text-orange-700 dark:text-orange-300">
+                            {pricing.campaignDiscountLabel} OFF
+                        </span>
+                    }
+                />
+            )}
 
             {/* Brinde de Campanha discreto */}
             {giftDetails && (

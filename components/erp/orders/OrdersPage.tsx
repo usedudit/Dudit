@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
@@ -162,6 +163,7 @@ export default function OrdersPage({
     partnerId: string
 }) {
     const { toast } = useToast()
+    const router = useRouter()
     const { exportData, isExporting } = useErpExport()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
@@ -564,9 +566,9 @@ export default function OrdersPage({
         if (isMarketplace || hasMethod) {
             openPaymentStatusModal(order)
         } else {
-            openEntity('edit', order.originalId)
+            router.push(`/erp/orders?edit=${order.originalId}&payment=1`)
         }
-    }, [openEntity, openPaymentStatusModal])
+    }, [router, openPaymentStatusModal])
 
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
@@ -811,7 +813,7 @@ export default function OrdersPage({
                                         payment_breakdown: order.payment_breakdown || [],
                                     })
                                 } else {
-                                    openEntity('edit', order.id)
+                                    router.push(`/erp/orders?edit=${order.id}&payment=1`)
                                 }
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}

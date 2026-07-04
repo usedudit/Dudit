@@ -188,12 +188,10 @@ export function Combobox({
                         placeholder={searchPlaceholder}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        // CORREÇÃO 1: Controladores de foco
                         onFocus={() => setIsSearchFocused(true)}
                         onBlur={() => setIsSearchFocused(false)}
                         className={cn(
                             inputBaseClasses,
-                            // CORREÇÃO 2: Usa o estado ao invés de 'true' fixo
                             borderClasses(isSearchFocused),
                             "pr-8"
                         )}
@@ -261,10 +259,12 @@ export function Combobox({
         <>
             <div ref={triggerRef} className={cn("relative", width, className)}>
                 {label && (
-                    <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">
-                        {label}
-                        {required && <span className="text-brand-red ml-1">*</span>}
-                    </label>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                            {label}
+                            {required && <span className="text-brand-red"> *</span>}
+                        </label>
+                    </div>
                 )}
                 <button
                     type="button"
@@ -275,7 +275,6 @@ export function Combobox({
                         "flex items-center justify-between",
                         borderClasses(isOpen, error),
                         "disabled:bg-brand-gray dark:disabled:bg-dark-border/30 disabled:opacity-100 disabled:cursor-not-allowed",
-                        // CORREÇÃO 3: Força o background branco quando está aberto
                         isOpen && "bg-white dark:bg-dark-surface"
                     )}
                 >

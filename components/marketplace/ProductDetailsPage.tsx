@@ -1042,7 +1042,7 @@ export function ProductDetailsPageClient({
                 {product.name}
             </h1>
 
-            {showPrice && activePromo && !pricing.hasCampaignDiscount && (
+            {showPrice && activePromo && !pricing.hasCampaignDiscount && !pricing.hasManualPromo && (
                 <div className="mb-6 flex">
                     <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
                         {activePromo.name}
@@ -1067,53 +1067,37 @@ export function ProductDetailsPageClient({
 
                     // Caso: Campanha (com ou sem Pix) usando o novo design de banner
                     if (hasCampaign) {
-                        const discountBadge = (
-                            <span className="bg-[#ffe082] text-[#e65100] dark:bg-[#e65100]/20 dark:text-[#ffb74d] text-xs font-bold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">
-                                {pricing.campaignDiscountLabel} OFF
-                            </span>
-                        );
-
                         return (
-                            <div className="rounded-xl overflow-hidden border border-orange-100 mb-6">
-                                {/* Banner de Campanha */}
-                                <div className="bg-orange-300 text-white px-4 py-2.5 flex justify-between items-center select-none font-semibold text-xs md:text-sm">
-                                    <span>{activePromo?.name || "Oferta de Campanha"}</span>
-                                </div>
-
-                                {/* Bloco de Preço */}
-                                <div className="bg-[#fff7ed] border border-orange-100 p-4 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-brand-inactive-text line-through font-normal">
-                                            {formatMoney(pricing.original)}
-                                        </span>
-                                    </div>
-                                    {hasPix ? (
-                                        <>
-                                            <div className="flex items-baseline gap-2 flex-wrap">
-                                                <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
-                                                    {formatMoney(pixUnitPrice)}
-                                                </p>
-                                                <span className="text-xs md:text-sm font-semibold text-brand-green">no Pix</span>
-                                            </div>
-                                            <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                                                ou {formatMoney(displayPrice)} em outros meios
-                                            </p>
-                                        </>
-                                    ) : (
+                            <div className="space-y-1">
+                                <span className="text-sm text-brand-inactive-text line-through font-normal">
+                                    {formatMoney(pricing.original)}
+                                </span>
+                                {hasPix ? (
+                                    <>
                                         <div className="flex items-baseline gap-2 flex-wrap">
                                             <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
-                                                {formatMoney(displayPrice)}
+                                                {formatMoney(pixUnitPrice)}
                                             </p>
+                                            <span className="text-xs md:text-sm font-semibold text-brand-green">no Pix</span>
                                         </div>
-                                    )}
-                                    <Button
-                                        variant="link"
-                                        onClick={() => setShowPaymentMethodsModal(true)}
-                                        className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left hover:underline"
-                                    >
-                                        Ver opções de pagamento
-                                    </Button>
-                                </div>
+                                        <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                            ou {formatMoney(displayPrice)} em outros meios
+                                        </p>
+                                    </>
+                                ) : (
+                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                        <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
+                                            {formatMoney(displayPrice)}
+                                        </p>
+                                    </div>
+                                )}
+                                <Button
+                                    variant="link"
+                                    onClick={() => setShowPaymentMethodsModal(true)}
+                                    className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left hover:underline"
+                                >
+                                    Ver opções de pagamento
+                                </Button>
                             </div>
                         );
                     }
@@ -1198,6 +1182,20 @@ export function ProductDetailsPageClient({
                     );
                 })()}
             </div>
+
+            {/* Campanha InfoCard */}
+            {showPrice && pricing.hasCampaignDiscount && activePromo && (
+                <InfoCard
+                    color="orange"
+                    className="mb-6"
+                    message={activePromo.name}
+                    rightElement={
+                        <span className="font-bold text-sm text-orange-700 dark:text-orange-300">
+                            {pricing.campaignDiscountLabel} OFF
+                        </span>
+                    }
+                />
+            )}
 
             {/* Brinde de Campanha discreto */}
             {giftDetails && (
@@ -1289,43 +1287,34 @@ export function ProductDetailsPageClient({
             {/* Shipping */}
             {
                 !isProductOwner && (
-                    <FormSection title="Entrega" className="mb-8">
-                        <div className="flex flex-col border border-brand-border rounded-2xl bg-white overflow-hidden">
+                    <FormSection className="mb-8">
+                        <div className="flex flex-col">
                             {/* CEP Input or User Address */}
-                            {userId ? (
-                                loadingAddresses ? (
-                                    <div className="p-4 bg-brand-gray/10 text-center text-xs text-brand-inactive-text animate-pulse">
-                                        Carregando endereços...
-                                    </div>
-                                ) : userAddresses.length > 0 && selectedAddress ? (
-                                    <div className="flex items-center justify-between w-full p-4 bg-brand-gray/10">
-                                        <div className="flex items-stretch gap-3">
-                                            <img
-                                                src="https://img.dudit.com.br/static/Map.png"
-                                                alt="Endereço de entrega"
-                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                            />
-                                            <div className="flex flex-col justify-center">
-                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
-                                                <p className="text-xs text-brand-inactive-text max-w-[200px] sm:max-w-xs truncate">
-                                                    {selectedAddress.street}, {selectedAddress.number}
-                                                </p>
-                                            </div>
+                            {loadingAddresses ? (
+                                <div className="py-4 text-center text-xs text-brand-inactive-text animate-pulse">
+                                    Carregando endereços...
+                                </div>
+                            ) : userId && userAddresses.length > 0 && selectedAddress ? (
+                                <div className="flex items-center justify-between w-full py-4">
+                                    <div className="flex items-stretch gap-3">
+                                        <img
+                                            src="https://img.dudit.com.br/static/Map.png"
+                                            alt="Endereço de entrega"
+                                            className="w-10 h-10 object-cover rounded-xl shrink-0"
+                                        />
+                                        <div className="flex flex-col justify-center">
+                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
+                                            <p className="text-xs text-brand-inactive-text max-w-[200px] sm:max-w-xs truncate">
+                                                {selectedAddress.street}, {selectedAddress.number}
+                                            </p>
                                         </div>
-                                        <Button variant="link" size="sm" className="text-brand-green font-bold hover:underline p-0" onClick={() => setShowAddressModal(true)}>
-                                            Trocar
-                                        </Button>
                                     </div>
-                                ) : (
-                                    <div className="p-4 bg-brand-gray/10 flex flex-col items-center justify-center text-center gap-2">
-                                        <p className="text-xs text-brand-inactive-text">Nenhum endereço cadastrado</p>
-                                        <Button variant="outline" size="sm" className="h-8 border-brand-green text-brand-green hover:bg-green-50" onClick={() => setShowAddressForm(true)}>
-                                            Cadastrar endereço
-                                        </Button>
-                                    </div>
-                                )
+                                    <Button variant="link" size="sm" className="text-brand-green font-bold hover:underline p-0" onClick={() => setShowAddressModal(true)}>
+                                        Trocar
+                                    </Button>
+                                </div>
                             ) : (
-                                <div className="p-4 bg-brand-gray/10">
+                                <div className="py-4">
                                     <CepInput
                                         value={cep}
                                         onChange={setCep}
@@ -1334,12 +1323,12 @@ export function ProductDetailsPageClient({
                                 </div>
                             )}
 
-                            <Separator className="opacity-60" />
+                            {!loadingAddresses && <Separator className="opacity-60" />}
 
                             {/* Delivery Option if configured */}
                             {deliveryConfig?.settings?.isDeliveryEnabled ? (
                                 <>
-                                    <div className="flex justify-between items-start py-4 px-4">
+                                    <div className="flex justify-between items-start py-4">
                                         <div>
                                             <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pelo vendedor</p>
                                             {deliveryLoading ? (
@@ -1365,11 +1354,11 @@ export function ProductDetailsPageClient({
                                         </div>
                                     </div>
 
-                                    <Separator className="opacity-60" />
+                                    {(deliveryConfig?.settings?.isPickupEnabled !== false) && <Separator className="opacity-60" />}
                                 </>
                             ) : (
                                 <>
-                                    <div className="flex justify-between items-start py-4 px-4">
+                                    <div className="flex justify-between items-start py-4">
                                         <div>
                                             <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
                                             <p className="text-xs text-brand-inactive-text">Fale com o vendedor no WhatsApp após o pedido</p>
@@ -1379,22 +1368,24 @@ export function ProductDetailsPageClient({
                                         </div>
                                     </div>
 
-                                    <Separator className="opacity-60" />
+                                    {(deliveryConfig?.settings?.isPickupEnabled !== false) && <Separator className="opacity-60" />}
                                 </>
                             )}
 
-                            {/* Retirar no local - Always show if store exists */}
-                            <div className="flex justify-between items-start py-4 px-4">
-                                <div>
-                                    <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
-                                    {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                        <InfoCard className="mt-3" color="orange" message={`Pronto ${getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre ${preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e ${preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`} />
-                                    )}
+                            {/* Retirar no local - Only show if enabled (defaults to true) */}
+                            {(deliveryConfig?.settings?.isPickupEnabled !== false) && (
+                                <div className="flex justify-between items-start py-4">
+                                    <div>
+                                        <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
+                                        {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
+                                            <InfoCard className="mt-3" color="orange" message={`Pronto ${getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre ${preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e ${preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`} />
+                                        )}
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-bold text-brand-green">Grátis</p>
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-sm font-bold text-brand-green">Grátis</p>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </FormSection>
                 )

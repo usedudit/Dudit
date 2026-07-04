@@ -15,6 +15,7 @@ import {
   MethodGridForPartnerMethods,
   MoneyPaymentView,
   normalizeMethodType,
+  normalizePaymentMethodLabel,
   PaymentMethodSelector,
   PixPaymentView,
   SplitMethodSelector,
@@ -93,8 +94,13 @@ export function BalancePaymentCollector({
 
   useEffect(() => {
     if (!lockedMethodLabel || activeMethods.length === 0 || isLoading) return
-    const methodType = normalizeMethodType(lockedMethodLabel)
-    const matches = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === methodType)
+    const normalizedLabel = normalizePaymentMethodLabel(lockedMethodLabel)
+    const methodType = normalizeMethodType(normalizedLabel)
+    const matches = activeMethods.filter((m: PartnerPaymentMethod) => {
+      if (normalizeMethodType(m.type) === methodType) return true
+      if (normalizePaymentMethodLabel(m.name) === normalizedLabel) return true
+      return false
+    })
     if (matches.length > 0) {
       selectSingleMethod(matches[0])
     }

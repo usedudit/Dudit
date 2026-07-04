@@ -2432,6 +2432,17 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             if ("error" in reserveResult) return { error: reserveResult.error }
         }
 
+        if (delta.incoming.length === 0 && delta.outgoing.length === 0 && stockItems.length > 0) {
+            const reserveResult = await reserveOrderInventory({
+                client: supabase,
+                partnerId: data.partnerId,
+                orderId,
+                items: stockItems,
+            })
+
+            if ("error" in reserveResult) return { error: reserveResult.error }
+        }
+
         if (shouldDeductInventory(data.deliveryStatus)) {
             const finalizeResult = await finalizeOrderInventory({
                 client: supabase,

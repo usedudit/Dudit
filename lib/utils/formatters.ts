@@ -1,7 +1,11 @@
 /**
  * Formatting utilities for a standardized display across the project.
  * Focuses on pt-BR locale.
+ *
+ * Date/time functions now delegate to lib/date for centralized timezone handling.
  */
+
+import * as dateTz from "@/lib/date"
 
 /**
  * Formats a number as BRL currency (R$ 0,00).
@@ -28,13 +32,7 @@ export function formatCurrency(value: number | string): string {
  */
 export function formatDate(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "America/Sao_Paulo",
-  }).format(d)
+  return dateTz.formatDate(date)
 }
 
 /**
@@ -54,15 +52,7 @@ export function formatDateToBR(dateStr?: string | null): string {
  */
 export function formatFullDate(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(d)
+  return dateTz.formatFullDate(date)
 }
 
 /**
@@ -70,12 +60,7 @@ export function formatFullDate(date: Date | string | number): string {
  */
 export function formatShortDate(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    timeZone: "America/Sao_Paulo",
-  }).format(d)
+  return dateTz.formatInTz(date, dateTz.getDefaultTimezone(), "dd 'de' MMMM")
 }
 
 /**
@@ -83,15 +68,7 @@ export function formatShortDate(date: Date | string | number): string {
  */
 export function formatDateTime(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(d)
+  return dateTz.formatDateTime(date)
 }
 
 /**
@@ -99,12 +76,7 @@ export function formatDateTime(date: Date | string | number): string {
  */
 export function formatTime(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(d)
+  return dateTz.formatTime(date)
 }
 
 /**
@@ -112,66 +84,23 @@ export function formatTime(date: Date | string | number): string {
  * 0 = vence hoje, 1 = vence amanhã, negative = already passed that calendar day.
  */
 export function diffCalendarDaysInSaoPaulo(dueYmd: string): number {
-  const trimmed = dueYmd.slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 0
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date())
-  const y = Number(parts.find((p) => p.type === "year")?.value)
-  const m = Number(parts.find((p) => p.type === "month")?.value)
-  const d = Number(parts.find((p) => p.type === "day")?.value)
-  const todayMs = Date.UTC(y, m - 1, d)
-  const [dy, dm, dd] = trimmed.split("-").map(Number)
-  const dueMs = Date.UTC(dy, dm - 1, dd)
-  return Math.round((dueMs - todayMs) / 86400000)
+  return dateTz.diffCalendarDays(dateTz.getTodayYmd(), dueYmd)
 }
 
 /** Hoje (calendário) em YYYY-MM-DD no fuso America/Sao_Paulo. */
 export function getTodayYmdSaoPaulo(): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date())
-  const y = parts.find((p) => p.type === "year")?.value
-  const m = parts.find((p) => p.type === "month")?.value
-  const d = parts.find((p) => p.type === "day")?.value
-  return `${y}-${m}-${d}`
+  return dateTz.getTodayYmd()
 }
 
 /**
- * Exibe data vinda do Postgres sem erro de “um dia antes”:
+ * Exibe data vinda do Postgres sem erro de "um dia antes":
  * valores `DATE` (YYYY-MM-DD) são o dia civil desejado; não usar `new Date("YYYY-MM-DD")` (UTC meia-noite).
  */
 export function formatBrazilDateFromDbInput(
   value: string | null | undefined,
   variant: "dayMonthYear" | "dayMonth"
 ): string {
-  if (value == null || value === "") return "-"
-  const s = String(value).trim()
-  const ymd = s.slice(0, 10)
-  if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
-    const [y, m, d] = ymd.split("-").map(Number)
-    const anchor = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
-    return anchor.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      ...(variant === "dayMonthYear" ? { year: "numeric" as const } : {}),
-      timeZone: "America/Sao_Paulo",
-    })
-  }
-  const dt = new Date(s)
-  if (Number.isNaN(dt.getTime())) return s
-  return dt.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    ...(variant === "dayMonthYear" ? { year: "numeric" as const } : {}),
-    timeZone: "America/Sao_Paulo",
-  })
+  return dateTz.formatBrazilDateFromDbInput(value, variant)
 }
 
 /**
@@ -179,20 +108,15 @@ export function formatBrazilDateFromDbInput(
  */
 export function formatDayMonth(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(d)
+  return dateTz.formatInTz(date, dateTz.getDefaultTimezone(), "dd/MM")
 }
+
 /**
- * Formats a date as a long month name (January, February...).
+ * Formats a date as a long month name (janeiro, fevereiro...).
  */
 export function formatMonth(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(d)
+  return dateTz.formatInTz(date, dateTz.getDefaultTimezone(), "MMMM")
 }
 
 /**
@@ -200,8 +124,7 @@ export function formatMonth(date: Date | string | number): string {
  */
 export function formatYear(date: Date | string | number): string {
   if (!date) return ""
-  const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", { year: "numeric" }).format(d)
+  return dateTz.formatInTz(date, dateTz.getDefaultTimezone(), "yyyy")
 }
 
 /**
@@ -253,6 +176,7 @@ export function formatCEP(value: string): string {
     .replace(/(\d{5})(\d)/, "$1-$2")
     .replace(/(-\d{3})\d+?$/, "$1")
 }
+
 /**
  * Formats a number as a percentage (0,00%).
  */
@@ -290,47 +214,7 @@ export function getBillingUnitSuffix(unit?: string | null): string {
  * Returns year, month, day, hour, minute, second and dayOfWeek in America/Sao_Paulo timezone.
  */
 export function getSaoPauloDateComponents(date: Date = new Date()) {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-    second: "numeric",
-    hour12: false,
-  })
-
-  const parts = formatter.formatToParts(date)
-  const partVal = (type: string) => Number(parts.find((p) => p.type === type)?.value || 0)
-
-  const year = partVal("year")
-  const month = partVal("month")
-  const day = partVal("day")
-  let hour = partVal("hour")
-  if (hour === 24) hour = 0 // formatToParts can return 24 for midnight depending on node/V8 version
-  const minute = partVal("minute")
-  const second = partVal("second")
-
-  const weekdayFormatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    weekday: "short",
-  })
-  const weekdayParts = weekdayFormatter.formatToParts(date)
-  const weekdayStr = weekdayParts.find((p) => p.type === "weekday")?.value || ""
-
-  const weekdayMap: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  }
-  const dayOfWeek = weekdayMap[weekdayStr] ?? date.getDay()
-
-  return { year, month, day, hour, minute, second, dayOfWeek }
+  return dateTz.getDateComponents(date)
 }
 
 /**
@@ -354,9 +238,9 @@ export function getSaoPauloOffsetMinutes(date: Date = new Date()): number {
  * Handles DST correctly via Intl.
  */
 export function createSaoPauloDate(year: number, month: number, day: number, hour: number, minute: number): Date {
-  const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute))
-  const offsetMinutes = getSaoPauloOffsetMinutes(utcDate)
-  return new Date(utcDate.getTime() - offsetMinutes * 60000)
+  const ymd = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+  const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+  return dateTz.parseInTz(ymd, hm)
 }
 
 /**
@@ -366,7 +250,7 @@ export function createSaoPauloDate(year: number, month: number, day: number, hou
  * e futuramente pode ser sobrescrito por parceiro.
  */
 export function getDefaultTimezone(): string {
-  return process.env.APP_DEFAULT_TIMEZONE || "America/Sao_Paulo"
+  return dateTz.getDefaultTimezone()
 }
 
 /**
@@ -382,15 +266,5 @@ export function getDefaultTimezone(): string {
  * e respeita horário de verão automaticamente via Intl.
  */
 export function parseDateInTimezone(dateStr: string, timeStr: string, timezone?: string): Date {
-  const tz = timezone || getDefaultTimezone()
-  const [y, m, d] = dateStr.split("-").map(Number)
-  const [h, min] = timeStr.split(":").map(Number)
-  const utcDate = new Date(Date.UTC(y, m - 1, d, h, min))
-  const tzString = utcDate.toLocaleString("en-US", { timeZone: tz })
-  const localDate = new Date(tzString)
-  const diffMs = localDate.getTime() - utcDate.getTime()
-  return new Date(utcDate.getTime() - diffMs)
+  return dateTz.parseInTz(dateStr, timeStr, timezone)
 }
-
-
-

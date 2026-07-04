@@ -3,7 +3,9 @@ import {
     DefaultModal,
     Button,
     InfoCard,
+    IconPlaceholder,
 } from '@/components/reusable';
+import { CheckCircleIcon } from '@/lib/icons';
 import { useToast } from "@/components/ui/use-toast";
 import { updateOrdersStatusInBatchAction } from '@/app/actions/erp/orders';
 import {
@@ -199,17 +201,17 @@ export default function PaymentStatusModal({
             maxWidth="4xl"
             footer={
                 <div className="flex justify-end gap-3 w-full">
-                    <Button variant="outline" onClick={onClose} disabled={loading || syncing}>
-                        Cancelar
-                    </Button>
                     {!isFullyPaid && totalRemaining > 0.009 && (
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={loading || syncing || !canSubmitBalance}
-                            isLoading={loading}
-                        >
-                            Salvar recebimento
-                        </Button>
+                        <>
+                            <Button variant="outline" onClick={onClose} disabled={loading || syncing}>
+                                Cancelar
+                            </Button><Button
+                                onClick={handleSubmit}
+                                disabled={loading || syncing || !canSubmitBalance}
+                                isLoading={loading}
+                            >
+                                Salvar recebimento
+                            </Button></>
                     )}
                 </div>
             }
@@ -244,7 +246,7 @@ export default function PaymentStatusModal({
                         syncing={syncing}
                     />
 
-                    {!isFullyPaid && totalRemaining > 0.009 && (
+                    {!isFullyPaid && totalRemaining > 0.009 ? (
                         <BalancePaymentCollector
                             partnerId={partnerId}
                             remainingBalance={totalRemaining}
@@ -253,7 +255,19 @@ export default function PaymentStatusModal({
                             onValidityChange={setCanSubmitBalance}
                             lockedMethodLabel={lockedMethod}
                         />
-                    )}
+                    ) : isFullyPaid ? (
+                        <div className="rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 p-6">
+                            <IconPlaceholder
+                                icon={CheckCircleIcon}
+                                title="Pedido já está pago"
+                                subtitle="Não há saldo restante para receber."
+                                containerSize="w-14 h-14"
+                                iconSize="w-7 h-7"
+                                titleClass="text-base font-bold"
+                                subtitleClass="text-sm"
+                            />
+                        </div>
+                    ) : null}
                 </div>
             </div>
         </DefaultModal>

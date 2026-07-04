@@ -56,6 +56,171 @@ async function revalidatePromotions(partnerId: string) {
   revalidatePath(`/erp/promotions/${partnerId}`)
 }
 
+async function checkPromotionOverlap(
+  supabase: any,
+  data: z.infer<typeof PromotionSchema>,
+  promotionId?: string,
+  customCampaignB?: { starts_at: string | null; ends_at: string | null; is_active: boolean }
+) {
+  if (!data.isActive) return null
+
+  let campaignB: { starts_at: string | null; ends_at: string | null; is_active: boolean }
+  if (customCampaignB) {
+    campaignB = customCampaignB
+  } else {
+    const { data: dbCamp, error: campBError } = await supabase
+      .from("campaigns")
+      .select("starts_at, ends_at, is_active")
+      .eq("id", data.campaignId)
+      .single()
+    if (campBError || !dbCamp) {
+      return "Campanha associada não encontrada."
+    }
+    campaignB = dbCamp
+  }
+
+  if (!campaignB.is_active) return null
+
+  let query = supabase
+    .from("promotions")
+    .select(`
+      id,
+      name,
+      promotion_type,
+      apply_scope,
+      campaign_id,
+      campaigns!inner(is_active, starts_at, ends_at),
+      promotion_products(product_id),
+      promotion_categories(category_id),
+      promotion_services(service_id)
+    `)
+    .eq("partner_id", data.partnerId)
+    .eq("is_active", true)
+    .eq("promotion_type", data.promotionType)
+    .eq("campaigns.is_active", true)
+
+  if (promotionId) {
+    query = query.neq("id", promotionId)
+  }
+
+  const { data: activePromos, error: activeError } = await query
+  if (activeError || !activePromos) {
+    console.error("Error fetching active promotions for overlap check:", activeError)
+    return null
+  }
+
+  const startB = campaignB.starts_at ? new Date(campaignB.starts_at) : null
+  const endB = campaignB.ends_at ? new Date(campaignB.ends_at) : null
+
+  const overlappingPromos = activePromos.filter((promo: any) => {
+    const startA = promo.campaigns.starts_at ? new Date(promo.campaigns.starts_at) : null
+    const endA = promo.campaigns.ends_at ? new Date(promo.campaigns.ends_at) : null
+
+    const overlapStart = !startA || !endB || startA <= endB
+    const overlapEnd = !endA || !startB || endA >= startB
+
+    return overlapStart && overlapEnd
+  })
+
+  if (overlappingPromos.length === 0) {
+    return null
+  }
+
+  const pIdsB = data.productIds || []
+  const cIdsB = data.categoryIds || []
+  const sIdsB = data.serviceIds || []
+  const scopeB = data.applyScope
+
+  const allProductIds = new Set<string>()
+  const allServiceIds = new Set<string>()
+
+  pIdsB.forEach((id: string) => allProductIds.add(id))
+  sIdsB.forEach((id: string) => allServiceIds.add(id))
+
+  overlappingPromos.forEach((promo: any) => {
+    const pIdsA = (promo.promotion_products || []).map((p: any) => p.product_id)
+    const sIdsA = (promo.promotion_services || []).map((s: any) => s.service_id)
+    pIdsA.forEach((id: string) => allProductIds.add(id))
+    sIdsA.forEach((id: string) => allServiceIds.add(id))
+  })
+
+  const productToCategoryMap = new Map<string, string>()
+  const serviceToCategoryMap = new Map<string, string>()
+
+  if (allProductIds.size > 0) {
+    const { data: pData } = await supabase
+      .from("products")
+      .select("id, category_id")
+      .in("id", Array.from(allProductIds))
+    if (pData) {
+      pData.forEach((p: any) => {
+        if (p.category_id) productToCategoryMap.set(p.id, p.category_id)
+      })
+    }
+  }
+
+  if (allServiceIds.size > 0) {
+    const { data: sData } = await supabase
+      .from("services")
+      .select("id, category_id")
+      .in("id", Array.from(allServiceIds))
+    if (sData) {
+      sData.forEach((s: any) => {
+        if (s.category_id) serviceToCategoryMap.set(s.id, s.category_id)
+      })
+    }
+  }
+
+  for (const promo of overlappingPromos) {
+    const scopeA = promo.apply_scope
+    const pIdsA = (promo.promotion_products || []).map((p: any) => p.product_id)
+    const cIdsA = (promo.promotion_categories || []).map((c: any) => c.category_id)
+    const sIdsA = (promo.promotion_services || []).map((s: any) => s.service_id)
+
+    let hasOverlap = false
+
+    if (scopeB === "entire_cart" || scopeA === "entire_cart") {
+      hasOverlap = true
+    } else if (scopeB === "category" && scopeA === "category") {
+      hasOverlap = cIdsB.some((id: string) => cIdsA.includes(id))
+    } else if (scopeB === "specific_products" && scopeA === "specific_products") {
+      hasOverlap = pIdsB.some((id: string) => pIdsA.includes(id))
+    } else if (scopeB === "specific_services" && scopeA === "specific_services") {
+      hasOverlap = sIdsB.some((id: string) => sIdsA.includes(id))
+    } else if (scopeB === "category" && scopeA === "specific_products") {
+      hasOverlap = pIdsA.some((pid: string) => {
+        const catId = productToCategoryMap.get(pid)
+        return catId ? cIdsB.includes(catId) : false
+      })
+    } else if (scopeB === "specific_products" && scopeA === "category") {
+      hasOverlap = pIdsB.some((pid: string) => {
+        const catId = productToCategoryMap.get(pid)
+        return catId ? cIdsA.includes(catId) : false
+      })
+    } else if (scopeB === "category" && scopeA === "specific_services") {
+      hasOverlap = sIdsA.some((sid: string) => {
+        const catId = serviceToCategoryMap.get(sid)
+        return catId ? cIdsB.includes(catId) : false
+      })
+    } else if (scopeB === "specific_services" && scopeA === "category") {
+      hasOverlap = sIdsB.some((sid: string) => {
+        const catId = serviceToCategoryMap.get(sid)
+        return catId ? cIdsA.includes(catId) : false
+      })
+    }
+
+    if (hasOverlap) {
+      const typeLabel =
+        data.promotionType === "discount" ? "desconto" :
+        data.promotionType === "gift" ? "brinde" : "Leve X Pague Y"
+
+      return `O item/escopo selecionado já possui uma promoção de ${typeLabel} ativa no mesmo período (Campanha: "${promo.name || "Existente"}").`
+    }
+  }
+
+  return null
+}
+
 // ---------------------------------------------------------------------------
 // Campaign Actions
 // ---------------------------------------------------------------------------
@@ -150,6 +315,59 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
   await requirePermission(data.partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
+  if (data.isActive) {
+    const { data: promotions } = await supabase
+      .from("promotions")
+      .select(`
+        *,
+        promotion_products(product_id),
+        promotion_categories(category_id),
+        promotion_services(service_id)
+      `)
+      .eq("campaign_id", campaignId)
+      .eq("is_active", true)
+
+    if (promotions) {
+      const customCampaignB = {
+        starts_at: data.startsAt || null,
+        ends_at: data.endsAt || null,
+        is_active: data.isActive,
+      }
+
+      for (const promo of promotions) {
+        const candidate = {
+          partnerId: promo.partner_id,
+          campaignId: campaignId,
+          name: promo.name,
+          description: promo.description,
+          promotionType: promo.promotion_type,
+          discountType: promo.discount_type,
+          discountValue: promo.discount_value,
+          maxDiscountAmount: promo.max_discount_amount,
+          minSpendAmount: promo.min_spend_amount,
+          giftProductId: promo.gift_product_id,
+          giftServiceId: promo.gift_service_id,
+          buyQuantity: promo.buy_quantity,
+          payQuantity: promo.pay_quantity,
+          priority: promo.priority,
+          applyScope: promo.apply_scope,
+          allowCouponCombination: promo.allow_coupon_combination,
+          usageLimit: promo.usage_limit,
+          usageLimitPerCustomer: promo.usage_limit_per_customer,
+          isActive: true,
+          productIds: (promo.promotion_products || []).map((p: any) => p.product_id),
+          categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
+          serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+        }
+
+        const overlapError = await checkPromotionOverlap(supabase, candidate, promo.id, customCampaignB)
+        if (overlapError) {
+          return { success: false, error: overlapError }
+        }
+      }
+    }
+  }
+
   const { error: updateError } = await supabase
     .from("campaigns")
     .update({
@@ -212,6 +430,69 @@ export async function toggleCampaignsStatusAction(
   await requireUser()
   await requirePermission(partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
+
+  if (isActive) {
+    for (const campaignId of campaignIds) {
+      const { data: campaign } = await supabase
+        .from("campaigns")
+        .select("starts_at, ends_at")
+        .eq("id", campaignId)
+        .single()
+
+      if (campaign) {
+        const customCampaignB = {
+          starts_at: campaign.starts_at,
+          ends_at: campaign.ends_at,
+          is_active: true,
+        }
+
+        const { data: promotions } = await supabase
+          .from("promotions")
+          .select(`
+            *,
+            promotion_products(product_id),
+            promotion_categories(category_id),
+            promotion_services(service_id)
+          `)
+          .eq("campaign_id", campaignId)
+          .eq("is_active", true)
+
+        if (promotions) {
+          for (const promo of promotions) {
+            const candidate = {
+              partnerId: promo.partner_id,
+              campaignId: campaignId,
+              name: promo.name,
+              description: promo.description,
+              promotionType: promo.promotion_type,
+              discountType: promo.discount_type,
+              discountValue: promo.discount_value,
+              maxDiscountAmount: promo.max_discount_amount,
+              minSpendAmount: promo.min_spend_amount,
+              giftProductId: promo.gift_product_id,
+              giftServiceId: promo.gift_service_id,
+              buyQuantity: promo.buy_quantity,
+              payQuantity: promo.pay_quantity,
+              priority: promo.priority,
+              applyScope: promo.apply_scope,
+              allowCouponCombination: promo.allow_coupon_combination,
+              usageLimit: promo.usage_limit,
+              usageLimitPerCustomer: promo.usage_limit_per_customer,
+              isActive: true,
+              productIds: (promo.promotion_products || []).map((p: any) => p.product_id),
+              categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
+              serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+            }
+
+            const overlapError = await checkPromotionOverlap(supabase, candidate, promo.id, customCampaignB)
+            if (overlapError) {
+              return { success: false, error: overlapError }
+            }
+          }
+        }
+      }
+    }
+  }
 
   const { error } = await supabase
     .from("campaigns")
@@ -352,6 +633,11 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
   await requirePermission(data.partnerId, "coupons", "create")
   const supabase = await getSupabaseServerClient()
 
+  const overlapError = await checkPromotionOverlap(supabase, data)
+  if (overlapError) {
+    return { success: false, error: overlapError }
+  }
+
   // Validate logical constraints
   if (data.promotionType === "buy_x_pay_y") {
     if (!data.buyQuantity || !data.payQuantity || data.buyQuantity <= data.payQuantity) {
@@ -436,6 +722,11 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
   await requireUser()
   await requirePermission(data.partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
+
+  const overlapError = await checkPromotionOverlap(supabase, data, promotionId)
+  if (overlapError) {
+    return { success: false, error: overlapError }
+  }
 
   // Validate logical constraints
   if (data.promotionType === "buy_x_pay_y") {
@@ -536,6 +827,54 @@ export async function togglePromotionStatusAction(partnerId: string, promotionId
   await requireUser()
   await requirePermission(partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
+
+  if (isActive) {
+    const { data: promo, error: fetchErr } = await supabase
+      .from("promotions")
+      .select(`
+        *,
+        promotion_products(product_id),
+        promotion_categories(category_id),
+        promotion_services(service_id)
+      `)
+      .eq("id", promotionId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (fetchErr || !promo) {
+      return { success: false, error: "Promoção não encontrada." }
+    }
+
+    const candidate = {
+      partnerId: promo.partner_id,
+      campaignId: promo.campaign_id,
+      name: promo.name,
+      description: promo.description,
+      promotionType: promo.promotion_type,
+      discountType: promo.discount_type,
+      discountValue: promo.discount_value,
+      maxDiscountAmount: promo.max_discount_amount,
+      minSpendAmount: promo.min_spend_amount,
+      giftProductId: promo.gift_product_id,
+      giftServiceId: promo.gift_service_id,
+      buyQuantity: promo.buy_quantity,
+      payQuantity: promo.pay_quantity,
+      priority: promo.priority,
+      applyScope: promo.apply_scope,
+      allowCouponCombination: promo.allow_coupon_combination,
+      usageLimit: promo.usage_limit,
+      usageLimitPerCustomer: promo.usage_limit_per_customer,
+      isActive: true,
+      productIds: (promo.promotion_products || []).map((p: any) => p.product_id),
+      categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
+      serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+    }
+
+    const overlapError = await checkPromotionOverlap(supabase, candidate, promotionId)
+    if (overlapError) {
+      return { success: false, error: overlapError }
+    }
+  }
 
   const { error } = await supabase
     .from("promotions")

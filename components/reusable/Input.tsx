@@ -84,14 +84,14 @@ export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInpu
     },
     ref
   ) => {
-  const inputId = id || name || Math.random().toString(36).substring(7)
+    const inputId = id || name || Math.random().toString(36).substring(7)
 
-  const isLocked = disabled || readOnly
+    const isLocked = disabled || readOnly
 
-  const borderRadiusClass =
-    variant === "full-rounded" ? "rounded-full" : "rounded-lg"
+    const borderRadiusClass =
+      variant === "full-rounded" ? "rounded-full" : "rounded-lg"
 
-  const baseInputClasses = `
+    const baseInputClasses = `
     w-full h-[42px]
     bg-brand-gray dark:bg-dark-border/30
     border
@@ -107,119 +107,119 @@ export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInpu
     ${isLocked ? "cursor-not-allowed pointer-events-none opacity-80" : ""}
   `
 
-  const paddingClasses = `
+    const paddingClasses = `
     ${prefix ? "pl-10" : "px-4"}
     ${suffix ? "pr-10" : "pr-4"}
     py-2
   `
 
-  const handleFocus: React.FocusEventHandler<
-    HTMLInputElement | HTMLTextAreaElement
-  > = (event) => {
-    if (readOnly) return
-    onFocus?.(event)
-  }
+    const handleFocus: React.FocusEventHandler<
+      HTMLInputElement | HTMLTextAreaElement
+    > = (event) => {
+      if (readOnly) return
+      onFocus?.(event)
+    }
 
-  return (
-    <div className={cn("flex-1 w-full", className)}>
-      {label && (
-        <div className="flex items-center justify-between gap-2 mb-1.5">
-          <label
-            htmlFor={inputId}
-            className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate"
-          >
-            {label}
-            {required && <span className="text-brand-red"> *</span>}
-          </label>
-          {labelAddon}
-        </div>
-      )}
-
-      <div className="relative">
-        {prefix && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-dark dark:text-dark-heading pointer-events-none">
-            {prefix}
-          </span>
-        )}
-
-        {multiline ? (
-          <textarea
-            ref={ref as React.Ref<HTMLTextAreaElement>}
-            id={inputId}
-            name={name}
-            value={value}
-            placeholder={placeholder}
-            onChange={onChange}
-            onBlur={onBlur}
-            onFocus={handleFocus}
-            disabled={disabled}
-            readOnly={readOnly}
-            required={required}
-            maxLength={maxLength}
-            inputMode={inputMode}
-            onKeyDown={onKeyDown}
-            autoFocus={autoFocus}
-            autoComplete={autoComplete}
-            spellCheck={spellCheck}
-            tabIndex={readOnly ? -1 : 0}
-            {...({ autoCorrect, autoCapitalize } as any)}
-            rows={rows}
-            className={`${baseInputClasses} px-4 py-2.5 resize-none`}
-          />
-        ) : (
-          <input
-            ref={ref as React.Ref<HTMLInputElement>}
-            id={inputId}
-            type={type}
-            name={name}
-            value={value}
-            placeholder={placeholder}
-            onChange={onChange as React.ChangeEventHandler<HTMLInputElement>}
-            onBlur={onBlur}
-            onFocus={handleFocus}
-            disabled={disabled}
-            readOnly={readOnly}
-            required={required}
-            min={min}
-            max={max}
-            maxLength={maxLength}
-            step={step}
-            pattern={pattern}
-            title={title}
-            inputMode={inputMode}
-            onKeyDown={onKeyDown}
-            autoFocus={autoFocus}
-            autoComplete={autoComplete}
-            spellCheck={spellCheck}
-            tabIndex={readOnly ? -1 : 0}
-            {...({ autoCorrect, autoCapitalize } as any)}
-            className={`${baseInputClasses} ${paddingClasses}`}
-          />
-        )}
-
-        {suffix && (
-          <div className="absolute right-3 top-0 h-full flex items-center justify-center">
-            {suffix}
+    return (
+      <div className={cn("flex-1 w-full", className)}>
+        {label && (
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <label
+              htmlFor={inputId}
+              className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate"
+            >
+              {label}
+              {required && <span className="text-brand-red"> *</span>}
+            </label>
+            {labelAddon}
           </div>
         )}
-      </div>
 
-      <div className="flex justify-between mt-1">
-        {error && errorMessage ? (
-          <p className="text-xs text-brand-red">{errorMessage}</p>
-        ) : (
-          <div />
-        )}
+        <div className="relative">
+          {prefix && (
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-dark dark:text-dark-heading pointer-events-none">
+              {prefix}
+            </span>
+          )}
 
-        {maxLength && showCharacterCount && (
-          <p className="text-[11px] text-brand-inactive-text font-medium">
-            {String(value || "").length}/{maxLength}
-          </p>
-        )}
+          {multiline ? (
+            <textarea
+              ref={ref as React.Ref<HTMLTextAreaElement>}
+              id={inputId}
+              name={name}
+              value={value}
+              placeholder={placeholder}
+              onChange={onChange}
+              onBlur={onBlur}
+              onFocus={handleFocus}
+              disabled={disabled}
+              readOnly={readOnly}
+              required={required}
+              maxLength={maxLength}
+              inputMode={inputMode}
+              onKeyDown={onKeyDown}
+              autoFocus={autoFocus}
+              autoComplete={autoComplete}
+              spellCheck={spellCheck}
+              tabIndex={readOnly ? -1 : 0}
+              {...({ autoCorrect, autoCapitalize } as any)}
+              rows={rows}
+              className={`${baseInputClasses} px-4 py-2.5 resize-none`}
+            />
+          ) : (
+            <input
+              ref={ref as React.Ref<HTMLInputElement>}
+              id={inputId}
+              type={type}
+              name={name}
+              value={value}
+              placeholder={placeholder}
+              onChange={onChange as React.ChangeEventHandler<HTMLInputElement>}
+              onBlur={onBlur}
+              onFocus={handleFocus}
+              disabled={disabled}
+              readOnly={readOnly}
+              required={required}
+              min={min}
+              max={max}
+              maxLength={maxLength}
+              step={step}
+              pattern={pattern}
+              title={title}
+              inputMode={inputMode}
+              onKeyDown={onKeyDown}
+              autoFocus={autoFocus}
+              autoComplete={autoComplete}
+              spellCheck={spellCheck}
+              tabIndex={readOnly ? -1 : 0}
+              {...({ autoCorrect, autoCapitalize } as any)}
+              className={`${baseInputClasses} ${paddingClasses}`}
+            />
+          )}
+
+          {suffix && (
+            <div className="absolute right-3 top-0 h-full flex items-center justify-center">
+              {suffix}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-between mt-1">
+          {error && errorMessage ? (
+            <p className="text-xs text-brand-red">{errorMessage}</p>
+          ) : (
+            <div />
+          )}
+
+          {maxLength && showCharacterCount && (
+            <p className="text-[11px] text-brand-inactive-text font-medium">
+              {String(value || "").length}/{maxLength}
+            </p>
+          )}
+        </div>
       </div>
-    </div>
-  )
-})
+    )
+  })
 
 Input.displayName = "Input"
 

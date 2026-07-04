@@ -440,7 +440,11 @@ export default async function ExplorarPage({
             />
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
-            <Suspense>
+            <Suspense fallback={
+                    <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
+                        <ThreeDotsLoader />
+                    </div>
+                }>
                 <ExplorarPageClient
                     initialResults={productsWithDistance}
                     initialMoreDistantSellers={moreDistantSellersWithDistance}

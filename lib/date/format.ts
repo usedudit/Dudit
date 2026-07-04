@@ -24,6 +24,14 @@ export function formatFullDate(date: Date | string | number, tz?: string): strin
   return formatInTz(date, tz || getDefaultTimezone(), "dd 'de' MMMM 'de' yyyy, HH:mm")
 }
 
+export function formatDateShort(date: Date | string | number, tz?: string): string {
+  return formatInTz(date, tz || getDefaultTimezone(), "dd 'de' MMM")
+}
+
+export function formatDateTimeWithBullet(date: Date | string | number, tz?: string): string {
+  return formatInTz(date, tz || getDefaultTimezone(), "dd/MM/yyyy '•' HH:mm")
+}
+
 export function formatBrazilDateFromDbInput(
   value: string | null | undefined,
   variant: "dayMonthYear" | "dayMonth",

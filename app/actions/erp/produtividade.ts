@@ -413,9 +413,9 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
       commissionValue: Number(config?.value || 0),
       pendingAmount: money(Math.max(0, estimatedComm - comm.paid)),
       paidAmount: comm.paid,
-      bonusAmount: money(bonus.pending + bonus.paid),
+      bonusAmount: money(bonus.pending),
       bonusPending: money(bonus.pending),
-      totalAccumulated,
+      totalAccumulated: money(estimatedComm + bonus.pending),
     }
   })
 
@@ -519,6 +519,32 @@ export async function recordCommissionPaymentAction(
   const paymentType = isBonus ? "Bônus meta" : "Comissão"
   const notes = isBonus ? "Pagamento manual de bônus de meta." : "Pagamento manual de comissão."
 
+  let contactId: string | null = null
+  const { data: profileRow } = await admin
+    .from("user_profiles")
+    .select("full_name")
+    .eq("user_id", seller.user_id)
+    .maybeSingle()
+  const employeeName = profileRow?.full_name || "Vendedor"
+
+  const { data: existingContact } = await admin
+    .from("transaction_contacts")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("type", "employee")
+    .ilike("name", employeeName)
+    .maybeSingle()
+  if (existingContact?.id) {
+    contactId = existingContact.id
+  } else {
+    const { data: newContact } = await admin
+      .from("transaction_contacts")
+      .insert({ partner_id: partnerId, name: employeeName, type: "employee" })
+      .select("id")
+      .single()
+    if (newContact?.id) contactId = newContact.id
+  }
+
   const now = new Date().toISOString()
   const { data: txData, error: txError } = await admin
     .from("transactions")
@@ -538,6 +564,8 @@ export async function recordCommissionPaymentAction(
       notes,
       account_id: resolvedAccountId,
       seller_partner_user_id: sellerPartnerUserId,
+      contact_id: contactId,
+      contact_type: "employee",
     })
     .select("id")
     .single()
@@ -555,4 +583,86 @@ export async function recordCommissionPaymentAction(
 
   revalidateTag(`productivity_${partnerId}`, "max")
   return { success: true, transactionId: txData.id }
+}
+
+export async function payPendingBonusAction(
+  partnerId: string,
+  sellerPartnerUserId: string,
+  amount: number,
+  accountId?: string | null,
+): Promise<{ success: boolean; error?: string }> {
+  await requireUser()
+
+  const admin = getAdminClient()
+
+  const { data: seller } = await admin
+    .from("partner_users")
+    .select("id, user_id")
+    .eq("id", sellerPartnerUserId)
+    .eq("partner_id", partnerId)
+    .single()
+
+  if (!seller) return { success: false, error: "Vendedor não encontrado" }
+  if (amount <= 0) return { success: false, error: "Valor inválido" }
+
+  const { data: pendingBonuses } = await admin
+    .from("transactions")
+    .select("id, amount")
+    .eq("partner_id", partnerId)
+    .eq("seller_partner_user_id", sellerPartnerUserId)
+    .eq("category", "Metas e Bônus")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+
+  if (!pendingBonuses || pendingBonuses.length === 0) {
+    return { success: false, error: "Nenhum bônus pendente encontrado." }
+  }
+
+  let remaining = money(amount)
+  const toUpdate: string[] = []
+
+  for (const b of pendingBonuses) {
+    if (remaining <= 0) break
+    const bAmt = money(Number(b.amount || 0))
+    if (bAmt <= 0) continue
+    toUpdate.push(b.id)
+    remaining = money(remaining - bAmt)
+  }
+
+  if (toUpdate.length === 0) {
+    return { success: false, error: "Nenhum bônus pendente encontrado." }
+  }
+
+  const remainingPaid = money(amount - Math.max(0, remaining))
+  const now = new Date().toISOString()
+
+  const { error: updateError } = await admin
+    .from("transactions")
+    .update({ status: "paid", payment_date: now })
+    .in("id", toUpdate)
+
+  if (updateError) return { success: false, error: updateError.message }
+
+  let resolvedAccountId = accountId
+  if (!resolvedAccountId) {
+    const { data: accounts } = await admin
+      .from("finance_accounts")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("type", "cash")
+      .limit(1)
+    if (accounts && accounts.length > 0) {
+      resolvedAccountId = accounts[0].id
+    }
+  }
+
+  try {
+    await admin.rpc("apply_account_balance_delta", {
+      p_account_id: resolvedAccountId,
+      p_delta: -remainingPaid,
+    })
+  } catch { }
+
+  revalidateTag(`productivity_${partnerId}`, "max")
+  return { success: true }
 }

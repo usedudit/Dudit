@@ -2937,7 +2937,7 @@ export function CheckoutPageClient() {
                                 <img
                                     src="https://img.dudit.com.br/static/Map.png"
                                     alt="Mapa"
-                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                    className="w-10 h-10 object-cover rounded-xl shrink-0"
                                 />
                                 <div className="flex flex-col min-w-0">
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
@@ -2953,7 +2953,7 @@ export function CheckoutPageClient() {
                                 <img
                                     src="https://img.dudit.com.br/static/Map.png"
                                     alt="Mapa"
-                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                    className="w-10 h-10 object-cover rounded-xl shrink-0"
                                 />
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>

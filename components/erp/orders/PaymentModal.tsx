@@ -1764,73 +1764,73 @@ const PaymentModal = ({
                                                             )}
                                                         </div>
                                                     )}
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    {availableMethodTypes.has("cash") && (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        {availableMethodTypes.has("cash") && (
+                                                            <PaymentMethodCard
+                                                                icon={MoneyIcon}
+                                                                label="Dinheiro"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => openMethodTypeSelection("cash")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("pix") && (
+                                                            <PaymentMethodCard
+                                                                icon={QRCodeIcon}
+                                                                label="Pix"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => openMethodTypeSelection("pix")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("credit_card") && (
+                                                            <PaymentMethodCard
+                                                                icon={CreditCardIcon}
+                                                                label="Cartão de Crédito"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => openMethodTypeSelection("credit_card")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("debit_card") && (
+                                                            <PaymentMethodCard
+                                                                icon={CreditCardIcon}
+                                                                label="Cartão de Débito"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => openMethodTypeSelection("debit_card")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("bank_transfer") && (
+                                                            <PaymentMethodCard
+                                                                icon={FileIcon}
+                                                                label="Transferência"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => openMethodTypeSelection("bank_transfer")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("other") && (
+                                                            <PaymentMethodCard
+                                                                icon={TagIcon}
+                                                                label="Outros"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => openMethodTypeSelection("other")}
+                                                            />
+                                                        )}
                                                         <PaymentMethodCard
-                                                            icon={MoneyIcon}
-                                                            label="Dinheiro"
+                                                            icon={SplitIcon}
+                                                            label="Dividir"
                                                             disabled={isMarketplaceOrder}
-                                                            onClick={() => openMethodTypeSelection("cash")}
+                                                            onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
                                                         />
-                                                    )}
-                                                    {availableMethodTypes.has("pix") && (
-                                                        <PaymentMethodCard
-                                                            icon={QRCodeIcon}
-                                                            label="Pix"
-                                                            disabled={isMarketplaceOrder}
-                                                            onClick={() => openMethodTypeSelection("pix")}
-                                                        />
-                                                    )}
-                                                    {availableMethodTypes.has("credit_card") && (
-                                                        <PaymentMethodCard
-                                                            icon={CreditCardIcon}
-                                                            label="Cartão de Crédito"
-                                                            disabled={isMarketplaceOrder}
-                                                            onClick={() => openMethodTypeSelection("credit_card")}
-                                                        />
-                                                    )}
-                                                    {availableMethodTypes.has("debit_card") && (
-                                                        <PaymentMethodCard
-                                                            icon={CreditCardIcon}
-                                                            label="Cartão de Débito"
-                                                            disabled={isMarketplaceOrder}
-                                                            onClick={() => openMethodTypeSelection("debit_card")}
-                                                        />
-                                                    )}
-                                                    {availableMethodTypes.has("bank_transfer") && (
-                                                        <PaymentMethodCard
-                                                            icon={FileIcon}
-                                                            label="Transferência"
-                                                            disabled={isMarketplaceOrder}
-                                                            onClick={() => openMethodTypeSelection("bank_transfer")}
-                                                        />
-                                                    )}
-                                                    {availableMethodTypes.has("other") && (
-                                                        <PaymentMethodCard
-                                                            icon={TagIcon}
-                                                            label="Outros"
-                                                            disabled={isMarketplaceOrder}
-                                                            onClick={() => openMethodTypeSelection("other")}
-                                                        />
-                                                    )}
-                                                    <PaymentMethodCard
-                                                        icon={SplitIcon}
-                                                        label="Dividir"
-                                                        disabled={isMarketplaceOrder}
-                                                        onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
-                                                    />
-                                                    {mpConnected && !isMarketplaceOrder && (
-                                                        <button
-                                                            onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
-                                                            className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
-                                                        >
-                                                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#00b1ea]/10 flex items-center justify-center transition-colors group-hover:bg-white dark:group-hover:bg-dark-surface overflow-hidden">
-                                                                <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-6 h-6 md:w-7 md:h-7 object-contain" />
-                                                            </div>
-                                                            <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">Mercado Pago</span>
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                        {mpConnected && !isMarketplaceOrder && (
+                                                            <button
+                                                                onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
+                                                                className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
+                                                            >
+                                                                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#00b1ea]/10 flex items-center justify-center transition-colors group-hover:bg-white dark:group-hover:bg-dark-surface overflow-hidden">
+                                                                    <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-6 h-6 md:w-7 md:h-7 object-contain" />
+                                                                </div>
+                                                                <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">Mercado Pago</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>)}
 
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
@@ -2387,7 +2387,7 @@ const PaymentModal = ({
                                                     <p className="text-sm text-brand-inactive-text max-w-sm">
                                                         O pagamento será processado na aba do Mercado Pago. Após a conclusão, volte aqui para registrar a venda.
                                                     </p>
-                                                    <Button variant="filled" className="mt-4 h-12 px-8" onClick={() => {
+                                                    <Button variant="outline" className="mt-4 h-12 px-8" onClick={() => {
                                                         handleStartProcessing({
                                                             paymentMethod: "Mercado Pago",
                                                             paymentProvider: "Mercado Pago",
@@ -2684,7 +2684,7 @@ const PaymentModal = ({
                             setShowPaymentStatusModal(false);
                         }}
                         right={paymentPendingType === 'unpaid' ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
-                        className={paymentPendingType === 'unpaid' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}
+                        className={`px-4 py-3 gap-4 ${paymentPendingType === 'unpaid' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}`}
                     />
                     <ListItem
                         icon={ClockIcon}
@@ -2696,7 +2696,7 @@ const PaymentModal = ({
                             setShowPaymentStatusModal(false);
                         }}
                         right={paymentPendingType === 'pending_stock' ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
-                        className={paymentPendingType === 'pending_stock' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}
+                        className={`px-4 py-3 gap-4 ${paymentPendingType === 'pending_stock' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}`}
                     />
                 </div>
             </DefaultModal>
@@ -2718,7 +2718,7 @@ const PaymentModal = ({
                         setShowDeliveryStatusModal(false);
                     }}
                     right={isPendingDelivery ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
-                    className={isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}
+                    className={`px-4 py-3 gap-4 ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}`}
                 />
             </DefaultModal>
 

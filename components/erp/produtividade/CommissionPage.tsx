@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useCallback } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { IconPlaceholder, FormDropdown } from "@/components/reusable"
+import { IconPlaceholder } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { usePermissions } from "@/lib/permission-context"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -17,14 +17,17 @@ import {
   ChartIcon,
   AwardIcon,
   TargetIcon,
+  ArrowUpDownIcon,
 } from "@/lib/icons"
 
-const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
-  { id: "seller", label: "Vendedor", align: "left", width: "300px" },
-  { id: "pending", label: "Pendente", align: "right", width: "120px" },
-  { id: "paid", label: "Pago", align: "right", width: "120px" },
-  { id: "bonus", label: "Bônus", align: "right", width: "120px" },
-  { id: "total", label: "Total", align: "right", width: "120px" },
+type ColumnDef = { id: string; label: string; align: "left" | "center" | "right"; width: string; sortable?: boolean; key?: string }
+
+const COLUMNS: ColumnDef[] = [
+  { id: "seller", label: "Vendedor", align: "left", width: "300px", sortable: true, key: "name" },
+  { id: "pending", label: "Pendente", align: "right", width: "120px", sortable: true, key: "pending" },
+  { id: "paid", label: "Pago", align: "right", width: "120px", sortable: true, key: "paid" },
+  { id: "bonus", label: "Bônus a pagar", align: "right", width: "140px", sortable: true, key: "bonus" },
+  { id: "total", label: "Total", align: "right", width: "120px", sortable: true, key: "total" },
   { id: "actions", label: "Ações", align: "center", width: "100px" },
 ]
 
@@ -42,8 +45,6 @@ type Props = {
   overview: CommissionOverview
 }
 
-type SortKey = "name" | "pending" | "paid" | "bonus" | "total"
-
 export default function CommissionPage({ partnerId, overview }: Props) {
   const { hasSpecific } = usePermissions()
 
@@ -52,7 +53,7 @@ export default function CommissionPage({ partnerId, overview }: Props) {
 
   const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
   const [search, setSearch] = useState("")
-  const [sortKey, setSortKey] = useState<SortKey>("total")
+  const [sortConfig, setSortConfig] = useState<{ key: string; dir: "asc" | "desc" } | null>(null)
   const [page, setPage] = useState(0)
   const [paymentModal, setPaymentModal] = useState<{
     partnerUserId: string
@@ -66,26 +67,39 @@ export default function CommissionPage({ partnerId, overview }: Props) {
   const effectiveViewMode = isTablet ? "grid" : viewMode
   const canPayCommission = hasSpecific("productivity_commissions", "can_pay_commission")
 
+  const handleSort = useCallback((key: string) => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) return { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      return { key, dir: "asc" }
+    })
+  }, [])
+
   const sortedSellers = useMemo(() => {
     const list = [...overview.sellers]
-    switch (sortKey) {
+    if (!sortConfig) {
+      list.sort((a, b) => b.totalAccumulated - a.totalAccumulated)
+      return list
+    }
+    const { key, dir } = sortConfig
+    const mul = dir === "asc" ? 1 : -1
+    switch (key) {
       case "name":
-        list.sort((a, b) => a.name.localeCompare(b.name))
+        list.sort((a, b) => a.name.localeCompare(b.name) * mul)
         break
       case "pending":
-        list.sort((a, b) => b.pendingAmount - a.pendingAmount)
+        list.sort((a, b) => (a.pendingAmount - b.pendingAmount) * mul)
         break
       case "paid":
-        list.sort((a, b) => b.paidAmount - a.paidAmount)
+        list.sort((a, b) => (a.paidAmount - b.paidAmount) * mul)
         break
       case "bonus":
-        list.sort((a, b) => b.bonusAmount - a.bonusAmount)
+        list.sort((a, b) => (a.bonusAmount - b.bonusAmount) * mul)
         break
       default:
-        list.sort((a, b) => b.totalAccumulated - a.totalAccumulated)
+        list.sort((a, b) => (a.totalAccumulated - b.totalAccumulated) * mul)
     }
     return list
-  }, [overview.sellers, sortKey])
+  }, [overview.sellers, sortConfig])
 
   const filteredSellers = useMemo(() => {
     if (!search.trim()) return sortedSellers
@@ -98,14 +112,6 @@ export default function CommissionPage({ partnerId, overview }: Props) {
   }, [filteredSellers, page])
 
   const hasMore = pagedSellers.length < filteredSellers.length
-
-  const sortOptions = [
-    { value: "total", label: "Total" },
-    { value: "name", label: "Nome" },
-    { value: "pending", label: "Pendente" },
-    { value: "paid", label: "Pago" },
-    { value: "bonus", label: "Bônus" },
-  ]
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -131,22 +137,12 @@ export default function CommissionPage({ partnerId, overview }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-none px-4 md:px-8 mb-4">
-          <CommissionPageControls
-            search={search}
-            onSearchChange={(v) => { setSearch(v); setPage(0) }}
-            viewMode={effectiveViewMode}
-            onViewModeChange={setViewModeState}
-          />
-          <div className="w-40 shrink-0">
-            <FormDropdown
-              label=""
-              value={sortKey}
-              setValue={(v) => setSortKey(v as SortKey)}
-              options={sortOptions}
-            />
-          </div>
-        </div>
+        <CommissionPageControls
+          search={search}
+          onSearchChange={(v) => { setSearch(v); setPage(0) }}
+          viewMode={effectiveViewMode}
+          onViewModeChange={setViewModeState}
+        />
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
@@ -223,15 +219,20 @@ export default function CommissionPage({ partnerId, overview }: Props) {
                       <thead>
                         <tr className="bg-brand-gray dark:bg-dark-border/50">
                           {COLUMNS.map((col, idx) => {
+                            const isSorted = sortConfig?.key === col.key
                             const isLast = idx === COLUMNS.length - 1
                             return (
                               <th
                                 key={col.id}
-                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isLast ? "rounded-r-lg" : idx === 0 ? "rounded-l-lg" : ""}`}
+                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isLast ? "rounded-r-lg" : idx === 0 ? "rounded-l-lg" : ""} ${col.sortable ? "cursor-pointer hover:bg-gray-200 dark:hover:bg-dark-border transition-colors select-none group" : ""}`}
                                 style={{ width: col.width }}
+                                onClick={() => col.sortable && col.key && handleSort(col.key)}
                               >
-                                <div className={`flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                  {col.label}
+                                <div className={`flex items-center gap-1 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                  <span>{col.label}</span>
+                                  {col.sortable && (
+                                    <ArrowUpDownIcon className={`w-3.5 h-3.5 transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading block" : "text-gray-400 hidden group-hover:block opacity-40"}`} />
+                                  )}
                                 </div>
                               </th>
                             )

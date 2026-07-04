@@ -13,8 +13,7 @@ interface OrderObservationsTabProps {
 export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ notes, setNotes, disabled = false }) => {
     return (
         <FadeIn>
-            <FormSection title="" hasSeparator={false} className="mt-0">
-                <p className="text-sm text-brand-inactive-text">Estas informações são apenas para uso interno e não aparecerão para o cliente.</p>
+            <FormSection title="Observações" hasSeparator={false} className="mt-0">
                 <FormTextarea
                     name="notes"
                     label=""

@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getDeliveryStatusLabel, getPaymentStatusLabel, getSalesChannelLabel, getFulfillmentModeLabel } from "@/lib/orders/status"
 import { mapCustomerStatusLabel, stockStatusFromQuantity } from "./filters"
 import type { ExportColumnDef, ExportRow } from "./types"
@@ -61,7 +61,7 @@ export function mapOrderRow(row: any, sellerNames: Map<string, string>): ExportR
 
   return {
     orderNumber: row.order_number || row.sale_number || row.id?.slice(0, 8) || "-",
-    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    date: row.created_at ? formatDateTime(row.created_at) : "-",
     customer: row.customer_name || "Consumidor final",
     salesperson: sellerNames.get(String(sellerId)) || "-",
     items: formatItemNames(items),
@@ -118,7 +118,7 @@ export function mapCustomerRow(row: any, stats?: { orders: number; ltv: number }
     name: row.name || "-",
     email: row.email || "-",
     phone: row.phone || "-",
-    createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString("pt-BR") : "-",
+    createdAt: row.created_at ? formatDate(row.created_at) : "-",
     totalOrders: stats?.orders ?? 0,
     lifetimeValue: formatCurrency(stats?.ltv ?? 0),
   }
@@ -198,8 +198,8 @@ export function mapSubscriptionRow(row: any): ExportRow {
     customer: row.customers?.name || row.customer?.name || "-",
     plan: row.recurring_plans?.name || row.plan?.name || "-",
     status: statusLabels[row.status] || row.status || "-",
-    nextBilling: row.next_execution_at ? new Date(row.next_execution_at).toLocaleDateString("pt-BR") : "-",
-    startedAt: row.started_at ? new Date(row.started_at).toLocaleDateString("pt-BR") : "-",
+    nextBilling: row.next_execution_at ? formatDate(row.next_execution_at) : "-",
+    startedAt: row.started_at ? formatDate(row.started_at) : "-",
     salesChannel: row.delivery_type === "delivery" ? "Entrega" : "Retirada",
   }
 }
@@ -263,7 +263,7 @@ export function mapReturnRow(row: any): ExportRow {
   const rawStatus = row.status || ""
   return {
     id: row.id?.slice(0, 8) || "-",
-    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    date: row.created_at ? formatDateTime(row.created_at) : "-",
     customer: row.customer_name_snapshot || "-",
     orderNumber: row.order_number_snapshot || row.orders?.order_number || "-",
     requestType: RETURN_REQUEST_TYPE_LABELS[row.request_type] || row.request_type || "-",
@@ -304,7 +304,7 @@ export function mapStockMovementRow(row: any): ExportRow {
   const skus = items.map((i: any) => i.products?.sku || i.sku || "").filter(Boolean).join("; ")
   const totalQty = items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
   return {
-    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    date: row.created_at ? formatDateTime(row.created_at) : "-",
     movementType: MOVEMENT_TYPE_LABELS[row.movement_type] || row.movement_type || "-",
     product: productNames || "-",
     sku: skus || "-",
@@ -346,14 +346,14 @@ const TRANSACTION_STATUS_LABELS: Record<string, string> = {
 
 export function mapTransactionRow(row: any): ExportRow {
   return {
-    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    date: row.created_at ? formatDateTime(row.created_at) : "-",
     description: row.description || "-",
     category: row.transaction_categories?.name || row.category || "-",
     transactionType: TRANSACTION_TYPE_LABELS[row.transaction_type] || row.transaction_type || "-",
     amount: formatCurrency(Number(row.amount ?? 0)),
     status: TRANSACTION_STATUS_LABELS[row.status] || row.status || "-",
-    dueDate: row.due_date ? new Date(row.due_date).toLocaleDateString("pt-BR") : "-",
-    paymentDate: row.payment_date ? new Date(row.payment_date).toLocaleDateString("pt-BR") : "-",
+    dueDate: row.due_date ? formatDate(row.due_date) : "-",
+    paymentDate: row.payment_date ? formatDate(row.payment_date) : "-",
     account: row.financial_accounts?.name || row.account_name || "-",
     paymentType: row.payment_methods?.name || row.payment_type || "-",
   }
@@ -381,7 +381,7 @@ export function mapSupplierRow(row: any): ExportRow {
     city: row.city || "-",
     state: row.state || "-",
     status: row.status === "ativo" ? "Ativo" : row.status === "inativo" ? "Inativo" : row.status || "-",
-    createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString("pt-BR") : "-",
+    createdAt: row.created_at ? formatDate(row.created_at) : "-",
   }
 }
 
@@ -417,9 +417,9 @@ export function mapServiceOrderRow(row: any): ExportRow {
     title: row.title || "-",
     status: SERVICE_ORDER_STATUS_LABELS[row.status] || row.status || "-",
     assignedUser: row.user_profiles?.full_name || row.assigned_user_name || "-",
-    expectedCompletion: row.expected_completion_date ? new Date(row.expected_completion_date).toLocaleDateString("pt-BR") : "-",
+    expectedCompletion: row.expected_completion_date ? formatDate(row.expected_completion_date) : "-",
     totalAmount: formatCurrency(Number(row.total_amount ?? 0)),
-    createdAt: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    createdAt: row.created_at ? formatDateTime(row.created_at) : "-",
   }
 }
 
@@ -438,8 +438,8 @@ export const CASH_REGISTER_EXPORT_COLUMNS: ExportColumnDef[] = [
 
 export function mapCashRegisterRow(row: any): ExportRow {
   return {
-    openedAt: row.opened_at ? new Date(row.opened_at).toLocaleString("pt-BR") : "-",
-    closedAt: row.closed_at ? new Date(row.closed_at).toLocaleString("pt-BR") : "-",
+    openedAt: row.opened_at ? formatDateTime(row.opened_at) : "-",
+    closedAt: row.closed_at ? formatDateTime(row.closed_at) : "-",
     status: row.status === "open" ? "Aberto" : row.status === "closed" ? "Fechado" : row.status || "-",
     openedBy: row.opener?.full_name || row.opened_by_name || "-",
     initialAmount: formatCurrency(Number(row.initial_amount ?? 0)),
@@ -477,7 +477,7 @@ export function mapXmlImportRow(row: any): ExportRow {
     totalValue: formatCurrency(Number(row.total_value ?? 0)),
     itemsCount: Number(row.items_count ?? 0),
     status: XML_IMPORT_STATUS_LABELS[row.status] || row.status || "-",
-    date: row.created_at ? new Date(row.created_at).toLocaleString("pt-BR") : "-",
+    date: row.created_at ? formatDateTime(row.created_at) : "-",
     accessKey: row.access_key || "-",
   }
 }

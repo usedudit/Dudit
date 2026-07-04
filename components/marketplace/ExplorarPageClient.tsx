@@ -557,9 +557,7 @@ export function ExplorarPageClient({
     // Handles browser Back/Forward navigation syncing path params and searchParams back to component state
     useEffect(() => {
         const urlType = searchParams.get("type") || "tudo"
-        if (urlType !== currentType) {
-            setCurrentType(urlType as any)
-        }
+        setCurrentType(urlType as any)
 
         const pathCity = slug[0] || null
         const urlCity = pathCity || searchParams.get("cidade") || null
@@ -568,15 +566,10 @@ export function ExplorarPageClient({
         }
 
         const urlRadius = searchParams.get("radius")
-        const nextRadius = urlRadius ? Number(urlRadius) : null
-        if (nextRadius !== selectedRadius) {
-            setSelectedRadius(nextRadius)
-        }
+        setSelectedRadius(urlRadius ? Number(urlRadius) : null)
 
         const urlSection = searchParams.get("section")
-        if (urlSection !== selectedSection) {
-            setSelectedSection(urlSection)
-        }
+        setSelectedSection(urlSection || null)
 
         const pathCategorySlug = slug[1] || null
         const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : null
@@ -591,12 +584,8 @@ export function ExplorarPageClient({
             }
         }
 
-        const isCatsEqual = selectedCategories.length === nextCats.length &&
-            selectedCategories.every((val, index) => val === nextCats[index])
-        if (!isCatsEqual) {
-            setSelectedCategories(nextCats)
-        }
-    }, [searchParams, params, selectedRadius, selectedSection])
+        setSelectedCategories(nextCats)
+    }, [searchParams, params])
 
 
 

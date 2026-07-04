@@ -2,13 +2,14 @@ export type OrderFinancialSnapshot = {
   total_amount?: number | null
   paid_amount?: number | null
   amount_paid?: number | null
+  paidAmount?: number | null
   situation?: string | null
   payment_breakdown?: unknown[] | null
   checkout_fulfillment?: Record<string, unknown> | null
 }
 
 export function getOrderPaidAmount(order: OrderFinancialSnapshot): number {
-  const paid = Number(order.paid_amount ?? order.amount_paid ?? 0)
+  const paid = Number(order.paid_amount ?? order.amount_paid ?? order.paidAmount ?? 0)
   return Number.isFinite(paid) ? Math.max(0, paid) : 0
 }
 
