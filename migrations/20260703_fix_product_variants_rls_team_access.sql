@@ -5,25 +5,35 @@
 --
 -- Context:
 --   Migration 950 (HIGH-02) aligned products/services/customers/orders RLS with
---   the team model (partners.user_id OR partner_users, with role gating on
---   mutations). product_variants was NOT included and still carried the legacy
---   policies from migrations 220 / 311:
+--   the team model. product_variants was NOT included and still carried the
+--   legacy policies from migrations 220 / 311:
 --     * INSERT: WITH CHECK (true)  -> ANY authenticated user could insert a
 --       variant referencing ANY product_id, i.e. a direct cross-tenant write
 --       straight against the DB, bypassing the application layer entirely.
 --     * UPDATE / DELETE: owner-only (partners.user_id = auth.uid()) -> ignored
---       partner_users, so legitimate team members could not manage variants and
---       RLS was not a reliable second layer for RLS-scoped client paths.
+--       team members and was not a reliable second layer.
+--
+-- IMPORTANT — role source of truth:
+--   The RBAC refactor (20260505_rbac_roles_table.sql) made `partner_users.role_id`
+--   (lowercase: owner/admin/manager/operator/delivery) the source of truth. The
+--   application (team.ts, invitations.ts, authorization.ts) reads/writes ONLY
+--   role_id; the legacy uppercase `role` column is no longer maintained and
+--   defaults to 'OPERATOR' for new rows. Therefore these policies gate on
+--   role_id, NOT the stale legacy `role` column.
+--   (Note: migration 950's policies still reference the legacy `role` column and
+--    are effectively stale for team members — tracked separately. RLS is only a
+--    backstop there because the app mutates via the service-role client.)
 --
 -- This migration:
 --   1. Keeps public SELECT of ACTIVE variants (buyers add them to cart).
 --   2. Lets owner + ANY team member SELECT all variants (incl. inactive) for mgmt.
 --   3. Restricts INSERT/UPDATE/DELETE to owner + partner_users with an
---      appropriate role, derived via the parent product's partner_id.
+--      appropriate role_id, derived via the parent product's partner_id.
 --
--- Role model mirrors migration 950:
---   INSERT / UPDATE -> OWNER, ADMIN, MANAGER
---   DELETE          -> OWNER, ADMIN
+-- Role model (role_id, lowercase):
+--   INSERT / UPDATE -> owner, admin, manager
+--   DELETE          -> owner, admin
+--   (The partner owner is always covered via partners.user_id = auth.uid().)
 -- ============================================================================
 
 BEGIN;
@@ -77,7 +87,7 @@ WITH CHECK (
         UNION
         SELECT partner_id FROM public.partner_users
           WHERE user_id = auth.uid()
-          AND role IN ('OWNER', 'ADMIN', 'MANAGER')
+          AND role_id IN ('owner', 'admin', 'manager')
       )
   )
 );
@@ -97,7 +107,7 @@ USING (
         UNION
         SELECT partner_id FROM public.partner_users
           WHERE user_id = auth.uid()
-          AND role IN ('OWNER', 'ADMIN', 'MANAGER')
+          AND role_id IN ('owner', 'admin', 'manager')
       )
   )
 )
@@ -110,7 +120,7 @@ WITH CHECK (
         UNION
         SELECT partner_id FROM public.partner_users
           WHERE user_id = auth.uid()
-          AND role IN ('OWNER', 'ADMIN', 'MANAGER')
+          AND role_id IN ('owner', 'admin', 'manager')
       )
   )
 );
@@ -130,7 +140,7 @@ USING (
         UNION
         SELECT partner_id FROM public.partner_users
           WHERE user_id = auth.uid()
-          AND role IN ('OWNER', 'ADMIN')
+          AND role_id IN ('owner', 'admin')
       )
   )
 );
