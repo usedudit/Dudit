@@ -656,7 +656,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                             </div>
 
                                             {/* Items List */}
-                                            <FormSection hasSeparator title="Itens do Orçamento">
+                                            <FormSection hasSeparator title="Itens do Orçamento" className='mb-8'>
                                                 <div className="space-y-4">
                                                     {isLoadingQuoteItems ? (
                                                         <div className="flex items-center justify-center py-14">

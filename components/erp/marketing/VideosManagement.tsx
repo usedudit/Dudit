@@ -29,13 +29,11 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function VideosManagementPage() {
   const { toast } = useToast()
-  const { businessInfo, planSlug } = usePermissions()
+  const { businessInfo, planSlug, partnerId } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
 
   const [videos, setVideos] = useState<CommunityVideoItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
-
-  const partnerId = (businessInfo as any)?.id
 
   const loadVideos = useCallback(async () => {
     if (!partnerId) return
