@@ -97,7 +97,7 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([couponId, count]) => {
-          const c = couponMap.get(couponId) || {}
+          const c: any = couponMap.get(couponId) || {}
           return { id: couponId, code: c.code || "Desconhecido", usageCount: count, discountValue: money(c.discount_value || 0), discountType: c.discount_type || "fixed" }
         })
 
