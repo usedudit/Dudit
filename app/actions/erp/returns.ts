@@ -231,6 +231,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         reason: row.reason,
         status: row.status,
         refundValue: toNumber(row.refund_amount),
+        refundType: (row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].refund_type : undefined,
         storeCreditValue: toNumber(row.store_credit_amount),
         evidenceImages: (row.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
         observations: row.customer_details || row.customer_message || row.seller_notes || row.internal_notes || "",
@@ -384,12 +385,14 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
 
             // If not found in customers, check if there's a user profile (marketplace user)
             if (!buyerDetails) {
-                const { data: profileData } = await supabase
-                    .from("profiles")
-                    .select("email")
-                    .eq("id", data.orders.buyer_id)
-                    .maybeSingle()
-                buyerDetails = profileData ? { email: profileData.email, phone: null } : null
+                try {
+                    const { data: authData } = await supabase.auth.admin.getUserById(data.orders.buyer_id)
+                    if (authData?.user?.email) {
+                        buyerDetails = { email: authData.user.email, phone: null }
+                    }
+                } catch (err) {
+                    console.error("Error fetching buyer email from auth.users:", err)
+                }
             }
         }
 
@@ -978,7 +981,7 @@ export async function processReturnRequestAction(input: unknown) {
                     p_partner_id: request.partner_id,
                     p_movement_type: "in",
                     p_reason: "RETURN_IN",
-                    p_notes: "Devolução do cliente",
+                    p_notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
                     p_created_by: user.id,
                     p_items: returnToStockItems,
                 })
@@ -992,7 +995,7 @@ export async function processReturnRequestAction(input: unknown) {
                         .update({
                             source_return_request_id: data.requestId,
                             reason: "RETURN_IN",
-                            notes: `Devolução do cliente - solicitação DVL-${data.requestId.slice(0, 6).toUpperCase()}`
+                            notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`
                         })
                         .eq("id", v_stock_movement_id)
 

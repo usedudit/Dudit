@@ -6,10 +6,10 @@ import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, AlertModal, Badge, Checkbox, BadgeVariant, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { Button, IconPlaceholder, AlertModal, Checkbox, BadgeVariant, SelectionBanner, ThreeDotsLoader, DefaultModal, FormDropdown } from "@/components/reusable"
+import { formatDate } from "@/lib/utils";
 import QuoteSkeleton from "./QuoteSkeleton"
-import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction, getERPQuotesPageAction, getQuoteDetailsAction, type ERPQuoteListCursor } from "@/app/actions/erp/quotes"
+import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction, updateQuoteStatusAction, getERPQuotesPageAction, getQuoteDetailsAction, type ERPQuoteListCursor } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -23,6 +23,8 @@ import QuoteDetail from "./QuoteDetail"
 import QuotePrintModal from "./QuotePrintModal"
 import { useNotification } from "@/hooks/use-notification"
 import { ShareModal } from "@/components/marketplace/ShareModal"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -156,6 +158,42 @@ export default function QuotesPage({
             prevQuotesRef.current = loadedQuotes
         }
     }, [loadedQuotes])
+
+    // Export state & handlers
+    const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
+
+    // Status alteration state
+    const [quoteToUpdateStatus, setQuoteToUpdateStatus] = useState<any | null>(null)
+    const [pendingStatus, setPendingStatus] = useState<string>("")
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+
+    const handleOpenStatusModal = useCallback((quote: any) => {
+        setQuoteToUpdateStatus(quote)
+        setPendingStatus(quote.status || "draft")
+    }, [])
+
+    const handleStatusChangeSubmit = async () => {
+        if (!quoteToUpdateStatus) return
+        setIsUpdatingStatus(true)
+        try {
+            const res = await updateQuoteStatusAction({
+                quoteId: quoteToUpdateStatus.originalId || quoteToUpdateStatus.id,
+                partnerId,
+                status: pendingStatus as any
+            })
+            if (res.success) {
+                success("Sucesso", "Status do orçamento atualizado com sucesso.")
+                setQuoteToUpdateStatus(null)
+                afterMutation()
+            } else {
+                error("Erro", res.error || "Não foi possível atualizar o status.")
+            }
+        } catch (err) {
+            error("Erro", "Erro ao conectar ao servidor.")
+        } finally {
+            setIsUpdatingStatus(false)
+        }
+    }
 
     useEffect(() => {
         const handleReset = () => closeEntity()
@@ -371,6 +409,26 @@ export default function QuotesPage({
         debouncedSearch.length > 0
     const hasQuotes = (currentQuotes?.length || 0) > 0
 
+    const handleExport = useCallback(() => {
+        void exportData(
+            {
+                partnerId,
+                module: "quotes",
+                format: "xlsx",
+                filters: {
+                    search: debouncedSearch,
+                    activeTab,
+                    status: filters.status,
+                    datePeriod: filters.issuePeriod
+                },
+            },
+            {
+                selectedIds: selection.ids,
+                totalCount: filteredQuotes.length,
+            }
+        )
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters.status, filters.issuePeriod, selection.ids, filteredQuotes.length])
+
     // Handlers
     const handleAddQuote = useCallback(() => {
         openEntity('create')
@@ -552,7 +610,12 @@ export default function QuotesPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
+                                    <Button
+                                        variant="outline"
+                                        leftIcon={<ExportFileIcon size={18} />}
+                                        onClick={handleExport}
+                                        isLoading={isExporting}
+                                    >
                                         Exportar
                                     </Button>
 
@@ -569,7 +632,7 @@ export default function QuotesPage({
                                     search={search}
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
-                                    onExport={() => { }}
+                                    onExport={handleExport}
                                     onAddQuote={handleAddQuote}
                                     filters={filters}
                                     setFilters={setFilters as any}
@@ -649,6 +712,7 @@ export default function QuotesPage({
                                                                     onDelete={() => handleDeleteQuote(q)}
                                                                     onPrint={() => handlePrintQuote(q)}
                                                                     onShare={() => handleShareQuote(q)}
+                                                                    onStatus={() => handleOpenStatusModal(q)}
                                                                     onClick={() => handleViewQuote(q)}
                                                                     onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                     onPrefetchMouseLeave={prefetch.onMouseLeave}
@@ -725,6 +789,7 @@ export default function QuotesPage({
                                                                                 onDelete={handleDeleteQuote}
                                                                                 onPrint={handlePrintQuote}
                                                                                 onShare={handleShareQuote}
+                                                                                onStatus={handleOpenStatusModal}
                                                                                 onClick={handleViewQuote}
                                                                                 onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                                 onPrefetchMouseLeave={prefetch.onMouseLeave}
@@ -846,6 +911,49 @@ export default function QuotesPage({
                     label="Link do orçamento"
                 />
             )}
+
+            {quoteToUpdateStatus && (
+                <DefaultModal
+                    isOpen={!!quoteToUpdateStatus}
+                    onClose={() => !isUpdatingStatus && setQuoteToUpdateStatus(null)}
+                    title="Alterar status do orçamento"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex justify-end gap-3 w-full">
+                            <Button variant="outline" onClick={() => setQuoteToUpdateStatus(null)} disabled={isUpdatingStatus}>Cancelar</Button>
+                            <Button onClick={handleStatusChangeSubmit} isLoading={isUpdatingStatus} disabled={pendingStatus === quoteToUpdateStatus.status}>Salvar</Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Selecione o novo status para este orçamento.</p>
+                        <FormDropdown
+                            label="Status"
+                            value={pendingStatus}
+                            setValue={setPendingStatus}
+                            options={[
+                                { value: 'draft', label: 'Rascunho' },
+                                { value: 'sent', label: 'Enviado' },
+                                { value: 'pending_client', label: 'Pendente do Cliente' },
+                                { value: 'viewed', label: 'Visualizado' },
+                                { value: 'approved', label: 'Aprovado' },
+                                { value: 'rejected', label: 'Rejeitado' },
+                                { value: 'expired', label: 'Expirado' },
+                                { value: 'cancelled', label: 'Cancelado' }
+                            ]}
+                        />
+                    </div>
+                </DefaultModal>
+            )}
+
+            <ExportSelectionModal
+                isOpen={selectionModal.isOpen}
+                selectedCount={selectionModal.selectedCount}
+                totalCount={selectionModal.totalCount}
+                onExportSelected={handleExportSelected}
+                onExportAll={handleExportAll}
+                onClose={closeSelectionModal}
+            />
         </>
     )
 }

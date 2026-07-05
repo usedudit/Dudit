@@ -11,7 +11,8 @@ import {
     CheckCircleIcon,
     EditIcon,
     FileIcon,
-    TelegramIcon
+    TelegramIcon,
+    EyeIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
@@ -108,6 +109,8 @@ const QuoteEditor = (props: QuoteEditorProps) => {
     const statusOptions = [
         { value: 'draft', label: 'Rascunho', icon: FileIcon, color: 'text-gray-500' },
         { value: 'sent', label: 'Enviado', icon: TelegramIcon, color: 'text-blue-500' },
+        { value: 'pending_client', label: 'Pendente do Cliente', icon: ClockIcon, color: 'text-brand-orange' },
+        { value: 'viewed', label: 'Visualizado', icon: EyeIcon, color: 'text-teal-500' },
         { value: 'approved', label: 'Aprovado', icon: CheckCircleIcon, color: 'text-green-500' },
         { value: 'rejected', label: 'Recusado', icon: AlertCircleIcon, color: 'text-red-500' },
         { value: 'expired', label: 'Expirado', icon: ClockIcon, color: 'text-brand-orange' },

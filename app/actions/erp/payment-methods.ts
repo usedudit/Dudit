@@ -63,12 +63,14 @@ async function resolvePixKeyFromPartner(
     }
     if (pixKeyType === "cnpj") return partner.cnpj || null
     if (pixKeyType === "email") {
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("email")
-            .eq("id", partner.user_id)
-            .single()
-        return profile?.email || null
+        if (!partner.user_id) return null
+        try {
+            const { data: authData } = await supabase.auth.admin.getUserById(partner.user_id)
+            return authData?.user?.email || null
+        } catch (err) {
+            console.error("Error fetching user email from auth.users:", err)
+            return null
+        }
     }
     return partner.phone || null
 }

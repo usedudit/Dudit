@@ -989,6 +989,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         });
         if (stRes.success) {
             setStatus("draft");
+            setOriginalQuoteData((prev: any) => prev ? { ...prev, status: "draft" } : null);
             notifySuccess("Orçamento reaberto", "Agora você pode editar itens e valores.");
             debouncedRefresh();
         } else {

@@ -120,6 +120,8 @@ const navItems: NavItem[] = [
             { label: "Campanhas e Promoções", href: "/erp/promotions" },
             { label: "Planos Recorrentes", href: "/erp/recurring/plans" },
             { label: "Assinaturas", href: "/erp/recurring/subscriptions" },
+            { label: "Coleções", href: "/erp/marketing/colecoes" },
+            { label: "Vídeos da Comunidade", href: "/erp/marketing/videos" },
         ],
     },
     {
@@ -272,6 +274,8 @@ export function ERPSidebar() {
     const campaignsResourceActive = isSystemResourceActive(businessInfo, "campaigns")
     const showcaseResourceActive = isSystemResourceActive(businessInfo, "showcase")
     const productivityResourceActive = isSystemResourceActive(businessInfo, "productivity")
+    const communityVideosResourceActive = isSystemResourceActive(businessInfo, "communityVideos")
+    const colecoesResourceActive = isSystemResourceActive(businessInfo, "colecoes")
     const salesGroupActive = ordersResourceActive || quotesResourceActive || returnsResourceActive || posResourceActive || deliveriesResourceActive
     const servicesGroupActive = servicesResourceActive || appointmentsResourceActive || serviceOrdersResourceActive || serviceCadastrosResourceActive
 
@@ -357,6 +361,8 @@ export function ERPSidebar() {
                         if (item.label === "Marketing") {
                             if (sub.href === "/erp/coupons") return couponsResourceActive
                             if (sub.href === "/erp/promotions") return campaignsResourceActive
+                            if (sub.href === "/erp/marketing/videos") return communityVideosResourceActive
+                            if (sub.href === "/erp/marketing/colecoes") return colecoesResourceActive
                             return marketingResourceActive
                         }
                         if (item.label === "Produtividade") {
@@ -391,7 +397,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, stockMovementsResourceActive, productCadastrosResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, serviceCadastrosResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, couponsResourceActive, campaignsResourceActive, showcaseResourceActive])
+    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, stockMovementsResourceActive, productCadastrosResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, serviceCadastrosResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, couponsResourceActive, campaignsResourceActive, showcaseResourceActive, communityVideosResourceActive, colecoesResourceActive])
 
     useEffect(() => {
         setIsMounted(true)

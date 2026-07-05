@@ -125,11 +125,11 @@ const ModerationListRow = React.memo(({
                     >
                         {item.moderation_status === "pending_moderation" && (
                             <DropdownItem onClick={() => onApprove(item.id, item.type)} className="text-brand-green">
-                                <CheckCircleIcon size={16} /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}
+                                <CheckCircleIcon size={16} /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
                             </DropdownItem>
                         )}
                         <DropdownItem onClick={() => onDetail(item)} className="text-brand-red">
-                            <CancelCircleIcon size={16} /> Rejeitar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}
+                            <CancelCircleIcon size={16} /> Rejeitar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
                         </DropdownItem>
                     </ActionsDropdown>
                 </div>

@@ -44,6 +44,15 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 
+const mapPaymentMethodToPt = (method: string): string => {
+    const m = String(method || "").toLowerCase().trim();
+    if (m === "pix") return "Pix";
+    if (m === "credit_card") return "Cartão de Crédito";
+    if (m === "other") return "Outro";
+    if (m === "mercado pago" || m === "mercado_pago") return "Mercado Pago";
+    return method;
+}
+
 interface CreateReturnPageProps {
     partnerId: string
     mode: "create" | "edit" | "view"
@@ -1356,7 +1365,7 @@ export default function CreateReturnPage({
                                                                     />
                                                                     <PaymentRow label="Valor do reembolso" value={formatCurrency(refundValue)} />
                                                                     {refundPaymentMethod && (
-                                                                        <PaymentRow label="Método de reembolso" value={refundPaymentMethod} />
+                                                                        <PaymentRow label="Método de reembolso" value={mapPaymentMethodToPt(refundPaymentMethod)} />
                                                                     )}
                                                                     {failedOrPendingRefund && (
                                                                         <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-xl space-y-3">

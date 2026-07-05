@@ -33,6 +33,17 @@ const CONDITION_LABELS: Record<string, string> = {
     danificado: "Danificado"
 };
 
+const REASON_LABELS: Record<string, string> = {
+    size_fit: "Tamanho / Caimento",
+    defect: "Defeito",
+    defective: "Defeito",
+    not_as_described: "Diferente do anunciado",
+    regret: "Arrependimento / Desistência",
+    damaged: "Danificado no transporte",
+    wrong_item: "Item incorreto enviado",
+    other: "Outro motivo",
+};
+
 export default async function PrintTrocaPage({ params }: PageProps) {
     const { id } = await params
     
@@ -230,13 +241,16 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                         <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                                             Produto
                                         </th>
-                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-20 border-b border-gray-100">
+                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-16 border-b border-gray-100">
                                             Qtd
                                         </th>
                                         <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-24 border-b border-gray-100">
-                                            Preço
+                                            Preço Unit.
                                         </th>
-                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-28 border-b border-gray-100">
+                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-24 border-b border-gray-100">
+                                            Preço Pago
+                                        </th>
+                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-24 border-b border-gray-100">
                                             Subtotal
                                         </th>
                                         <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tr-xl border-b border-gray-100">
@@ -246,9 +260,11 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                 </thead>
                                 <tbody>
                                     {returnRequest.items.map((item: any, idx: number) => {
-                                        const unitPrice = Number(item.netItemValue || item.price || 0)
-                                        const subtotal = unitPrice * Number(item.quantity || 0)
+                                        const unitPrice = Number(item.price || 0)
+                                        const netPrice = Number(item.netItemValue || item.price || 0)
+                                        const subtotal = netPrice * Number(item.quantity || 0)
                                         const conditionLabel = CONDITION_LABELS[item.condition?.toLowerCase()] || item.condition || "-"
+                                        const reasonLabel = REASON_LABELS[item.reason?.toLowerCase()] || item.reason || "Outro motivo"
                                         return (
                                             <tr key={idx} className="bg-white">
                                                 <td className="py-2 pl-6 pr-4 border-b border-gray-50">
@@ -266,12 +282,17 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                                     </span>
                                                 </td>
                                                 <td className="py-2 px-4 border-b border-gray-50 text-right">
+                                                    <span className="text-[13px] font-medium text-gray-600">
+                                                        {formatCurrency(netPrice)}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2 px-4 border-b border-gray-50 text-right">
                                                     <span className="text-[13px] font-bold text-black">
                                                         {formatCurrency(subtotal)}
                                                     </span>
                                                 </td>
                                                 <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-xs">
-                                                    <p className="text-gray-600 font-medium line-clamp-2">"{item.reason || 'N/A'}"</p>
+                                                    <p className="text-gray-600 font-medium line-clamp-2">{reasonLabel}</p>
                                                     <span className="text-[10px] text-gray-400">Estado: {conditionLabel}</span>
                                                 </td>
                                             </tr>
@@ -281,17 +302,19 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                             </table>
                         </div>
 
-                        {/* Financial and Observations block */}
-                        <div className="px-8 mt-6 grid grid-cols-2 gap-8">
-                            <div className="text-xs text-gray-500 space-y-1">
-                                {returnRequest.observations && (
-                                    <div className="bg-[#f8f9fa] p-4 rounded-lg text-black">
-                                        <p className="font-bold text-[#113833] mb-1">Observações:</p>
-                                        <p className="italic">"{returnRequest.observations}"</p>
-                                    </div>
-                                )}
+                        {/* Observations block */}
+                        {returnRequest.observations && (
+                            <div className="px-8 mt-6">
+                                <div className="bg-[#f8f9fa] p-4 rounded-lg text-xs text-black">
+                                    <p className="font-bold text-[#113833] mb-1">Observações:</p>
+                                    <p className="italic">"{returnRequest.observations}"</p>
+                                </div>
                             </div>
-                            <div className="bg-[#f8f9fa] p-6 rounded-lg text-black space-y-2.5">
+                        )}
+
+                        {/* Financial block taking full width */}
+                        <div className="px-8 mt-6">
+                            <div className="bg-[#f8f9fa] p-6 rounded-lg text-black space-y-2.5 w-full">
                                 {Number(returnRequest.refundValue || 0) > 0 && (
                                     <div className="flex justify-between text-xs">
                                         <span className="text-gray-500 font-medium">Valor Reembolsado</span>
@@ -316,32 +339,18 @@ export default async function PrintTrocaPage({ params }: PageProps) {
                                         <span className="font-bold text-brand-green">{formatCurrency(returnRequest.exchangeSurplusAmount || 0)}</span>
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* Timeline Events if any */}
-                        {returnRequest.returnEvents && returnRequest.returnEvents.length > 0 && (
-                            <div className="px-8 mt-6">
-                                <h3 className="font-bold text-sm text-[#113833] mb-3">Histórico de Eventos</h3>
-                                <div className="border border-gray-100 rounded-lg p-4 space-y-4">
-                                    {returnRequest.returnEvents.map((event: any) => (
-                                        <div key={event.id} className="text-xs flex items-start gap-3">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 shrink-0" />
-                                            <div className="flex-1">
-                                                <div className="flex justify-between text-[11px] text-gray-400 mb-0.5">
-                                                    <span>
-                                                        Status: <strong className="text-gray-600">{STATUS_LABELS[event.new_status] || event.new_status || "Atualizado"}</strong>
-                                                    </span>
-                                                    <span>{formatDate(event.created_at)}</span>
-                                                </div>
-                                                {event.notes && <p className="text-gray-600 italic font-medium">"{event.notes}"</p>}
-                                                <span className="text-[10px] text-gray-400">Responsável: {event.actor_name || "Sistema"}</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="pt-3 border-t border-gray-200 flex justify-between items-center mt-2">
+                                    <span className="font-bold text-sm text-[#113833]">Total da Resolução</span>
+                                    <span className="font-bold text-lg text-black">
+                                        {formatCurrency(
+                                            returnRequest.requestType === "refund" || returnRequest.desiredResolution === "refund" ? returnRequest.refundValue :
+                                                returnRequest.requestType === "store_credit" || returnRequest.desiredResolution === "store_credit" ? returnRequest.storeCreditValue :
+                                                    (Number(returnRequest.refundValue || 0) + Number(returnRequest.storeCreditValue || 0) + Number(returnRequest.exchangeShortfallAmount || 0))
+                                        )}
+                                    </span>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         {/* Signatures at bottom */}
                         <div className="px-8 mt-auto py-12 border-t border-gray-100 grid grid-cols-2 gap-8 text-center text-xs shrink-0">

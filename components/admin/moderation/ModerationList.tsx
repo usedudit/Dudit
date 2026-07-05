@@ -87,7 +87,7 @@ function ProductModerationSheet({
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
             <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Revisar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}</h2>
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Revisar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
@@ -184,7 +184,7 @@ function ProductModerationSheet({
                             onClick={() => setShowApproveModal(true)}
                             disabled={isPending}
                         >
-                            <CheckCircleIcon size={20} className="mr-2" /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}
+                                <CheckCircleIcon size={20} className="mr-2" /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
                         </Button>
 
                         <div className="flex gap-3">
@@ -215,7 +215,7 @@ function ProductModerationSheet({
             <DefaultModal
                 isOpen={showApproveModal}
                 onClose={() => setShowApproveModal(false)}
-                title={`Aprovar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}`}
+                title={`Aprovar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}`}
                 maxWidth="sm"
                 footer={
                     <>
@@ -282,7 +282,7 @@ function ProductModerationSheet({
             <DefaultModal
                 isOpen={showFullRejectModal}
                 onClose={() => { setShowFullRejectModal(false); setRejectReason("") }}
-                title={`Rejeitar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}`}
+                title={`Rejeitar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}`}
                 maxWidth="md"
                 footer={
                     <>

@@ -526,6 +526,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                 }}
                                                 onDelete={() => setShowDeleteModal(true)}
                                                 onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
+                                                onStatus={handleOpenStatusModal}
                                             />
 
                                             <Button onClick={() => onEditQuote && onEditQuote(quote)} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
@@ -980,6 +981,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                 }}
                                 onDelete={() => setShowDeleteModal(true)}
                                 onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
+                                onStatus={handleOpenStatusModal}
                                 trigger={
                                     <Button variant="outline" className="flex-1" leftIcon={<ThreeDotsIcon size={18} />}>
                                         Opções

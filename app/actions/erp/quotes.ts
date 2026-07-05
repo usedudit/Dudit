@@ -660,7 +660,7 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
 
     // 2. Fetch partner, store and default address
     const [partnerRes, storeRes] = await Promise.all([
-        supabase.from("partners").select("store_name, store_image_url, email, phone").eq("id", partnerId).maybeSingle(),
+        supabase.from("partners").select("store_name, store_image_url, user_id, phone").eq("id", partnerId).maybeSingle(),
         supabase.from("stores").select("name, image_url").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
     const partner = partnerRes.data
@@ -676,6 +676,17 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
     let partnerAddressFormatted = "Endereço não cadastrado"
     if (partnerAddr) {
         partnerAddressFormatted = `${partnerAddr.street}, ${partnerAddr.number}${partnerAddr.complement ? ` - ${partnerAddr.complement}` : ""}\n${partnerAddr.neighborhood} - ${partnerAddr.city}/${partnerAddr.state}\nCEP: ${partnerAddr.zip_code}`
+    }
+
+    let partnerEmail = null
+    if (partner?.user_id) {
+        try {
+            const admin = getAdminClient()
+            const { data: authData } = await admin.auth.admin.getUserById(partner.user_id)
+            partnerEmail = authData?.user?.email || null
+        } catch (err) {
+            console.error("Error fetching partner email:", err)
+        }
     }
 
     // 3. Fetch seller profile
@@ -754,7 +765,7 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
         partner: {
             name: store?.name || partner?.store_name || "Parceiro",
             image_url: store?.image_url || partner?.store_image_url || null,
-            email: partner?.email || null,
+            email: partnerEmail,
             phone: partner?.phone || null,
             address: partnerAddressFormatted
         },
@@ -837,12 +848,10 @@ export async function updateQuoteStatusAction(data: {
                 })
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)
-                .eq("updated_at", current.updated_at) // Optimistic lock: prevents TOCTOU race
 
             if (error) {
-                // If updated_at changed between read and write, the row won't match and no update happens
                 console.error("[updateQuoteStatusAction] Error:", error)
-                return errorResponse(error.message || "O orçamento foi modificado por outro usuário. Atualize a página.")
+                return errorResponse(error.message || "Erro ao atualizar status.")
             }
 
             // Generate snapshot if transitioning out of draft
@@ -1990,7 +1999,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         addresses (*)
                     ),
                     partners (
-                        id, store_name, store_image_url, phone
+                        id, store_name, store_image_url, user_id, phone
                     )
                 `)
                 .eq("public_token", publicToken)
@@ -2007,7 +2016,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                             addresses (*)
                         ),
                         partners (
-                            id, store_name, store_image_url, phone
+                            id, store_name, store_image_url, user_id, phone
                         )
                     `)
                     .eq("id", publicToken)
@@ -2227,6 +2236,16 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
 
                 // Store already fetched above
 
+                let partnerEmail = null
+                if (quote.partners?.user_id) {
+                    try {
+                        const { data: authData } = await admin.auth.admin.getUserById(quote.partners.user_id)
+                        partnerEmail = authData?.user?.email || null
+                    } catch (err) {
+                        console.error("Error fetching partner email in fallback:", err)
+                    }
+                }
+
                 fallbackSnapshot = {
                     quote_number: quote.quote_number,
                     issue_date: quote.issue_date,
@@ -2241,7 +2260,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     partner: {
                         name: store?.name || quote.partners?.store_name || "Parceiro",
                         image_url: store?.image_url || quote.partners?.store_image_url || null,
-                        email: quote.partners?.email || null,
+                        email: partnerEmail,
                         phone: quote.partners?.phone || null,
                         address: partnerAddressFormatted
                     },

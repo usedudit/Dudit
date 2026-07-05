@@ -124,6 +124,18 @@ export async function getModerationQueue(
         ownerMap = new Map((owners || []).map((o: any) => [o.user_id, o.full_name]))
     }
 
+    // Community videos query
+    let videoQuery = supabase
+        .from("community_videos")
+        .select("id, partner_id, title, description, video_thumbnail, moderation_status, views_count, created_at")
+        .not("moderation_status", "eq", "approved")
+
+    if (statusFilter && statusFilter === "pending_moderation") {
+        videoQuery = videoQuery.eq("moderation_status", "pending_moderation")
+    }
+
+    const { data: videos } = await videoQuery.order("created_at", { ascending: false }).limit(10)
+
     // 2. Partners query
     let partnerQuery = supabase
         .from("partners")
@@ -219,6 +231,21 @@ export async function getModerationQueue(
         returnOwnerMap = new Map((returnOwners || []).map((o: any) => [o.user_id, o.full_name]))
     }
 
+    const mappedVideos: ModerationItem[] = (videos || []).map((v: any) => ({
+        id: v.id,
+        type: "community_video" as const,
+        title: v.title || "Vídeo da comunidade",
+        description: v.description,
+        price: 0,
+        images: [v.video_thumbnail].filter(Boolean),
+        owner_store_name: "",
+        partner_id: v.partner_id || "",
+        owner_user_name: "",
+        moderation_status: v.moderation_status,
+        risk_score: 0,
+        created_at: v.created_at,
+    }))
+
     const mappedReturns: ModerationItem[] = (returnDisputes || []).map((r: any) => ({
         id: r.id,
         type: "return_dispute" as const,
@@ -235,7 +262,7 @@ export async function getModerationQueue(
     }))
 
     // Combine and sort
-    const combined = [...mappedProducts, ...mappedPartners, ...mappedReturns]
+    const combined = [...mappedVideos, ...mappedProducts, ...mappedPartners, ...mappedReturns]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, pageSize)
 
@@ -251,7 +278,7 @@ export async function getModerationQueue(
 
 export async function approveModeration(
     entityId: string,
-    type: "product" | "partner" | "return_dispute" = "product"
+    type: "product" | "partner" | "return_dispute" | "community_video" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -259,6 +286,36 @@ export async function approveModeration(
     const supabase = getAdminClient()
 
     // Anti-IDOR: re-fetch entity
+    if (type === "community_video") {
+        const { data: video } = await supabase
+            .from("community_videos")
+            .select("id, moderation_status")
+            .eq("id", entityId)
+            .single()
+
+        if (!video) return { success: false, error: "Vídeo não encontrado" }
+
+        const { error: updateError } = await supabase
+            .from("community_videos")
+            .update({
+                moderation_status: "approved",
+                published_at: new Date().toISOString(),
+            })
+            .eq("id", entityId)
+
+        if (updateError) return { success: false, error: updateError.message }
+
+        await adminAuditLog({
+            adminUserId: admin.userId,
+            actionType: AdminActionType.MODERATION_APPROVE,
+            targetType: "community_video",
+            targetId: entityId,
+            metadata: { previousStatus: video.moderation_status },
+        })
+
+        return { success: true }
+    }
+
     if (type === "return_dispute") {
         const { data: rr, error: rrError } = await supabase
             .from("return_requests")
@@ -507,7 +564,7 @@ export async function rejectFlaggedImages(
 export async function rejectModeration(
     entityId: string,
     reason: string,
-    type: "product" | "partner" | "return_dispute" = "product"
+    type: "product" | "partner" | "return_dispute" | "community_video" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -517,6 +574,36 @@ export async function rejectModeration(
     }
 
     const supabase = getAdminClient()
+
+    if (type === "community_video") {
+        const { data: video } = await supabase
+            .from("community_videos")
+            .select("id, moderation_status")
+            .eq("id", entityId)
+            .single()
+
+        if (!video) return { success: false, error: "Vídeo não encontrado" }
+
+        const { error: updateError } = await supabase
+            .from("community_videos")
+            .update({
+                moderation_status: "rejected",
+                moderation_reason: reason.trim(),
+            })
+            .eq("id", entityId)
+
+        if (updateError) return { success: false, error: updateError.message }
+
+        await adminAuditLog({
+            adminUserId: admin.userId,
+            actionType: AdminActionType.MODERATION_REJECT,
+            targetType: "community_video",
+            targetId: entityId,
+            metadata: { reason: reason.trim(), previousStatus: video.moderation_status },
+        })
+
+        return { success: true }
+    }
 
     if (type === "return_dispute") {
         const { data: rr, error: rrError } = await supabase

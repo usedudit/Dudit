@@ -15,6 +15,7 @@ interface QuoteGridCardProps {
     onDuplicate: () => void
     onPrint?: () => void
     onShare?: () => void
+    onStatus?: () => void
     onClick?: () => void
     onPrefetchMouseEnter?: React.MouseEventHandler<HTMLDivElement>
     onPrefetchMouseLeave?: React.MouseEventHandler<HTMLDivElement>
@@ -31,6 +32,7 @@ const QuoteGridCard = React.memo(
         onDuplicate,
         onPrint,
         onShare,
+        onStatus,
         onClick,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
@@ -135,6 +137,7 @@ const QuoteGridCard = React.memo(
                                 onDelete={onDelete}
                                 onPrint={onPrint}
                                 onShare={onShare}
+                                onStatus={onStatus}
                             />
                         </div>
                     </div>

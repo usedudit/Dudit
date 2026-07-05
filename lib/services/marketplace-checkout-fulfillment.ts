@@ -405,13 +405,13 @@ export async function fulfillMarketplaceOrder(
     .eq("user_id", order.buyer_id)
     .maybeSingle()
 
-  const { data: buyerProfile } = await supabase
-    .from("profiles")
-    .select("email")
-    .eq("id", order.buyer_id)
-    .maybeSingle()
-
-  const buyerEmail = buyerProfile?.email || null
+  let buyerEmail = null
+  try {
+    const { data: authData } = await supabase.auth.admin.getUserById(order.buyer_id)
+    buyerEmail = authData?.user?.email || null
+  } catch (err) {
+    console.error("Error fetching buyer email from auth.users:", err)
+  }
   const buyerName = profile?.full_name || order.customer_name || buyerEmail?.split("@")[0] || "Cliente"
 
   const result: CheckoutFulfillmentResult = {

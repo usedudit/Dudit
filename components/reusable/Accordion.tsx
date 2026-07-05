@@ -18,6 +18,7 @@ import {
   BlockedIcon,
   MoneyIcon,
   MotorbikeIcon,
+  StatusIcon,
 } from "@/lib/icons"
 
 interface AccordionProps {
@@ -95,6 +96,7 @@ interface ActionsDropdownProps {
   onCancel?: () => void
   onPaymentStatus?: () => void
   onDeliveryStatus?: () => void
+  onStatus?: () => void
   cancelLabel?: string
   cancelIcon?: React.ReactNode
   trigger?: React.ReactElement
@@ -115,6 +117,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   onCancel,
   onPaymentStatus,
   onDeliveryStatus,
+  onStatus,
   cancelLabel = "Cancelar",
   cancelIcon,
   trigger,
@@ -198,6 +201,11 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     {onDeliveryStatus && (
       <DropdownItem onClick={onDeliveryStatus}>
         <MotorbikeIcon size={18} /> Alterar status de entrega
+      </DropdownItem>
+    )}
+    {onStatus && (
+      <DropdownItem onClick={onStatus}>
+        <StatusIcon size={18} /> Alterar status
       </DropdownItem>
     )}
     {children}

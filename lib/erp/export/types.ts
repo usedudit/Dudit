@@ -16,6 +16,15 @@ export type ErpExportModule =
   | "service-orders"
   | "cash-register"
   | "xml-import"
+  | "quotes"
+
+export type QuotesExportFilters = {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  datePeriod?: DatePeriodFilterValue
+  selectedIds?: string[]
+}
 
 export type ErpExportFormat = "xlsx" | "csv"
 
@@ -133,6 +142,7 @@ export type ErpExportFilters =
   | ServiceOrdersExportFilters
   | CashRegisterExportFilters
   | XmlImportExportFilters
+  | QuotesExportFilters
 
 export type ExportColumnDef = {
   header: string

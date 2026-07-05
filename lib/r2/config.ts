@@ -86,4 +86,5 @@ export const R2_PREFIXES = {
   serviceOrderSignatures: "service-orders/signatures/",
   serviceOrderAttachments: "service-orders/attachments/",
   serviceOrderPdfs: "service-orders/pdfs/",
+  communityVideos: "community-videos/",
 } as const

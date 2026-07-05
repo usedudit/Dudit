@@ -39,6 +39,8 @@ export type PermissionTemplate = {
   recurring_plans: { view: boolean; manage: boolean }
   recurring_subscriptions: { view: boolean; manage: boolean }
   productivity: { view: boolean; goals_view: boolean; goals_manage: boolean; commissions_view: boolean; commissions_manage: boolean }
+  community_videos: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  colecoes: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   settings: {
     view: boolean
     settings_negocio: boolean

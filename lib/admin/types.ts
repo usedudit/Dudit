@@ -98,6 +98,8 @@ export type AuditTargetType =
     | "advertisement"
     | "marketplace_synonym_group"
     | "marketplace_synonym_term"
+    | "community_video"
+    | "collection"
 
 export interface AdminAuditLogEntry {
     adminUserId: string
@@ -144,7 +146,7 @@ export interface CursorPaginatedResult<T> {
 
 export interface ModerationItem {
     id: string
-    type: "product" | "service" | "partner" | "return_dispute"
+    type: "product" | "service" | "partner" | "return_dispute" | "community_video"
     title: string
     description: string | null
     price: number

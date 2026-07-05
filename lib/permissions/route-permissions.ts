@@ -130,6 +130,8 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
     recurring_plans: { key: "recurring_plans", path: "/erp/recurring/plans", label: "Planos Recorrentes", category: "Marketing" },
     recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recurring/subscriptions", label: "Assinaturas", category: "Marketing" },
+    community_videos: { key: "community_videos", path: "/erp/marketing/videos", label: "Vídeos da Comunidade", category: "Marketing" },
+    colecoes: { key: "colecoes", path: "/erp/marketing/colecoes", label: "Coleções", category: "Marketing" },
 
     // ── Configurações
     settings: { key: "settings", path: "/erp/settings", label: "Configurações", category: "Configurações" },
@@ -250,6 +252,8 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_marketing: full,
     recurring_plans: full,
     recurring_subscriptions: full,
+    community_videos: full,
+    colecoes: full,
     // Configurações
     settings: full,
     settings_business: withSpecific(full, { can_edit_business_data: true }),
@@ -327,6 +331,8 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_marketing: full,
     recurring_plans: full,
     recurring_subscriptions: full,
+    community_videos: full,
+    colecoes: full,
     // Configurações (limitado): pode visualizar; sem assinatura/integrações
     settings: viewOnly,
     settings_business: viewOnly,
@@ -390,6 +396,8 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_marketing: noAccess,
     recurring_plans: viewOnly,
     recurring_subscriptions: viewOnly,
+    community_videos: noAccess,
+    colecoes: noAccess,
     // Config - no access
     settings: noAccess,
     settings_business: noAccess,
@@ -449,6 +457,8 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_marketing: noAccess,
     recurring_plans: noAccess,
     recurring_subscriptions: noAccess,
+    community_videos: noAccess,
+    colecoes: noAccess,
     // Config - no access
     settings: noAccess,
     settings_business: noAccess,

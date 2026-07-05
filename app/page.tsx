@@ -11,6 +11,8 @@ import type { Metadata } from "next"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
+import { getCommunityCollections } from "@/app/actions/marketplace/collections"
+import { getCommunityVideos } from "@/app/actions/marketplace/community-videos"
 
 export const metadata: Metadata = {
     title: "Dudit | Descubra. Anuncie. Organize.",
@@ -77,7 +79,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 
         console.log(`[DIAG] scope=${scope} displayCity=${ctxCity} displayState=${ctxState} cityName=${cityName} isDefaultSP=${isDefaultSP}`)
 
-        const [sectionsResult, adsResult] = await Promise.all([
+        const [sectionsResult, adsResult, collectionsResult, videosResult] = await Promise.all([
             getHomeSections({
                 city: ctxCity,
                 state: ctxState,
@@ -94,10 +96,38 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
                 city: ctxCity,
                 state: ctxState,
             }),
+            getCommunityCollections(),
+            getCommunityVideos(),
         ])
 
         sections = sectionsResult
         homeAds = adsResult
+
+        const extraSections: HomeSection[] = []
+
+        if (collectionsResult.items.length > 0) {
+            extraSections.push({
+                id: "communityCollections",
+                title: "Coleções da comunidade",
+                subtitle: "Listas criadas por usuários",
+                gatilho: "prova_social",
+                items: collectionsResult.items,
+                seeMoreLink: "/explorar",
+            })
+        }
+
+        if (videosResult.items.length > 0) {
+            extraSections.push({
+                id: "communityVideos",
+                title: "Vídeos da comunidade",
+                subtitle: "Vídeos de produtos e serviços",
+                gatilho: "curiosidade",
+                items: videosResult.items,
+                seeMoreLink: "/explorar",
+            })
+        }
+
+        sections = [...sections, ...extraSections]
     }
 
     const tEnd = performance.now()

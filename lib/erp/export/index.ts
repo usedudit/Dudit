@@ -15,6 +15,7 @@ import { fetchSuppliersExport } from "./fetchers/suppliers"
 import { fetchServiceOrdersExport } from "./fetchers/service-orders"
 import { fetchCashRegisterExport } from "./fetchers/cash-register"
 import { fetchXmlImportExport } from "./fetchers/xml-import"
+import { fetchQuotesExport } from "./fetchers/quotes"
 import { buildExportFile } from "./workbook"
 import type {
   AppointmentsExportFilters,
@@ -32,6 +33,7 @@ import type {
   SuppliersExportFilters,
   TransactionsExportFilters,
   XmlImportExportFilters,
+  QuotesExportFilters,
 } from "./types"
 
 export async function generateErpExport(params: {
@@ -87,6 +89,9 @@ export async function generateErpExport(params: {
       break
     case "xml-import":
       result = await fetchXmlImportExport(supabase, partnerId, filters as XmlImportExportFilters)
+      break
+    case "quotes":
+      result = await fetchQuotesExport(supabase, partnerId, filters as QuotesExportFilters)
       break
     default:
       throw new Error("Módulo de exportação inválido")

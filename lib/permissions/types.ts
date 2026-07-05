@@ -201,6 +201,8 @@ export type RouteKey =
     | "cadastros_marketing"
     | "recurring_plans"
     | "recurring_subscriptions"
+    | "community_videos"
+    | "colecoes"
     // Configurações
     | "settings"
     | "settings_business"

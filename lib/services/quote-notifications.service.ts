@@ -95,11 +95,16 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
         if (quote.user_id) {
             const { data: profile } = await supabase
                 .from("user_profiles")
-                .select("email, full_name")
+                .select("full_name")
                 .eq("user_id", quote.user_id)
                 .maybeSingle()
-            if (profile?.email) {
-                sellerEmail = profile.email
+            try {
+                const { data: authData } = await supabase.auth.admin.getUserById(quote.user_id)
+                if (authData?.user?.email) {
+                    sellerEmail = authData.user.email
+                }
+            } catch (err) {
+                console.error("Error fetching seller email from auth.users:", err)
             }
         }
 

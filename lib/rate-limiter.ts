@@ -47,6 +47,8 @@ export enum RateLimitCategory {
   SUBSCRIPTION_CANCEL = "SUBSCRIPTION_CANCEL",
   SUBSCRIPTION_WEBHOOK = "SUBSCRIPTION_WEBHOOK",
   REFUND_EXECUTE = "REFUND_EXECUTE",
+  COLLECTION_CREATE = "COLLECTION_CREATE",
+  COMMUNITY_VIDEO_UPLOAD = "COMMUNITY_VIDEO_UPLOAD",
   DEFAULT = "DEFAULT",
 }
 
@@ -276,6 +278,18 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     window: "10 m",
     identifierType: IdentifierType.USER_PLUS_IP,
     failClosed: true,
+  },
+  [RateLimitCategory.COLLECTION_CREATE]: {
+    maxRequests: 10,
+    window: "1 h",
+    identifierType: IdentifierType.USER,
+    failClosed: false,
+  },
+  [RateLimitCategory.COMMUNITY_VIDEO_UPLOAD]: {
+    maxRequests: 5,
+    window: "1 h",
+    identifierType: IdentifierType.USER,
+    failClosed: false,
   },
   [RateLimitCategory.DEFAULT]: {
     maxRequests: 100,

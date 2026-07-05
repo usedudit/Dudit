@@ -16,6 +16,7 @@ export const MODULE_SHEET_NAMES: Record<string, string> = {
   "service-orders": "Ordens de Serviço",
   "cash-register": "Controle de Caixa",
   "xml-import": "Importação XML",
+  quotes: "Orçamentos",
 }
 
 export const MODULE_FILENAME_NAMES: Record<string, string> = {
@@ -33,6 +34,7 @@ export const MODULE_FILENAME_NAMES: Record<string, string> = {
   "service-orders": "ordens-servico",
   "cash-register": "controle-caixa",
   "xml-import": "importacao-xml",
+  quotes: "orcamentos",
 }
 
 export function formatExportFilename(module: string, extension: string): string {

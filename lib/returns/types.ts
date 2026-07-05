@@ -91,6 +91,7 @@ export type ReturnRequestListItem = {
   orderTotal?: number
   orderPaidAmount?: number
   refundPaymentMethod?: string
+  refundType?: "full" | "partial" | "none" | "store_credit" | string | null
   exchangeOrderId?: string | null
   exchangeSubstatus?: string | null
   exchangeShortfallAmount?: number

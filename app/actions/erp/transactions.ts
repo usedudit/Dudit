@@ -2635,8 +2635,7 @@ export async function getTransactionDetailsAction(
             product_price,
             subtotal,
             product_name,
-            sku,
-            products ( images )
+            products ( sku, images )
           )
         `,
                 )
@@ -2666,7 +2665,7 @@ export async function getTransactionDetailsAction(
                     return {
                         id: String(item.id),
                         title: String(item.product_name || "Item"),
-                        sku: String(item.sku || "N/A"),
+                        sku: String(item.products?.sku || "N/A"),
                         quantity: qty,
                         unitPrice: unit,
                         lineTotal: sub,

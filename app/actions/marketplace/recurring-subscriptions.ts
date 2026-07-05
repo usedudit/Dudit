@@ -77,15 +77,15 @@ export async function subscribeToRecurringPlanAction(input: {
     }
 
     const { data: profile } = await admin
-      .from("profiles")
-      .select("full_name, email, phone")
+      .from("user_profiles")
+      .select("full_name, phone")
       .eq("user_id", user.id)
       .maybeSingle()
 
     const customerId = await ensureMarketplaceCustomer({
       partnerId: input.partnerId,
       name: profile?.full_name || user.email || "Cliente",
-      email: profile?.email || user.email,
+      email: user.email || null,
       phone: profile?.phone || null,
       userId: user.id,
     })

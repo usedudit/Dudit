@@ -481,3 +481,57 @@ export function mapXmlImportRow(row: any): ExportRow {
     accessKey: row.access_key || "-",
   }
 }
+
+// ── Quotes (Orçamentos) ──────────────────────────────────────────────
+
+export const QUOTE_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { header: "Número", key: "quoteNumber", width: 18 },
+  { header: "Data Emissão", key: "date", width: 16 },
+  { header: "Validade", key: "expirationDate", width: 16 },
+  { header: "Cliente", key: "customer", width: 28 },
+  { header: "Vendedor", key: "salesperson", width: 22 },
+  { header: "Status", key: "status", width: 20 },
+  { header: "Subtotal", key: "subtotal", width: 14 },
+  { header: "Desconto", key: "discount", width: 14 },
+  { header: "Frete", key: "shipping", width: 14 },
+  { header: "Outros Custos", key: "otherCosts", width: 14 },
+  { header: "Total", key: "total", width: 16 },
+  { header: "Qtde Itens", key: "itemsCount", width: 12 },
+]
+
+const QUOTE_STATUS_LABELS: Record<string, string> = {
+  draft: "Rascunho",
+  sent: "Enviado",
+  pending_client: "Pendente do Cliente",
+  viewed: "Visualizado",
+  approved: "Aprovado",
+  rejected: "Rejeitado",
+  expired: "Expirado",
+  cancelled: "Cancelado",
+  converted_to_order: "Convertido em Pedido"
+}
+
+export function mapQuoteRow(row: any): ExportRow {
+  const rawStatus = row.status || ""
+  
+  // Resolve customer name
+  const customerName = row.customers?.name || "-"
+  
+  // Resolve salesperson name
+  const salespersonName = row.user_profiles?.full_name || "-"
+
+  return {
+    quoteNumber: row.quote_number || "-",
+    date: row.issue_date ? formatDate(row.issue_date) : "-",
+    expirationDate: row.expiration_date ? formatDate(row.expiration_date) : "-",
+    customer: customerName,
+    salesperson: salespersonName,
+    status: QUOTE_STATUS_LABELS[rawStatus] || rawStatus || "-",
+    subtotal: formatCurrency(Number(row.subtotal ?? 0)),
+    discount: formatCurrency(Number(row.discount_value ?? 0)),
+    shipping: formatCurrency(Number(row.shipping_cost ?? 0)),
+    otherCosts: formatCurrency(Number(row.additional_costs ?? 0)),
+    total: formatCurrency(Number(row.total ?? 0)),
+    itemsCount: Number(row.items_count ?? 0),
+  }
+}

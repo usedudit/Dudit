@@ -147,7 +147,7 @@ BEGIN
           v_request.partner_id,
           'in',
           'RETURN_IN',
-          'Devolução do cliente',
+          'Devolução DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)),
           p_actor_user_id,
           v_items
         );
@@ -156,7 +156,7 @@ BEGIN
         UPDATE public.stock_movements
         SET source_return_request_id = p_request_id,
             reason = 'RETURN_IN',
-            notes = COALESCE(notes, 'Devolução do cliente - solicitação DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6)))
+            notes = 'Devolução DVL-' || UPPER(SUBSTRING(p_request_id::TEXT FROM 1 FOR 6))
         WHERE id = v_stock_movement_id;
       END IF;
     END IF;

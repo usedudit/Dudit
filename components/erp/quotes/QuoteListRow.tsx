@@ -24,6 +24,7 @@ interface QuoteListItemProps {
     onClick: (quote: any) => void
     onPrint?: (quote: any) => void
     onShare?: (quote: any) => void
+    onStatus?: (quote: any) => void
     onPrefetchMouseEnter?: React.MouseEventHandler<HTMLTableRowElement>
     onPrefetchMouseLeave?: React.MouseEventHandler<HTMLTableRowElement>
     onPrefetchTouchStart?: React.TouchEventHandler<HTMLTableRowElement>
@@ -41,6 +42,7 @@ const QuoteListItem = React.memo(
         onClick,
         onPrint,
         onShare,
+        onStatus,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
@@ -116,6 +118,7 @@ const QuoteListItem = React.memo(
                                 onDelete={() => onDelete(quote)}
                                 onPrint={onPrint ? () => onPrint(quote) : undefined}
                                 onShare={onShare ? () => onShare(quote) : undefined}
+                                onStatus={onStatus ? () => onStatus(quote) : undefined}
                             />
                         </div>
                     )

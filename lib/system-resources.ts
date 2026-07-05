@@ -23,6 +23,8 @@ export type SystemResourceId =
   | "coupons"
   | "campaigns"
   | "productivity"
+  | "communityVideos"
+  | "colecoes"
 
 export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing"
 
@@ -177,12 +179,27 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     module: "management",
     minimumPlan: "escalar",
   },
+  {
+    id: "communityVideos",
+    label: "Vídeos da Comunidade",
+    description: "Vídeos curtos vinculados a produtos, serviços ou coleções.",
+    module: "marketing",
+    minimumPlan: "crescer",
+  },
+  {
+    id: "colecoes",
+    label: "Coleções",
+    description: "Listas públicas de produtos e serviços criadas por usuários.",
+    module: "marketing",
+  },
 ]
 
 export const SYSTEM_RESOURCE_IDS: SystemResourceId[] = [
   ...SYSTEM_RESOURCES.map((resource) => resource.id),
   "marketing",
   "showcase",
+  "communityVideos",
+  "colecoes",
 ]
 
 export function normalizeActiveResources(value: unknown): SystemResourceId[] {
@@ -240,6 +257,8 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: st
     "coupons",
     "campaigns",
     "productivity",
+    "communityVideos",
+    "colecoes",
   ]
   if (sells.includes("products")) {
     defaults.push("products")

@@ -40,6 +40,14 @@ export const TAGS = {
   // Platform advertising
   advertisements: "advertisements",
 
+  // Collections
+  colecoes: 'colecoes',
+  colecao: (id: string) => `colecao-${id}`,
+
+  // Community Videos
+  communityVideos: 'community-videos',
+  communityVideo: (id: string) => `community-video-${id}`,
+
   // Reports
   report: (partnerId: string, category: string) => `report-${category}:${partnerId}`,
   reportGeneral: (partnerId: string) => `report-visao-geral:${partnerId}`,
