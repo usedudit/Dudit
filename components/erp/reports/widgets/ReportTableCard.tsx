@@ -26,6 +26,7 @@ interface ReportTableCardProps {
   maxRows?: number
   detailHref?: string
   detailLabel?: string
+  onRowClick?: (row: TableRow) => void
   className?: string
 }
 
@@ -37,6 +38,7 @@ export function ReportTableCard({
   maxRows = 6,
   detailHref,
   detailLabel = "Ver Detalhes",
+  onRowClick,
   className,
 }: ReportTableCardProps) {
   const router = useRouter()
@@ -79,7 +81,11 @@ export function ReportTableCard({
                 {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-brand-border dark:border-dark-border last:border-b-0 h-[60px]"
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={cn(
+                      "border-b border-brand-border dark:border-dark-border last:border-b-0 h-[60px]",
+                      onRowClick && "cursor-pointer hover:bg-brand-green-light/30 dark:hover:bg-dark-border/20 transition-colors"
+                    )}
                   >
                     {columns.map((col) => (
                       <td

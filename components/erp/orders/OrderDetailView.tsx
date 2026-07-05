@@ -173,24 +173,37 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         let mounted = true
 
         async function load() {
-            // Only show loading spinner if we have NO data at all
-            if (!initialOrder) setLoading(true)
+            try {
+                // Only show loading spinner if we have NO data at all
+                if (!initialOrder) setLoading(true)
 
-            const res = await getOrderDetailsAction(orderId, partnerId)
-            if (!mounted) return
+                const res = await getOrderDetailsAction(orderId, partnerId)
+                if (!mounted) return
 
-            if (res.success) {
-                setOrder(res.data)
-            } else if (!initialOrder) {
-                notifyError("Erro", res.error)
-                onBack()
+                if (res && 'success' in res && res.success) {
+                    setOrder(res.data)
+                } else {
+                    const errorMsg = res && 'error' in res && typeof res.error === 'string' ? res.error : "Erro ao carregar detalhes do pedido"
+                    console.error("[OrderDetailView] error loading order details:", errorMsg)
+                    if (!initialOrder) {
+                        notifyError("Erro", errorMsg)
+                        onBack()
+                    }
+                }
+            } catch (err: any) {
+                console.error("[OrderDetailView] failed to fetch order details:", err)
+                if (!initialOrder) {
+                    notifyError("Erro", err?.message || "Erro desconhecido")
+                    onBack()
+                }
+            } finally {
+                if (mounted) setLoading(false)
             }
-            setLoading(false)
         }
 
         load()
         return () => { mounted = false }
-    }, [orderId, partnerId])
+    }, [orderId, partnerId, initialOrder, notifyError, onBack])
 
     useEffect(() => {
         let mounted = true

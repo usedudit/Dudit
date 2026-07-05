@@ -1,11 +1,12 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { ProductsTab } from "@/components/erp/dashboard/widgets/ProductsTab"
 import { ServicesTab } from "@/components/erp/dashboard/widgets/ServicesTab"
 import { FinancialTab } from "@/components/erp/dashboard/widgets/FinancialTab"
-import { OperationsTab } from "@/components/erp/dashboard/widgets/OperationsTab"
+import { ReportExportButton } from "./shared"
 import {
   GridIcon,
   AnalyticsIcon,
@@ -53,6 +54,17 @@ import {
   generateProductivityInsights,
 } from "./insights"
 import type { Insight } from "./insights"
+
+function exportToCSV(filename: string, headers: string[], rows: string[][]) {
+  const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n")
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${filename}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 type TabId = "visao-geral" | "vendas" | "produtos" | "servicos" | "entregas" | "ordens-servico" | "financeiro" | "clientes" | "marketing" | "produtividade" | "trocas"
 
@@ -246,8 +258,29 @@ function GeneralOverviewSection(props: ReportsPageProps) {
     }) : []),
   ]
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("visao-geral-relatorios",
+      ["Indicador", "Valor"],
+      [
+        ["Receita", props.salesData?.metrics.revenueFormatted || "-"],
+        ["Pedidos", String(props.salesData?.metrics.orderCount || 0)],
+        ["Ticket Médio", props.salesData?.metrics.ticketFormatted || "-"],
+        ["Estoque Crítico", String((props.productsData?.criticalStock || []).length)],
+        ["Clientes Ativos", String(props.customerData?.activeCustomers || 0)],
+        ["Entregas no Prazo", props.deliveryData ? `${props.deliveryData.metrics.onTimeRate}%` : "-"],
+      ]
+    )
+  }, [props])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Visão Geral dos Relatórios</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <InsightRow insights={allInsights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -311,7 +344,8 @@ function GeneralOverviewSection(props: ReportsPageProps) {
   )
 }
 
-function SalesSection({ salesData, sells }: { salesData: SalesReportData | null; sells: string[] }) {
+function SalesSection({ salesData, sells, period }: { salesData: SalesReportData | null; sells: string[]; period: Period }) {
+  const router = useRouter()
   if (!salesData) {
     return <SectionPlaceholder title="Vendas" description="Ative o módulo de produtos para visualizar relatórios de vendas." />
   }
@@ -331,8 +365,26 @@ function SalesSection({ salesData, sells }: { salesData: SalesReportData | null;
     transfer: "Transferência", bank_transfer: "Transferência", boleto: "Boleto",
   }
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("relatorio-vendas", ["Indicador", "Valor", "Período Anterior"],
+      [
+        ["Receita", salesData.metrics.revenueFormatted, "—"],
+        ["Pedidos", String(salesData.metrics.orderCount), "—"],
+        ["Ticket Médio", salesData.metrics.ticketFormatted, "—"],
+        ...salesData.evolution.map(e => [e.label, `R$ ${e.value}`, `R$ ${e.secondary}`]),
+      ]
+    )
+  }, [salesData])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Relatório de Vendas</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <InsightRow insights={insights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -401,8 +453,22 @@ function ServiceOrdersSection({ servicesData }: { servicesData: ServicesDashboar
 
   const todayAppts = servicesData.todayAppointments || []
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("ordens-servico",
+      ["Indicador", "Valor"],
+      servicesData.metrics.slice(0, 6).map(m => [m.title, m.value])
+    )
+  }, [servicesData])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Ordens de Serviço</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {servicesData.metrics.slice(0, 6).map((m, i) => (
           <ReportMetricCard key={i} data={{ title: m.title, value: m.value, subtitle: m.detail, tone: m.tone }} />
@@ -434,8 +500,28 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
     onTimeRate: deliveryData.metrics.onTimeRate,
   })
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("relatorio-entregas",
+      ["Indicador", "Valor"],
+      [
+        ["Total Entregas", String(deliveryData.metrics.total)],
+        ["Pendentes", String(deliveryData.metrics.pending)],
+        ["Atrasadas", String(deliveryData.metrics.late)],
+        ["No Prazo", `${deliveryData.metrics.onTimeRate}%`],
+        ["Tempo Médio", `${deliveryData.metrics.avgTimeMinutes}min`],
+      ]
+    )
+  }, [deliveryData])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Relatório de Entregas</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <InsightRow insights={insights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -475,7 +561,8 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
   )
 }
 
-function CustomersSection({ customerData }: { customerData: CustomerReportData | null }) {
+function CustomersSection({ customerData, period }: { customerData: CustomerReportData | null; period: Period }) {
+  const router = useRouter()
   if (!customerData) {
     return <SectionPlaceholder title="Clientes" description="Relatórios de clientes disponíveis com o plano Crescer." />
   }
@@ -490,8 +577,28 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
     topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
   })
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("relatorio-clientes",
+      ["Indicador", "Valor"],
+      [
+        ["Total de Clientes", String(customerData.totalCustomers)],
+        ["Clientes Ativos", String(customerData.activeCustomers)],
+        ["Novos Clientes", String(customerData.newCustomers)],
+        ["Ticket Médio", customerData.avgTicketFormatted],
+        ...customerData.topCustomers.map(c => [c.label, c.value]),
+      ]
+    )
+  }, [customerData])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Relatório de Clientes</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <InsightRow insights={insights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -539,8 +646,28 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
     topSourcePercent: marketingData.topSourcePercent,
   })
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("relatorio-marketing",
+      ["Canal", "Faturamento"],
+      [
+        ["Faturamento Total", marketingData.totalRevenueFormatted],
+        ["Principal Canal", `${marketingData.topSource} (${marketingData.topSourcePercent}%)`],
+        ["Cupons Criados", String(marketingData.couponStats.total)],
+        ["Uso de Cupons", `${marketingData.couponStats.usageRate}%`],
+        ...marketingData.revenueBySource.map(s => [s.label, `R$ ${s.value}`]),
+      ]
+    )
+  }, [marketingData])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Relatório de Marketing</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <InsightRow insights={insights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -564,6 +691,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
 }
 
 function ProductivitySection({ productivityData }: { productivityData: ProductivityReportData | null }) {
+  const router = useRouter()
   if (!productivityData) {
     return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços para acompanhar a produtividade da equipe." />
   }
@@ -575,8 +703,28 @@ function ProductivitySection({ productivityData }: { productivityData: Productiv
     totalRevenue: productivityData.metrics.totalRevenue,
   })
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("relatorio-produtividade",
+      ["Indicador", "Valor"],
+      [
+        ["Atendimentos", String(productivityData.metrics.totalAppointments)],
+        ["Receita", productivityData.metrics.totalRevenueFormatted],
+        ["Tempo Médio", `${productivityData.metrics.avgDuration}min`],
+        ["Comparecimento", `${productivityData.metrics.attendanceRate}%`],
+        ...productivityData.staffRanking.map(s => [s.label, `R$ ${s.value}`]),
+      ]
+    )
+  }, [productivityData])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Relatório de Produtividade</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <InsightRow insights={insights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -616,6 +764,7 @@ function ProductivitySection({ productivityData }: { productivityData: Productiv
 }
 
 function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null }) {
+  const router = useRouter()
   if (!returnsData) {
     return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
   }
@@ -629,8 +778,27 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
     returnCount: returnsData.returnCount,
   })
 
+  const onExport = useCallback(async (format: "csv" | "xlsx") => {
+    if (format === "xlsx") return
+    exportToCSV("relatorio-trocas",
+      ["Indicador", "Valor"],
+      [
+        ["Total Devoluções", String(returnsData.returnCount)],
+        ["Taxa de Devolução", `${returnsData.returnRate}%`],
+        ["Total Reembolsado", returnsData.totalRefundedFormatted],
+        ...returnsData.byReason.map(r => [r.label, `${r.value} ocorrência(s)`]),
+      ]
+    )
+  }, [returnsData])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Relatório de Trocas e Devoluções</h2>
+        <ReportExportButton onExport={onExport} />
+      </div>
+
       <InsightRow insights={insights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -654,6 +822,7 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
           { key: "date", header: "Data" },
         ]}
         data={returnsData.recentReturns}
+        onRowClick={() => router.push("/erp/returns")}
       />
     </div>
   )

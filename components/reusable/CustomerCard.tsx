@@ -10,6 +10,7 @@ interface CustomerCardProps {
         name?: string;
         email?: string;
         phone?: string;
+        [key: string]: any;
     } | null;
     address?: {
         street?: string;
@@ -20,6 +21,8 @@ interface CustomerCardProps {
         state?: string;
         country?: string;
         zipCode?: string;
+        zip_code?: string;
+        [key: string]: any;
     } | null;
     billingAddress?: {
         street?: string;
@@ -30,6 +33,8 @@ interface CustomerCardProps {
         state?: string;
         country?: string;
         zipCode?: string;
+        zip_code?: string;
+        [key: string]: any;
     } | null;
     showMap?: boolean;
     className?: string;
@@ -37,20 +42,78 @@ interface CustomerCardProps {
     chrome?: "default" | "minimal";
 }
 
-const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingAddress, showMap = true, className = "", onRemove, chrome = "default" }) => {
-    const addressToUse = address || (customer ? {
-        street: (customer as any).address_street,
-        number: (customer as any).address_number,
-        complement: (customer as any).address_complement,
-        neighborhood: (customer as any).address_neighborhood,
-        city: (customer as any).address_city,
-        state: (customer as any).address_state || (customer as any).address_uf,
-        zipCode: (customer as any).address_zip_code,
-    } : null);
+/** Normalize an address-like object so that both snake_case DB fields and
+ *  camelCase props are accessible under a single canonical shape. */
+const normalizeAddress = (addr: any): { street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string; country?: string; zipCode?: string } | null => {
+    if (!addr) return null;
+    const normalized = {
+        street: addr.street || addr.address_street || undefined,
+        number: addr.number || addr.address_number || undefined,
+        complement: addr.complement || addr.address_complement || undefined,
+        neighborhood: addr.neighborhood || addr.address_neighborhood || addr.bairro || undefined,
+        city: addr.city || addr.address_city || addr.cidade || undefined,
+        state: addr.state || addr.uf || addr.address_state || addr.address_uf || undefined,
+        country: addr.country || addr.address_country || undefined,
+        zipCode: addr.zipCode || addr.zip_code || addr.address_zip_code || addr.cep || undefined,
+    };
+    // Only return if there's at least one meaningful field
+    if (normalized.street || normalized.city || normalized.zipCode) return normalized;
+    return null;
+};
 
-    const hasAddress = !!addressToUse?.street || !!addressToUse?.city;
-    const hasBillingAddress = !!billingAddress?.street || !!billingAddress?.city;
-    const hasContact = !!customer?.email || !!customer?.phone;
+const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingAddress, showMap = true, className = "", onRemove, chrome = "default" }) => {
+    // 1. Resolve address: explicit prop > customer.addresses array > flat fields on customer
+    const resolveAddress = (): ReturnType<typeof normalizeAddress> => {
+        // If an explicit address prop was given, normalize and use it
+        if (address) return normalizeAddress(address);
+        if (!customer) return null;
+
+        // Try customer.addresses array (from Supabase joins like `addresses(*)`)
+        const addrArray = (customer as any).addresses;
+        if (Array.isArray(addrArray) && addrArray.length > 0) {
+            const primary = addrArray.find((a: any) => a.address_type === "primary" || a.is_default) || addrArray[0];
+            const norm = normalizeAddress(primary);
+            if (norm) return norm;
+        }
+
+        // Try flat address_* fields on the customer object itself (legacy snapshots)
+        const fromFlat = normalizeAddress({
+            address_street: (customer as any).address_street,
+            address_number: (customer as any).address_number,
+            address_complement: (customer as any).address_complement,
+            address_neighborhood: (customer as any).address_neighborhood,
+            address_city: (customer as any).address_city,
+            address_state: (customer as any).address_state,
+            address_uf: (customer as any).address_uf,
+            address_zip_code: (customer as any).address_zip_code,
+        });
+        if (fromFlat) return fromFlat;
+
+        // Try plain fields directly on customer (some snapshots use street, city directly)
+        return normalizeAddress(customer);
+    };
+
+    const resolveBillingAddress = (): ReturnType<typeof normalizeAddress> => {
+        if (billingAddress) return normalizeAddress(billingAddress);
+        if (!customer) return null;
+        const addrArray = (customer as any).addresses;
+        if (Array.isArray(addrArray)) {
+            const billing = addrArray.find((a: any) => a.address_type === "billing");
+            if (billing) return normalizeAddress(billing);
+        }
+        return null;
+    };
+
+    // 2. Resolve contact info: check multiple possible field names
+    const resolvedEmail = customer?.email || (customer as any)?.contact_email || (customer as any)?.buyer_email || "";
+    const resolvedPhone = customer?.phone || (customer as any)?.contact_phone || (customer as any)?.phone_fixed || (customer as any)?.phoneFixed || "";
+
+    const addressToUse = resolveAddress();
+    const resolvedBillingAddress = resolveBillingAddress();
+
+    const hasAddress = !!addressToUse?.street || !!addressToUse?.city || !!addressToUse?.zipCode;
+    const hasBillingAddress = !!resolvedBillingAddress?.street || !!resolvedBillingAddress?.city;
+    const hasContact = !!resolvedEmail || !!resolvedPhone;
 
     const formatAddress = (addr: any) => {
         if (!addr) return null;
@@ -71,7 +134,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
     };
 
     const formattedAddress = formatAddress(addressToUse);
-    const formattedBillingAddress = formatAddress(billingAddress);
+    const formattedBillingAddress = formatAddress(resolvedBillingAddress);
 
     const chromeClass =
         chrome === "minimal"
@@ -203,17 +266,17 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
 
                     {hasContact ? (
                         <div className="space-y-3">
-                            {customer?.email && (
+                            {resolvedEmail && (
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 truncate w-full">
-                                        {customer.email}
+                                        {resolvedEmail}
                                     </span>
                                 </div>
                             )}
-                            {customer?.phone && (
+                            {resolvedPhone && (
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 truncate w-full">
-                                        {customer.phone}
+                                        {resolvedPhone}
                                     </span>
                                 </div>
                             )}

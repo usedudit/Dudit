@@ -28,7 +28,7 @@ export async function getReturnableQuantities(orderId: string): Promise<Record<s
         .select(`
             status,
             deleted_at,
-            return_items (
+            return_items!return_items_return_request_id_fkey (
                 order_item_id,
                 quantity
             )

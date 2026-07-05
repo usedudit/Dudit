@@ -1433,7 +1433,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                 .select(`
                     order_id,
                     status,
-                    return_items (
+                    return_items!return_items_return_request_id_fkey (
                         order_item_id,
                         quantity
                     )

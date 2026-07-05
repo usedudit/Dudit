@@ -1733,7 +1733,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             stores(name),
             coupons(*),
             appointments(*),
-            return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, created_at, return_items(*))
+            return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, created_at, return_items!return_items_return_request_id_fkey(*))
         `)
         .eq("partner_id", partnerId)
 
@@ -3532,7 +3532,7 @@ export async function getERPOrdersPageAction(
                 created_at,
                 stores(name),
                 return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount),
-                order_items(quantity, product_id, variant_id, service_id, line_type),
+                order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
                 payment_method,
                 payment_breakdown
             `
