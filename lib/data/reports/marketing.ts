@@ -22,6 +22,8 @@ export interface MarketingReportData {
     totalDiscountFormatted: string
   }
   evolution: { label: string; online: number; presencial: number; outros: number }[]
+  topCoupons: { id: string; code: string; usageCount: number; discountValue: number; discountType: string }[]
+  campaigns: { id: string; name: string; isActive: boolean; startsAt: string | null; endsAt: string | null }[]
 }
 
 const getCachedMarketingData = cache(async (partnerId: string, period: Period = "monthly") => {
@@ -30,7 +32,7 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
       const supabase = createAdminClient()
       const { today, from } = getDateRangeWithPrevious(period)
 
-      const [ordersResult, couponsResult] = await Promise.all([
+      const [ordersResult, couponsResult, couponUsagesResult, campaignsResult] = await Promise.all([
         supabase
           .from("orders")
           .select("id, total_amount, order_source, created_at")
@@ -44,10 +46,22 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
           .eq("partner_id", partnerId)
           .eq("is_active", true)
           .limit(200),
+        supabase
+          .from("coupon_usages")
+          .select("coupon_id, order_id, used_at")
+          .gte("used_at", `${from}T00:00:00`)
+          .limit(500),
+        supabase
+          .from("campaigns")
+          .select("id, name, is_active, starts_at, ends_at")
+          .eq("partner_id", partnerId)
+          .order("created_at", { ascending: false })
+          .limit(50),
       ])
 
       if (ordersResult.error) throw ordersResult.error
       if (couponsResult.error) throw couponsResult.error
+      if (campaignsResult.error) throw campaignsResult.error
 
       const orders = ordersResult.data || []
 
@@ -72,6 +86,23 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
       const totalCoupons = coupons.length
       const usedCoupons = coupons.filter((c: any) => (c.usage_count || 0) > 0).length
       const usageRate = totalCoupons > 0 ? Math.round((usedCoupons / totalCoupons) * 100) : 0
+
+      const couponUsages = couponUsagesResult.data || []
+      const usageByCoupon = new Map<string, number>()
+      for (const u of couponUsages) {
+        usageByCoupon.set(u.coupon_id, (usageByCoupon.get(u.coupon_id) || 0) + 1)
+      }
+      const couponMap = new Map(coupons.map((c: any) => [c.id, c]))
+      const topCoupons = Array.from(usageByCoupon.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([couponId, count]) => {
+          const c = couponMap.get(couponId) || {}
+          return { id: couponId, code: c.code || "Desconhecido", usageCount: count, discountValue: money(c.discount_value || 0), discountType: c.discount_type || "fixed" }
+        })
+
+      const campaignsData = campaignsResult.data || []
+      const campaigns = campaignsData.map((c: any) => ({ id: c.id, name: c.name, isActive: c.is_active, startsAt: c.starts_at, endsAt: c.ends_at }))
 
       const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
       const todayDate = new Date(today + "T12:00:00Z")
@@ -116,6 +147,8 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
           totalDiscountFormatted: brl(0),
         },
         evolution,
+        topCoupons,
+        campaigns,
       }
     },
     [`report-marketing-${partnerId}-${period}`],

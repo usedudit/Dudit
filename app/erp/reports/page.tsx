@@ -17,6 +17,8 @@ import {
     getDeliveryReportData,
     getMarketingReportData,
     getProductivityReportData,
+    getServiceOrderReportData,
+    getGoalReportData,
 } from "@/lib/data/reports"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
@@ -49,7 +51,7 @@ export default async function ERPReportsPage(props: {
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
 
-    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData] = await Promise.all([
+    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, stockValue] = await Promise.all([
         checkPermission(partnerId, "products", "view").then(res => res.allowed ? getDashboardProductsData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getDashboardServicesData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "financial", "view").then(res => res.allowed ? getDashboardFinancialData(partnerId).catch(() => null) : null),
@@ -59,6 +61,17 @@ export default async function ERPReportsPage(props: {
         checkPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDeliveryReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "products", "view").then(res => res.allowed ? getMarketingReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getProductivityReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "service_orders", "view").then(res => res.allowed ? getServiceOrderReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getGoalReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "products", "view").then(async (res) => {
+          if (!res.allowed) return 0
+          try {
+            const supabase = (await import("@/lib/supabase/server")).createAdminClient()
+            const r = await supabase.from("products").select("stock_quantity, cost_price").eq("partner_id", partnerId)
+            if (r.error || !r.data) return 0
+            return r.data.reduce((sum: number, p: any) => sum + (Number(p.stock_quantity || 0) * Number(p.cost_price || 0)), 0)
+          } catch { return 0 }
+        }),
     ])
 
     return (
@@ -93,6 +106,9 @@ export default async function ERPReportsPage(props: {
                             deliveryData={deliveryData}
                             marketingData={marketingData}
                             productivityData={productivityData}
+                            serviceOrdersData={serviceOrdersData}
+                            goalData={goalData}
+                            stockValue={stockValue}
                         />
                     </Suspense>
                 </div>

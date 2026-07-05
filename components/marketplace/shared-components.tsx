@@ -242,8 +242,9 @@ interface ItemCardProps {
     }
     userCoords?: { lat: number; lng: number } | null
     showSeller?: boolean
-    className?: string
     promotions?: any[]
+    hidePromoBadge?: boolean
+    className?: string
 }
 
 // Simple client-side cache for partner promotions to avoid redundant network requests
@@ -266,7 +267,7 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions }) => {
+export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge }) => {
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
@@ -374,11 +375,20 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         loading="lazy"
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
-                        {showPrice && pricing.badgeVariant === "blue" && (
-                            <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pricing.discountPercent}%</Badge>
-                        )}
-                        {showPrice && pricing.badgeVariant === "orange" && (
-                            <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pricing.discountPercent}%</Badge>
+                        {!hidePromoBadge && showPrice && pricing.badgeVariant && (
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap
+                                ${pricing.badgeVariant === "blue" ? "bg-[#2968c8]" : "bg-[#ff7a00]"}`}>
+                                {pricing.badgeVariant === "blue" ? (
+                                    <>
+                                        <svg className="w-3 h-3 fill-current shrink-0" viewBox="0 0 24 24">
+                                            <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z" />
+                                        </svg>
+                                        <span>Oferta Imperdível</span>
+                                    </>
+                                ) : (
+                                    <span>{pricing.discountPercent}% OFF</span>
+                                )}
+                            </div>
                         )}
                         {timeLeft && (
                             <Badge variant="orange" icon={null} className="whitespace-nowrap">{timeLeft}</Badge>

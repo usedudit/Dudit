@@ -21,7 +21,8 @@ export interface DeliveryReportData {
   }
   byStatus: { label: string; value: number }[]
   evolution: { label: string; value: number; secondary: number }[]
-  recentDeliveries: { id: string; status: string; date: string; duration?: string }[]
+  recentDeliveries: { id: string; status: string; date: string; duration?: string; deliveryPerson?: string }[]
+  deliveryPersonRanking: { id: string; name: string; deliveries: number; status: string }[]
 }
 
 const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "monthly") => {
@@ -33,7 +34,7 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
       const [periodDeliveriesResult, prevDeliveriesResult] = await Promise.all([
         supabase
           .from("deliveries")
-          .select("id, status, started_at, delivered_at, estimated_duration_minutes, created_at")
+          .select("id, status, started_at, delivered_at, estimated_duration_minutes, created_at, delivery_person_id")
           .eq("partner_id", partnerId)
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
@@ -105,6 +106,40 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
         byStatus.set(s, (byStatus.get(s) || 0) + 1)
       }
 
+      const personIds = [...new Set(periodDeliveries.map((d: any) => d.delivery_person_id).filter(Boolean))]
+      let personNameMap = new Map<string, string>()
+      if (personIds.length > 0) {
+        const puResult = await supabase.from("partner_users").select("id, user_id").in("id", personIds)
+        if (!puResult.error && puResult.data) {
+          const userIds = [...new Set(puResult.data.map((pu: any) => pu.user_id).filter(Boolean))]
+          if (userIds.length > 0) {
+            const upResult = await supabase.from("user_profiles").select("user_id, full_name").in("user_id", userIds)
+            if (!upResult.error && upResult.data) {
+              const userIdToName = new Map(upResult.data.map((u: any) => [u.user_id, u.full_name]))
+              for (const pu of puResult.data) {
+                const name = userIdToName.get(pu.user_id)
+                if (name) personNameMap.set(pu.id, name as string)
+              }
+            }
+          }
+        }
+      }
+      const personDeliveryCount = new Map<string, number>()
+      for (const d of periodDeliveries) {
+        if (d.delivery_person_id) {
+          personDeliveryCount.set(d.delivery_person_id, (personDeliveryCount.get(d.delivery_person_id) || 0) + 1)
+        }
+      }
+      const deliveryPersonRanking = Array.from(personDeliveryCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([id, count]) => ({
+          id,
+          name: personNameMap.get(id) || "Entregador",
+          deliveries: count,
+          status: (count > 1 && personDeliveryCount.size > 1) ? "Ativo" : "Único",
+        }))
+
       const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
       const todayDate = new Date(today + "T12:00:00Z")
 
@@ -151,7 +186,9 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
           status: statusLabels[String(d.status || "").toLowerCase()] || d.status || "-",
           date: new Date(d.created_at).toLocaleDateString("pt-BR"),
           duration: d.estimated_duration_minutes ? `${d.estimated_duration_minutes}min` : undefined,
+          deliveryPerson: d.delivery_person_id ? personNameMap.get(d.delivery_person_id) || "Sem nome" : "Não atribuído",
         })),
+        deliveryPersonRanking,
       }
     },
     [`report-deliveries-${partnerId}-${period}`],

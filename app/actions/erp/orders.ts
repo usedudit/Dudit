@@ -760,14 +760,14 @@ export async function createFinancialTransactionsForReceivedAmount(
             const newEntry = newBreakdown[i]
             if (!newEntry?.method) continue
 
-            const newReceived = Number(newEntry.effectiveAmount ?? newEntry.amount ?? newEntry.amountReceived ?? 0)
+            const newReceived = Number(newEntry.amountReceived ?? newEntry.effectiveAmount ?? newEntry.amount ?? 0)
 
             const oldEntry = oldBreakdown.find((old: any) => 
                 old?.method === newEntry.method && 
                 old?.paymentMethodId === newEntry.paymentMethodId
             ) || oldBreakdown[i]
 
-            const oldReceived = oldEntry ? Number(oldEntry.effectiveAmount ?? oldEntry.amount ?? oldEntry.amountReceived ?? 0) : 0
+            const oldReceived = oldEntry ? Number(oldEntry.amountReceived ?? oldEntry.effectiveAmount ?? oldEntry.amount ?? 0) : 0
             const delta = newReceived - oldReceived
 
             if (delta > 0.009) {

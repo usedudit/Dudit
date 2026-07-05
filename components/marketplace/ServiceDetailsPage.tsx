@@ -973,9 +973,17 @@ export function ServiceDetailsPageClient({
                     if (hasCampaign) {
                         return (
                             <div className="space-y-1">
-                                <span className="text-sm text-brand-inactive-text line-through font-normal">
-                                    {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix}
-                                </span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm text-brand-inactive-text line-through font-normal">
+                                        {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]">
+                                        <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24">
+                                            <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z" />
+                                        </svg>
+                                        <span>Oferta Imperdível</span>
+                                    </span>
+                                </div>
                                 {hasPix ? (
                                     <>
                                         <div className="flex items-baseline gap-2 flex-wrap">
@@ -1010,11 +1018,12 @@ export function ServiceDetailsPageClient({
                     if (hasProductPromo && hasPix) {
                         return (
                             <div className="space-y-1">
-                                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
-                                <Badge variant="orange" className="ml-2">
-                                    <TagIcon size={12} />
-                                    {pricing.discountPercent}% OFF
-                                </Badge>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ff7a00]">
+                                        {pricing.discountPercent}% OFF
+                                    </span>
+                                </div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
                                         {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
@@ -1035,11 +1044,12 @@ export function ServiceDetailsPageClient({
                     if (hasProductPromo && !hasPix) {
                         return (
                             <div className="space-y-1">
-                                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
-                                <Badge variant="orange" className="ml-2">
-                                    <TagIcon size={12} />
-                                    {pricing.discountPercent}% OFF
-                                </Badge>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ff7a00]">
+                                        {pricing.discountPercent}% OFF
+                                    </span>
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
                                         {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix}
@@ -1096,20 +1106,6 @@ export function ServiceDetailsPageClient({
                     </div>
                 )}
             </div>
-
-            {/* Campanha InfoCard */}
-            {showPrice && pricing.hasCampaignDiscount && activePromo && (
-                <InfoCard
-                    color="orange"
-                    className="mb-6"
-                    message={activePromo.name}
-                    rightElement={
-                        <span className="font-bold text-sm text-orange-700 dark:text-orange-300">
-                            {pricing.campaignDiscountLabel} OFF
-                        </span>
-                    }
-                />
-            )}
 
             {/* Brinde de Campanha discreto */}
             {giftDetails && (

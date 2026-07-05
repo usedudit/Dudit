@@ -28,6 +28,8 @@ export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
   creditType?: "full" | "partial"
   refundValue: number
   storeCreditValue: number
+  orderTotal?: number
+  orderPaidAmount?: number
   returnDate?: string
   items: any[]
   returnEvents?: ReturnEvent[]

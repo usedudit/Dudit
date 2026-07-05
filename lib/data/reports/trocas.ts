@@ -17,6 +17,8 @@ export interface ReturnsReportData {
   byReason: { label: string; value: number }[]
   byStatus: { label: string; value: number }[]
   recentReturns: { id: string; customer: string; reason: string; amount: string; status: string; date: string }[]
+  returnEvolution: { label: string; value: number }[]
+  topReturnedProducts: { productName: string; count: number; totalQuantity: number }[]
 }
 
 const getCachedReturnsData = cache(async (partnerId: string, period: Period = "monthly") => {
@@ -55,7 +57,6 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
       ])
 
       if (periodReturnsResult.error) throw periodReturnsResult.error
-      if (prevReturnsResult.error) throw prevReturnsResult.error
 
       const periodReturns = periodReturnsResult.data || []
       const prevReturns = prevReturnsResult.data || []
@@ -78,6 +79,47 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
       const byStatus = new Map<string, number>()
       for (const r of periodReturns) {
         byStatus.set(r.status || "pending", (byStatus.get(r.status || "pending") || 0) + 1)
+      }
+
+      // ─── Return evolution (last daysInPeriod days) ───
+      const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
+      const todayDate = new Date(today + "T12:00:00Z")
+      const returnDateMap = new Map<string, number>()
+      for (const r of periodReturns) {
+        const k = String(r.created_at || "").slice(0, 10)
+        returnDateMap.set(k, (returnDateMap.get(k) || 0) + 1)
+      }
+      const returnEvolution = Array.from({ length: daysInPeriod }, (_, i) => {
+        const date = new Date(todayDate)
+        date.setUTCDate(date.getUTCDate() - (daysInPeriod - 1 - i))
+        const key = date.toISOString().slice(0, 10)
+        return {
+          label: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+          value: returnDateMap.get(key) || 0,
+        }
+      })
+
+      const periodReturnIds = periodReturns.map((r: any) => r.id)
+      let topReturnedProducts: { productName: string; count: number; totalQuantity: number }[] = []
+      if (periodReturnIds.length > 0) {
+        const itemsResult = await supabase
+          .from("return_items")
+          .select("product_name_snapshot, quantity")
+          .in("return_request_id", periodReturnIds)
+        if (!itemsResult.error && itemsResult.data) {
+          const prodMap = new Map<string, { count: number; qty: number }>()
+          for (const item of itemsResult.data) {
+            const name = item.product_name_snapshot || "Sem nome"
+            const cur = prodMap.get(name) || { count: 0, qty: 0 }
+            cur.count++
+            cur.qty += Number(item.quantity || 0)
+            prodMap.set(name, cur)
+          }
+          topReturnedProducts = Array.from(prodMap.entries())
+            .sort((a, b) => b[1].count - a[1].count)
+            .slice(0, 10)
+            .map(([productName, data]) => ({ productName, count: data.count, totalQuantity: data.qty }))
+        }
       }
 
       const reasonLabels: Record<string, string> = {
@@ -117,6 +159,8 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
           status: statusLabels[r.status] || r.status,
           date: new Date(r.created_at).toLocaleDateString("pt-BR"),
         })),
+        returnEvolution,
+        topReturnedProducts,
       }
     },
     [`report-returns-${partnerId}-${period}`],

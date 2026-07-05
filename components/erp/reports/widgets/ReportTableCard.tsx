@@ -1,9 +1,10 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/reusable"
 import { useRouter } from "next/navigation"
+import { ChevronLeftIcon, ChevronRightIcon } from "@/lib/icons"
 
 export interface TableColumn {
   key: string
@@ -23,7 +24,7 @@ interface ReportTableCardProps {
   columns: TableColumn[]
   data: TableRow[]
   emptyMessage?: string
-  maxRows?: number
+  pageSize?: number
   detailHref?: string
   detailLabel?: string
   onRowClick?: (row: TableRow) => void
@@ -35,14 +36,16 @@ export function ReportTableCard({
   columns,
   data,
   emptyMessage = "Nenhum dado disponível.",
-  maxRows = 6,
+  pageSize = 6,
   detailHref,
   detailLabel = "Ver Detalhes",
   onRowClick,
   className,
 }: ReportTableCardProps) {
   const router = useRouter()
-  const rows = data.slice(0, maxRows)
+  const [page, setPage] = useState(0)
+  const totalPages = Math.ceil(data.length / pageSize)
+  const rows = data.slice(page * pageSize, (page + 1) * pageSize)
 
   return (
     <div className={cn(
@@ -51,8 +54,12 @@ export function ReportTableCard({
     )}>
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
-        {data.length === 0 && (
-          <span className="text-sm font-medium text-brand-inactive-text">{emptyMessage}</span>
+        {data.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-medium text-brand-inactive-text">
+              {page * pageSize + 1}-{Math.min((page + 1) * pageSize, data.length)} de {data.length}
+            </span>
+          </div>
         )}
       </div>
 
@@ -106,8 +113,46 @@ export function ReportTableCard({
             </table>
           </div>
 
-          {detailHref && rows.length >= maxRows && (
-            <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {totalPages > 1 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={page === 0}
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                  >
+                    <ChevronLeftIcon size={16} />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPage(i)}
+                      className={cn(
+                        "h-8 w-8 rounded-full text-[13px] font-bold transition-colors",
+                        i === page
+                          ? "bg-brand-green text-white"
+                          : "text-brand-inactive-text hover:bg-brand-green-light dark:hover:bg-dark-border/40"
+                      )}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  >
+                    <ChevronRightIcon size={16} />
+                  </Button>
+                </>
+              )}
+            </div>
+            {detailHref && (
               <Button
                 variant="outline"
                 size="sm"
@@ -115,8 +160,8 @@ export function ReportTableCard({
               >
                 {detailLabel}
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </>
       ) : (
         <div className="py-12 flex flex-col items-center justify-center text-center">

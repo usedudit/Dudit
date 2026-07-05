@@ -560,6 +560,77 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
     )
 }
 
+function isItemInPromotion(item: any, promo: any, itemType: "produto" | "servico") {
+    if (!promo) return false
+    
+    // Check campaign scope
+    if (promo.applyScope === "entire_cart") return true
+    
+    if (itemType === "produto") {
+        if (promo.applyScope === "specific_products") {
+            return promo.applicableProductIds?.includes(item.id)
+        }
+        if (promo.applyScope === "category" && item.category_id) {
+            return promo.applicableCategoryIds?.includes(item.category_id)
+        }
+    }
+    
+    if (itemType === "servico") {
+        if (promo.applyScope === "specific_services") {
+            return promo.applicableServiceIds?.includes(item.id)
+        }
+        if (promo.applyScope === "category" && item.category_id) {
+            return promo.applicableCategoryIds?.includes(item.category_id)
+        }
+    }
+    
+    return false
+}
+
+function CampaignCountdown({ endsAt }: { endsAt?: string | null }) {
+    const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 })
+
+    useEffect(() => {
+        const targetDate = endsAt ? new Date(endsAt) : new Date(Date.now() + 8 * 60 * 60 * 1000)
+        
+        const updateTimer = () => {
+            const now = new Date()
+            const difference = targetDate.getTime() - now.getTime()
+            
+            if (difference <= 0) {
+                setTimeLeft({ hours: 0, minutes: 0, seconds: 0 })
+                return
+            }
+            
+            const totalSeconds = Math.floor(difference / 1000)
+            const hours = Math.floor(totalSeconds / 3600)
+            const minutes = Math.floor((totalSeconds % 3600) / 60)
+            const seconds = totalSeconds % 60
+            
+            setTimeLeft({ hours, minutes, seconds })
+        }
+        
+        updateTimer()
+        const interval = setInterval(updateTimer, 1000)
+        return () => clearInterval(interval)
+    }, [endsAt])
+
+    const pad = (num: number) => String(num).padStart(2, '0')
+
+    return (
+        <div className="flex items-center gap-1.5 shrink-0 select-none">
+            <span className="text-[10px] md:text-xs font-black uppercase text-brand-dark tracking-wide mr-0.5">Encerra em</span>
+            <div className="flex items-center gap-0.5 text-[11px] md:text-[13px] font-bold text-brand-dark">
+                <span className="px-1.5 py-0.5 rounded bg-white/90 backdrop-blur-sm shadow-sm">{pad(timeLeft.hours)}</span>
+                <span className="font-extrabold">:</span>
+                <span className="px-1.5 py-0.5 rounded bg-white/90 backdrop-blur-sm shadow-sm">{pad(timeLeft.minutes)}</span>
+                <span className="font-extrabold">:</span>
+                <span className="px-1.5 py-0.5 rounded bg-white/90 backdrop-blur-sm shadow-sm">{pad(timeLeft.seconds)}</span>
+            </div>
+        </div>
+    )
+}
+
 export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
     const calculatedReviewsCount = reviews?.length || 0
     const calculatedAverageRating = useMemo(() => {
@@ -632,6 +703,35 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
     }, [partner?.id])
 
+    const campaignSections = useMemo(() => {
+        if (!partnerPromotions || partnerPromotions.length === 0) return []
+        
+        return partnerPromotions.map(promo => {
+            const promoItems: any[] = []
+            
+            if (products) {
+                products.forEach(p => {
+                    if (isItemInPromotion(p, promo, "produto")) {
+                        promoItems.push({ ...p, _itemType: "produto" })
+                    }
+                })
+            }
+            
+            if (services) {
+                services.forEach(s => {
+                    if (isItemInPromotion(s, promo, "servico")) {
+                        promoItems.push({ ...s, _itemType: "servico" })
+                    }
+                })
+            }
+            
+            return {
+                promotion: promo,
+                items: promoItems
+            }
+        }).filter(sec => sec.items.length > 0)
+    }, [partnerPromotions, products, services])
+
     const partnerRawImage = partner.store_avatar || partner.store_image_url || partner.profile_image_url || partner.storeImageUrl || null
     const partnerProfileImageUrl = getImageUrl(partnerRawImage)
     const fallbackBanner = partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
@@ -667,9 +767,21 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         ...groupedItems.map(group => ({ id: group.id, label: group.name })),
     ], [featuredItems.length, groupedItems])
 
+    const isCampaignView = categoryView?.startsWith("campaign-") || false
+    const activeCampaignId = isCampaignView && categoryView ? categoryView.replace("campaign-", "") : null
+    const activeCampaignPromo = useMemo(() => {
+        return partnerPromotions?.find(p => p.id === activeCampaignId || p.campaignId === activeCampaignId)
+    }, [partnerPromotions, activeCampaignId])
+
     const categoryName = useMemo(
-        () => categoryView ? groupedItems.find(group => group.id === categoryView)?.name || categoryView : null,
-        [categoryView, groupedItems]
+        () => {
+            if (!categoryView) return null
+            if (isCampaignView) {
+                return activeCampaignPromo?.name || "Oferta Especial"
+            }
+            return groupedItems.find(group => group.id === categoryView)?.name || categoryView
+        },
+        [categoryView, isCampaignView, activeCampaignPromo, groupedItems]
     )
 
     useEffect(() => {
@@ -792,10 +904,30 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         setActiveTag(tag)
     }
 
-    const categoryItems = categoryView
-        ? (groupedItems.find(group => group.id === categoryView)?.items || [])
+    const categoryItems = useMemo(() => {
+        if (!categoryView) return []
+        if (isCampaignView && activeCampaignPromo) {
+            const promoItems: any[] = []
+            if (products) {
+                products.forEach(p => {
+                    if (isItemInPromotion(p, activeCampaignPromo, "produto")) {
+                        promoItems.push({ ...p, _itemType: "produto" })
+                    }
+                })
+            }
+            if (services) {
+                services.forEach(s => {
+                    if (isItemInPromotion(s, activeCampaignPromo, "servico")) {
+                        promoItems.push({ ...s, _itemType: "servico" })
+                    }
+                })
+            }
+            return promoItems.filter(item => !categorySearchValue.trim() || item.name?.toLowerCase().includes(categorySearchValue.trim().toLowerCase()))
+        }
+        
+        return (groupedItems.find(group => group.id === categoryView)?.items || [])
             .filter(item => !categorySearchValue.trim() || item.name?.toLowerCase().includes(categorySearchValue.trim().toLowerCase()))
-        : []
+    }, [categoryView, isCampaignView, activeCampaignPromo, products, services, categorySearchValue, groupedItems])
 
     const categoryAvailableBrands = useMemo(() => {
         const brands = new Set<string>()
@@ -1155,13 +1287,22 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                             <ArrowLeftIcon size={18} />
                                         </button>
                                         <div>
-                                            <h2 className="text-xl lg:text-[24px] font-semibold text-brand-dark">{groupedItems.find(group => group.id === categoryView)?.name}</h2>
+                                            <h2 className="text-xl lg:text-[24px] font-semibold text-brand-dark">{categoryName}</h2>
                                             <p className="text-sm font-medium text-brand-inactive-text mt-1">{categoryFilteredItems.length} resultado{categoryFilteredItems.length !== 1 ? "s" : ""} encontrado{categoryFilteredItems.length !== 1 ? "s" : ""}</p>
                                         </div>
                                     </div>
                                     {categoryFilteredItems.length > 0 ? (
                                         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4">
-                                            {categoryFilteredItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} className="w-full" promotions={partnerPromotions} />)}
+                                            {categoryFilteredItems.map(item => (
+                                                <ItemCard
+                                                    key={item.id}
+                                                    product={normalizeItemForCard(item, partner)}
+                                                    showSeller={false}
+                                                    className="w-full"
+                                                    promotions={partnerPromotions}
+                                                    hidePromoBadge={isCampaignView}
+                                                />
+                                            ))}
                                         </div>
                                     ) : (
                                         <IconPlaceholder
@@ -1176,6 +1317,49 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             ) : (
                                 <>
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
+                                    
+                                    {/* Seção de Ofertas Relâmpago / Campanhas */}
+                                    {campaignSections.map(sec => {
+                                        const promo = sec.promotion
+                                        const items = sec.items.slice(0, 20)
+                                        
+                                        return (
+                                            <div key={promo.id} className="mb-10 w-full rounded-2xl p-4 md:p-6 bg-gradient-to-r from-amber-400 to-amber-300 text-brand-dark animate-fade-in shadow-md">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xl md:text-2xl">⚡</span>
+                                                        <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">{promo.name}</h2>
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-4 flex-wrap">
+                                                        <CampaignCountdown endsAt={promo.endsAt || (promo as any).ends_at} />
+                                                        
+                                                        <button
+                                                            onClick={() => openCategory(`campaign-${promo.id}`)}
+                                                            className="text-[12px] md:text-xs font-black uppercase tracking-wider text-brand-dark hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-full shadow-sm"
+                                                        >
+                                                            Ver tudo
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 pt-1 px-1 snap-x snap-mandatory">
+                                                    {items.map(item => (
+                                                        <div key={item.id} className="snap-start shrink-0">
+                                                            <ItemCard
+                                                                product={normalizeItemForCard(item, partner)}
+                                                                showSeller={false}
+                                                                promotions={partnerPromotions}
+                                                                hidePromoBadge={true}
+                                                                className="w-[145px] md:w-[175px] bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                    
                                     {featuredItems.length > 0 && (
                                         <div id="featured" data-category-section="featured" className="scroll-mt-[150px]">
                                             <HorizontalCarousel

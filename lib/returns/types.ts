@@ -88,6 +88,8 @@ export type ReturnRequestListItem = {
   duditReportId?: string | null
   paymentProvider?: string
   mpPaymentId?: string | null
+  orderTotal?: number
+  orderPaidAmount?: number
   refundPaymentMethod?: string
   exchangeOrderId?: string | null
   exchangeSubstatus?: string | null

@@ -18,11 +18,28 @@ export interface SalesReportData {
     ticketMedio: number
     ticketFormatted: string
     ticketTrend: string
+    itemsSold: number
+    cancellationRate: number
+    cancellationRateFormatted: string
+    netRevenue: number
+    netRevenueFormatted: string
+    estimatedGrossProfit: number
+    estimatedGrossProfitFormatted: string
+    grossMargin: number
+    grossMarginFormatted: string
+    costCoveragePct: number
   }
   bySource: { label: string; value: number }[]
   byPaymentMethod: { label: string; value: number }[]
   evolution: { label: string; value: number; secondary: number }[]
   topProducts: { id: string; label: string; value: number; subtitle?: string }[]
+  ordersByHour: { label: string; value: number }[]
+  ordersByDayOfWeek: { label: string; value: number }[]
+  abcCurve: { label: string; value: number; cumulative: number; category: "A" | "B" | "C" }[]
+  leastSoldProducts: { id: string; label: string; value: number }[]
+  productTurnover: number
+  topServices: { id: string; label: string; value: number; count: number }[]
+  topMarginProducts: { id: string; label: string; value: number; margin: number }[]
 }
 
 const getCachedSalesData = cache(async (partnerId: string, period: Period = "monthly"): Promise<SalesReportData> => {
@@ -31,10 +48,10 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
-      const [currentOrdersResult, prevOrdersResult, itemsResult] = await Promise.all([
+      const [currentOrdersResult, prevOrdersResult, itemsResult, cancelResult, allItemsResult, serviceItemsResult] = await Promise.all([
         supabase
           .from("orders")
-          .select("id, total_amount, order_source, payment_method, created_at")
+          .select("id, total_amount, order_source, payment_method, created_at, discount_total, delivery_fee, amount_paid")
           .eq("partner_id", partnerId)
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
@@ -49,10 +66,31 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
           .limit(500),
         supabase
           .from("order_items")
-          .select("product_name, quantity, created_at, orders!inner(partner_id, total_amount)")
+          .select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)")
           .eq("orders.partner_id", partnerId)
           .gte("created_at", `${from}T00:00:00`)
           .limit(500),
+        supabase
+          .from("orders")
+          .select("id, situation, created_at")
+          .eq("partner_id", partnerId)
+          .gte("created_at", `${from}T00:00:00`)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("order_items")
+          .select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)")
+          .eq("orders.partner_id", partnerId)
+          .gte("created_at", `${from}T00:00:00`)
+          .order("created_at", { ascending: false })
+          .limit(300),
+        supabase
+          .from("order_items")
+          .select("product_name, quantity, net_item_value, line_type, created_at, orders!inner(partner_id)")
+          .eq("orders.partner_id", partnerId)
+          .in("line_type", ["service_booking"])
+          .gte("created_at", `${from}T00:00:00`)
+          .limit(200),
       ])
 
       if (currentOrdersResult.error) throw currentOrdersResult.error
@@ -127,6 +165,137 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
           subtitle: `${i + 1}º em vendas`,
         }))
 
+      // ─── Items sold ───
+      const totalItemsSold = itemRows.reduce((sum: number, item: any) => sum + money(item.quantity), 0)
+
+      // ─── Cancellation rate ───
+      const cancelRows = cancelResult.data || []
+      const cancelledCount = cancelRows.filter((o: any) => {
+        const s = String(o.situation || "").toLowerCase()
+        return ["cancelled", "cancelado", "cancelada"].includes(s)
+      }).length
+      const cancellationRate = cancelRows.length > 0 ? Math.round((cancelledCount / cancelRows.length) * 100) : 0
+
+      // ─── Net revenue (after discounts/shipping) ───
+      const totalDiscount = periodOrders.reduce((a: number, o: any) => a + money(o.discount_total || 0), 0)
+      const totalDeliveryFee = periodOrders.reduce((a: number, o: any) => a + money(o.delivery_fee || 0), 0)
+      const netRevenue = periodOrders.reduce((a: number, o: any) => a + money(o.amount_paid || o.total_amount), 0)
+
+      // ─── Gross profit (cost_price lookup) ───
+      const prodIds = [...new Set(itemRows.map((i: any) => i.product_id).filter(Boolean))]
+      let costPriceMap = new Map<string, number>()
+      if (prodIds.length > 0) {
+        const prodResult = await supabase.from("products").select("id, cost_price").in("id", prodIds)
+        if (!prodResult.error && prodResult.data) {
+          for (const p of prodResult.data) {
+            if (p.cost_price) costPriceMap.set(p.id, money(p.cost_price))
+          }
+        }
+      }
+      let totalCost = 0
+      let itemsWithCost = 0
+      let totalItemsWithCost = 0
+      for (const item of itemRows) {
+        const pid = item.product_id
+        const qty = money(item.quantity || 0)
+        if (pid && costPriceMap.has(pid)) {
+          totalCost += qty * costPriceMap.get(pid)!
+          itemsWithCost++
+        }
+        if (pid) totalItemsWithCost++
+      }
+      const costCoveragePct = totalItemsWithCost > 0 ? Math.round((itemsWithCost / totalItemsWithCost) * 100) : 0
+      const estimatedGrossProfit = costCoveragePct >= 50 ? revenue - totalCost : 0
+      const grossMargin = revenue > 0 && estimatedGrossProfit > 0 ? Math.round((estimatedGrossProfit / revenue) * 100) : 0
+
+      // ─── Top margin products ───
+      const prodRevenueMap = new Map<string, { revenue: number; cost: number; qty: number }>()
+      for (const item of itemRows) {
+        const name = item.product_name || "Produto"
+        const cur = prodRevenueMap.get(name) || { revenue: 0, cost: 0, qty: 0 }
+        const qty = money(item.quantity || 0)
+        const rev = money(item.net_item_value || 0)
+        cur.revenue += rev
+        cur.qty += qty
+        const pid = item.product_id
+        if (pid && costPriceMap.has(pid)) cur.cost += qty * costPriceMap.get(pid)!
+        prodRevenueMap.set(name, cur)
+      }
+      const topMarginProducts = Array.from(prodRevenueMap.entries())
+        .filter(([_, d]) => d.cost > 0)
+        .map(([label, d]) => ({ id: label, label, value: d.revenue, margin: Math.round(((d.revenue - d.cost) / d.revenue) * 100) }))
+        .sort((a, b) => b.margin - a.margin)
+        .slice(0, 5)
+
+      // ─── Top services ───
+      const serviceRows = serviceItemsResult.data || []
+      const svcMap = new Map<string, { count: number; revenue: number }>()
+      for (const item of serviceRows) {
+        const name = item.product_name || "Serviço"
+        const cur = svcMap.get(name) || { count: 0, revenue: 0 }
+        cur.count += money(item.quantity || 1)
+        cur.revenue += money(item.net_item_value || 0)
+        svcMap.set(name, cur)
+      }
+      const topServices = Array.from(svcMap.entries())
+        .sort((a, b) => b[1].revenue - a[1].revenue)
+        .slice(0, 8)
+        .map(([label, d]) => ({ id: label, label, value: d.revenue, count: d.count }))
+
+      // ─── Orders by hour ───
+      const hourBuckets = new Array(24).fill(0)
+      for (const o of periodOrders) {
+        const h = new Date(o.created_at).getHours()
+        hourBuckets[h]++
+      }
+      const ordersByHour = hourBuckets.map((count, h) => ({
+        label: `${String(h).padStart(2, "0")}h`,
+        value: count,
+      }))
+
+      // ─── Orders by day of week ───
+      const dowNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+      const dowBuckets = new Array(7).fill(0)
+      for (const o of periodOrders) {
+        const dow = new Date(o.created_at).getDay()
+        dowBuckets[dow]++
+      }
+      const ordersByDayOfWeek = dowBuckets.map((count, i) => ({
+        label: dowNames[i],
+        value: count,
+      }))
+
+      // ─── ABC Curve ───
+      const allItemRows = allItemsResult.data || []
+      const abcProdMap = new Map<string, number>()
+      for (const item of allItemRows) {
+        const name = item.product_name || "Produto"
+        abcProdMap.set(name, (abcProdMap.get(name) || 0) + money(item.total_amount || item.quantity))
+      }
+      const sortedProducts = Array.from(abcProdMap.entries()).sort((a, b) => b[1] - a[1])
+      const totalValue = sortedProducts.reduce((a, [_, v]) => a + v, 0)
+      let cumulative = 0
+      const abcCurve = sortedProducts.map(([label, value]) => {
+        cumulative += value
+        const cumPct = totalValue > 0 ? Math.round((cumulative / totalValue) * 100) : 0
+        let category: "A" | "B" | "C" = "C"
+        if (cumPct <= 50) category = "A"
+        else if (cumPct <= 80) category = "B"
+        return { label, value, cumulative: cumPct, category }
+      })
+
+      // ─── Least sold products ───
+      const leastSoldProducts = Array.from(prodMap.entries())
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, 5)
+        .map(([label, value]) => ({ id: label, label, value }))
+
+      // ─── Product turnover (giro) ───
+      const monthsInPeriod = Math.max(daysInPeriod / 30, 1)
+      const productTurnover = prodMap.size > 0
+        ? Math.round((totalItemsSold / prodMap.size) / monthsInPeriod)
+        : 0
+
       return {
         metrics: {
           revenue,
@@ -137,6 +306,16 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
           ticketMedio,
           ticketFormatted: brl(ticketMedio),
           ticketTrend,
+          itemsSold: totalItemsSold,
+          cancellationRate,
+          cancellationRateFormatted: `${cancellationRate}%`,
+          netRevenue,
+          netRevenueFormatted: brl(netRevenue),
+          estimatedGrossProfit,
+          estimatedGrossProfitFormatted: brl(estimatedGrossProfit),
+          grossMargin,
+          grossMarginFormatted: `${grossMargin}%`,
+          costCoveragePct,
         },
         bySource: Array.from(bySource.entries())
           .sort((a, b) => b[1] - a[1])
@@ -146,6 +325,13 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
           .map(([label, value]) => ({ label, value })),
         evolution,
         topProducts,
+        ordersByHour,
+        ordersByDayOfWeek,
+        abcCurve,
+        leastSoldProducts,
+        productTurnover,
+        topServices,
+        topMarginProducts,
       }
     },
     [`report-sales-${partnerId}-${period}`],

@@ -247,6 +247,8 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         duditReportId: row.dudit_report_id || null,
         paymentProvider: row.orders?.payment_provider || undefined,
         mpPaymentId: row.orders?.mp_payment_id || undefined,
+        orderTotal: toNumber(row.orders?.total_amount),
+        orderPaidAmount: toNumber(row.orders?.amount_paid || row.orders?.paid_amount || row.orders?.total_amount),
         refundPaymentMethod: (row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].payment_method : undefined,
         exchangeOrderId: row.exchange_order_id || undefined,
         exchangeSubstatus: row.exchange_substatus || undefined,
@@ -971,7 +973,7 @@ export async function processReturnRequestAction(input: unknown) {
             if (!existingMovement) {
                 const { data: stockMovementRes, error: stockMovementErr } = await supabase.rpc("create_batch_stock_movement", {
                     p_partner_id: request.partner_id,
-                    p_direction: "in",
+                    p_movement_type: "in",
                     p_reason: "RETURN_IN",
                     p_notes: "Devolução do cliente",
                     p_created_by: user.id,

@@ -46,3 +46,9 @@ export type { MarketingReportData } from "./marketing"
 
 export { getProductivityReportData } from "./produtividade"
 export type { ProductivityReportData } from "./produtividade"
+
+export { getGoalReportData } from "./metas"
+export type { GoalReportData } from "./metas"
+
+export { getServiceOrderReportData } from "./service-orders"
+export type { ServiceOrderReportData } from "./service-orders"

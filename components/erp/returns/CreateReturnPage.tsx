@@ -366,8 +366,12 @@ export default function CreateReturnPage({
             setReturnDate(new Date(returnRequest.returnDate || returnRequest.createdAt))
             setReturnStatus(returnRequest.status)
             setResolutionType((returnRequest.approvedResolution || returnRequest.desiredResolution || "refund") as any)
-            setRefundType(returnRequest.refundType || (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))
-            setRefundValue(returnRequest.refundValue)
+            
+            const isCancellation = returnRequest.requestType === "cancellation" || (returnRequest as any).request_type === "cancellation"
+            const isFullRefund = isCancellation || (returnRequest.refundValue > 0 && returnRequest.orderPaidAmount && Math.abs(returnRequest.refundValue - returnRequest.orderPaidAmount) < 0.01)
+            
+            setRefundType(isCancellation ? "full" : (returnRequest.refundType || (isFullRefund ? "full" : (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))))
+            setRefundValue(isCancellation ? (returnRequest.orderPaidAmount || returnRequest.refundValue) : returnRequest.refundValue)
             setRefundPaymentMethod(returnRequest.refundPaymentMethod || "")
             setCreditValue(returnRequest.storeCreditValue || 0)
             setExchangeStatus(returnRequest.exchangeSubstatus || "pending")

@@ -12,10 +12,15 @@ export interface CustomerReportData {
   totalCustomers: number
   newCustomers: number
   activeCustomers: number
+  recurringCustomers: number
+  inactiveCustomers: number
   avgTicket: number
   avgTicketFormatted: string
   previousAvgTicket: number
+  purchaseFrequency: number
+  avgDaysBetweenPurchases: number
   topCustomers: { id: string; label: string; value: string; subtitle?: string; orders: number }[]
+  vipCustomers: { id: string; label: string; value: string; orders: number }[]
   customerEvolution: { label: string; ativos: number; novos: number }[]
 }
 
@@ -25,7 +30,7 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
-      const [customersResult, periodOrdersResult, prevOrdersResult] = await Promise.all([
+      const [customersResult, periodOrdersResult, prevOrdersResult, allCustomersResult] = await Promise.all([
         supabase
           .from("customers")
           .select("id, name, created_at")
@@ -47,14 +52,20 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
           .lt("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
+        supabase
+          .from("orders")
+          .select("id, customer_name, customer_id, total_amount, created_at")
+          .eq("partner_id", partnerId)
+          .order("created_at", { ascending: false })
+          .limit(1000),
       ])
 
       if (customersResult.error) throw customersResult.error
-      if (periodOrdersResult.error) throw periodOrdersResult.error
 
       const customers = customersResult.data || []
       const periodOrders = periodOrdersResult.data || []
       const prevOrders = prevOrdersResult.data || []
+      const allOrders = allCustomersResult.data || []
 
       const totalCustomers = customers.length
       const newCustomers = customers.filter((c: any) => {
@@ -62,31 +73,80 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
         return d >= from
       }).length
 
-      const periodCustomers = new Set<string>()
-      const customerRevenue = new Map<string, { name: string; total: number; count: number }>()
+      const periodCustomerSet = new Set<string>()
+      const periodCustomerMap = new Map<string, { name: string; total: number; count: number }>()
       for (const o of periodOrders) {
         const key = o.customer_id || o.customer_name || "anon"
-        periodCustomers.add(key)
-        const current = customerRevenue.get(key) || { name: o.customer_name || "Cliente", total: 0, count: 0 }
+        periodCustomerSet.add(key)
+        const current = periodCustomerMap.get(key) || { name: o.customer_name || "Cliente", total: 0, count: 0 }
         current.total += money(o.total_amount)
         current.count += 1
-        customerRevenue.set(key, current)
+        periodCustomerMap.set(key, current)
       }
 
-      const activeCustomers = periodCustomers.size
-      const totalRevenue = Array.from(customerRevenue.values()).reduce((a, c) => a + c.total, 0)
+      const activeCustomers = periodCustomerSet.size
+      const totalRevenue = Array.from(periodCustomerMap.values()).reduce((a, c) => a + c.total, 0)
       const avgTicket = activeCustomers > 0 ? totalRevenue / activeCustomers : 0
 
-      const prevPeriodCustomers = new Set<string>()
+      // Previous period
+      const prevCustomerSet = new Set<string>()
       let prevRevenue = 0
       for (const o of prevOrders) {
-        prevPeriodCustomers.add(o.customer_id || o.customer_name || "anon")
+        prevCustomerSet.add(o.customer_id || o.customer_name || "anon")
         prevRevenue += money(o.total_amount)
       }
-      const prevActive = prevPeriodCustomers.size
+      const prevActive = prevCustomerSet.size
       const previousAvgTicket = prevActive > 0 ? prevRevenue / prevActive : 0
 
-      const topCustomers = Array.from(customerRevenue.entries())
+      // ─── Recurring customers (bought in both current AND previous period) ───
+      const recurringCustomers = [...periodCustomerSet].filter(c => prevCustomerSet.has(c)).length
+
+      // ─── Inactive customers (have orders but last order > 90 days ago) ───
+      const allCustomerIds = new Set<string>()
+      for (const o of allOrders) {
+        allCustomerIds.add(o.customer_id || o.customer_name || "anon")
+      }
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - 90)
+      const customerLastOrder = new Map<string, string>()
+      for (const o of allOrders) {
+        const key = o.customer_id || o.customer_name || "anon"
+        const orderDate = String(o.created_at || "").slice(0, 10)
+        const existing = customerLastOrder.get(key)
+        if (!existing || orderDate > existing) customerLastOrder.set(key, orderDate)
+      }
+      const inactiveCustomers = [...customerLastOrder.entries()]
+        .filter(([_, date]) => date < cutoffDate.toISOString().slice(0, 10))
+        .length
+
+      // ─── Purchase frequency (avg orders per active customer in period) ───
+      const totalOrdersInPeriod = periodOrders.length
+      const purchaseFrequency = activeCustomers > 0
+        ? Math.round((totalOrdersInPeriod / activeCustomers) * 10) / 10
+        : 0
+
+      // ─── Avg days between purchases ───
+      const customerDates = new Map<string, string[]>()
+      for (const o of allOrders) {
+        const key = o.customer_id || o.customer_name || "anon"
+        const prev = customerDates.get(key) || []
+        prev.push(String(o.created_at || "").slice(0, 10))
+        customerDates.set(key, prev)
+      }
+      let totalGaps = 0
+      let gapCount = 0
+      for (const [_, dates] of customerDates) {
+        if (dates.length < 2) continue
+        const sorted = dates.sort()
+        for (let i = 1; i < sorted.length; i++) {
+          totalGaps += (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86400000
+          gapCount++
+        }
+      }
+      const avgDaysBetweenPurchases = gapCount > 0 ? Math.round(totalGaps / gapCount) : 0
+
+      // Top customers (current period)
+      const topCustomers = Array.from(periodCustomerMap.entries())
         .sort((a, b) => b[1].total - a[1].total)
         .slice(0, 8)
         .map(([id, data]) => ({
@@ -97,6 +157,26 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
           orders: data.count,
         }))
 
+      // ─── VIP customers (top 5 by lifetime value) ───
+      const lifetimeMap = new Map<string, { name: string; total: number; count: number }>()
+      for (const o of allOrders) {
+        const key = o.customer_id || o.customer_name || "anon"
+        const current = lifetimeMap.get(key) || { name: o.customer_name || "Cliente", total: 0, count: 0 }
+        current.total += money(o.total_amount)
+        current.count += 1
+        lifetimeMap.set(key, current)
+      }
+      const vipCustomers = Array.from(lifetimeMap.entries())
+        .sort((a, b) => b[1].total - a[1].total)
+        .slice(0, 5)
+        .map(([id, data]) => ({
+          id,
+          label: data.name,
+          value: brl(data.total),
+          orders: data.count,
+        }))
+
+      // Evolution
       const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
       const todayDate = new Date(today + "T12:00:00Z")
 
@@ -127,10 +207,15 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
         totalCustomers,
         newCustomers,
         activeCustomers,
+        recurringCustomers,
+        inactiveCustomers,
         avgTicket,
         avgTicketFormatted: brl(avgTicket),
         previousAvgTicket,
+        purchaseFrequency,
+        avgDaysBetweenPurchases,
         topCustomers,
+        vipCustomers,
         customerEvolution,
       }
     },

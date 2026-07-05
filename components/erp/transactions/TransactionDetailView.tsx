@@ -340,11 +340,12 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                 />
                                                             </div>
                                                         </div>
-                                                    ) : (detail.transactionType === "refund" || detail.categoryLine.toLowerCase().includes("comiss") || detail.isRecurring || detail.categoryLine === "Vendas") ? (
+                                                    ) : (detail.transactionType === "refund" || detail.categoryLine === "Reembolso" || detail.categoryLine === "Refund" || detail.categoryLine === "Crédito em loja" || detail.categoryLine === "Store Credit Liability" || detail.categoryLine.toLowerCase().includes("comiss") || detail.isRecurring || detail.categoryLine === "Vendas") ? (
                                                         <ListItem
                                                             className="border-0 px-0 py-2 rounded-none bg-transparent hover:border-transparent hover:bg-transparent cursor-default"
                                                             icon={(() => {
-                                                                if (detail.transactionType === "refund") return ReturnIcon;
+                                                                if (detail.transactionType === "refund" || detail.categoryLine === "Reembolso" || detail.categoryLine === "Refund") return ReturnIcon;
+                                                                if (detail.categoryLine === "Crédito em loja" || detail.categoryLine === "Store Credit Liability") return DigitalWalletIcon;
                                                                 if (detail.categoryLine.toLowerCase().includes("comiss")) return TrendingUpIcon;
                                                                 if (detail.isRecurring) return RepeatIcon;
                                                                 return ShoppingCartIcon;

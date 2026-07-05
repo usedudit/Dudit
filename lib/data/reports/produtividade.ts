@@ -9,7 +9,7 @@ import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
 
 export interface ProductivityReportData {
-  staffRanking: { id: string; label: string; value: string; appointments: number; revenue: number; cancelled: number }[]
+  staffRanking: { id: string; label: string; value: string; appointments: number; revenue: number; cancelled: number; ticketMedio?: number }[]
   serviceRanking: { id: string; label: string; value: string; count: number }[]
   dailyEvolution: { label: string; atendimentos: number; receita: number }[]
   metrics: {
@@ -18,6 +18,7 @@ export interface ProductivityReportData {
     totalRevenueFormatted: string
     avgDuration: number
     attendanceRate: number
+    avgTicketPerStaff: number
   }
 }
 
@@ -121,6 +122,7 @@ const getCachedProductivityData = cache(async (partnerId: string, period: Period
             appointments: data.appointments,
             revenue: data.revenue,
             cancelled: data.cancelled,
+            ticketMedio: data.appointments > 0 ? Math.round(data.revenue / data.appointments) : 0,
           })),
         serviceRanking: Array.from(byService.entries())
           .sort((a, b) => b[1].count - a[1].count)
@@ -138,6 +140,7 @@ const getCachedProductivityData = cache(async (partnerId: string, period: Period
           totalRevenueFormatted: brl(totalRevenue),
           avgDuration,
           attendanceRate,
+          avgTicketPerStaff: completedCount > 0 ? Math.round(totalRevenue / completedCount) : 0,
         },
       }
     },
