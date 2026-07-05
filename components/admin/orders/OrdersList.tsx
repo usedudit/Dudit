@@ -299,7 +299,7 @@ function OrderDetailsSheet({ order, isOpen, onClose }: OrderDetailsSheetProps) {
                                     if (order.payment_provider === "Mercado Pago" && pmLabel) {
                                         pmLabel = `Mercado Pago (${pmLabel})`
                                     }
-                                    return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} />
+                                     return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} simplify />
                                 })()}
                                 <span className="text-brand-inactive-text">-</span>
                                 <span>{order.situation === "paid" ? "Pago" : order.situation === "pending" ? "Pendente" : order.situation === "cancelled" ? "Cancelado" : order.situation || "-"}</span>

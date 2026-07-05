@@ -151,14 +151,38 @@ export async function getPartnerTeamUserIds(partnerId: string): Promise<string[]
   return [...userIds]
 }
 
+async function resolveUserIdFromCustomerLookup(admin: ReturnType<typeof getAdminClient>, customerId: string): Promise<string | null> {
+  const { data: customer } = await admin
+    .from("customers")
+    .select("user_id")
+    .eq("id", customerId)
+    .maybeSingle()
+
+  if (customer?.user_id) {
+    const { data: profile } = await admin
+      .from("user_profiles")
+      .select("user_id")
+      .eq("user_id", customer.user_id)
+      .maybeSingle()
+
+    if (profile?.user_id) return profile.user_id
+  }
+
+  return null
+}
+
 export async function resolveCustomerUserId(params: {
   customerId?: string | null
   buyerId?: string | null
   marketplaceOrderId?: string | null
 }): Promise<string | null> {
-  if (params.buyerId) return params.buyerId
-
   const admin = getAdminClient()
+
+  if (params.buyerId) {
+    const resolved = await resolveUserIdFromCustomerLookup(admin, params.buyerId)
+    if (resolved) return resolved
+    return params.buyerId
+  }
 
   if (params.marketplaceOrderId) {
     const { data: order } = await admin
@@ -166,30 +190,20 @@ export async function resolveCustomerUserId(params: {
       .select("buyer_id")
       .eq("id", params.marketplaceOrderId)
       .maybeSingle()
-    if (order?.buyer_id) return order.buyer_id
+    if (order?.buyer_id) {
+      const resolved = await resolveUserIdFromCustomerLookup(admin, order.buyer_id)
+      if (resolved) return resolved
+      return order.buyer_id
+    }
   }
 
   if (params.customerId) {
-    const { data: customer } = await admin
-      .from("customers")
-      .select("user_id")
-      .eq("id", params.customerId)
-      .maybeSingle()
+    const resolved = await resolveUserIdFromCustomerLookup(admin, params.customerId)
+    if (resolved) return resolved
 
-    if (customer?.user_id) {
-      const { data: profile } = await admin
-        .from("user_profiles")
-        .select("user_id")
-        .eq("user_id", customer.user_id)
-        .maybeSingle()
-
-      if (profile?.user_id) return profile.user_id
-
-      console.warn("[notifications] customer.user_id does not exist in user_profiles", {
-        customerId: params.customerId,
-        user_id: customer.user_id,
-      })
-    }
+    console.warn("[notifications] customer.user_id does not exist in user_profiles", {
+      customerId: params.customerId,
+    })
   }
 
   return null

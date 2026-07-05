@@ -96,6 +96,7 @@ interface Order {
     refunded_amount?: number;
     payment_method?: string;
     payment_breakdown?: any;
+    has_items_to_restore?: boolean;
 }
 
 interface FilterState {
@@ -385,6 +386,7 @@ export default function OrdersPage({
                     refunded_amount: Number(o.refunded_amount || 0),
                     payment_method: o.payment_method || "",
                     payment_breakdown: o.payment_breakdown || null,
+                    has_items_to_restore: Boolean(o.has_items_to_restore),
                 }
             })
             .filter((o: Order) => {
@@ -597,12 +599,26 @@ export default function OrdersPage({
 
     const shouldShowAutomaticRefundCheckbox = useMemo(() => {
         if (cancellableOrdersSelection.length === 0) return false
-        return cancellableOrdersSelection.every((order) => order.situation === "paid" || order.situation === "partially_paid" || order.paidAmount > 0.009)
+        return cancellableOrdersSelection.every((order) => {
+            const hasPayment = order.situation === "paid" || order.situation === "partially_paid" || order.paidAmount > 0.009
+            const remainingRefund = Math.max(0, order.paidAmount - (order.refunded_amount || 0))
+            return hasPayment && remainingRefund > 0.009
+        })
+    }, [cancellableOrdersSelection])
+
+    const automaticRefundLabel = useMemo(() => {
+        if (cancellableOrdersSelection.length === 1) {
+            const order = cancellableOrdersSelection[0]
+            const remainingRefund = Math.max(0, order.paidAmount - (order.refunded_amount || 0))
+            return `Gerar reembolso automático (${formatCurrency(remainingRefund)})`
+        }
+        const totalRemaining = cancellableOrdersSelection.reduce((sum, order) => sum + Math.max(0, order.paidAmount - (order.refunded_amount || 0)), 0)
+        return `Gerar reembolso automático (${formatCurrency(totalRemaining)})`
     }, [cancellableOrdersSelection])
 
     const shouldShowRestoreStockCheckbox = useMemo(() => {
         if (cancellableOrdersSelection.length === 0) return false
-        return cancellableOrdersSelection.some((order) => order.items_count > 0)
+        return cancellableOrdersSelection.some((order) => order.has_items_to_restore && order.items_count > 0)
     }, [cancellableOrdersSelection])
 
     const selectedOrdersForBulkActions = useMemo(() => {
@@ -1144,7 +1160,7 @@ export default function OrdersPage({
                             {shouldShowAutomaticRefundCheckbox && (
                                 <label className="flex items-center gap-3 py-2 cursor-pointer">
                                     <Checkbox checked={generateAutomaticRefundOnCancel} onChange={(checked) => setGenerateAutomaticRefundOnCancel(Boolean(checked))} />
-                                    <span className="text-sm text-brand-dark dark:text-dark-heading">Gerar reembolso automático</span>
+                                    <span className="text-sm text-brand-dark dark:text-dark-heading">{automaticRefundLabel}</span>
                                 </label>
                             )}
                         </div>

@@ -181,17 +181,17 @@ const StatItem = ({ value, label, icon }: any) => (
 
 const getBusinessDayStatus = (value: any) => {
     if (!value?.enabled) return "closed"
-    
+
     try {
         const now = new Date()
         const currentMinutes = now.getHours() * 60 + now.getMinutes()
-        
+
         const [fromH, fromM] = value.from.split(":").map(Number)
         const fromMinutes = fromH * 60 + fromM
-        
+
         const [toH, toM] = value.to.split(":").map(Number)
         const toMinutes = toH * 60 + toM
-        
+
         if (fromMinutes < toMinutes) {
             if (currentMinutes < fromMinutes || currentMinutes >= toMinutes) {
                 return "closed"
@@ -203,14 +203,14 @@ const getBusinessDayStatus = (value: any) => {
         } else {
             const isOpen = currentMinutes >= fromMinutes || currentMinutes < toMinutes
             if (!isOpen) return "closed"
-            
+
             let remaining = 0
             if (currentMinutes >= fromMinutes) {
                 remaining = (24 * 60 - currentMinutes) + toMinutes
             } else {
                 remaining = toMinutes - currentMinutes
             }
-            
+
             if (remaining <= 60) {
                 return "closing_soon"
             }
@@ -562,10 +562,10 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
 
 function isItemInPromotion(item: any, promo: any, itemType: "produto" | "servico") {
     if (!promo) return false
-    
+
     // Check campaign scope
     if (promo.applyScope === "entire_cart") return true
-    
+
     if (itemType === "produto") {
         if (promo.applyScope === "specific_products") {
             return promo.applicableProductIds?.includes(item.id)
@@ -574,7 +574,7 @@ function isItemInPromotion(item: any, promo: any, itemType: "produto" | "servico
             return promo.applicableCategoryIds?.includes(item.category_id)
         }
     }
-    
+
     if (itemType === "servico") {
         if (promo.applyScope === "specific_services") {
             return promo.applicableServiceIds?.includes(item.id)
@@ -583,52 +583,8 @@ function isItemInPromotion(item: any, promo: any, itemType: "produto" | "servico
             return promo.applicableCategoryIds?.includes(item.category_id)
         }
     }
-    
+
     return false
-}
-
-function CampaignCountdown({ endsAt }: { endsAt?: string | null }) {
-    const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 })
-
-    useEffect(() => {
-        const targetDate = endsAt ? new Date(endsAt) : new Date(Date.now() + 8 * 60 * 60 * 1000)
-        
-        const updateTimer = () => {
-            const now = new Date()
-            const difference = targetDate.getTime() - now.getTime()
-            
-            if (difference <= 0) {
-                setTimeLeft({ hours: 0, minutes: 0, seconds: 0 })
-                return
-            }
-            
-            const totalSeconds = Math.floor(difference / 1000)
-            const hours = Math.floor(totalSeconds / 3600)
-            const minutes = Math.floor((totalSeconds % 3600) / 60)
-            const seconds = totalSeconds % 60
-            
-            setTimeLeft({ hours, minutes, seconds })
-        }
-        
-        updateTimer()
-        const interval = setInterval(updateTimer, 1000)
-        return () => clearInterval(interval)
-    }, [endsAt])
-
-    const pad = (num: number) => String(num).padStart(2, '0')
-
-    return (
-        <div className="flex items-center gap-1.5 shrink-0 select-none">
-            <span className="text-[10px] md:text-xs font-black uppercase text-brand-dark tracking-wide mr-0.5">Encerra em</span>
-            <div className="flex items-center gap-0.5 text-[11px] md:text-[13px] font-bold text-brand-dark">
-                <span className="px-1.5 py-0.5 rounded bg-white/90 backdrop-blur-sm shadow-sm">{pad(timeLeft.hours)}</span>
-                <span className="font-extrabold">:</span>
-                <span className="px-1.5 py-0.5 rounded bg-white/90 backdrop-blur-sm shadow-sm">{pad(timeLeft.minutes)}</span>
-                <span className="font-extrabold">:</span>
-                <span className="px-1.5 py-0.5 rounded bg-white/90 backdrop-blur-sm shadow-sm">{pad(timeLeft.seconds)}</span>
-            </div>
-        </div>
-    )
 }
 
 export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
@@ -705,10 +661,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     const campaignSections = useMemo(() => {
         if (!partnerPromotions || partnerPromotions.length === 0) return []
-        
+
         return partnerPromotions.map(promo => {
             const promoItems: any[] = []
-            
+
             if (products) {
                 products.forEach(p => {
                     if (isItemInPromotion(p, promo, "produto")) {
@@ -716,7 +672,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     }
                 })
             }
-            
+
             if (services) {
                 services.forEach(s => {
                     if (isItemInPromotion(s, promo, "servico")) {
@@ -724,7 +680,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     }
                 })
             }
-            
+
             return {
                 promotion: promo,
                 items: promoItems
@@ -924,7 +880,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             }
             return promoItems.filter(item => !categorySearchValue.trim() || item.name?.toLowerCase().includes(categorySearchValue.trim().toLowerCase()))
         }
-        
+
         return (groupedItems.find(group => group.id === categoryView)?.items || [])
             .filter(item => !categorySearchValue.trim() || item.name?.toLowerCase().includes(categorySearchValue.trim().toLowerCase()))
     }, [categoryView, isCampaignView, activeCampaignPromo, products, services, categorySearchValue, groupedItems])
@@ -1317,23 +1273,21 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             ) : (
                                 <>
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
-                                    
+
                                     {/* Seção de Ofertas Relâmpago / Campanhas */}
                                     {campaignSections.map(sec => {
                                         const promo = sec.promotion
                                         const items = sec.items.slice(0, 20)
-                                        
+
                                         return (
-                                            <div key={promo.id} className="mb-10 w-full rounded-2xl p-4 md:p-6 bg-gradient-to-r from-amber-400 to-amber-300 text-brand-dark animate-fade-in shadow-md">
-                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                                            <div key={promo.id} className="mb-10 w-full rounded-2xl p-4 bg-gradient-to-r from-amber-400 to-amber-300 text-brand-dark animate-fade-in shadow-md">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xl md:text-2xl">⚡</span>
                                                         <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">{promo.name}</h2>
                                                     </div>
-                                                    
+
                                                     <div className="flex items-center gap-4 flex-wrap">
-                                                        <CampaignCountdown endsAt={promo.endsAt || (promo as any).ends_at} />
-                                                        
                                                         <button
                                                             onClick={() => openCategory(`campaign-${promo.id}`)}
                                                             className="text-[12px] md:text-xs font-black uppercase tracking-wider text-brand-dark hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-full shadow-sm"
@@ -1342,8 +1296,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                         </button>
                                                     </div>
                                                 </div>
-                                                
-                                                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 pt-1 px-1 snap-x snap-mandatory">
+
+                                                <div className="flex gap-3 overflow-x-auto scrollbar-hide px-1 snap-x snap-mandatory">
                                                     {items.map(item => (
                                                         <div key={item.id} className="snap-start shrink-0">
                                                             <ItemCard
@@ -1359,7 +1313,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                             </div>
                                         )
                                     })}
-                                    
+
                                     {featuredItems.length > 0 && (
                                         <div id="featured" data-category-section="featured" className="scroll-mt-[150px]">
                                             <HorizontalCarousel

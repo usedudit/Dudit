@@ -16,6 +16,13 @@ interface OrderDataForTransaction {
     reference_note?: string
 }
 
+function normalizeOrigin(raw?: string | null): string {
+    const allowed = new Set(["manual", "system", "gateway"])
+    const value = String(raw || "").trim().toLowerCase()
+    if (allowed.has(value)) return value
+    return "manual"
+}
+
 function normalizeMethod(value?: string | null) {
     const m = String(value || "").trim().toLowerCase()
     if (!m) return "desconhecido"
@@ -208,7 +215,7 @@ export async function createTransactionFromOrder(
                 payment_type: entry.method,
                 payment_method_id: entry.paymentMethodId || null,
                 transaction_type: "income" as const,
-                origin: orderData.order_source || "manual",
+                origin: normalizeOrigin(orderData.order_source),
                 account_id: accountId,
                 reference_note: entry.referenceNote,
             }

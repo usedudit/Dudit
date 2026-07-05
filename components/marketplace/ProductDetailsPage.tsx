@@ -1074,10 +1074,8 @@ export function ProductDetailsPageClient({
                                         {formatMoney(pricing.original)}
                                     </span>
                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]">
-                                        <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24">
-                                            <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z" />
-                                        </svg>
-                                        <span>Oferta Imperdível</span>
+                                        <TagIcon className="w-3 h-3 fill-current shrink-0" />
+                                        <span>Oferta Especial</span>
                                     </span>
                                 </div>
                                 {hasPix ? (
@@ -1329,7 +1327,7 @@ export function ProductDetailsPageClient({
                                             <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pelo vendedor</p>
                                             {deliveryLoading ? (
                                                 <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
-                                            ) : deliveryError ? (
+                                            ) : (deliveryError && deliveryError !== "Entrega não disponível no plano atual.") ? (
                                                 <p className="text-xs text-red-500">{deliveryError}</p>
                                             ) : calculatedAddress ? (
                                                 <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
@@ -1344,6 +1342,8 @@ export function ProductDetailsPageClient({
                                                 <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
                                                     {deliveryFee > 0 ? formatMoney(deliveryFee) : "Grátis"}
                                                 </p>
+                                            ) : deliveryError === "Entrega não disponível no plano atual." ? (
+                                                <p className="text-sm font-bold text-brand-dark">A combinar</p>
                                             ) : (
                                                 <p className="text-sm font-semibold text-brand-inactive-text">-</p>
                                             )}
@@ -1374,7 +1374,9 @@ export function ProductDetailsPageClient({
                                     <div>
                                         <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
                                         {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                            <InfoCard className="mt-3" color="orange" message={`Pronto ${getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre ${preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e ${preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`} />
+                                            <p className="text-xs text-orange-500">
+                                                Pronto {getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                            </p>
                                         )}
                                     </div>
                                     <div className="text-right">

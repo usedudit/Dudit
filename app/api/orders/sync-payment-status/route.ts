@@ -230,6 +230,7 @@ export async function POST(request: NextRequest) {
               customerName: fullOrder.customer_name || null,
               financeAccountId: fullOrder.finance_account_id || null,
               orderSource: fullOrder.order_source || "manual",
+              paymentMethod: fullOrder.payment_method || "Método não definido",
             })
 
             const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")

@@ -532,14 +532,17 @@ export async function onOrderStatusChanged(
     if (buyerId) {
       const skipForCustomer = mixType === "service" && (situation === "paid" || situation === "cancelled")
       if (!skipForCustomer) {
-        await notifyCustomer({
-          userId: buyerId,
-          type,
-          entityType: "order",
-          entityId: orderId,
-          ctx: { ...ctx, orderNumber },
-          origin,
-        })
+        const userId = await resolveCustomerUserId({ buyerId })
+        if (userId) {
+          await notifyCustomer({
+            userId,
+            type,
+            entityType: "order",
+            entityId: orderId,
+            ctx: { ...ctx, orderNumber },
+            origin,
+          })
+        }
       }
     }
 
@@ -563,14 +566,17 @@ export async function onOrderStatusChanged(
     const type = CUSTOMER_DELIVERY_TYPES[deliveryStatus]
     const buyerId = order.buyer_id as string | null
     if (buyerId) {
-      await notifyCustomer({
-        userId: buyerId,
-        type,
-        entityType: "order",
-        entityId: orderId,
-        ctx: { ...ctx, orderNumber },
-        origin,
-      })
+      const userId = await resolveCustomerUserId({ buyerId })
+      if (userId) {
+        await notifyCustomer({
+          userId,
+          type,
+          entityType: "order",
+          entityId: orderId,
+          ctx: { ...ctx, orderNumber },
+          origin,
+        })
+      }
     }
   }
 }

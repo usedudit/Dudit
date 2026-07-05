@@ -246,31 +246,19 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
     const hasPendingPayment = order.situation !== "paid" && order.situation !== "cancelled" && remainingPaymentAmount > 0.009
     const getPaymentTypeLabel = () => {
-        let baseLabel = "Pix";
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
-        if (breakdownMethod) {
-            const m = breakdownMethod.toLowerCase();
-            if (m === "pix" || m === "bank_transfer") baseLabel = "Pix";
-            else if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) baseLabel = "Cartão de Crédito";
-            else if (m.includes("débito") || m.includes("debito") || m.includes("debit")) baseLabel = "Cartão de Débito";
-            else if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) baseLabel = "Dinheiro";
-            else if (m.includes("boleto")) baseLabel = "Boleto";
-            else baseLabel = breakdownMethod;
-        } else {
-            const pm = String(order.payment_method || "").toLowerCase();
-            if (pm === "pix" || pm === "bank_transfer") baseLabel = "Pix";
-            else if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) baseLabel = "Cartão de Crédito";
-            else if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) baseLabel = "Cartão de Débito";
-            else if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) baseLabel = "Dinheiro";
-            else if (pm.includes("boleto")) baseLabel = "Boleto";
-            else baseLabel = order.payment_method || "Nao informado";
-        }
+        const rawMethod = breakdownMethod || order.payment_method;
+
+        let label = formatPaymentMethodLabel(rawMethod, null);
+        if (!label) label = "Não informado";
 
         if (order.payment_provider === "Mercado Pago") {
-            return `Mercado Pago (${baseLabel})`;
+            if (!label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
+                return `${label} (Mercado Pago)`;
+            }
         }
-        return baseLabel;
+        return label;
     };
     const paymentMethodLabel = `${getPaymentTypeLabel()}${pendingSuffix}`
     const isMercadoPago = order.payment_provider === "Mercado Pago";

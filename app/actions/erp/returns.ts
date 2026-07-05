@@ -935,17 +935,20 @@ export async function processReturnRequestAction(input: unknown) {
             const itemIds = data.returnToInventoryItems.map(i => i.id)
             const { data: dbItems, error: dbItemsErr } = await supabase
                 .from("return_items")
-                .select("id, product_id, variant_id")
+                .select("id, order_item_id, product_id, variant_id")
                 .eq("return_request_id", data.requestId)
-                .in("id", itemIds)
 
             if (dbItemsErr) throw dbItemsErr
 
+            const matchedDbItems = (dbItems || []).filter((item: any) =>
+                itemIds.includes(item.id) || itemIds.includes(item.order_item_id)
+            )
+
             const qtyMap = new Map(data.returnToInventoryItems.map(i => [i.id, i.quantity]))
-            returnToStockItems = (dbItems || []).map((item: any) => ({
+            returnToStockItems = matchedDbItems.map((item: any) => ({
                 product_id: item.product_id,
                 variant_id: item.variant_id || null,
-                quantity: qtyMap.get(item.id) || 1,
+                quantity: qtyMap.get(item.id) || qtyMap.get(item.order_item_id) || 1,
             }))
         } else if (data.returnToInventory && !useSelectiveReturn) {
             const { data: dbItems, error: dbItemsErr } = await supabase

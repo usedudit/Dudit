@@ -139,7 +139,7 @@ const OrderGridCard = React.memo(
                                     if (order.payment_provider === "Mercado Pago" && pmLabel) {
                                         pmLabel = `Mercado Pago (${pmLabel})`
                                     }
-                                    return <PaymentMethodIndicator label={pmLabel} />
+                                    return <PaymentMethodIndicator label={pmLabel} simplify />
                                 })()}
                             </div>
                             <span className="text-brand-inactive-text dark:text-dark-body">•</span>

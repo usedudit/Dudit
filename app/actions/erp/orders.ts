@@ -744,6 +744,7 @@ export async function createFinancialTransactionsForReceivedAmount(
         totalAmount: number
         newBreakdown: any[]
         oldBreakdown: any[]
+        paymentMethod?: string | null
         customerId?: string | null
         customerName?: string | null
         financeAccountId?: string | null
@@ -755,6 +756,23 @@ export async function createFinancialTransactionsForReceivedAmount(
 
         const oldBreakdown = Array.isArray(params.oldBreakdown) ? params.oldBreakdown : []
         const newBreakdown = Array.isArray(params.newBreakdown) ? params.newBreakdown : []
+
+        if (newBreakdown.length === 0 && params.totalAmount > 0.009 && params.paymentMethod) {
+            await createTransactionFromOrder(supabase, {
+                order_number: params.orderNumber,
+                partner_id: params.partnerId,
+                total_amount: params.totalAmount,
+                payment_method: params.paymentMethod,
+                payment_breakdown: null,
+                payment_date: new Date().toISOString(),
+                customer_id: params.customerId || null,
+                customer_name: params.customerName || null,
+                finance_account_id: params.financeAccountId || null,
+                order_source: params.orderSource || "manual",
+                reference_note: `sale-tx:${params.orderNumber}:fallback`,
+            })
+            return
+        }
 
         for (let i = 0; i < newBreakdown.length; i++) {
             const newEntry = newBreakdown[i]
@@ -1675,6 +1693,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             customerName: order.customer_name,
             financeAccountId: order.finance_account_id || data.financeAccountId,
             orderSource: order.order_source || "manual",
+            paymentMethod: paymentMethodSummary || data.paymentMethod || "Método não definido",
         })
     }
 
@@ -2301,6 +2320,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             customerName: data.customerName || null,
             financeAccountId: data.financeAccountId,
             orderSource: currentOrder.order_source || "manual",
+            paymentMethod: paymentMethodSummary || data.paymentMethod || currentOrder.payment_method || "Método não definido",
         })
     }
 
@@ -2994,6 +3014,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     customerName: order.customer_name || null,
                     financeAccountId: order.finance_account_id || null,
                     orderSource: order.order_source || "manual",
+                    paymentMethod: order.payment_method || "Método não definido",
                 })
             }
 
@@ -3531,7 +3552,7 @@ export async function getERPOrdersPageAction(
                 order_source,
                 created_at,
                 stores(name),
-                return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount),
+                return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                 order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
                 payment_method,
                 payment_breakdown
@@ -3579,21 +3600,38 @@ export async function getERPOrdersPageAction(
 
         const rows = data || []
         const hasMore = rows.length > limit
-        const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => ({
-            ...row,
-            is_pos_sale: Boolean(row?.is_pos_sale),
-            quantity: Number(row?.quantity || 0) || (Array.isArray(row?.order_items)
-                ? row.order_items.reduce((sum: number, item: any) => sum + Number(item?.quantity || 0), 0)
-                : 0),
-            return_count: Array.isArray(row?.return_requests) ? row.return_requests.length : 0,
-            is_refunded: Array.isArray(row?.return_requests) && row.return_requests.some((req: any) => {
-                const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
-                const isRefundResolution = req.approved_resolution === "refund" || (!req.approved_resolution && req.desired_resolution === "refund")
-                const hasRefundValue = Number(req.refund_amount || 0) > 0
-                return isApprovedOrResolved && (isRefundResolution || hasRefundValue)
-            }),
-            refunded_amount: Array.isArray(row?.return_requests)
-                ? row.return_requests.reduce((sum: number, req: any) => {
+        const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
+            const returnedToInventoryQtyMap = new Map<string, number>()
+            const reqs = Array.isArray(row?.return_requests) ? row.return_requests : []
+            for (const req of reqs) {
+                if (req.inventory_movement_id && Array.isArray(req.return_items)) {
+                    for (const item of req.return_items) {
+                        const current = returnedToInventoryQtyMap.get(item.order_item_id) || 0
+                        returnedToInventoryQtyMap.set(item.order_item_id, current + Number(item.quantity || 0))
+                    }
+                }
+            }
+            const orderItems = Array.isArray(row?.order_items) ? row.order_items : []
+            const totalRemainingToRestore = orderItems.reduce((sum: number, item: any) => {
+                const returnedQty = returnedToInventoryQtyMap.get(item.id) || 0
+                return sum + Math.max(0, Number(item.quantity || 0) - returnedQty)
+            }, 0)
+            const has_items_to_restore = totalRemainingToRestore > 0
+
+            return {
+                ...row,
+                is_pos_sale: Boolean(row?.is_pos_sale),
+                quantity: Number(row?.quantity || 0) || (Array.isArray(row?.order_items)
+                    ? row.order_items.reduce((sum: number, item: any) => sum + Number(item?.quantity || 0), 0)
+                    : 0),
+                return_count: reqs.length,
+                is_refunded: reqs.some((req: any) => {
+                    const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
+                    const isRefundResolution = req.approved_resolution === "refund" || (!req.approved_resolution && req.desired_resolution === "refund")
+                    const hasRefundValue = Number(req.refund_amount || 0) > 0
+                    return isApprovedOrResolved && (isRefundResolution || hasRefundValue)
+                }),
+                refunded_amount: reqs.reduce((sum: number, req: any) => {
                     const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
                     const isRefundResolution = req.approved_resolution === "refund" || (!req.approved_resolution && req.desired_resolution === "refund")
                     const hasRefundValue = Number(req.refund_amount || 0) > 0
@@ -3601,11 +3639,12 @@ export async function getERPOrdersPageAction(
                         return sum + Number(req.refund_amount || 0)
                     }
                     return sum
-                }, 0)
-                : 0,
-            // Backward-compatible field used by UI, with fallback when column doesn't exist in DB
-            order_date: row?.order_date || row?.created_at || null,
-        }))
+                }, 0),
+                has_items_to_restore,
+                // Backward-compatible field used by UI, with fallback when column doesn't exist in DB
+                order_date: row?.order_date || row?.created_at || null,
+            }
+        })
         const last = items[items.length - 1]
         const nextCursor: ERPOrderListCursor | null =
             hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null

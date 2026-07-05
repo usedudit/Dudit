@@ -202,7 +202,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                             )}
 
                             {showItemInfo && itemName && (
-                                <div className="ml-12">
+                                <div className="mt-4">
                                     {(() => {
                                         const card = (
                                             <>

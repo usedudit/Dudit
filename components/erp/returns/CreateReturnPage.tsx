@@ -327,6 +327,15 @@ export default function CreateReturnPage({
                 condition: mapToLegacyCondition(item.condition || "aberto"),
             }))
             setReturnItems(items)
+            
+            const itemsTotal = calculateReturnNetTotal(
+                items.map(item => ({
+                    netItemValue: item.netItemValue,
+                    price: item.price,
+                    quantity: item.quantity,
+                    orderedQuantity: item.maxQuantity,
+                }))
+            )
 
             // Setup exchange items from snapshot
             if (returnRequest.exchangeItemsSnapshot && returnRequest.exchangeItemsSnapshot.length > 0) {
@@ -368,12 +377,13 @@ export default function CreateReturnPage({
             setResolutionType((returnRequest.approvedResolution || returnRequest.desiredResolution || "refund") as any)
             
             const isCancellation = returnRequest.requestType === "cancellation" || (returnRequest as any).request_type === "cancellation"
-            const isFullRefund = isCancellation || (returnRequest.refundValue > 0 && returnRequest.orderPaidAmount && Math.abs(returnRequest.refundValue - returnRequest.orderPaidAmount) < 0.01)
+            const loadedRefundValue = returnRequest.refundValue || (returnRequest.desiredResolution === "refund" ? itemsTotal : 0)
+            const isFullRefund = isCancellation || (loadedRefundValue > 0 && returnRequest.orderPaidAmount && Math.abs(loadedRefundValue - returnRequest.orderPaidAmount) < 0.01)
             
             setRefundType(isCancellation ? "full" : (returnRequest.refundType || (isFullRefund ? "full" : (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))))
-            setRefundValue(isCancellation ? (returnRequest.orderPaidAmount || returnRequest.refundValue) : returnRequest.refundValue)
+            setRefundValue(isCancellation ? (returnRequest.orderPaidAmount || loadedRefundValue) : loadedRefundValue)
             setRefundPaymentMethod(returnRequest.refundPaymentMethod || "")
-            setCreditValue(returnRequest.storeCreditValue || 0)
+            setCreditValue(returnRequest.storeCreditValue || (returnRequest.desiredResolution === "store_credit" ? itemsTotal : 0))
             setExchangeStatus(returnRequest.exchangeSubstatus || "pending")
             setExchangeBalanceResolution(returnRequest.exchangeBalanceResolution || "store_credit")
             setReplacementProduct((returnRequest as any).replacementProduct || "")

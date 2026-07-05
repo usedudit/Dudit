@@ -9,28 +9,48 @@ const PixIcon = ({ className }: { className?: string }) => (
     </svg>
 )
 
-export function PaymentMethodIndicator({ label, simplifyMultiple = true }: { label?: string | null; simplifyMultiple?: boolean }) {
+export function PaymentMethodIndicator({
+    label,
+    simplifyMultiple = true,
+    simplify = false
+}: {
+    label?: string | null
+    simplifyMultiple?: boolean
+    simplify?: boolean
+}) {
     if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body truncate">Não informado</span>
     
     const parts = label.split(",").map(p => p.trim()).filter(Boolean)
     if (parts.length > 1) {
         if (simplifyMultiple) {
-            return <PaymentMethodIndicatorKeyed part="Múltiplos meios" />
+            return <PaymentMethodIndicatorKeyed part="Múltiplos meios" simplify={simplify} />
         }
         return (
             <div className="flex flex-wrap gap-2 items-center">
                 {parts.map((part, index) => (
-                    <PaymentMethodIndicatorKeyed key={index} part={part} />
+                    <PaymentMethodIndicatorKeyed key={index} part={part} simplify={simplify} />
                 ))}
             </div>
         )
     }
     
-    return <PaymentMethodIndicatorKeyed part={parts[0] || label} />
+    return <PaymentMethodIndicatorKeyed part={parts[0] || label} simplify={simplify} />
 }
 
-function PaymentMethodIndicatorKeyed({ part }: { part: string }) {
-    const normalized = part.toLowerCase()
+function PaymentMethodIndicatorKeyed({ part, simplify = false }: { part: string; simplify?: boolean }) {
+    const displayPart = simplify ? (() => {
+        const normalized = part.toLowerCase()
+        if (normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
+            return part
+        }
+        const match = part.match(/^([^(]+)\s*\(([^)]+)\)$/)
+        if (match) {
+            return match[1].trim()
+        }
+        return part
+    })() : part
+
+    const normalized = displayPart.toLowerCase()
     let icons: React.ReactNode[] = []
     let colorClass = "text-brand-inactive-text dark:text-dark-body"
 
@@ -99,7 +119,7 @@ function PaymentMethodIndicatorKeyed({ part }: { part: string }) {
             <span className="flex items-center gap-1">
                 {icons}
             </span>
-            <span>{part}</span>
+            <span>{displayPart}</span>
         </span>
     )
 }

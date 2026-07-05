@@ -67,7 +67,7 @@ const TransactionListItem = React.memo(
                                 )}
                             </div>
                             <div className="mt-1 flex items-center">
-                                <PaymentMethodIndicator label={transaction.paymentType} />
+                                <PaymentMethodIndicator label={transaction.paymentType} simplify />
                             </div>
                         </div>
                     )
