@@ -62,6 +62,11 @@ const getFormattedMethodLabel = (name: string, type?: string | null) => {
 
 import { CompactPaymentStatusAlert } from '@/components/erp/payments/shared/CompactPaymentStatusAlert';
 import { PaymentAmountLabel } from '@/components/erp/payments/shared/PaymentAmountLabel';
+import { generateStaticPix } from '@/lib/utils/pix-generator';
+import { PixQrDisplayModal } from '@/components/erp/payments/shared/PixQrDisplayModal';
+import { getPaymentMethodDetailsAction, updatePaymentMethodAction } from '@/app/actions/erp/payment-methods';
+import { AlertModal, Input, CpfCnpjInput, EmailInput, PhoneInput } from '@/components/reusable';
+import QRCode from 'qrcode';
 const SuccessActionCard = React.memo(({ icon: Icon, label, onClick }: { icon: any, label: string, onClick?: () => void }) => (
     <div
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
@@ -255,6 +260,16 @@ const PaymentModal = ({
 
     // Pix Generation State
     const [isPixGenerated, setIsPixGenerated] = useState(false);
+    const [showPixQrModal, setShowPixQrModal] = useState(false);
+    const [pixQrData, setPixQrData] = useState<{ payload: string; qrDataUrl: string } | null>(null);
+    const [isGeneratingPix, setIsGeneratingPix] = useState(false);
+    const [hasPixKey, setHasPixKey] = useState<boolean | null>(null);
+    const [tempPixKey, setTempPixKey] = useState("");
+    const [tempPixKeyType, setTempPixKeyType] = useState<"cpf" | "cnpj" | "email" | "phone" | "random">("cpf");
+    const [showWarningModal, setShowWarningModal] = useState(false);
+    const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false);
+    const [showKeyInputs, setShowKeyInputs] = useState(false);
+    const [savingPixKey, setSavingPixKey] = useState(false);
 
     // Toggles
     const [paymentPendingType, setPaymentPendingType] = useState<'none' | 'unpaid' | 'pending_stock'>('none');
@@ -454,6 +469,16 @@ const PaymentModal = ({
             setPaymentStatus('input');
             setLastPaymentPayload(null);
             setErrorMessage("Não conseguimos concluir a venda agora.");
+            setShowPixQrModal(false);
+            setPixQrData(null);
+            setIsGeneratingPix(false);
+            setHasPixKey(null);
+            setTempPixKey("");
+            setTempPixKeyType("cpf");
+            setShowWarningModal(false);
+            setShowConfirmSaveModal(false);
+            setShowKeyInputs(false);
+            setSavingPixKey(false);
 
             setPayments([
                 { id: 1, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
@@ -1454,6 +1479,59 @@ const PaymentModal = ({
         };
     };
 
+    const handleGeneratePixWithKey = async (keyToUse: string, typeToUse: string) => {
+        if (!selectedMethodId) return;
+        setIsGeneratingPix(true);
+        try {
+            const payload = generateStaticPix(
+                keyToUse,
+                paymentBaseAmount,
+                selectedStore?.name || "Loja",
+                "",
+                "DUDIT",
+                typeToUse
+            );
+            const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 });
+            setPixQrData({ payload, qrDataUrl });
+            setShowPixQrModal(true);
+        } catch (err) {
+            console.error("Error generating static Pix:", err);
+        } finally {
+            setIsGeneratingPix(false);
+        }
+    };
+
+    const handleGeneratePix = async () => {
+        if (!selectedMethodId) return;
+        
+        setIsGeneratingPix(true);
+        try {
+            const res = await getPaymentMethodDetailsAction(selectedMethodId);
+            if (res.success && res.method.pix_key) {
+                setHasPixKey(true);
+                const payload = generateStaticPix(
+                    res.method.pix_key,
+                    paymentBaseAmount,
+                    selectedStore?.name || "Loja",
+                    "",
+                    "DUDIT",
+                    res.method.pix_key_type
+                );
+                const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 });
+                setPixQrData({ payload, qrDataUrl });
+                setShowPixQrModal(true);
+            } else {
+                setHasPixKey(false);
+                setShowWarningModal(true);
+                setShowKeyInputs(true);
+            }
+        } catch (err) {
+            console.error("Error generating static Pix:", err);
+        } finally {
+            setIsGeneratingPix(false);
+        }
+    };
+
     const handleStartProcessing = async (forcedPayload?: any) => {
         const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
         const payload = forcedPayload || buildConfirmPayload();
@@ -2010,6 +2088,7 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
+
                                                 {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
                                                     <FormDropdown
                                                         label="Quem paga a taxa?"
@@ -2027,20 +2106,94 @@ const PaymentModal = ({
                                                         Calculando valor a cobrar...
                                                     </div>
                                                 )}
-                                                {!isPixGenerated ? (
-                                                    <Button variant="filled" className="w-full h-12" onClick={() => setIsPixGenerated(true)}>Gerar QR Code</Button>
+
+                                                {showKeyInputs ? (
+                                                    <div className="space-y-4 border border-yellow-200 dark:border-yellow-900/40 bg-yellow-50/50 dark:bg-yellow-900/10 p-4 rounded-xl text-left">
+                                                        <h5 className="text-sm font-semibold text-yellow-800 dark:text-yellow-400">
+                                                            Cadastrar Chave Pix temporária/padrão
+                                                        </h5>
+
+                                                        <FormDropdown
+                                                            label="Tipo de chave"
+                                                            placeholder="Selecione o tipo"
+                                                            value={tempPixKeyType}
+                                                            setValue={(val: any) => setTempPixKeyType(val)}
+                                                            options={[
+                                                                { value: "cpf", label: "CPF" },
+                                                                { value: "cnpj", label: "CNPJ" },
+                                                                { value: "email", label: "E-mail" },
+                                                                { value: "phone", label: "Celular" },
+                                                                { value: "random", label: "Chave Aleatória" },
+                                                            ]}
+                                                        />
+
+                                                        {tempPixKeyType === "cpf" && (
+                                                            <CpfCnpjInput
+                                                                label="Chave PIX (CPF)"
+                                                                placeholder="000.000.000-00"
+                                                                value={tempPixKey}
+                                                                onChange={(e) => setTempPixKey(e.target.value)}
+                                                                name="pix_key"
+                                                            />
+                                                        )}
+                                                        {tempPixKeyType === "cnpj" && (
+                                                            <CpfCnpjInput
+                                                                label="Chave PIX (CNPJ)"
+                                                                placeholder="00.000.000/0000-00"
+                                                                value={tempPixKey}
+                                                                onChange={(e) => setTempPixKey(e.target.value)}
+                                                                name="pix_key_cnpj"
+                                                            />
+                                                        )}
+                                                        {tempPixKeyType === "email" && (
+                                                            <EmailInput
+                                                                label="Chave PIX (E-mail)"
+                                                                placeholder="exemplo@email.com"
+                                                                value={tempPixKey}
+                                                                onChange={(e) => setTempPixKey(e.target.value)}
+                                                            />
+                                                        )}
+                                                        {tempPixKeyType === "phone" && (
+                                                            <PhoneInput
+                                                                label="Chave PIX (Celular)"
+                                                                placeholder="(00) 00000-0000"
+                                                                value={tempPixKey}
+                                                                onChange={(e) => setTempPixKey(e.target.value)}
+                                                            />
+                                                        )}
+                                                        {tempPixKeyType === "random" && (
+                                                            <Input
+                                                                label="Chave PIX (Aleatória)"
+                                                                placeholder="123e4567-e89b-12d3-a456-426614174000"
+                                                                value={tempPixKey}
+                                                                onChange={(e) => setTempPixKey(e.target.value)}
+                                                            />
+                                                        )}
+
+                                                        <Button
+                                                            variant="filled"
+                                                            className="w-full h-12 mt-2"
+                                                            onClick={() => {
+                                                                if (tempPixKey) {
+                                                                    setShowConfirmSaveModal(true);
+                                                                }
+                                                            }}
+                                                            isLoading={isGeneratingPix}
+                                                            disabled={paymentBaseAmount <= 0 || !tempPixKey}
+                                                        >
+                                                            Gerar QR Code
+                                                        </Button>
+                                                    </div>
                                                 ) : (
-                                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={standardTransition} className="flex flex-col items-center">
-                                                        <div className="bg-white p-6 rounded-3xl border border-brand-border mb-8 shadow-sm">
-                                                            <QRCodeIcon size={180} className="text-brand-dark" />
-                                                        </div>
-                                                        <div className="w-full relative">
-                                                            <input type="text" readOnly value="00020126580014br.gov.bcb.pix0136123e4567..." className="w-full pl-4 pr-12 py-4 rounded-xl bg-gray-100 dark:bg-dark-border/30 text-sm text-brand-inactive-text border border-transparent focus:border-brand-green outline-none font-medium" />
-                                                            <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-lg transition-colors text-brand-dark dark:text-dark-heading">
-                                                                <CopyIcon size={18} />
-                                                            </button>
-                                                        </div>
-                                                    </motion.div>
+                                                    <Button
+                                                        variant="filled"
+                                                        className="w-full h-12"
+                                                        onClick={handleGeneratePix}
+                                                        isLoading={isGeneratingPix}
+                                                        disabled={paymentBaseAmount <= 0}
+                                                    >
+                                                        Gerar QR Code
+                                                    </Button>
                                                 )}
                                             </div>
                                         </motion.div>
@@ -2772,6 +2925,69 @@ const PaymentModal = ({
                     className={`px-4 py-3 gap-4 ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}`}
                 />
             </DefaultModal>
+
+            {showWarningModal && (
+                <AlertModal
+                    title="Chave Pix Não Cadastrada"
+                    message="Este método de pagamento Pix não possui uma chave cadastrada. Por favor, preencha os dados da chave Pix para gerar o QR Code."
+                    variant="warning"
+                    isOpen={showWarningModal}
+                    onClose={() => setShowWarningModal(false)}
+                    confirmText="Ok"
+                />
+            )}
+
+            {showConfirmSaveModal && (
+                <AlertModal
+                    title="Salvar Chave Pix?"
+                    message="Deseja salvar esta chave Pix e o tipo dela como padrão para as próximas cobranças deste método de pagamento?"
+                    variant="info"
+                    isOpen={showConfirmSaveModal}
+                    onClose={async () => {
+                        setShowConfirmSaveModal(false);
+                        await handleGeneratePixWithKey(tempPixKey, tempPixKeyType);
+                    }}
+                    onConfirm={async () => {
+                        if (!selectedMethodId) return;
+                        setShowConfirmSaveModal(false);
+                        setSavingPixKey(true);
+                        try {
+                            await updatePaymentMethodAction(selectedMethodId, {
+                                pixKeyType: tempPixKeyType,
+                                pixKey: tempPixKey
+                            });
+                            setHasPixKey(true);
+                            invalidate();
+                        } catch (err) {
+                            console.error("Error saving Pix key:", err);
+                        } finally {
+                            setSavingPixKey(false);
+                        }
+                        await handleGeneratePixWithKey(tempPixKey, tempPixKeyType);
+                    }}
+                    confirmText="Sim, salvar"
+                    cancelText="Não, apenas gerar"
+                    isLoading={savingPixKey}
+                />
+            )}
+
+            {pixQrData && (
+                <PixQrDisplayModal
+                    isOpen={showPixQrModal}
+                    onClose={() => {
+                        setShowPixQrModal(false);
+                        setPixQrData(null);
+                    }}
+                    qrCode={pixQrData.qrDataUrl}
+                    payload={pixQrData.payload}
+                    amount={paymentBaseAmount}
+                    onConfirmPayment={async () => {
+                        setShowPixQrModal(false);
+                        setPixQrData(null);
+                        await handleStartProcessing();
+                    }}
+                />
+            )}
 
             {printOrderId && (
                 <SaleReceiptPrintModal

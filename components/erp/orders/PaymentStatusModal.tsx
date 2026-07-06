@@ -254,6 +254,7 @@ export default function PaymentStatusModal({
                             onLegsReady={onLegsReady}
                             onValidityChange={setCanSubmitBalance}
                             lockedMethodLabel={lockedMethod}
+                            onConfirmPayment={handleSubmit}
                         />
                     ) : isFullyPaid ? (
                         <div className="my-auto">

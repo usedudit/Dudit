@@ -8,6 +8,7 @@ export {
 } from "./PaymentMethodSelector"
 export { MoneyPaymentView, parseCalculatorInput, formatCalculatorAmount } from "./MoneyPaymentView"
 export { PixPaymentView } from "./PixPaymentView"
+export { PixQrDisplayModal } from "./PixQrDisplayModal"
 export { CardPaymentView } from "./CardPaymentView"
 export { SplitPaymentView, SplitMethodSelector, type SplitPaymentLeg } from "./SplitPaymentView"
 export { DepositReceiptsSection, isMpLeg } from "./DepositReceiptsSection"

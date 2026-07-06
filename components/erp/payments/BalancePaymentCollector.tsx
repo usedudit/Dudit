@@ -18,6 +18,7 @@ import {
   normalizePaymentMethodLabel,
   PaymentMethodSelector,
   PixPaymentView,
+  PixQrDisplayModal,
   SplitMethodSelector,
   SplitPaymentView,
   type PaymentBreakdownLeg,
@@ -33,6 +34,7 @@ type BalancePaymentCollectorProps = {
   onLegsReady: (legs: PaymentBreakdownLeg[]) => void
   onValidityChange?: (valid: boolean) => void
   lockedMethodLabel?: string | null
+  onConfirmPayment?: () => void
 }
 
 function buildFlatLeg(method: PartnerPaymentMethod, amount: number, installmentNumber = 1): PaymentBreakdownLeg {
@@ -57,6 +59,7 @@ export function BalancePaymentCollector({
   onLegsReady,
   onValidityChange,
   lockedMethodLabel,
+  onConfirmPayment,
 }: BalancePaymentCollectorProps) {
   const { selectedStore } = useStore()
   const { methods, isLoading } = usePaymentMethods(partnerId)
@@ -78,6 +81,7 @@ export function BalancePaymentCollector({
   const [editingSplitIndex, setEditingSplitIndex] = useState<number | null>(null)
   const [pixQrData, setPixQrData] = useState<{ payload: string; qrDataUrl: string } | null>(null)
   const [generatingPix, setGeneratingPix] = useState(false)
+  const [activePixModalData, setActivePixModalData] = useState<{ payload: string; qrDataUrl: string } | null>(null)
 
   // New state variables for Pix key warning and entry flow
   const [hasPixKey, setHasPixKey] = useState<boolean | null>(null)
@@ -97,6 +101,7 @@ export function BalancePaymentCollector({
     setSelectedMethod(null)
     setSelectedMethodType(null)
     setPixQrData(null)
+    setActivePixModalData(null)
     setSplitLegs([
       { id: 1, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
       { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
@@ -232,7 +237,7 @@ export function BalancePaymentCollector({
         typeToUse
       )
       const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 })
-      setPixQrData({ payload, qrDataUrl })
+      setActivePixModalData({ payload, qrDataUrl })
     } catch (err) {
       console.error("Error generating static Pix:", err)
     } finally {
@@ -255,7 +260,7 @@ export function BalancePaymentCollector({
         )
         const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 })
         const data = { payload, qrDataUrl }
-        setPixQrData(data)
+        setActivePixModalData(data)
         return data
       } finally {
         setGeneratingPix(false)
@@ -280,7 +285,7 @@ export function BalancePaymentCollector({
         )
         const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 })
         const data = { payload, qrDataUrl }
-        setPixQrData(data)
+        setActivePixModalData(data)
         return data
       } else {
         setHasPixKey(false)
@@ -370,7 +375,7 @@ export function BalancePaymentCollector({
           totalPaid={amount}
           totalNeed={remainingBalance}
           onGenerateQr={handleGeneratePix}
-          qrData={pixQrData}
+          qrData={null}
           isGenerating={generatingPix}
           showKeyInputs={showKeyInputs}
           tempPixKey={tempPixKey}
@@ -476,6 +481,20 @@ export function BalancePaymentCollector({
           confirmText="Sim, salvar"
           cancelText="Não, apenas gerar"
           isLoading={savingPixKey}
+        />
+      )}
+
+      {activePixModalData && (
+        <PixQrDisplayModal
+          isOpen={!!activePixModalData}
+          onClose={() => setActivePixModalData(null)}
+          qrCode={activePixModalData.qrDataUrl}
+          payload={activePixModalData.payload}
+          amount={amount}
+          onConfirmPayment={() => {
+            setActivePixModalData(null)
+            onConfirmPayment?.()
+          }}
         />
       )}
     </div>
