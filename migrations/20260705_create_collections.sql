@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS collections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL CHECK (char_length(name) >= 2 AND char_length(name) <= 100),
   description TEXT CHECK (char_length(description) <= 500),
-  author_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   cover_url TEXT,
   items_count INTEGER NOT NULL DEFAULT 0 CHECK (items_count >= 0),
   views_count INTEGER NOT NULL DEFAULT 0 CHECK (views_count >= 0),
@@ -44,39 +44,48 @@ CREATE INDEX IF NOT EXISTS idx_collection_items_item ON collection_items(item_ty
 -- ============================================================================
 ALTER TABLE collections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE collection_items ENABLE ROW LEVEL SECURITY;
+-- Note: ENABLE ROW LEVEL SECURITY is idempotent; re-running is safe.
 
 -- Collections: dono pode tudo; demais usuários autenticados podem ler
+DROP POLICY IF EXISTS "collections_select_own_or_public" ON collections;
 CREATE POLICY "collections_select_own_or_public"
   ON collections FOR SELECT
   USING (author_id = auth.uid() OR true);
 
+DROP POLICY IF EXISTS "collections_insert_own" ON collections;
 CREATE POLICY "collections_insert_own"
   ON collections FOR INSERT
   WITH CHECK (author_id = auth.uid());
 
+DROP POLICY IF EXISTS "collections_update_own" ON collections;
 CREATE POLICY "collections_update_own"
   ON collections FOR UPDATE
   USING (author_id = auth.uid())
   WITH CHECK (author_id = auth.uid());
 
+DROP POLICY IF EXISTS "collections_delete_own" ON collections;
 CREATE POLICY "collections_delete_own"
   ON collections FOR DELETE
   USING (author_id = auth.uid());
 
 -- Collection items: acesso via collection
+DROP POLICY IF EXISTS "collection_items_select" ON collection_items;
 CREATE POLICY "collection_items_select"
   ON collection_items FOR SELECT
   USING (EXISTS (SELECT 1 FROM collections c WHERE c.id = collection_id));
 
+DROP POLICY IF EXISTS "collection_items_insert" ON collection_items;
 CREATE POLICY "collection_items_insert"
   ON collection_items FOR INSERT
   WITH CHECK (EXISTS (SELECT 1 FROM collections c WHERE c.id = collection_id AND c.author_id = auth.uid()));
 
+DROP POLICY IF EXISTS "collection_items_update" ON collection_items;
 CREATE POLICY "collection_items_update"
   ON collection_items FOR UPDATE
   USING (EXISTS (SELECT 1 FROM collections c WHERE c.id = collection_id AND c.author_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM collections c WHERE c.id = collection_id AND c.author_id = auth.uid()));
 
+DROP POLICY IF EXISTS "collection_items_delete" ON collection_items;
 CREATE POLICY "collection_items_delete"
   ON collection_items FOR DELETE
   USING (EXISTS (SELECT 1 FROM collections c WHERE c.id = collection_id AND c.author_id = auth.uid()));

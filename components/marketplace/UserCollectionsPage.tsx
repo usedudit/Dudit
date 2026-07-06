@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { MarketplaceHeader } from "./MarketplaceHeader"
+import { MarketplaceFooter } from "./MarketplaceFooter"
 import { CollectionCard } from "@/components/marketplace/CollectionCard"
 import { createCollection } from "@/app/actions/marketplace/collections"
 import { Button, DefaultModal, Input, FormTextarea, IconPlaceholder } from "@/components/reusable"
@@ -57,70 +59,74 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
 
   return (
     <>
-      <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px]">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-              Minhas Coleções
-              {initialCollections.length > 0 && (
-                <span className="text-brand-inactive-text font-bold text-base lg:text-lg ml-2">
-                  ({initialCollections.length})
-                </span>
-              )}
-            </h1>
-            <p className="text-md text-brand-inactive-text mt-1">
-              Organize seus produtos e serviços favoritos em coleções personalizadas
-            </p>
-          </div>
-          {initialCollections.length > 0 && (
-            <Button
-              onClick={() => setIsCreateModalOpen(true)}
-              leftIcon={<PlusIcon size={18} />}
-              variant="default"
-              className="hidden sm:flex"
-            >
-              Nova Coleção
-            </Button>
-          )}
-        </div>
-
-        {/* Content */}
-        {initialCollections.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <IconPlaceholder
-              placeholderType="image"
-              imageSrc="https://img.dudit.com.br/static/mascots/Favoritos.png"
-              imageAlt="Suas coleções estão vazias"
-              title="Suas coleções estão vazias"
-              subtitle="Crie coleções para organizar seus produtos e serviços favoritos!"
-              itemButton={{
-                text: "Criar Coleção",
-                action: () => setIsCreateModalOpen(true),
-                variant: "default",
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
-              {initialCollections.map((collection) => (
-                <CollectionCard key={collection.id} collection={collection} className="w-full" />
-              ))}
+      <MarketplaceHeader simpleTitle="Minhas Coleções" />
+      <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+        <div className="container mx-auto px-4 max-w-[1400px] w-full mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                Minhas Coleções
+                {initialCollections.length > 0 && (
+                  <span className="text-brand-inactive-text font-bold text-base lg:text-lg ml-2">
+                    ({initialCollections.length})
+                  </span>
+                )}
+              </h1>
+              <p className="text-md text-brand-inactive-text mt-1">
+                Organize seus produtos e serviços favoritos em coleções personalizadas
+              </p>
             </div>
-
-            {/* Mobile Sticky Button */}
-            <div className="sm:hidden fixed bottom-20 right-4 z-40">
+            {initialCollections.length > 0 && (
               <Button
                 onClick={() => setIsCreateModalOpen(true)}
+                leftIcon={<PlusIcon size={18} />}
                 variant="default"
-                className="w-12 h-12 rounded-full flex items-center justify-center p-0 shadow-lg"
+                className="hidden sm:flex"
               >
-                <PlusIcon size={24} />
+                Nova Coleção
               </Button>
+            )}
+          </div>
+
+          {/* Content */}
+          {initialCollections.length === 0 ? (
+            <div className="flex justify-center py-12">
+              <IconPlaceholder
+                placeholderType="image"
+                imageSrc="https://img.dudit.com.br/static/mascots/Favoritos.png"
+                imageAlt="Suas coleções estão vazias"
+                title="Suas coleções estão vazias"
+                subtitle="Crie coleções para organizar seus produtos e serviços favoritos!"
+                itemButton={{
+                  text: "Criar Coleção",
+                  action: () => setIsCreateModalOpen(true),
+                  variant: "default",
+                }}
+              />
             </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
+                {initialCollections.map((collection) => (
+                  <CollectionCard key={collection.id} collection={collection} className="w-full" />
+                ))}
+              </div>
+
+              {/* Mobile Sticky Button */}
+              <div className="sm:hidden fixed bottom-20 right-4 z-40">
+                <Button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  variant="default"
+                  className="w-12 h-12 rounded-full flex items-center justify-center p-0 shadow-lg"
+                >
+                  <PlusIcon size={24} />
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+        <MarketplaceFooter />
       </div>
 
       {/* Create Modal */}

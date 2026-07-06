@@ -1,10 +1,10 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/reusable"
+import { Button, AlertModal } from "@/components/reusable"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { usePaymentMethods } from "@/hooks/use-payment-methods"
-import { getPaymentMethodDetailsAction } from "@/app/actions/erp/payment-methods"
+import { getPaymentMethodDetailsAction, updatePaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
 import { useStore } from "@/lib/store-context"
 import QRCode from "qrcode"
@@ -79,6 +79,17 @@ export function BalancePaymentCollector({
   const [pixQrData, setPixQrData] = useState<{ payload: string; qrDataUrl: string } | null>(null)
   const [generatingPix, setGeneratingPix] = useState(false)
 
+  // New state variables for Pix key warning and entry flow
+  const [hasPixKey, setHasPixKey] = useState<boolean | null>(null)
+  const [savedPixKey, setSavedPixKey] = useState<string | null>(null)
+  const [savedPixKeyType, setSavedPixKeyType] = useState<string | null>(null)
+  const [tempPixKey, setTempPixKey] = useState("")
+  const [tempPixKeyType, setTempPixKeyType] = useState<"cpf" | "cnpj" | "email" | "phone" | "random">("cpf")
+  const [showWarningModal, setShowWarningModal] = useState(false)
+  const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false)
+  const [showKeyInputs, setShowKeyInputs] = useState(false)
+  const [savingPixKey, setSavingPixKey] = useState(false)
+
   useEffect(() => {
     if (lockedMethodLabel) return
     setAmount(remainingBalance)
@@ -90,6 +101,15 @@ export function BalancePaymentCollector({
       { id: 1, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
       { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
     ])
+    // Reset our new states
+    setHasPixKey(null)
+    setSavedPixKey(null)
+    setSavedPixKeyType(null)
+    setTempPixKey("")
+    setTempPixKeyType("cpf")
+    setShowWarningModal(false)
+    setShowConfirmSaveModal(false)
+    setShowKeyInputs(false)
   }, [remainingBalance, partnerId, lockedMethodLabel])
 
   useEffect(() => {
@@ -105,6 +125,26 @@ export function BalancePaymentCollector({
       selectSingleMethod(matches[0])
     }
   }, [lockedMethodLabel, activeMethods, isLoading])
+
+  // Effect to load Pix key details when method is selected and view goes to "pix"
+  useEffect(() => {
+    if (view === "pix" && selectedMethod) {
+      getPaymentMethodDetailsAction(selectedMethod.id).then((res) => {
+        if (res.success) {
+          if (res.method.pix_key) {
+            setHasPixKey(true)
+            setSavedPixKey(res.method.pix_key)
+            setSavedPixKeyType(res.method.pix_key_type)
+            setShowKeyInputs(false)
+          } else {
+            setHasPixKey(false)
+            setShowWarningModal(true)
+            setShowKeyInputs(true)
+          }
+        }
+      })
+    }
+  }, [view, selectedMethod])
 
   const isLocked = Boolean(lockedMethodLabel)
 
@@ -179,22 +219,75 @@ export function BalancePaymentCollector({
     }
   }, [amount, installments, selectedMethod, view, emitLegs])
 
-  const handleGeneratePix = async (pixAmount: number) => {
+  const handleGeneratePixWithKey = async (keyToUse: string, typeToUse: string) => {
     if (!selectedMethod?.id) return null
     setGeneratingPix(true)
     try {
-      const res = await getPaymentMethodDetailsAction(selectedMethod.id)
-      if (!res.success || !res.method.pix_key) return null
       const payload = generateStaticPix(
-        res.method.pix_key,
-        pixAmount,
+        keyToUse,
+        amount,
         selectedStore?.name || "Loja",
         "",
+        "DUDIT",
+        typeToUse
       )
       const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 })
-      const data = { payload, qrDataUrl }
-      setPixQrData(data)
-      return data
+      setPixQrData({ payload, qrDataUrl })
+    } catch (err) {
+      console.error("Error generating static Pix:", err)
+    } finally {
+      setGeneratingPix(false)
+    }
+  }
+
+  const handleGeneratePix = async (pixAmount: number) => {
+    if (!selectedMethod?.id) return null
+    if (hasPixKey && savedPixKey) {
+      setGeneratingPix(true)
+      try {
+        const payload = generateStaticPix(
+          savedPixKey,
+          pixAmount,
+          selectedStore?.name || "Loja",
+          "",
+          "DUDIT",
+          savedPixKeyType
+        )
+        const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 })
+        const data = { payload, qrDataUrl }
+        setPixQrData(data)
+        return data
+      } finally {
+        setGeneratingPix(false)
+      }
+    }
+
+    setGeneratingPix(true)
+    try {
+      const res = await getPaymentMethodDetailsAction(selectedMethod.id)
+      if (res.success && res.method.pix_key) {
+        setHasPixKey(true)
+        setSavedPixKey(res.method.pix_key)
+        setSavedPixKeyType(res.method.pix_key_type)
+
+        const payload = generateStaticPix(
+          res.method.pix_key,
+          pixAmount,
+          selectedStore?.name || "Loja",
+          "",
+          "DUDIT",
+          res.method.pix_key_type
+        )
+        const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 })
+        const data = { payload, qrDataUrl }
+        setPixQrData(data)
+        return data
+      } else {
+        setHasPixKey(false)
+        setShowWarningModal(true)
+        setShowKeyInputs(true)
+        return null
+      }
     } finally {
       setGeneratingPix(false)
     }
@@ -279,6 +372,16 @@ export function BalancePaymentCollector({
           onGenerateQr={handleGeneratePix}
           qrData={pixQrData}
           isGenerating={generatingPix}
+          showKeyInputs={showKeyInputs}
+          tempPixKey={tempPixKey}
+          onTempPixKeyChange={setTempPixKey}
+          tempPixKeyType={tempPixKeyType}
+          onTempPixKeyTypeChange={setTempPixKeyType}
+          onConfirmGenerateWithKey={() => {
+            if (tempPixKey) {
+              setShowConfirmSaveModal(true)
+            }
+          }}
         />
       )}
 
@@ -328,6 +431,52 @@ export function BalancePaymentCollector({
 
       {!isLocked && view === "split_method_select" && (
         <SplitMethodSelector methods={activeMethods} onSelect={handleSplitMethodSelect} />
+      )}
+
+      {showWarningModal && (
+        <AlertModal
+          title="Chave Pix Não Cadastrada"
+          message="Este método de pagamento Pix não possui uma chave cadastrada. Por favor, preencha os dados da chave Pix para gerar o QR Code."
+          variant="warning"
+          isOpen={showWarningModal}
+          onClose={() => setShowWarningModal(false)}
+          confirmText="Ok"
+        />
+      )}
+
+      {showConfirmSaveModal && (
+        <AlertModal
+          title="Salvar Chave Pix?"
+          message="Deseja salvar esta chave Pix e o tipo dela como padrão para as próximas cobranças deste método de pagamento?"
+          variant="info"
+          isOpen={showConfirmSaveModal}
+          onClose={async () => {
+            setShowConfirmSaveModal(false)
+            await handleGeneratePixWithKey(tempPixKey, tempPixKeyType)
+          }}
+          onConfirm={async () => {
+            if (!selectedMethod) return
+            setShowConfirmSaveModal(false)
+            setSavingPixKey(true)
+            try {
+              await updatePaymentMethodAction(selectedMethod.id, {
+                pixKeyType: tempPixKeyType,
+                pixKey: tempPixKey
+              })
+              setHasPixKey(true)
+              setSavedPixKey(tempPixKey)
+              setSavedPixKeyType(tempPixKeyType)
+            } catch (err) {
+              console.error("Error saving Pix key:", err)
+            } finally {
+              setSavingPixKey(false)
+            }
+            await handleGeneratePixWithKey(tempPixKey, tempPixKeyType)
+          }}
+          confirmText="Sim, salvar"
+          cancelText="Não, apenas gerar"
+          isLoading={savingPixKey}
+        />
       )}
     </div>
   )

@@ -305,6 +305,14 @@ export function resolveActiveResources(businessInfo: { sells?: string[]; activeR
         }
       }
     }
+    if (version < 7) {
+      const v7Resources: SystemResourceId[] = ["communityVideos"]
+      for (const r of v7Resources) {
+        if (!current.includes(r)) {
+          current.push(r)
+        }
+      }
+    }
     return current
   }
   return defaultActiveResourcesForBusinessInfo(businessInfo)

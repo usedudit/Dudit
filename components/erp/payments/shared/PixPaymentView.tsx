@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Button, FormDropdown, MoneyInput } from "@/components/reusable"
+import { Button, FormDropdown, MoneyInput, Input, CpfCnpjInput, EmailInput, PhoneInput } from "@/components/reusable"
 import { CopyIcon, QRCodeIcon } from "@/lib/icons"
 import { CompactPaymentStatusAlert } from "./CompactPaymentStatusAlert"
 import { PaymentAmountLabel } from "./PaymentAmountLabel"
@@ -20,6 +20,14 @@ type PixPaymentViewProps = {
   onGenerateQr?: (amount: number) => Promise<{ payload: string; qrDataUrl: string } | null>
   qrData?: { payload: string; qrDataUrl: string } | null
   isGenerating?: boolean
+
+  // New props for dynamic key entry when method has no key saved
+  showKeyInputs?: boolean
+  tempPixKey?: string
+  onTempPixKeyChange?: (val: string) => void
+  tempPixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random"
+  onTempPixKeyTypeChange?: (val: any) => void
+  onConfirmGenerateWithKey?: () => void
 }
 
 export function PixPaymentView({
@@ -37,6 +45,13 @@ export function PixPaymentView({
   onGenerateQr,
   qrData,
   isGenerating = false,
+
+  showKeyInputs = false,
+  tempPixKey = "",
+  onTempPixKeyChange,
+  tempPixKeyType = "cpf",
+  onTempPixKeyTypeChange,
+  onConfirmGenerateWithKey,
 }: PixPaymentViewProps) {
   const [localGenerated, setLocalGenerated] = useState(false)
   const generated = qrData || (localGenerated && !onGenerateQr)
@@ -72,7 +87,81 @@ export function PixPaymentView({
             Calculando valor a cobrar...
           </div>
         )}
-        {!generated ? (
+        
+        {showKeyInputs && !generated ? (
+          <div className="space-y-4 border border-yellow-200 dark:border-yellow-900/40 bg-yellow-50/50 dark:bg-yellow-900/10 p-4 rounded-xl">
+            <h5 className="text-sm font-semibold text-yellow-800 dark:text-yellow-400">
+              Cadastrar Chave Pix temporária/padrão
+            </h5>
+            
+            <FormDropdown
+              label="Tipo de chave"
+              placeholder="Selecione o tipo"
+              value={tempPixKeyType}
+              setValue={(val) => onTempPixKeyTypeChange?.(val)}
+              options={[
+                { value: "cpf", label: "CPF" },
+                { value: "cnpj", label: "CNPJ" },
+                { value: "email", label: "E-mail" },
+                { value: "phone", label: "Celular" },
+                { value: "random", label: "Chave Aleatória" },
+              ]}
+            />
+            
+            {tempPixKeyType === "cpf" && (
+              <CpfCnpjInput
+                label="Chave PIX (CPF)"
+                placeholder="000.000.000-00"
+                value={tempPixKey}
+                onChange={(e) => onTempPixKeyChange?.(e.target.value)}
+                name="pix_key"
+              />
+            )}
+            {tempPixKeyType === "cnpj" && (
+              <CpfCnpjInput
+                label="Chave PIX (CNPJ)"
+                placeholder="00.000.000/0000-00"
+                value={tempPixKey}
+                onChange={(e) => onTempPixKeyChange?.(e.target.value)}
+                name="pix_key_cnpj"
+              />
+            )}
+            {tempPixKeyType === "email" && (
+              <EmailInput
+                label="Chave PIX (E-mail)"
+                placeholder="exemplo@email.com"
+                value={tempPixKey}
+                onChange={(e) => onTempPixKeyChange?.(e.target.value)}
+              />
+            )}
+            {tempPixKeyType === "phone" && (
+              <PhoneInput
+                label="Chave PIX (Celular)"
+                placeholder="(00) 00000-0000"
+                value={tempPixKey}
+                onChange={(e) => onTempPixKeyChange?.(e.target.value)}
+              />
+            )}
+            {tempPixKeyType === "random" && (
+              <Input
+                label="Chave PIX (Aleatória)"
+                placeholder="123e4567-e89b-12d3-a456-426614174000"
+                value={tempPixKey}
+                onChange={(e) => onTempPixKeyChange?.(e.target.value)}
+              />
+            )}
+            
+            <Button
+              variant="filled"
+              className="w-full h-12 mt-2"
+              onClick={onConfirmGenerateWithKey}
+              isLoading={isGenerating}
+              disabled={amount <= 0 || !tempPixKey}
+            >
+              Gerar QR Code
+            </Button>
+          </div>
+        ) : !generated ? (
           <Button variant="filled" className="w-full h-12" onClick={handleGenerate} isLoading={isGenerating} disabled={amount <= 0}>
             Gerar QR Code
           </Button>

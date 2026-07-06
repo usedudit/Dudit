@@ -59,7 +59,7 @@ export default async function ERPReportsPage(props: {
         checkPermission(partnerId, "customers", "view").then(res => res.allowed ? getCustomerReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "orders", "view").then(res => res.allowed ? getReturnsReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDeliveryReportData(partnerId, period).catch(() => null) : null),
-        checkPermission(partnerId, "products", "view").then(res => res.allowed ? getMarketingReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "coupons", "view").then(res => res.allowed ? getMarketingReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getProductivityReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "service_orders", "view").then(res => res.allowed ? getServiceOrderReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getGoalReportData(partnerId, period).catch(() => null) : null),

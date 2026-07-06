@@ -12,6 +12,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
+import { AddToCollectionModal } from "./AddToCollectionModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
 import { ReviewsSection } from "./ReviewsSection"
@@ -169,6 +170,7 @@ export function ProductDetailsPageClient({
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
     const [showShareModal, setShowShareModal] = useState(false)
+    const [showCollectionModal, setShowCollectionModal] = useState(false)
     const [showReportModal, setShowReportModal] = useState(false)
     // isFavorite state is now managed by FavoritesProvider
     const [isMounted, setIsMounted] = useState(false)
@@ -1634,6 +1636,13 @@ export function ProductDetailsPageClient({
                 label="Link do produto"
             />
 
+            <AddToCollectionModal
+                isOpen={showCollectionModal}
+                onClose={() => setShowCollectionModal(false)}
+                itemType="product"
+                itemId={product.id}
+            />
+
             <ReportModal
                 isOpen={showReportModal}
                 onClose={() => setShowReportModal(false)}
@@ -2050,6 +2059,9 @@ export function ProductDetailsPageClient({
 
                                         <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
                                             <ShareIcon className="w-5 h-5 text-brand-green" />
+                                        </Button>
+                                        <Button variant="outline" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
+                                            <PlusIcon className="w-5 h-5 text-brand-green" />
                                         </Button>
 
                                         <div className="flex-1 flex items-center">

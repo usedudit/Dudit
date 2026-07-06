@@ -180,7 +180,9 @@ export function PaymentWrapper({
                     pixKey,
                     amount,
                     sellerName || "Loja",
-                    ""
+                    "",
+                    "DUDIT",
+                    pixKeyType
                 )
                 setManualPixPayload(payload)
                 QRCode.toDataURL(payload, { width: 256, margin: 1 })
@@ -190,7 +192,7 @@ export function PaymentWrapper({
                 console.error("Error generating static Pix:", err)
             }
         }
-    }, [step, pixKey, amount, sellerName])
+    }, [step, pixKey, amount, sellerName, pixKeyType])
 
     useEffect(() => {
         if (brickInitializedRef.current) return
@@ -660,19 +662,19 @@ export function PaymentWrapper({
                             </div>
 
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
-                                Pague o sinal via Pix
+                                Agora é só pagar com Pix
                             </h1>
                             <p className="text-md text-brand-inactive-text text-center max-w-md mb-4">
-                                Para confirmar seu agendamento, faça o pagamento do sinal. O restante será pago diretamente no atendimento.
+                                É rapidinho: escaneie o QR Code ou copie o código Pix e pague pelo app do seu banco.
                             </p>
 
                             {manualPixQrCode && (
-                                <div className="mb-8 relative flex flex-col items-center">
-                                    <div className="w-64 h-64 p-2 bg-white border border-brand-border dark:border-dark-border rounded-2xl flex items-center justify-center shrink-0">
+                                <div className="mb-8 relative">
+                                    <div className="w-64 h-64 p-2 bg-transparent flex items-center justify-center isolate">
                                         <img
                                             src={manualPixQrCode}
                                             alt="PIX QR Code"
-                                            className="w-full h-full object-contain"
+                                            className="w-full h-full object-contain mix-blend-multiply"
                                         />
                                     </div>
                                     <div className="mt-4 flex flex-col items-center">

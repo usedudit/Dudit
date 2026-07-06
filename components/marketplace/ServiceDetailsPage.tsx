@@ -32,6 +32,7 @@ import { InfoCard } from "@/components/reusable/InfoCard"
 import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
+import { AddToCollectionModal } from "./AddToCollectionModal"
 import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useNotification } from "@/hooks/use-notification"
@@ -159,6 +160,7 @@ export function ServiceDetailsPageClient({
     const [isLoadingSlots, setIsLoadingSlots] = useState(false)
     const [isBooking, setIsBooking] = useState(false)
     const [showShareModal, setShowShareModal] = useState(false)
+    const [showCollectionModal, setShowCollectionModal] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
     const [activeImgIndex, setActiveImgIndex] = useState(0)
@@ -1589,6 +1591,13 @@ export function ServiceDetailsPageClient({
                 label="Link do serviço"
             />
 
+            <AddToCollectionModal
+                isOpen={showCollectionModal}
+                onClose={() => setShowCollectionModal(false)}
+                itemType="service"
+                itemId={service.id}
+            />
+
             <VendorPaymentMethodsModal
                 isOpen={showPaymentMethodsModal}
                 onClose={() => setShowPaymentMethodsModal(false)}
@@ -2038,6 +2047,9 @@ export function ServiceDetailsPageClient({
 
                                         <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
                                             <ShareIcon className="w-5 h-5 text-brand-green" />
+                                        </Button>
+                                        <Button variant="outline" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
+                                            <PlusIcon className="w-5 h-5 text-brand-green" />
                                         </Button>
 
                                         <div className="flex-1 flex items-center">

@@ -1,4 +1,5 @@
 import React from "react";
+import { SparklesIcon } from "@/lib/icons"
 import { SummaryCards, Cashflow, NeedsAttention } from "./LeftColumn";
 import { ExpenseBreakdown } from "./MiddleColumn";
 import { TopCategories, RecentActivities } from "./RightColumn";
@@ -67,6 +68,24 @@ function getCompareInfo(compare: CompareMode, period: Period, compareFrom?: stri
   }
 }
 
+function DashboardInsight({ message, color }: { message: string; color: string }) {
+  const colors: Record<string, { bg: string; text: string; bar: string; border: string }> = {
+    green: { bg: "bg-[#ecfdf5] dark:bg-emerald-900/20", text: "text-emerald-900 dark:text-emerald-100", bar: "bg-emerald-500", border: "border-emerald-100 dark:border-emerald-900/30" },
+    red: { bg: "bg-red-50 dark:bg-red-900/10", text: "text-red-700 dark:text-red-300/80", bar: "bg-red-400", border: "border-red-100 dark:border-red-900/30" },
+    orange: { bg: "bg-[#fff7ed] dark:bg-orange-900/20", text: "text-orange-700 dark:text-orange-300/80", bar: "bg-orange-500", border: "border-orange-100 dark:border-orange-900/30" },
+    blue: { bg: "bg-blue-50 dark:bg-blue-900/20", text: "text-blue-700 dark:text-blue-300/80", bar: "bg-blue-500", border: "border-blue-100 dark:border-blue-900/30" },
+  }
+  const c = colors[color] || colors.blue
+  return (
+    <div className={`${c.bg} ${c.border} rounded-lg px-4 py-3 border`}>
+      <div className="flex gap-3 items-start">
+        <div className={`${c.bar} w-1 rounded-full self-stretch shrink-0 min-h-5`} />
+        <p className={`text-sm ${c.text}`}>{message}</p>
+      </div>
+    </div>
+  )
+}
+
 export async function Dashboard({
   partnerId, sells, period = "monthly", compare = "none",
   compareFrom, compareTo,
@@ -115,31 +134,65 @@ export async function Dashboard({
     }))
   }
 
+  const revenueMetric = metrics.find(m => m.title.toLowerCase().includes("faturamento") || m.title.toLowerCase().includes("receita"))
+  const revenueVal = revenueMetric ? parseMetricValue(revenueMetric.value) : 0
+  const alertCount = alertsData.alerts.length
+  const topCategory = topCategoriesData.categories[0]
+  const originCount = revenueOriginData.origins.length
+
+  const insights: { message: string; color: string }[] = []
+  if (revenueVal > 0) {
+    const trend = revenueMetric?.trend || ""
+    if (trend.includes("+")) insights.push({ message: `Faturamento de ${revenueMetric?.value} — ${trend} em relação ao período anterior.`, color: "green" })
+    else insights.push({ message: `Faturamento de ${revenueMetric?.value} no período.`, color: "blue" })
+  }
+  if (topCategory) {
+    insights.push({ message: `"${topCategory.label}" é a categoria mais vendida.`, color: "blue" })
+  }
+  if (originCount > 0) {
+    const topOrigin = revenueOriginData.origins.reduce((a, b) => (a.value > b.value ? a : b))
+    insights.push({ message: `${topOrigin.label} é a principal origem de receita (${Math.round((Number(topOrigin.value) / revenueOriginData.origins.reduce((s, o) => s + Number(o.value), 0)) * 100)}%).`, color: "green" })
+  }
+  if (alertCount > 0) {
+    insights.push({ message: `${alertCount} alerta(s) precisam de atenção no painel.`, color: "orange" })
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        {/* Row 1 */}
-        <div className="lg:col-span-6 flex flex-col gap-6">
+        <div className="lg:col-span-7 flex flex-col gap-6">
           <SummaryCards metrics={metrics} />
         </div>
-        <div className="lg:col-span-6 flex flex-col gap-6">
+        <div className="lg:col-span-5 flex flex-col gap-6">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+            <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 mb-4">
+              <SparklesIcon size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
+              Insights
+            </h3>
+            <div className="space-y-3">
+              {insights.slice(0, 4).map((insight, i) => (
+                <DashboardInsight key={i} message={insight.message} color={insight.color} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 flex flex-col gap-6">
           <ExpenseBreakdown originData={revenueOriginData.origins} revenueChartTrend={revenueChartData.trend} />
         </div>
-
-        {/* Row 2 */}
-        <div className="lg:col-span-6 flex flex-col gap-6">
+        <div className="lg:col-span-7 flex flex-col gap-6">
           <Cashflow revenueData={revenueData} totalRevenue={revenueChartData.total} compareLabel={compareLabel || "Período Anterior"} />
         </div>
-        <div className="lg:col-span-6 flex flex-col gap-6">
+
+        <div className="lg:col-span-7 flex flex-col gap-6">
           <TopCategories categoriesData={topCategoriesData.categories} />
         </div>
-
-        {/* Row 3 */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <NeedsAttention alerts={alertsData.alerts} />
-        </div>
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-5 flex flex-col gap-6">
           <RecentActivities activities={activityData.activity} />
+        </div>
+
+        <div className="lg:col-span-12 flex flex-col gap-6">
+          <NeedsAttention alerts={alertsData.alerts} />
         </div>
       </div>
     </div>

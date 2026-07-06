@@ -1,60 +1,122 @@
 /**
  * Shared utility for generating static Pix BR Code payload according to BACEN standards.
  */
+export function formatPixKey(key: string, type?: string | null): string {
+  const trimmed = key.trim()
+
+  // If the type is email or contains '@'
+  if (type === "email" || trimmed.includes("@")) {
+    return trimmed.toLowerCase()
+  }
+
+  // If type is random/EVP or looks like a UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (type === "random" || uuidRegex.test(trimmed)) {
+    return trimmed.toLowerCase()
+  }
+
+  // Clean all non-digits
+  const digits = trimmed.replace(/\D/g, "")
+
+  // Validate phone patterns if no explicit type is provided
+  // In Brazil, DDD is 2 digits (11-99), cell phones have 11 digits starting with 9, landlines have 10 digits.
+  const isCellPhone = digits.length === 11 && /^[1-9]{2}9\d{8}$/.test(digits)
+  const isLandline = digits.length === 10 && /^[1-9]{2}[2-8]\d{7}$/.test(digits)
+  const isPhone = isCellPhone || isLandline
+
+  // If phone number
+  if (type === "phone" || (isPhone && !type)) {
+    // If it already has the country code (55) at the beginning
+    if (digits.length >= 12 && digits.startsWith("55")) {
+      return `+${digits}`
+    }
+    // If it doesn't have country code (e.g., DDD + Number like 11999999999 or 1188888888)
+    if (digits.length === 10 || digits.length === 11) {
+      return `+55${digits}`
+    }
+  }
+
+  // For CPF (11 digits) or CNPJ (14 digits), or any other numeric key
+  return digits
+}
+
+function getByteLength(str: string): number {
+  return new TextEncoder().encode(str).length
+}
+
+function formatEMVTag(id: string, value: string): string {
+  const lenStr = String(getByteLength(value)).padStart(2, "0")
+  return `${id}${lenStr}${value}`
+}
+
 export function generateStaticPix(
   key: string,
   amount: number,
   merchantName: string,
   city: string,
-  txId = "DUDIT"
+  txId = "DUDIT",
+  keyType?: string | null
 ): string {
-  // Format clean name and clean city (ASCII only, limited length)
+  const cleanKey = formatPixKey(key, keyType)
+
   const cleanName = merchantName
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, "")
     .substring(0, 25)
     .trim()
 
   const cleanCity = (city || "SAO PAULO")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, "")
     .substring(0, 15)
     .trim()
 
-  let cleanKey = key.replace(/\s/g, "")
-  if (!cleanKey.includes("@") && cleanKey.length === 11) {
-    cleanKey = cleanKey.replace(/\D/g, "")
+  let cleanTxId = (txId || "***").trim()
+  if (cleanTxId !== "***") {
+    cleanTxId = cleanTxId
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "") // No spaces in TXID
+      .substring(0, 25)
+
+    if (!cleanTxId) {
+      cleanTxId = "***"
+    }
   }
 
-  const parts = [
-    { id: "00", value: "01" },
-    {
-      id: "26",
-      value: [
-        { id: "00", value: "br.gov.bcb.pix" },
-        { id: "01", value: cleanKey }
-      ].map(p => `${p.id}${String(p.value.length).padStart(2, "0")}${p.value}`).join("")
-    },
-    { id: "52", value: "0000" },
-    { id: "53", value: "986" },
-    { id: "54", value: amount.toFixed(2) },
-    { id: "58", value: "BR" },
-    { id: "59", value: cleanName },
-    { id: "60", value: cleanCity },
-    {
-      id: "62",
-      value: [
-        { id: "05", value: txId.substring(0, 25) }
-      ].map(p => `${p.id}${String(p.value.length).padStart(2, "0")}${p.value}`).join("")
-    }
-  ]
+  // Build Merchant Account Info (ID 26)
+  const guiTag = formatEMVTag("00", "br.gov.bcb.pix")
+  const keyTag = formatEMVTag("01", cleanKey)
+  const merchantAccountInfo = formatEMVTag("26", guiTag + keyTag)
 
-  let payload = parts.map(p => `${p.id}${String(p.value.length).padStart(2, "0")}${p.value}`).join("")
-  payload += "6304" // Indicator for CRC16
+  // Build Additional Data (ID 62)
+  const txIdTag = formatEMVTag("05", cleanTxId)
+  const additionalData = formatEMVTag("62", txIdTag)
 
-  // Calculate CRC16 CCITT
+  // Build main parts
+  let payload = ""
+  payload += formatEMVTag("00", "01") // Payload Format Indicator
+  payload += merchantAccountInfo      // Merchant Account Info
+  payload += formatEMVTag("52", "0000") // Merchant Category Code
+  payload += formatEMVTag("53", "986")  // Transaction Currency
+  
+  if (amount > 0) {
+    payload += formatEMVTag("54", amount.toFixed(2)) // Transaction Amount
+  }
+  
+  payload += formatEMVTag("58", "BR")   // Country Code
+  payload += formatEMVTag("59", cleanName) // Merchant Name
+  payload += formatEMVTag("60", cleanCity) // Merchant City
+  payload += additionalData             // Additional Data
+
+  payload += "6304" // CRC16 indicator
+
+  // Calculate CRC16 CCITT (False)
   let crc = 0xFFFF
   for (let i = 0; i < payload.length; i++) {
     const charCode = payload.charCodeAt(i)
