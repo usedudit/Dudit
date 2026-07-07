@@ -463,6 +463,7 @@ export async function onOrderStatusChanged(
   situation?: string,
   deliveryStatus?: string,
   origin: "manual" | "automation" | "system" = "automation",
+  cancellationReason?: string,
 ) {
   const partnerId = String(order.partner_id)
   const orderId = String(order.id)
@@ -480,6 +481,7 @@ export async function onOrderStatusChanged(
     storeName: partner?.store_name || undefined,
     customerName: String(order.customer_name || "Cliente"),
     amount: formatCurrency(order.total_amount as number | null),
+    cancellationNote: cancellationReason,
   }
 
   if (situation === "pending") {

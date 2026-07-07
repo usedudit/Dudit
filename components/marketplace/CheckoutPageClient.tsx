@@ -673,10 +673,10 @@ export function CheckoutPageClient() {
     const checkoutDepositChargeTotal = checkoutAmounts?.depositChargeTotal ?? 0
     const checkoutServiceDepositAmount = checkoutAmounts?.serviceDepositAmount ?? 0
     const checkoutChargeTotal = useMemo(() => {
-        if (!checkoutAmounts) return contextTotalSubtotal
+        if (!checkoutAmounts) return contextTotalSubtotal + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
         const usesDeposit = depositAvailable && payDepositOnly
         return usesDeposit ? checkoutAmounts.depositChargeTotal : checkoutAmounts.fullOrderTotal
-    }, [checkoutAmounts, depositAvailable, payDepositOnly, contextTotalSubtotal])
+    }, [checkoutAmounts, depositAvailable, payDepositOnly, contextTotalSubtotal, showDeliveryFeeRow, isPickup, deliveryFee])
     const checkoutDeliveryFee = checkoutAmounts?.deliveryFee ?? (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
     const checkoutAmountsReady = Boolean(checkoutAmounts && !checkoutAmountsLoading)
     const paymentTypeLabelMap: Record<string, string> = {
@@ -2192,7 +2192,15 @@ export function CheckoutPageClient() {
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
-                                    {partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
+                                    {!partnerInfo.mpConnected && !storefrontMethods.length ? (
+                                        <div className="flex items-center gap-3 py-2">
+                                            <MoneyIcon className="w-12 h-12 p-2.5 rounded-xl bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                            <div>
+                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
+                                                <p className="text-sm text-brand-inactive-text">O pagamento será combinado diretamente com o vendedor.</p>
+                                            </div>
+                                        </div>
+                                    ) : partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
                                         <>
                                             <div className="space-y-1 mb-4">
                                                 <ListItem
@@ -2555,7 +2563,15 @@ export function CheckoutPageClient() {
                                 {renderFreeDeliveryProgressCard()}
                                 {/* Payment Selector */}
                                 <FormSection title="Forma de Pagamento">
-                                    {partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
+                                    {!partnerInfo.mpConnected && !storefrontMethods.length ? (
+                                        <div className="flex items-center gap-3 py-2">
+                                            <MoneyIcon className="w-12 h-12 p-2.5 rounded-xl bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                            <div>
+                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
+                                                <p className="text-sm text-brand-inactive-text">O pagamento será combinado diretamente com o vendedor.</p>
+                                            </div>
+                                        </div>
+                                    ) : partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
                                         <div className="space-y-1">
                                             <ListItem
                                                 icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
@@ -2779,7 +2795,18 @@ export function CheckoutPageClient() {
                                         <div className="flex justify-between">
                                             <span>Entrega</span>
                                             <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
-                                                {isPickup ? "Grátis" : deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
+                                                {isPickup
+                                                    ? "Grátis"
+                                                    : deliveryQuoteLoading
+                                                        ? "Calculando..."
+                                                        : deliveryFee > 0
+                                                            ? formatCurrency(deliveryFee)
+                                                            : hasFreeDeliveryCoupon
+                                                                ? "Grátis"
+                                                                : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress
+                                                                    ? "A combinar"
+                                                                    : "Grátis"
+                                                }
                                             </span>
                                         </div>
                                         {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
@@ -3322,26 +3349,37 @@ export function CheckoutPageClient() {
                 maxWidth="md"
             >
                 <div className="pb-4">
-                    {(() => {
-                        const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
-                        const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
-                        const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
-                        const showTraditionalTab = !isPickup || canPayUponPickup
+                        {(() => {
+                            const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
+                            const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
+                            const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
+                            const showTraditionalTab = !isPickup || canPayUponPickup
+                            const showMercadoPagoTab = partnerInfo.mpConnected
+                            const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
 
-                        if (mustPayOnline && !partnerInfo.mpConnected) {
+                            if (!hasAnyPaymentMethod) {
+                                return (
+                                    <div className="p-6 text-center">
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                            O pagamento será combinado diretamente com o vendedor.
+                                        </p>
+                                    </div>
+                                )
+                            }
+
+                            if (mustPayOnline && !partnerInfo.mpConnected) {
+                                return (
+                                    <div className="p-6 text-center">
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                            Retirada requer uma integração de pagamento online ativa.
+                                        </p>
+                                    </div>
+                                )
+                            }
+
+                            const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
+
                             return (
-                                <div className="p-6 text-center">
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                        Retirada requer uma integração de pagamento online ativa.
-                                    </p>
-                                </div>
-                            )
-                        }
-
-                        const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
-                        const showMercadoPagoTab = partnerInfo.mpConnected
-
-                        return (
                             <Tabs defaultValue={paymentOption || (showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago")}>
                                 {showMercadoPagoTab || showTraditionalTab ? (
                                     <TabsList className="mb-4">

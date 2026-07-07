@@ -353,7 +353,9 @@ const PaymentModal = ({
     const [feeBearerOverride, setFeeBearerOverride] = useState<"merchant" | "customer" | null>(null);
     const [isPaymentCalculationLoading, setIsPaymentCalculationLoading] = useState(false);
     const [isSplitPreviewLoading, setIsSplitPreviewLoading] = useState(false);
-    const lastOptionsConfigRef = useRef<{ methodId: string | null; feeBearer: string | null }>({ methodId: null, feeBearer: null });
+    const lastOptionsConfigRef = useRef<{ methodId: string | null; feeBearer: string | null; amount: number | null }>({ methodId: null, feeBearer: null, amount: null });
+    const [wantsChange, setWantsChange] = useState(false);
+    const [payWithAmount, setPayWithAmount] = useState<number>(0);
     // CSS animation state matching DefaultModal/AlertModal
     const [isAnimating, setIsAnimating] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
@@ -395,6 +397,8 @@ const PaymentModal = ({
         setIsPaymentCalculationLoading(false);
         setIsPixGenerated(false);
         setFeeBearerOverride(null);
+        setWantsChange(false);
+        setPayWithAmount(0);
         if (options?.clearType) {
             setSelectedMethodType(null);
         }
@@ -485,6 +489,8 @@ const PaymentModal = ({
                 { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 }
             ]);
             setSelectedMethodId(null);
+            setWantsChange(false);
+            setPayWithAmount(0);
             setSelectedMethodType(null);
             setPaymentCalculation(null);
             setInstallmentOptions([]);
@@ -964,9 +970,10 @@ const PaymentModal = ({
 
         // Only compute full installment options when method or fee bearer changes
         const shouldComputeOptions = selectedMethodId !== lastOptionsConfigRef.current.methodId
-            || feeBearerOverride !== lastOptionsConfigRef.current.feeBearer;
+            || feeBearerOverride !== lastOptionsConfigRef.current.feeBearer
+            || base !== lastOptionsConfigRef.current.amount;
         if (shouldComputeOptions) {
-            lastOptionsConfigRef.current = { methodId: selectedMethodId, feeBearer: feeBearerOverride };
+            lastOptionsConfigRef.current = { methodId: selectedMethodId, feeBearer: feeBearerOverride, amount: base };
         }
 
         setIsPaymentCalculationLoading(true);
@@ -1441,7 +1448,22 @@ const PaymentModal = ({
                     return getFormattedMethodLabel(fallbackName, fallbackType);
                 })(),
                 amount: Number(totalPaidCalculated || 0),
-                amountReceived: paymentPendingType !== 'none' ? 0 : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0),
+                amountReceived: paymentPendingType !== 'none'
+                    ? 0
+                    : (view === 'money'
+                        ? (wantsChange ? Math.max(payWithAmount, totalPaidCalculated) : Math.max(paymentBaseAmount, totalPaidCalculated))
+                        : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0)),
+                wantsChange: view === 'money' ? wantsChange : undefined,
+                payWithAmount: view === 'money' && wantsChange ? payWithAmount : undefined,
+                changeAmount: paymentPendingType !== 'none'
+                    ? 0
+                    : (view === 'money'
+                        ? (wantsChange
+                            ? Number((payWithAmount - totalPaidCalculated).toFixed(2))
+                            : (paymentBaseAmount > totalPaidCalculated
+                                ? Number((paymentBaseAmount - totalPaidCalculated).toFixed(2))
+                                : 0))
+                        : 0),
                 adjustmentType: paymentCalculation?.adjustmentType || 'none',
                 adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
                 adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
@@ -1533,6 +1555,15 @@ const PaymentModal = ({
     };
 
     const handleStartProcessing = async (forcedPayload?: any) => {
+        if (view === 'money' && wantsChange && payWithAmount < totalPaidCalculated) {
+            toast({
+                title: "Valor de troco inválido",
+                description: `O valor pago (R$ ${payWithAmount.toFixed(2)}) deve ser maior ou igual ao valor a receber (R$ ${totalPaidCalculated.toFixed(2)}).`,
+                variant: "destructive",
+            });
+            return;
+        }
+
         const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
         const payload = forcedPayload || buildConfirmPayload();
         setLastPaymentPayload(payload);
@@ -1569,6 +1600,12 @@ const PaymentModal = ({
             })
         }
 
+        const isPendingPayment = paymentPendingType !== 'none';
+        const snapshotTotalPaid = isPendingPayment ? existingPaidAmount : totalPaidCalculated;
+        const snapshotIsUnderpaid = isPendingPayment ? (displayTransactionTotal > existingPaidAmount + 0.005) : isUnderpaid;
+        const snapshotRemainingPartial = isPendingPayment ? Math.max(0, displayTransactionTotal - existingPaidAmount) : remainingPartial;
+        const snapshotChange = isPendingPayment ? 0 : changeAmount;
+
         setSuccessSnapshot({
             subTotal,
             itemCount,
@@ -1577,10 +1614,10 @@ const PaymentModal = ({
             discountAmount: Number(discountAmount || 0),
             total,
             displayOrderTotal: displayTransactionTotal,
-            totalPaid: totalPaidCalculated,
-            change: changeAmount,
-            isUnderpaid,
-            remainingPartial,
+            totalPaid: snapshotTotalPaid,
+            change: snapshotChange,
+            isUnderpaid: snapshotIsUnderpaid,
+            remainingPartial: snapshotRemainingPartial,
             paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
             interestAmount: Number(currentPricingTotals.interestAmount || 0),
             feeAmount: Number(currentPricingTotals.feeAmount || 0),
@@ -2002,6 +2039,41 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
+                                                <div className="flex items-center space-x-2 mt-2 select-none">
+                                                    <input
+                                                        id="needs-change-checkbox"
+                                                        type="checkbox"
+                                                        checked={wantsChange}
+                                                        onChange={(e) => {
+                                                            setWantsChange(e.target.checked);
+                                                            if (e.target.checked && payWithAmount <= paymentBaseAmount) {
+                                                                setPayWithAmount(paymentBaseAmount);
+                                                            }
+                                                        }}
+                                                        className="h-4 w-4 rounded border-brand-border text-brand-primary focus:ring-brand-primary"
+                                                    />
+                                                    <label htmlFor="needs-change-checkbox" className="text-sm font-semibold text-brand-dark dark:text-dark-heading cursor-pointer">
+                                                        Precisa de troco?
+                                                    </label>
+                                                </div>
+                                                {wantsChange && (
+                                                    <div className="mt-3 space-y-3 animate-fade-in">
+                                                        <MoneyInput
+                                                            label="Pagará com quanto?"
+                                                            value={payWithAmount}
+                                                            onChange={(val: any) => setPayWithAmount(Number(val || 0))}
+                                                            className="font-bold"
+                                                        />
+                                                        {payWithAmount > paymentBaseAmount && (
+                                                            <div className="p-3 bg-blue-50 dark:bg-dark-border/20 border border-blue-200 dark:border-blue-900/30 rounded-xl text-sm flex justify-between items-center font-medium">
+                                                                <span className="text-brand-dark dark:text-dark-heading">Levar troco:</span>
+                                                                <span className="font-bold text-brand-primary">
+                                                                    {formatCurrency(payWithAmount - paymentBaseAmount)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex flex-wrap justify-center gap-3 mb-6 mt-4 w-full px-2">
                                                 {[5, 10, 20, 50, 100].map((amt) => (
@@ -2225,51 +2297,53 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
-                                                {isMarketplaceOrder ? (
-                                                    <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
-                                                        <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
-                                                        <div className="font-bold text-brand-dark dark:text-dark-heading">
-                                                            {(() => {
-                                                                if (installmentOptions.length > 0) {
-                                                                    const opt = installmentOptions.find(o => String(o.installments) === installments) || installmentOptions[0];
-                                                                    return `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`;
-                                                                }
-                                                                const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
-                                                                if (view === 'card' && maxInst > 1) {
-                                                                    const num = Math.min(maxInst, Math.max(1, Number(installments)));
-                                                                    return `${num}x de ${formatCurrency(paymentBaseAmount / num)}`;
-                                                                }
-                                                                return `1x de ${formatCurrency(paymentBaseAmount)}`;
-                                                            })()}
+                                                {selectedMethodObj && normalizeMethodType(selectedMethodObj.type) !== 'debit_card' && (
+                                                    isMarketplaceOrder ? (
+                                                        <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
+                                                            <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
+                                                            <div className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                {(() => {
+                                                                    if (installmentOptions.length > 0) {
+                                                                        const opt = installmentOptions.find(o => String(o.installments) === installments) || installmentOptions[0];
+                                                                        return `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"} (Total: ${formatCurrency(opt.finalAmount || (opt.installmentValue * opt.installments))})`;
+                                                                    }
+                                                                    const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
+                                                                    if (view === 'card' && maxInst > 1) {
+                                                                        const num = Math.min(maxInst, Math.max(1, Number(installments)));
+                                                                        return `${num}x de ${formatCurrency(paymentBaseAmount / num)} (Total: ${formatCurrency(paymentBaseAmount)})`;
+                                                                    }
+                                                                    return `1x de ${formatCurrency(paymentBaseAmount)} (Total: ${formatCurrency(paymentBaseAmount)})`;
+                                                                })()}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <FormDropdown
-                                                        label="Parcelas"
-                                                        value={String(installments)}
-                                                        setValue={(value) => setInstallments(value)}
-                                                        options={
-                                                            (() => {
-                                                                if (installmentOptions.length > 0) {
-                                                                    return installmentOptions.map(opt => ({
-                                                                        value: String(opt.installments),
-                                                                        label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
-                                                                    }));
-                                                                }
-                                                                const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
-                                                                if (view === 'card' && maxInst > 1) {
-                                                                    return Array.from({ length: maxInst }, (_, i) => {
-                                                                        const num = i + 1;
-                                                                        return {
-                                                                            value: String(num),
-                                                                            label: `${num}x de ${formatCurrency(paymentBaseAmount / num)}`
-                                                                        };
-                                                                    });
-                                                                }
-                                                                return [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) }];
-                                                            })()
-                                                        }
-                                                    />
+                                                    ) : (
+                                                        <FormDropdown
+                                                            label="Parcelas"
+                                                            value={String(installments)}
+                                                            setValue={(value) => setInstallments(value)}
+                                                            options={
+                                                                (() => {
+                                                                    if (installmentOptions.length > 0) {
+                                                                        return installmentOptions.map(opt => ({
+                                                                            value: String(opt.installments),
+                                                                            label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"} (Total: ${formatCurrency(opt.finalAmount || (opt.installmentValue * opt.installments))})`
+                                                                        }));
+                                                                    }
+                                                                    const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
+                                                                    if (view === 'card' && maxInst > 1) {
+                                                                        return Array.from({ length: maxInst }, (_, i) => {
+                                                                            const num = i + 1;
+                                                                            return {
+                                                                                value: String(num),
+                                                                                label: `${num}x de ${formatCurrency(paymentBaseAmount / num)} (Total: ${formatCurrency(paymentBaseAmount)})`
+                                                                            };
+                                                                        });
+                                                                    }
+                                                                    return [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) + ` (Total: ${formatCurrency(paymentBaseAmount)})` }];
+                                                                })()
+                                                            }
+                                                        />
+                                                    )
                                                 )}
                                                 {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
                                                     <FormDropdown
@@ -2691,7 +2765,10 @@ const PaymentModal = ({
                                             <div className="w-full py-3 px-4 rounded-lg flex items-center gap-3 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-300 border border-yellow-100 dark:border-yellow-900/30">
                                                 <div className="w-1 h-4 rounded-full bg-yellow-500"></div>
                                                 <span className="font-bold text-sm flex-1 text-yellow-700 dark:text-yellow-400">
-                                                    Venda paga parcialmente, restante a pagar: {formatCurrency(successSnapshot.remainingPartial)}
+                                                    {successSnapshot.totalPaid === 0
+                                                        ? `Pagamento pendente, falta receber: ${formatCurrency(successSnapshot.remainingPartial)}`
+                                                        : `Venda paga parcialmente, restante a pagar: ${formatCurrency(successSnapshot.remainingPartial)}`
+                                                    }
                                                 </span>
                                             </div>
                                         </div>

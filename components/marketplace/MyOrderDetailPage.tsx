@@ -194,6 +194,15 @@ const getCheckoutPricingSnapshot = (order: any) => {
     };
 };
 
+const getCancellationReason = (notes?: string | null) => {
+    if (!notes) return null;
+    const match = notes.match(/Pedido cancelado por:[\s\S]*$/);
+    if (match) {
+        return match[0].trim();
+    }
+    return null;
+};
+
 const getClientTimelineSteps = (order: any) => {
     const dateStrFull = formatFullDate(order.created_at);
     const dateStrTime = formatTime(order.created_at);
@@ -217,6 +226,7 @@ const getClientTimelineSteps = (order: any) => {
     const steps: { label: string; active: boolean; date?: string; time?: string; subLabel?: string | string[] }[] = [];
 
     if (isCancelled) {
+        const cancelReason = getCancellationReason(order.notes);
         steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
         steps.push({
             label: isPaid ? "Pago" : "Aguardando pagamento",
@@ -228,7 +238,8 @@ const getClientTimelineSteps = (order: any) => {
             label: "Cancelado",
             active: true,
             date: updateDateStr || dateStrFull,
-            time: updateTimeStr || dateStrTime
+            time: updateTimeStr || dateStrTime,
+            subLabel: cancelReason ? [cancelReason] : ["O pedido foi cancelado."]
         });
         return steps;
     }
@@ -687,6 +698,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (pm.includes("boleto")) baseLabel = "Boleto";
             else baseLabel = order.payment_method || order.payment_provider || "Pix";
         }
+        const mpLeg = breakdown.find((e: any) => String(e?.provider || "").toLowerCase().includes("mercado pago") || String(e?.method || "").toLowerCase().includes("mercado pago"));
+        const mpInstallments = mpLeg?.installmentNumber || order.installments || 1;
+        if (mpInstallments > 1) {
+            baseLabel = `${baseLabel} - ${mpInstallments}x`;
+        }
         if (order.payment_provider === "Mercado Pago") {
             return `Mercado Pago (${baseLabel})`;
         }
@@ -752,6 +768,20 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const shippingVal = Math.max(0, Number(pricingSnapshot?.deliveryFee ?? order.delivery_fee ?? order.shipping_total ?? 0));
     const subtotalVal = Number(pricingSnapshot?.subtotal ?? order.subtotal_original ?? itemsSubtotal);
     const totalVal = Number(order.total_amount || 0);
+    const wantsChange = order.wants_change ?? order.wantsChange ?? false;
+    const payWithAmount = Number(order.pay_with_amount ?? order.payWithAmount ?? 0);
+    const changeAmount = Math.max(0, payWithAmount > 0 && wantsChange ? payWithAmount - totalVal : 0);
+
+    const hasItemDiscount = itemsSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsSubtotal - subtotalVal) > 0.005
+    const itemDiscountRatio = hasItemDiscount ? subtotalVal / itemsSubtotal : 1
+
+    const getItemDiscountedPrice = (item: any) => {
+        const basePrice = Number(item.product_price || 0)
+        if (item.is_gift || item.is_promotional) return basePrice
+        if (!hasItemDiscount) return basePrice
+        const discounted = basePrice * itemDiscountRatio
+        return Math.round(discounted * 100) / 100
+    }
 
     const renderPriceSummary = () => {
         return (
@@ -787,6 +817,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <div className="flex justify-between text-sm text-brand-inactive-text">
                         <span>Juros e taxas do pagamento</span>
                         <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodInterestVal + paymentMethodFeeVal)}</span>
+                    </div>
+                )}
+                {wantsChange && payWithAmount > 0 && (
+                    <div className="flex justify-between text-sm text-brand-dark dark:text-dark-heading">
+                        <span>Troco Solicitado</span>
+                        <span className="font-bold">{formatCurrency(changeAmount)} (para {formatCurrency(payWithAmount)})</span>
                     </div>
                 )}
                 <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
@@ -985,14 +1021,28 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     </>
                                 )}
                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                    {item.is_gift ? (
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                        </div>
-                                    ) : (
-                                        formatProductUnitPrice(item.product_price, item.products?.unit)
-                                    )}
+                                    {(() => {
+                                        const displayPrice = getItemDiscountedPrice(item)
+                                        const basePrice = Number(item.product_price || 0)
+                                        const hasDiscount = !item.is_gift && hasItemDiscount && Math.abs(basePrice - displayPrice) > 0.005
+                                        if (item.is_gift) {
+                                            return (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                </div>
+                                            )
+                                        }
+                                        if (hasDiscount) {
+                                            return (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(displayPrice, item.products?.unit)}</span>
+                                                </div>
+                                            )
+                                        }
+                                        return formatProductUnitPrice(basePrice, item.products?.unit)
+                                    })()}
                                 </div>
                             </div>
                             <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
@@ -1038,7 +1088,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             <div className="space-y-3 pb-6 border-b border-brand-border dark:border-dark-border mb-6">
                 <div className="flex justify-between text-sm text-brand-inactive-text">
                     <span>Itens ({order.order_items?.length || 0})</span>
-                    <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                    <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(itemsSubtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-brand-inactive-text">
                     <span>Entrega</span>
@@ -1210,14 +1260,28 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 </>
                                                             )}
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                                                {item.is_gift ? (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    formatProductUnitPrice(item.product_price, item.products?.unit)
-                                                                )}
+                                                                {(() => {
+                                                                    const displayPrice = getItemDiscountedPrice(item)
+                                                                    const basePrice = Number(item.product_price || 0)
+                                                                    const hasDiscount = !item.is_gift && hasItemDiscount && Math.abs(basePrice - displayPrice) > 0.005
+                                                                    if (item.is_gift) {
+                                                                        return (
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                            </div>
+                                                                        )
+                                                                    }
+                                                                    if (hasDiscount) {
+                                                                        return (
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(displayPrice, item.products?.unit)}</span>
+                                                                            </div>
+                                                                        )
+                                                                    }
+                                                                    return formatProductUnitPrice(basePrice, item.products?.unit)
+                                                                })()}
                                                             </div>
                                                         </div>
                                                         <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
@@ -1366,6 +1430,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                                 }
                                             />
+                                            {order.situation === "pending" && order.payment_expires_at && (
+                                                <div className="mt-2 text-xs text-brand-orange bg-orange-500/10 px-3 py-2 rounded-lg font-medium">
+                                                    ⏰ O pagamento expira em {formatFullDate(order.payment_expires_at)} às {formatTime(order.payment_expires_at)}.
+                                                </div>
+                                            )}
                                         </div>
                                     </FormSection>
 

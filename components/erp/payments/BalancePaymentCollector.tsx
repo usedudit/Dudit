@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { formatCurrency } from "@/lib/utils"
 import { Button, AlertModal } from "@/components/reusable"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { usePaymentMethods } from "@/hooks/use-payment-methods"
@@ -34,6 +35,7 @@ type BalancePaymentCollectorProps = {
   onLegsReady: (legs: PaymentBreakdownLeg[]) => void
   onValidityChange?: (valid: boolean) => void
   lockedMethodLabel?: string | null
+  lockedInstallments?: number | null
   onConfirmPayment?: () => void
 }
 
@@ -59,6 +61,7 @@ export function BalancePaymentCollector({
   onLegsReady,
   onValidityChange,
   lockedMethodLabel,
+  lockedInstallments,
   onConfirmPayment,
 }: BalancePaymentCollectorProps) {
   const { selectedStore } = useStore()
@@ -93,6 +96,12 @@ export function BalancePaymentCollector({
   const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false)
   const [showKeyInputs, setShowKeyInputs] = useState(false)
   const [savingPixKey, setSavingPixKey] = useState(false)
+
+  useEffect(() => {
+    if (lockedInstallments) {
+      setInstallments(String(lockedInstallments))
+    }
+  }, [lockedInstallments])
 
   useEffect(() => {
     if (lockedMethodLabel) return
@@ -176,14 +185,21 @@ export function BalancePaymentCollector({
     setSelectedMethod(method)
     setAmount(remainingBalance)
     setView(getTargetViewForMethodType(normalizeMethodType(method.type)) as PaymentFlowView)
-    emitLegs([buildFlatLeg(method, remainingBalance)])
+    emitLegs([buildFlatLeg(method, remainingBalance, lockedInstallments || 1)])
   }
 
   const handleAmountChange = (value: number) => {
-    const clean = Math.max(0, Math.min(value, remainingBalance))
+    const isMoney = selectedMethod && normalizeMethodType(selectedMethod.type) === "cash"
+    const clean = isMoney ? Math.max(0, value) : Math.max(0, Math.min(value, remainingBalance))
     setAmount(clean)
     if (selectedMethod) {
-      emitLegs([buildFlatLeg(selectedMethod, clean, Math.max(1, Number(installments || 1)))])
+      const legAmount = Math.min(clean, remainingBalance)
+      const flatLeg = buildFlatLeg(selectedMethod, legAmount, Math.max(1, Number(installments || 1))) as any
+      if (isMoney && clean > remainingBalance) {
+        flatLeg.amountReceived = clean
+        flatLeg.changeAmount = Number((clean - remainingBalance).toFixed(2))
+      }
+      emitLegs([flatLeg])
     }
   }
 
@@ -220,9 +236,16 @@ export function BalancePaymentCollector({
 
   useEffect(() => {
     if (selectedMethod && view !== "split" && view !== "methods" && view !== "method_type_select") {
-      emitLegs([buildFlatLeg(selectedMethod, amount, Math.max(1, Number(installments || 1)))])
+      const isMoney = normalizeMethodType(selectedMethod.type) === "cash"
+      const legAmount = isMoney ? Math.min(amount, remainingBalance) : amount
+      const flatLeg = buildFlatLeg(selectedMethod, legAmount, Math.max(1, Number(installments || 1))) as any
+      if (isMoney && amount > remainingBalance) {
+        flatLeg.amountReceived = amount
+        flatLeg.changeAmount = Number((amount - remainingBalance).toFixed(2))
+      }
+      emitLegs([flatLeg])
     }
-  }, [amount, installments, selectedMethod, view, emitLegs])
+  }, [amount, installments, selectedMethod, view, remainingBalance, emitLegs])
 
   const handleGeneratePixWithKey = async (keyToUse: string, typeToUse: string) => {
     if (!selectedMethod?.id) return null
@@ -355,15 +378,25 @@ export function BalancePaymentCollector({
       )}
 
       {view === "money" && selectedMethod && (
-        <MoneyPaymentView
-          amount={amount}
-          onAmountChange={handleAmountChange}
-          baseAllocated={amount}
-          flatAmount
-          totalPaid={amount}
-          totalNeed={remainingBalance}
-          showNumpad={false}
-        />
+        <>
+          <MoneyPaymentView
+            amount={amount}
+            onAmountChange={handleAmountChange}
+            baseAllocated={amount}
+            flatAmount
+            totalPaid={amount}
+            totalNeed={remainingBalance}
+            showNumpad={false}
+          />
+          {amount > remainingBalance && (
+            <div className="w-full max-w-sm mx-auto mt-4 p-4 bg-blue-50 dark:bg-dark-border/20 border border-blue-200 dark:border-blue-900/30 rounded-xl text-sm flex justify-between items-center font-medium">
+              <span className="text-brand-dark dark:text-dark-heading">Troco a devolver:</span>
+              <span className="font-bold text-brand-primary">
+                {formatCurrency(amount - remainingBalance)}
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {view === "pix" && selectedMethod && (
@@ -398,8 +431,9 @@ export function BalancePaymentCollector({
           flatAmount
           installments={installments}
           onInstallmentsChange={setInstallments}
-          maxInstallments={1}
+          maxInstallments={lockedInstallments || 1}
           readOnlyInstallments
+          hideInstallments={normalizeMethodType(selectedMethod.type) === "debit_card"}
           totalPaid={amount}
           totalNeed={remainingBalance}
         />

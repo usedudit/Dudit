@@ -3,10 +3,10 @@ export type CanonicalPaymentType = "pix" | "credit_card" | "debit_card" | "cash"
 export function toCanonicalPaymentType(value: string | null | undefined): CanonicalPaymentType {
   const raw = String(value || "").trim().toLowerCase()
   if (raw === "pix") return "pix"
-  if (["credit_card", "credito", "cartao_credito", "cartão", "cartao"].includes(raw)) return "credit_card"
-  if (["debit_card", "debito", "cartao_debito"].includes(raw)) return "debit_card"
+  if (["credit_card", "credito", "cartao_credito", "cartão", "cartao", "cartão de crédito", "cartao de credito", "credit", "card"].includes(raw)) return "credit_card"
+  if (["debit_card", "debito", "cartao_debito", "cartão de débito", "cartao de debito", "debit"].includes(raw)) return "debit_card"
   if (["cash", "dinheiro"].includes(raw)) return "cash"
-  if (["bank_transfer", "transferencia_bancaria", "transferencia", "ted", "doc"].includes(raw)) return "bank_transfer"
+  if (["bank_transfer", "transferencia_bancaria", "transferencia", "ted", "doc", "transferência", "transferência bancária"].includes(raw)) return "bank_transfer"
   return "other"
 }
 

@@ -245,6 +245,15 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const pendingSuffix = paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : ""
     const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
     const hasPendingPayment = order.situation !== "paid" && order.situation !== "cancelled" && remainingPaymentAmount > 0.009
+
+    const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+    const mpLeg = breakdown.find((e: any) => String(e?.provider || "").toLowerCase().includes("mercado pago") || String(e?.method || "").toLowerCase().includes("mercado pago"));
+    const mpInstallments = mpLeg?.installmentNumber || 1;
+    const mpPaymentStatus = mpLeg?.paymentStatus;
+    const mpPaymentStatusDetail = mpLeg?.paymentStatusDetail;
+    const mpTotalFeeAmount = mpLeg?.feeAmount;
+    const mpNetReceivedAmount = mpLeg?.amountReceived;
+
     const getPaymentTypeLabel = () => {
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
@@ -254,6 +263,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         if (!label) label = "Não informado";
 
         if (order.payment_provider === "Mercado Pago") {
+            if (mpInstallments && mpInstallments > 1) {
+                label = `${label} - ${mpInstallments}x`;
+            }
             if (!label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
                 return `${label} (Mercado Pago)`;
             }
@@ -315,7 +327,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             case "pending":
             case "unpaid":
                 return {
-                    label: "Pendente",
+                    label: "A Receber",
                     color: "text-brand-orange dark:text-orange-400",
                     Icon: ClockIcon,
                 };
@@ -385,7 +397,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - paymentMethodExtraAmount
     const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
     const cashEntry = Array.isArray(order.payment_breakdown)
-        ? order.payment_breakdown.find((entry: any) => entry?.method === "cash")
+        ? order.payment_breakdown.find((entry: any) => {
+            const m = String(entry?.method || "").toLowerCase().trim();
+            return m === "cash" || m === "dinheiro";
+        })
         : null
     const wantsChange = cashEntry?.wantsChange ?? String(order.payment_method || "").toLowerCase().includes("troco para")
     const payWithAmount = cashEntry?.payWithAmount ?? (() => {
@@ -404,6 +419,20 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const isPickupOrder = order.delivery_type === "pickup" || Number(order.delivery_fee || 0) <= 0
 
     const isMarketplaceOrder = order.order_source === "Marketplace" || order.order_source === "Online Store"
+
+    const itemsBaseSubtotal = (sortedOrderItems || []).reduce(
+        (sum: number, item: any) => sum + Number(item.subtotal || item.product_price * item.quantity || 0), 0
+    )
+    const hasItemDiscount = isMarketplaceOrder && itemsBaseSubtotal > 0 && subtotalValue > 0 && Math.abs(itemsBaseSubtotal - subtotalValue) > 0.005
+    const itemDiscountRatio = hasItemDiscount ? subtotalValue / itemsBaseSubtotal : 1
+
+    const getItemDiscountedPrice = (item: any) => {
+        const basePrice = Number(item.product_price || 0)
+        if (item.is_gift || item.is_promotional) return basePrice
+        if (!hasItemDiscount) return basePrice
+        const discounted = basePrice * itemDiscountRatio
+        return Math.round(discounted * 100) / 100
+    }
 
     // Detect if order has services vs products for dynamic timeline labels
     const orderItems = order.order_items || []
@@ -713,14 +742,28 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                     )}
                                                                                 </div>
                                                                                 <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
-                                                                                    {item.is_gift ? (
-                                                                                        <div className="flex items-center gap-1.5">
-                                                                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        formatCurrency(item.subtotal || item.product_price * item.quantity)
-                                                                                    )}
+                                                                                    {(() => {
+                                                                                        const displayPrice = getItemDiscountedPrice(item)
+                                                                                        const basePrice = Number(item.product_price || 0)
+                                                                                        const displaySubtotal = displayPrice * Number(item.quantity || 1)
+                                                                                        if (item.is_gift) {
+                                                                                            return (
+                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                                </div>
+                                                                                            )
+                                                                                        }
+                                                                                        if (hasItemDiscount) {
+                                                                                            return (
+                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.subtotal || basePrice * item.quantity)}</span>
+                                                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(displaySubtotal)}</span>
+                                                                                                </div>
+                                                                                            )
+                                                                                        }
+                                                                                        return formatCurrency(item.subtotal || basePrice * item.quantity)
+                                                                                    })()}
                                                                                 </span>
                                                                             </div>
                                                                             {isService ? (
@@ -740,14 +783,27 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                 <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
                                                                                 <span className="text-brand-border dark:text-dark-border">|</span>
                                                                                 <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                                    {item.is_gift ? (
-                                                                                        <span className="flex items-center gap-1.5 inline-flex">
-                                                                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        formatProductUnitPrice(item.product_price, item.products?.unit)
-                                                                                    )}
+                                                                                    {(() => {
+                                                                                        const displayPrice = getItemDiscountedPrice(item)
+                                                                                        const basePrice = Number(item.product_price || 0)
+                                                                                        if (item.is_gift) {
+                                                                                            return (
+                                                                                                <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                                </span>
+                                                                                            )
+                                                                                        }
+                                                                                        if (hasItemDiscount) {
+                                                                                            return (
+                                                                                                <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                                    <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(displayPrice, item.products?.unit)}</span>
+                                                                                                </span>
+                                                                                            )
+                                                                                        }
+                                                                                        return formatProductUnitPrice(basePrice, item.products?.unit)
+                                                                                    })()}
                                                                                 </span>
                                                                             </div>
 
@@ -809,6 +865,36 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             <PaymentRow
                                                                 label="Método de Pagamento"
                                                                 value={renderPaymentMethodValue()} />
+
+                                                            {isMercadoPago && (
+                                                                <>
+                                                                    {mpPaymentStatus && (
+                                                                        <PaymentRow
+                                                                            label="Status do Pagamento (MP)"
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{mpPaymentStatus} {mpPaymentStatusDetail ? `(${mpPaymentStatusDetail})` : ""}</span>} />
+                                                                    )}
+                                                                    {mpInstallments && mpInstallments > 1 && (
+                                                                        <PaymentRow
+                                                                            label="Parcelas"
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{mpInstallments}x</span>} />
+                                                                    )}
+                                                                    {mpTotalFeeAmount != null && (
+                                                                        <PaymentRow
+                                                                            label="Taxa do Mercado Pago"
+                                                                            value={<span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">{formatCurrency(mpTotalFeeAmount)}</span>} />
+                                                                    )}
+                                                                    {mpNetReceivedAmount != null && (
+                                                                        <PaymentRow
+                                                                            label="Valor Líquido Recebido"
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(mpNetReceivedAmount)}</span>} />
+                                                                    )}
+                                                                    {order.mp_date_approved && (
+                                                                        <PaymentRow
+                                                                            label="Data de Aprovação (MP)"
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{formatDateTime(order.mp_date_approved)}</span>} />
+                                                                    )}
+                                                                </>
+                                                            )}
 
                                                             {paymentBreakdown.length > 1 && (
                                                                 <PaymentRow
@@ -1027,14 +1113,28 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                 )}
                                                                             </div>
                                                                             <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
-                                                                                {item.is_gift ? (
-                                                                                    <div className="flex items-center gap-1.5">
-                                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    formatCurrency(item.subtotal || item.product_price * item.quantity)
-                                                                                )}
+                                                                                {(() => {
+                                                                                    const displayPrice = getItemDiscountedPrice(item)
+                                                                                    const basePrice = Number(item.product_price || 0)
+                                                                                    const displaySubtotal = displayPrice * Number(item.quantity || 1)
+                                                                                    if (item.is_gift) {
+                                                                                        return (
+                                                                                            <div className="flex items-center gap-1.5">
+                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                            </div>
+                                                                                        )
+                                                                                    }
+                                                                                    if (hasItemDiscount) {
+                                                                                        return (
+                                                                                            <div className="flex items-center gap-1.5">
+                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.subtotal || basePrice * item.quantity)}</span>
+                                                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(displaySubtotal)}</span>
+                                                                                            </div>
+                                                                                        )
+                                                                                    }
+                                                                                    return formatCurrency(item.subtotal || basePrice * item.quantity)
+                                                                                })()}
                                                                             </span>
                                                                         </div>
                                                                         {isService ? (
@@ -1054,14 +1154,27 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
                                                                             <span className="text-brand-border dark:text-dark-border">|</span>
                                                                             <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                                {item.is_gift ? (
-                                                                                    <span className="flex items-center gap-1.5 inline-flex">
-                                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    formatProductUnitPrice(item.product_price, item.products?.unit)
-                                                                                )}
+                                                                                {(() => {
+                                                                                    const displayPrice = getItemDiscountedPrice(item)
+                                                                                    const basePrice = Number(item.product_price || 0)
+                                                                                    if (item.is_gift) {
+                                                                                        return (
+                                                                                            <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                            </span>
+                                                                                        )
+                                                                                    }
+                                                                                    if (hasItemDiscount) {
+                                                                                        return (
+                                                                                            <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(displayPrice, item.products?.unit)}</span>
+                                                                                            </span>
+                                                                                        )
+                                                                                    }
+                                                                                    return formatProductUnitPrice(basePrice, item.products?.unit)
+                                                                                })()}
                                                                             </span>
                                                                         </div>
 
@@ -1124,6 +1237,36 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <PaymentRow
                                                             label="Método de Pagamento"
                                                             value={renderPaymentMethodValue()} />
+
+                                                        {isMercadoPago && (
+                                                            <>
+                                                                {order.mp_payment_status && (
+                                                                    <PaymentRow
+                                                                        label="Status do Pagamento (MP)"
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{order.mp_payment_status} {order.mp_payment_status_detail ? `(${order.mp_payment_status_detail})` : ""}</span>} />
+                                                                )}
+                                                                {order.mp_installments && order.mp_installments > 1 && (
+                                                                    <PaymentRow
+                                                                        label="Parcelas"
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{order.mp_installments}x</span>} />
+                                                                )}
+                                                                {order.mp_total_fee_amount != null && (
+                                                                    <PaymentRow
+                                                                        label="Taxa do Mercado Pago"
+                                                                        value={<span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">{formatCurrency(order.mp_total_fee_amount)}</span>} />
+                                                                )}
+                                                                {order.mp_net_received_amount != null && (
+                                                                    <PaymentRow
+                                                                        label="Valor Líquido Recebido"
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.mp_net_received_amount)}</span>} />
+                                                                )}
+                                                                {order.mp_date_approved && (
+                                                                    <PaymentRow
+                                                                        label="Data de Aprovação (MP)"
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{formatDateTime(order.mp_date_approved)}</span>} />
+                                                                )}
+                                                            </>
+                                                        )}
 
                                                         {paymentBreakdown.length > 1 && (
                                                             <PaymentRow

@@ -21,6 +21,7 @@ type CardPaymentViewProps = {
   totalPaid?: number
   totalNeed?: number
   readOnlyInstallments?: boolean
+  hideInstallments?: boolean
 }
 
 export function CardPaymentView({
@@ -40,6 +41,7 @@ export function CardPaymentView({
   totalPaid = 0,
   totalNeed = 0,
   readOnlyInstallments = false,
+  hideInstallments = false,
 }: CardPaymentViewProps) {
   const installmentDropdownOptions =
     installmentOptions.length > 0
@@ -61,16 +63,18 @@ export function CardPaymentView({
       <div className="w-full text-left space-y-4">
         <PaymentAmountLabel label="Valor a receber" calculation={calculation} baseAllocated={baseAllocated} flatAmount={flatAmount} />
         <MoneyInput value={amount} onChange={onAmountChange} className="font-bold text-lg" />
-        {readOnlyInstallments ? (
-          <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
-            <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
-            <div className="font-bold text-brand-dark dark:text-dark-heading">
-              {installmentDropdownOptions.find((o) => o.value === installments)?.label ||
-                `1x de ${formatCurrency(amount)}`}
+        {!hideInstallments && (
+          readOnlyInstallments ? (
+            <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
+              <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
+              <div className="font-bold text-brand-dark dark:text-dark-heading">
+                {installmentDropdownOptions.find((o) => o.value === installments)?.label ||
+                  `1x de ${formatCurrency(amount)}`}
+              </div>
             </div>
-          </div>
-        ) : (
-          <FormDropdown label="Parcelas" value={installments} setValue={onInstallmentsChange} options={installmentDropdownOptions} />
+          ) : (
+            <FormDropdown label="Parcelas" value={installments} setValue={onInstallmentsChange} options={installmentDropdownOptions} />
+          )
         )}
         {showFeeBearer && onFeeBearerChange && !flatAmount && (
           <FormDropdown

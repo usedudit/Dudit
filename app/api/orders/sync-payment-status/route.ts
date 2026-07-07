@@ -121,12 +121,45 @@ export async function POST(request: NextRequest) {
     const previousPaidAmount = Number(order.paid_amount || 0)
     let approvedUpdate: Record<string, unknown> | null = null
 
+    const totalFeeAmount = paymentData.transaction_amount != null && paymentData.transaction_details?.net_received_amount != null
+      ? Number(paymentData.transaction_amount) - Number(paymentData.transaction_details.net_received_amount)
+      : null;
+
+    const paymentMethodName =
+      String(paymentData.payment_method_id || "").toLowerCase() === "pix"
+        ? "Pix"
+        : paymentData.payment_method?.type || order.payment_method || "Mercado Pago"
+
+    const mpLeg = {
+      method: paymentMethodName,
+      amount: Number(paymentData.transaction_amount || 0),
+      effectiveAmount: Number(paymentData.transaction_amount || 0),
+      amountReceived: paymentData.transaction_details?.net_received_amount ?? Number(paymentData.transaction_amount || 0),
+      provider: "Mercado Pago",
+      adjustmentType: "none",
+      adjustmentPercent: 0,
+      adjustmentAmount: 0,
+      installmentNumber: paymentData.installments ?? 1,
+      feeAmount: totalFeeAmount ?? 0,
+      paymentMethodId: paymentData.payment_method_id ?? null,
+      paymentTypeId: paymentData.payment_type_id ?? null,
+      paymentStatus: paymentData.status ?? null,
+      paymentStatusDetail: paymentData.status_detail ?? null,
+    }
+
+    const oldBreakdown = Array.isArray(order.payment_breakdown) ? [...order.payment_breakdown] : []
+    const mpLegIndex = oldBreakdown.findIndex(
+      (entry: any) =>
+        String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
+        String(entry?.method || "").toLowerCase().includes("mercado pago"),
+    )
+    const payment_breakdown =
+      mpLegIndex >= 0
+        ? oldBreakdown.map((entry: any, i: number) => (i === mpLegIndex ? { ...entry, ...mpLeg } : entry))
+        : [...oldBreakdown, mpLeg]
+
     if (paymentData.status === "approved") {
       const { buildMpApprovedPaymentUpdate } = await import("@/lib/payments/mp-order-payment-update")
-      const paymentMethodName =
-        String(paymentData.payment_method_id || "").toLowerCase() === "pix"
-          ? "Pix"
-          : paymentData.payment_method?.type || order.payment_method || "Mercado Pago"
       approvedUpdate = buildMpApprovedPaymentUpdate({
         order,
         transactionAmount: Number(paymentData.transaction_amount || 0),
@@ -134,6 +167,13 @@ export async function POST(request: NextRequest) {
         mpPaymentId: String(order.mp_payment_id),
         mpDateApproved: paymentData.date_approved,
         existingBreakdown: order.payment_breakdown,
+        mpInstallments: paymentData.installments ?? null,
+        mpNetReceivedAmount: paymentData.transaction_details?.net_received_amount ?? null,
+        mpTotalFeeAmount: totalFeeAmount,
+        mpPaymentMethodId: paymentData.payment_method_id ?? null,
+        mpPaymentTypeId: paymentData.payment_type_id ?? null,
+        mpPaymentStatus: paymentData.status ?? null,
+        mpPaymentStatusDetail: paymentData.status_detail ?? null,
       })
       newOrderStatus = approvedUpdate.situation as string
     } else if (paymentData.status === "in_process") {
@@ -177,6 +217,7 @@ export async function POST(request: NextRequest) {
             payment_method: paymentData.payment_method?.type || order.payment_method,
             payment_provider: "Mercado Pago",
             updated_at: new Date().toISOString(),
+            payment_breakdown,
           }
 
       const { data: updatedOrder, error: updateError } = await supabaseAdmin

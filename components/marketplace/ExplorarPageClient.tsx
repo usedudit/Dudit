@@ -9,6 +9,7 @@ import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
+import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import {
     ArrowLeft,
     ChevronLeft,
@@ -56,6 +57,7 @@ interface ExplorarPageClientProps {
     exploreAds?: SponsoredAd[]
     searchAds?: SponsoredAd[]
     isStateRoute?: boolean
+    communityVideos?: any[]
 }
 
 type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
@@ -409,6 +411,7 @@ export function ExplorarPageClient({
     exploreAds = [],
     searchAds = [],
     isStateRoute = false,
+    communityVideos = [],
 }: ExplorarPageClientProps & { hideHeaderAndFooter?: boolean }) {
     const router = useRouter()
     const pathname = usePathname()
@@ -1226,6 +1229,14 @@ export function ExplorarPageClient({
                                     })}
                                 </div>
                             </div>
+
+                            {/* 2. COMMUNITY VIDEOS */}
+                            {communityVideos.length > 0 && (
+                                <CommunityVideosCarousel
+                                    videos={communityVideos}
+                                    title="Vídeos da comunidade"
+                                />
+                            )}
                         </div>
                     )}
 

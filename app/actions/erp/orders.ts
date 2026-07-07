@@ -2982,12 +2982,17 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             : 0,
             })
 
+            const nextPaymentMethod = payload.paymentBreakdown
+                ? Array.from(new Set(payload.paymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)).filter(Boolean))).join(', ') || 'Método não definido'
+                : undefined
+
             const { error } = await supabase
                 .from("orders")
                 .update({
                     situation: paymentState.situation,
                     paid_amount: paymentState.paidAmount,
                     ...(payload.paymentBreakdown ? { payment_breakdown: payload.paymentBreakdown } : {}),
+                    ...(nextPaymentMethod ? { payment_method: nextPaymentMethod } : {}),
                     ...(payload.mpPaymentId ? { mp_payment_id: payload.mpPaymentId } : {}),
                 })
                 .eq("id", order.id)
@@ -3124,7 +3129,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     try {
         await Promise.all(
-            (currentOrders || []).map((order: { id: string; situation: string | null; delivery_status: string | null; total_amount?: number | null; paid_amount?: number | null }) => {
+            (currentOrders || []).map((order: any) => {
                 const lines: string[] = []
 
                 if (payload.actionType === "payment_status") {
@@ -3144,7 +3149,41 @@ export async function updateOrdersStatusInBatchAction(payload: {
                                         : 0,
                         })
 
-                        if (order.situation !== nextPaymentState.situation) {
+                        const oldBreakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+                        const newBreakdown = payload.paymentBreakdown || []
+
+                        const oldMap = new Map<string, number>()
+                        oldBreakdown.forEach((leg: any) => {
+                            if (leg?.method) {
+                                const m = String(leg.method)
+                                oldMap.set(m, (oldMap.get(m) || 0) + Number(leg.amountReceived || 0))
+                            }
+                        })
+
+                        const newMap = new Map<string, number>()
+                        newBreakdown.forEach((leg: any) => {
+                            if (leg?.method) {
+                                const m = String(leg.method)
+                                newMap.set(m, (newMap.get(m) || 0) + Number(leg.amountReceived || 0))
+                            }
+                        })
+
+                        const diffs: Array<{ method: string; amount: number }> = []
+                        newMap.forEach((newVal, method) => {
+                            const oldVal = oldMap.get(method) || 0
+                            if (newVal > oldVal + 0.009) {
+                                diffs.push({ method, amount: newVal - oldVal })
+                            }
+                        })
+
+                        if (diffs.length > 0) {
+                            const isFullyPaid = nextPaymentState.situation === "paid"
+                            diffs.forEach((d) => {
+                                const methodLabel = normalizePaymentMethodLabel(d.method) || "Método não definido"
+                                const suffix = isFullyPaid ? ". Pedido totalmente pago." : "."
+                                lines.push(`Recebido ${formatCurrency(d.amount)} via ${methodLabel}${suffix}`)
+                            })
+                        } else if (order.situation !== nextPaymentState.situation) {
                             let line = `alterou status de pagamento: ${getPaymentStatusLabel(order.situation)} -> ${getPaymentStatusLabel(nextPaymentState.situation)}`
                             if (payload.paidAmount !== undefined) {
                                 line += ` (Valor pago informado: ${formatCurrency(payload.paidAmount)})`

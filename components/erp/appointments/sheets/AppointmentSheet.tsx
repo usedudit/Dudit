@@ -1944,15 +1944,6 @@ export const AppointmentSheet = ({
                             const isStockLocked = isCompletedStatus;
                             return (
                                 <div className="space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Controle de Estoque</h3>
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                Gerencie os itens utilizados neste agendamento
-                                            </p>
-                                        </div>
-                                    </div>
-
                                     {isLoadingItems ? (
                                         <ThreeDotsLoader />
                                     ) : savedAppointmentItems.length === 0 ? (
@@ -2021,6 +2012,15 @@ export const AppointmentSheet = ({
                                                     </div>
                                                 );
                                             })}
+                                            {!isStockLocked && (
+                                                <Button
+                                                    variant="link"
+                                                    onClick={() => setIsAddItemSheetOpen(true)}
+                                                >
+                                                    <PlusIcon size={14} strokeWidth={3} />
+                                                    Adicionar item
+                                                </Button>
+                                            )}
                                         </div>
                                     )}
                                 </div>

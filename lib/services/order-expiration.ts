@@ -45,7 +45,7 @@ export async function checkAndExpireOrder(
 ): Promise<{ expired: boolean; reason?: string }> {
   const { data: order, error } = await client
     .from("orders")
-    .select("id, situation, payment_expires_at, cancelled_at, partner_id, total_amount")
+    .select("id, order_number, situation, payment_expires_at, cancelled_at, partner_id, total_amount, buyer_id, customer_name, notes")
     .eq("id", orderId)
     .single()
 
@@ -70,12 +70,21 @@ export async function checkAndExpireOrder(
   }
 
   const now = new Date().toISOString()
+  
+  // Format Sao Paulo localized datetime for Brazil locale
+  const formatDateTime = (date: Date) => {
+    return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+  }
+  const baseNotes = (order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
+  const cancelLine = `Pedido cancelado por: Sistema as ${formatDateTime(new Date())} - O tempo limite de pagamento expirou.`
+  const nextNotes = [baseNotes, cancelLine].filter(Boolean).join("\n")
 
   const { error: updateError } = await client
     .from("orders")
     .update({
       situation: "cancelled",
       cancelled_at: now,
+      notes: nextNotes,
     })
     .eq("id", orderId)
     .in("situation", ["pending", "in_process"])
@@ -114,6 +123,41 @@ export async function checkAndExpireOrder(
     const { revalidateMarketplace } = await import("@/lib/utils/revalidation")
     await revalidateMarketplace()
   } catch {}
+
+  // Log audit event for timeline/history
+  try {
+    const { logAuditEvent } = await import("@/lib/services/timeline.service")
+    await logAuditEvent({
+      partnerId: order.partner_id,
+      actorUserId: null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "cancel",
+      changeLines: ["Pedido cancelado pelo sistema.", "Motivo: O tempo limite para pagamento expirou."],
+      source: "system",
+      metadata: {
+        oldStatus: "Pendente",
+        newStatus: "Cancelado",
+        statusScope: "payment",
+      }
+    })
+  } catch (err) {
+    console.error("[order-expiration] Error logging audit event:", err)
+  }
+
+  // Trigger system notification for customer and seller
+  try {
+    const { onOrderStatusChanged } = await import("@/lib/services/notification-automation.service")
+    await onOrderStatusChanged(
+      { ...order, situation: "cancelled" },
+      "cancelled",
+      undefined,
+      "system",
+      "O prazo de pagamento expirou"
+    )
+  } catch (err) {
+    console.error("[order-expiration] Error triggering notifications:", err)
+  }
 
   return { expired: true }
 }

@@ -301,7 +301,7 @@ export default function OrdersPage({
     const filterSections: FilterSectionConfig[] = useMemo(
         () => [
             { id: "datePeriod", title: "Data do pedido", type: "date-period" },
-            { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
+            { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "A Receber", "Enviado", "Cancelado", "Em análise"] },
             {
                 id: "channel",
                 title: "Canal",
@@ -329,7 +329,8 @@ export default function OrdersPage({
                     delivered: { label: "Entregue", icon: <CheckCircleIcon size={12} />, color: "green" },
                     cancelled: { label: "Cancelado", icon: <CancelCircleIcon size={12} />, color: "red" },
                     in_process: { label: "Em análise", icon: <ClockIcon size={12} />, color: "yellow" },
-                    pending: { label: "Pendente", icon: <ClockIcon size={12} />, color: "gray" },
+                    pending: { label: "A Receber", icon: <ClockIcon size={12} />, color: "orange" },
+                    unpaid: { label: "A Receber", icon: <ClockIcon size={12} />, color: "orange" },
                 }
                 const statusInfo = statusMap[o.situation] || { label: o.situation, icon: <ClockIcon size={12} />, color: "gray" }
                 const deliveryInfo = getDeliveryStatusMeta(o.delivery_status) as any

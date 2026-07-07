@@ -42,11 +42,12 @@ export async function getAppointmentItemsAction(appointmentId: string) {
                 usage_type,
                 created_at,
                 updated_at,
-                products:product_id(name, sku, images, stock_quantity),
+                products:product_id(name, sku, stock_quantity, images),
                 services:service_id(name)
             `)
             .eq("appointment_id", appointmentId)
             .order("created_at", { ascending: true })
+            .limit(500)
 
         if (error) {
             console.error("getAppointmentItemsAction error:", error)

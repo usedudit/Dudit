@@ -89,11 +89,51 @@ export default function PaymentStatusModal({
         ? order.order_number || `#${String(order.id || order.originalId || "").substring(0, 8)}`
         : "";
 
+    const cashEntry = Array.isArray(breakdown)
+        ? breakdown.find((entry: any) => {
+            const m = String(entry?.method || "").toLowerCase().trim();
+            return m === "cash" || m === "dinheiro";
+        })
+        : null;
+    const wantsChange = (cashEntry as any)?.wantsChange ?? String(order?.payment_method || "").toLowerCase().includes("troco para");
+    const payWithAmount = (cashEntry as any)?.payWithAmount ?? (() => {
+        const match = String(order?.payment_method || "").match(/troco para R\$\s*([\d,.]+)/i)
+        if (match) {
+            const cleanNum = match[1].replace(/\./g, "").replace(',', '.')
+            return Number(cleanNum)
+        }
+        return null
+    })();
+    const cashChangeAmount = wantsChange && payWithAmount ? payWithAmount - Number(order?.total_amount || 0) : 0;
+
     const lockedMethod = useMemo(() => {
-        if (order?.situation !== "partially_paid") return null;
-        const paidLeg = breakdown.find((leg) => Number(leg.amountReceived ?? 0) > 0.009);
-        return paidLeg?.method || order?.payment_method || null;
+        const paidLeg = breakdown.find((leg) => {
+            const m = leg.method;
+            if (!m) return false;
+            const norm = m.toLowerCase();
+            return !norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente') && !norm.includes('não informado') && !norm.includes('nao informado');
+        });
+        if (paidLeg?.method) return paidLeg.method;
+
+        const mainMethod = order?.payment_method;
+        if (mainMethod) {
+            const norm = mainMethod.toLowerCase();
+            if (!norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente') && !norm.includes('não informado') && !norm.includes('nao informado')) {
+                return mainMethod;
+            }
+        }
+        return null;
     }, [order, breakdown]);
+
+    const lockedInstallments = useMemo(() => {
+        const matchingLeg = breakdown.find((leg) => {
+            const legMethod = leg.method;
+            if (!legMethod) return false;
+            const norm = legMethod.toLowerCase();
+            return !norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente') && !norm.includes('não informado') && !norm.includes('nao informado');
+        });
+        return matchingLeg?.installmentNumber || 1;
+    }, [breakdown]);
 
     const pendingNewAmount = useMemo(
         () => pendingLegs.reduce((sum, leg) => sum + Number(leg.amountReceived ?? leg.amount ?? 0), 0),
@@ -157,14 +197,51 @@ export default function PaymentStatusModal({
 
         setLoading(true);
         try {
-            const updatedBreakdown = [...breakdown, ...pendingLegs.map((leg) => ({
-                ...leg,
-                amountReceived: Number(leg.amountReceived ?? leg.amount ?? 0),
-                effectiveAmount: Number(leg.effectiveAmount ?? leg.amount ?? 0),
-                adjustmentType: 'none',
-                adjustmentPercent: 0,
-                adjustmentAmount: 0,
-            }))];
+            const updatedBreakdown = breakdown.map((leg) => ({ ...leg }));
+            for (const pendingLeg of pendingLegs) {
+                let legRemaining = Number(pendingLeg.amountReceived ?? pendingLeg.amount ?? 0);
+                
+                // 1. Try to distribute to matching methods
+                for (const leg of updatedBreakdown) {
+                    if (leg.method === pendingLeg.method || (leg.paymentMethodId && leg.paymentMethodId === pendingLeg.paymentMethodId)) {
+                        const legCapacity = Math.max(0, Number(leg.amount || 0) - Number(leg.amountReceived || 0));
+                        if (legCapacity > 0.009 && legRemaining > 0.009) {
+                            const toAdd = Math.min(legCapacity, legRemaining);
+                            leg.amountReceived = Number((Number(leg.amountReceived || 0) + toAdd).toFixed(2));
+                            legRemaining -= toAdd;
+                        }
+                    }
+                }
+                
+                // 2. Try to distribute to undefined method legs
+                if (legRemaining > 0.009) {
+                    for (const leg of updatedBreakdown) {
+                        const normalizedMethod = String(leg.method || "").toLowerCase();
+                        if (normalizedMethod === 'método não definido' || normalizedMethod === 'metodo nao definido' || !leg.method) {
+                            leg.method = pendingLeg.method;
+                            leg.paymentMethodId = pendingLeg.paymentMethodId;
+                            leg.installmentNumber = pendingLeg.installmentNumber;
+                            const legCapacity = Math.max(0, Number(leg.amount || 0) - Number(leg.amountReceived || 0));
+                            const toAdd = Math.min(legCapacity, legRemaining);
+                            leg.amountReceived = Number((Number(leg.amountReceived || 0) + toAdd).toFixed(2));
+                            legRemaining -= toAdd;
+                        }
+                    }
+                }
+                
+                // 3. Fallback: append as a new leg
+                if (legRemaining > 0.009) {
+                    updatedBreakdown.push({
+                        ...pendingLeg,
+                        amount: legRemaining,
+                        effectiveAmount: legRemaining,
+                        amountReceived: Number(legRemaining.toFixed(2)),
+                        adjustmentType: 'none',
+                        adjustmentPercent: 0,
+                        adjustmentAmount: 0,
+                    });
+                }
+            }
 
             const nextPaidAmount = totalPaid + pendingNewAmount;
             const nextSituation = resolveSituationFromPaid(nextPaidAmount, totalOrder);
@@ -226,6 +303,12 @@ export default function PaymentStatusModal({
                         message={`Sinal (${depositSummary.depositPercent}%): ${formatCurrency(depositSummary.depositAmount)} · Cobrança inicial: ${formatCurrency(depositSummary.initialChargeAmount)} · ${DEPOSIT_STATUS_LABELS[depositSummary.depositStatus] || depositSummary.depositStatus} · Restante: ${formatCurrency(depositSummary.remainingBalance)}${depositSummary.paymentProvider ? ` · via ${depositSummary.paymentProvider}` : ""}`}
                     />
                 )}
+                {wantsChange && payWithAmount !== null && (
+                    <InfoCard
+                        color="blue"
+                        message={`O cliente pagará em dinheiro e precisa de troco para ${formatCurrency(payWithAmount)}. Levar ${formatCurrency(cashChangeAmount)} de troco.`}
+                    />
+                )}
             </div>
 
             <div className="flex flex-col md:flex-row gap-6">
@@ -254,6 +337,7 @@ export default function PaymentStatusModal({
                             onLegsReady={onLegsReady}
                             onValidityChange={setCanSubmitBalance}
                             lockedMethodLabel={lockedMethod}
+                            lockedInstallments={lockedInstallments}
                             onConfirmPayment={handleSubmit}
                         />
                     ) : isFullyPaid ? (

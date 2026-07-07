@@ -39,15 +39,26 @@ export function PaymentMethodIndicator({
 
 function PaymentMethodIndicatorKeyed({ part, simplify = false }: { part: string; simplify?: boolean }) {
     const displayPart = simplify ? (() => {
-        const normalized = part.toLowerCase()
-        if (normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
-            return part
+        let targetPart = part
+        const lower = part.toLowerCase()
+        if (lower.startsWith("mercado pago (") || lower.startsWith("mercadopago (")) {
+            const match = part.match(/^(?:mercado\s*pago|mercadopago)\s*\(([^)]+)\)$/i)
+            if (match) {
+                const sub = match[1].trim()
+                const capitalizedSub = sub.charAt(0).toUpperCase() + sub.slice(1)
+                targetPart = `${capitalizedSub} (Mercado Pago)`
+            }
         }
-        const match = part.match(/^([^(]+)\s*\(([^)]+)\)$/)
+        
+        const normalized = targetPart.toLowerCase()
+        if (normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
+            return targetPart
+        }
+        const match = targetPart.match(/^([^(]+)\s*\(([^)]+)\)$/)
         if (match) {
             return match[1].trim()
         }
-        return part
+        return targetPart
     })() : part
 
     const normalized = displayPart.toLowerCase()
@@ -64,36 +75,32 @@ function PaymentMethodIndicatorKeyed({ part, simplify = false }: { part: string;
                 className="w-3.5 h-3.5 object-contain" 
             />
         )
-        const match = part.match(/\(([^)]+)\)/);
-        if (match) {
-            const sub = match[1].trim().toLowerCase();
-            if (sub.includes("pix")) {
-                icons.push(
-                    <img 
-                        key="sub" 
-                        src="https://img.dudit.com.br/static/icons/payments/Pix.png" 
-                        alt="Pix" 
-                        className="w-3.5 h-3.5 object-contain" 
-                    />
-                )
-            } else if (sub.includes("cartão") || sub.includes("cartao") || sub.includes("credit") || sub.includes("debit") || sub.includes("visa") || sub.includes("master") || sub.includes("elo") || sub.includes("card") || sub.includes("crédito") || sub.includes("credito") || sub.includes("débito") || sub.includes("debito")) {
-                icons.push(
-                    <CreditCardIcon key="sub" className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                )
-            } else if (sub.includes("dinheiro") || sub.includes("money") || sub.includes("cash")) {
-                icons.push(
-                    <MoneyIcon key="sub" className="w-3.5 h-3.5 text-brand-green" />
-                )
-            } else if (sub.includes("boleto")) {
-                icons.push(
-                    <img 
-                        key="sub" 
-                        src="https://img.dudit.com.br/static/icons/payments/Boleto.png" 
-                        alt="Boleto" 
-                        className="w-3.5 h-3.5 object-contain" 
-                    />
-                )
-            }
+        if (normalized.includes("pix")) {
+            icons.push(
+                <img 
+                    key="sub" 
+                    src="https://img.dudit.com.br/static/icons/payments/Pix.png" 
+                    alt="Pix" 
+                    className="w-3.5 h-3.5 object-contain" 
+                />
+            )
+        } else if (normalized.includes("cartão") || normalized.includes("cartao") || normalized.includes("credit") || normalized.includes("debit") || normalized.includes("visa") || normalized.includes("master") || normalized.includes("elo") || normalized.includes("card") || normalized.includes("crédito") || normalized.includes("credito") || normalized.includes("débito") || normalized.includes("debito")) {
+            icons.push(
+                <CreditCardIcon key="sub" className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            )
+        } else if (normalized.includes("dinheiro") || normalized.includes("money") || normalized.includes("cash")) {
+            icons.push(
+                <MoneyIcon key="sub" className="w-3.5 h-3.5 text-brand-green" />
+            )
+        } else if (normalized.includes("boleto")) {
+            icons.push(
+                <img 
+                    key="sub" 
+                    src="https://img.dudit.com.br/static/icons/payments/Boleto.png" 
+                    alt="Boleto" 
+                    className="w-3.5 h-3.5 object-contain" 
+                />
+            )
         }
     } else if (normalized.includes("multiplo") || normalized.includes("múltiplo")) {
         icons.push(<CreditCardIcon key="icon" className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />)

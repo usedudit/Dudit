@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { ExplorarPageClient } from "@/components/marketplace/ExplorarPageClient"
 import { getCachedExploreProducts, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { resolveCityCoordsFromSlug } from "@/app/actions/marketplace/search"
+import { getCommunityVideos } from "@/app/actions/marketplace/community-videos"
 import type { Metadata } from "next"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { parseMarketplaceType } from "@/lib/types/marketplace"
@@ -377,9 +378,10 @@ export default async function ExplorarPage({
         state,
     }
 
-    const [exploreAds, searchAds] = await Promise.all([
+    const [exploreAds, searchAds, communityVideosData] = await Promise.all([
         getSponsoredAdsForSlot("explore", adLocation),
         query ? getSponsoredAdsForSlot("search", adLocation) : Promise.resolve([] as SponsoredAd[]),
+        getCommunityVideos(),
     ])
 
     // BreadcrumbList Schema
@@ -462,6 +464,7 @@ export default async function ExplorarPage({
                     exploreAds={exploreAds}
                     searchAds={searchAds}
                     isStateRoute={isStateRoute}
+                    communityVideos={communityVideosData.items}
                 />
             </Suspense>
 

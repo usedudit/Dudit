@@ -84,7 +84,7 @@ const AppointmentsPage = ({
     partnerId: string;
     initialTeam?: Array<{ id: string; name: string; role: string }>;
     initialCustomers?: Array<{ id: string; name: string; email?: string; phone?: string; avatar_url?: string | null }>;
-    initialServices?: Array<{ id: string; name: string; price: number; promotional_price?: number | null; category_id?: string | null; duration: string; bufferMinutes: number; category: string; billingUnit: string }>;
+    initialServices?: Array<{ id: string; name: string; price: number; promotional_price?: number | null; category_id?: string | null; duration: string; bufferMinutes: number; category: string; billingUnit: string; resources?: any[] }>;
     initialUnavailableTypes?: any[];
     openingHours?: any;
 }) => {
@@ -117,7 +117,7 @@ const AppointmentsPage = ({
         initialCustomers.map(c => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, avatar_url: c.avatar_url }))
     );
     const [realServices, setRealServices] = useState<any[]>(() =>
-        initialServices.map(s => ({ id: s.id, name: s.name, price: s.price, promotional_price: s.promotional_price, category_id: s.category_id, duration: s.duration, category: s.category, bufferMinutes: s.bufferMinutes, billingUnit: s.billingUnit }))
+        initialServices.map(s => ({ id: s.id, name: s.name, price: s.price, promotional_price: s.promotional_price, category_id: s.category_id, duration: s.duration, category: s.category, bufferMinutes: s.bufferMinutes, billingUnit: s.billingUnit, resources: Array.isArray((s as any).resources) ? (s as any).resources : [] }))
     );
     const [realUnavailableTypes, setRealUnavailableTypes] = useState<any[]>(initialUnavailableTypes);
     const [partnerId, setPartnerId] = useState<string>(initialPartnerId || '');

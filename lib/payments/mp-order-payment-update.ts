@@ -27,6 +27,13 @@ export function buildMpApprovedPaymentUpdate(params: {
   mpPaymentId: string
   mpDateApproved?: string | null
   existingBreakdown?: unknown[]
+  mpInstallments?: number | null
+  mpNetReceivedAmount?: number | null
+  mpTotalFeeAmount?: number | null
+  mpPaymentMethodId?: string | null
+  mpPaymentTypeId?: string | null
+  mpPaymentStatus?: string | null
+  mpPaymentStatusDetail?: string | null
 }): {
   situation: string
   paid_amount: number
@@ -58,19 +65,24 @@ export function buildMpApprovedPaymentUpdate(params: {
     method: params.paymentMethodName,
     amount: chargeAmount,
     effectiveAmount: chargeAmount,
-    amountReceived: chargeAmount,
+    amountReceived: params.mpNetReceivedAmount ?? chargeAmount,
     provider: "Mercado Pago",
     adjustmentType: "none" as const,
     adjustmentPercent: 0,
     adjustmentAmount: 0,
-    installmentNumber: 1,
+    installmentNumber: params.mpInstallments ?? 1,
+    feeAmount: params.mpTotalFeeAmount ?? 0,
+    paymentMethodId: params.mpPaymentMethodId ?? null,
+    paymentTypeId: params.mpPaymentTypeId ?? null,
+    paymentStatus: params.mpPaymentStatus ?? null,
+    paymentStatusDetail: params.mpPaymentStatusDetail ?? null,
   }
 
   const payment_breakdown =
     mpLegIndex >= 0
       ? oldBreakdown.map((entry: any, i: number) =>
           i === mpLegIndex
-            ? { ...entry, ...mpLeg, amountReceived: chargeAmount, amount: chargeAmount, effectiveAmount: chargeAmount }
+            ? { ...entry, ...mpLeg }
             : entry,
         )
       : [...oldBreakdown, mpLeg]

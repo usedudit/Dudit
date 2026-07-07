@@ -117,7 +117,8 @@ export function CheckoutFulfillmentPanel({
   const hasProducts = productLines.length > 0 || requirements.showProductFulfillmentOptions
   const hasServices = serviceLines.length > 0 || requirements.showSchedulingSummary
 
-  const showProductsSection = hasProducts && (canShowProductDelivery || canShowProductPickup)
+  const hasAnyFulfillmentOption = canShowProductDelivery || canShowProductPickup
+  const showProductsSection = hasProducts && hasAnyFulfillmentOption
   const showServicesSection = hasServices
 
   const needsAddressForProductDelivery =
@@ -131,7 +132,24 @@ export function CheckoutFulfillmentPanel({
   )
 
   const renderProductsFulfillment = () => {
-    if (!showProductsSection) return null
+    if (!hasProducts) return null
+    if (!showProductsSection) {
+      return (
+        <FormSection title={hasServices ? "Produtos" : "Entrega"}>
+          <div className="flex items-center gap-3 py-2">
+            <img
+              src="https://img.dudit.com.br/static/Map.png"
+              alt="Entrega"
+              className="w-12 h-12 object-cover rounded-xl shrink-0"
+            />
+            <div>
+              <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
+              <p className="text-sm text-brand-inactive-text">O vendedor entrará em contato para combinar a entrega.</p>
+            </div>
+          </div>
+        </FormSection>
+      )
+    }
     return (
       <FormSection title={hasServices ? "Produtos" : "Entrega"}>
         <div className="space-y-6">

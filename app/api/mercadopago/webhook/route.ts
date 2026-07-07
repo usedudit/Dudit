@@ -322,6 +322,38 @@ async function processWebhookWithRetry(
       updated_at: new Date().toISOString(),
     }
 
+    const totalFeeAmount = paymentInfo.transaction_amount != null && paymentInfo.transaction_details?.net_received_amount != null
+      ? Number(paymentInfo.transaction_amount) - Number(paymentInfo.transaction_details.net_received_amount)
+      : null;
+
+    const mpLeg = {
+      method: paymentMethodName,
+      amount: Number(paymentInfo.transaction_amount || 0),
+      effectiveAmount: Number(paymentInfo.transaction_amount || 0),
+      amountReceived: paymentInfo.transaction_details?.net_received_amount ?? Number(paymentInfo.transaction_amount || 0),
+      provider: "Mercado Pago",
+      adjustmentType: "none",
+      adjustmentPercent: 0,
+      adjustmentAmount: 0,
+      installmentNumber: paymentInfo.installments ?? 1,
+      feeAmount: totalFeeAmount ?? 0,
+      paymentMethodId: paymentInfo.payment_method_id ?? null,
+      paymentTypeId: paymentInfo.payment_type_id ?? null,
+      paymentStatus: paymentInfo.status ?? null,
+      paymentStatusDetail: paymentInfo.status_detail ?? null,
+    }
+
+    const oldBreakdown = Array.isArray(orderData.payment_breakdown) ? [...orderData.payment_breakdown] : []
+    const mpLegIndex = oldBreakdown.findIndex(
+      (entry: any) =>
+        String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
+        String(entry?.method || "").toLowerCase().includes("mercado pago"),
+    )
+    const payment_breakdown =
+      mpLegIndex >= 0
+        ? oldBreakdown.map((entry: any, i: number) => (i === mpLegIndex ? { ...entry, ...mpLeg } : entry))
+        : [...oldBreakdown, mpLeg]
+
     if (paymentInfo.status === "approved") {
       const { buildMpApprovedPaymentUpdate } = await import("@/lib/payments/mp-order-payment-update")
       const approvedUpdate = buildMpApprovedPaymentUpdate({
@@ -331,6 +363,13 @@ async function processWebhookWithRetry(
         mpPaymentId: paymentId.toString(),
         mpDateApproved: paymentInfo.date_approved,
         existingBreakdown: orderData.payment_breakdown,
+        mpInstallments: paymentInfo.installments ?? null,
+        mpNetReceivedAmount: paymentInfo.transaction_details?.net_received_amount ?? null,
+        mpTotalFeeAmount: totalFeeAmount,
+        mpPaymentMethodId: paymentInfo.payment_method_id ?? null,
+        mpPaymentTypeId: paymentInfo.payment_type_id ?? null,
+        mpPaymentStatus: paymentInfo.status ?? null,
+        mpPaymentStatusDetail: paymentInfo.status_detail ?? null,
       })
       orderStatus = approvedUpdate.situation
       updateData = { ...updateData, ...approvedUpdate }
@@ -361,6 +400,7 @@ async function processWebhookWithRetry(
         payment_method: paymentMethodName,
         payment_provider: "Mercado Pago",
         mp_payment_id: paymentId.toString(),
+        payment_breakdown,
       }
     } else if (orderStatus === "cancelled") {
       updateData = {
@@ -368,6 +408,7 @@ async function processWebhookWithRetry(
         situation: orderStatus,
         payment_provider: "Mercado Pago",
         mp_payment_id: paymentId.toString(),
+        payment_breakdown,
       }
     }
 

@@ -697,6 +697,71 @@ export async function rejectModeration(
     return { success: true }
 }
 
+// ─── Get Admin Community Videos ────────────────────────────────────────────
+
+export async function getAdminCommunityVideos(
+    page: number = 1,
+    pageSize: number = 12,
+): Promise<{ success: boolean; data?: any[]; total?: number; error?: string }> {
+    try {
+        const admin = await requireAdmin("moderator")
+        await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+        const supabase = getAdminClient()
+
+        const { count: total } = await supabase
+            .from("community_videos")
+            .select("id", { count: "exact", head: true })
+            .not("moderation_status", "eq", "approved")
+
+        const from = (page - 1) * pageSize
+        const to = from + pageSize - 1
+
+        const { data, error } = await supabase
+            .from("community_videos")
+            .select(`
+                id,
+                partner_id,
+                title,
+                description,
+                video_url,
+                video_thumbnail,
+                video_signed_url,
+                duration,
+                moderation_status,
+                views_count,
+                clicks_count,
+                created_at,
+                partner:partner_id(store_name)
+            `)
+            .not("moderation_status", "eq", "approved")
+            .order("created_at", { ascending: false })
+            .range(from, to)
+
+        if (error) return { success: false, error: error.message }
+
+        const mapped = (data || []).map((v: any) => ({
+            id: v.id,
+            partner_id: v.partner_id,
+            title: v.title || "Sem título",
+            description: v.description,
+            video_url: v.video_url,
+            video_thumbnail: v.video_thumbnail,
+            video_signed_url: v.video_signed_url,
+            duration: v.duration,
+            moderation_status: v.moderation_status,
+            views_count: v.views_count || 0,
+            clicks_count: v.clicks_count || 0,
+            created_at: v.created_at,
+            partner_store_name: v.partner?.store_name || "Desconhecido",
+        }))
+
+        return { success: true, data: mapped, total: total || 0 }
+    } catch (err: any) {
+        return { success: false, error: err.message }
+    }
+}
+
 // ─── Reprocess Moderation ───────────────────────────────────────────────────
 
 export async function reprocessModeration(

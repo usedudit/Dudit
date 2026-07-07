@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
 import { Button, Input, FormTextarea, Badge, FormSection } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import SelectVideoProductSheet from "./SelectVideoProductSheet"
 import SelectVideoServiceSheet from "./SelectVideoServiceSheet"
-import { LinkIcon, PlayIcon } from "@/lib/icons"
+import { ChevronLeftIcon, LinkIcon, PlayIcon } from "@/lib/icons"
 import { supabaseBrowser } from "@/lib/supabase/browser-client"
 
 interface VideoFormPageProps {
@@ -19,7 +18,6 @@ interface VideoFormPageProps {
 
 export default function VideoFormPage({ video, onSave, onCancel, isLoading }: VideoFormPageProps) {
     const isEditing = !!video
-    const [activeTab, setActiveTab] = useState("dados")
     const [saving, setSaving] = useState(false)
 
     const [title, setTitle] = useState("")
@@ -60,11 +58,9 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
     }, [video])
 
     useEffect(() => {
-        if (activeTab === "vinculacoes") {
-            fetchProducts()
-            fetchServices()
-        }
-    }, [activeTab])
+        fetchProducts()
+        fetchServices()
+    }, [])
 
     async function fetchProducts() {
         setLoadingProducts(true)
@@ -121,34 +117,55 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
     }
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mx-auto max-w-5xl space-y-6 p-4 pb-24 lg:p-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                        {isEditing ? "Editar Vídeo" : "Novo Vídeo"}
-                    </h1>
-                    <p className="text-sm text-brand-inactive-text mt-1">
-                        {isEditing ? "Atualize as informações do vídeo comunitário." : "Adicione um novo vídeo à comunidade."}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" onClick={onCancel}>
-                        Cancelar
-                    </Button>
-                    <Button onClick={handleSubmit} disabled={saving || isLoading}>
-                        {saving || isLoading ? "Salvando..." : isEditing ? "Atualizar" : "Criar"}
-                    </Button>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+                <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-4">
+                    <div className="hidden md:flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <button onClick={onCancel} className="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border/40 transition-colors">
+                                <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                            </button>
+                            <div>
+                                <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                    {isEditing ? "Editar Vídeo" : "Novo Vídeo"}
+                                </h1>
+                                <p className="text-sm text-brand-inactive-text">
+                                    {isEditing ? "Atualize as informações do vídeo comunitário." : "Adicione um novo vídeo à comunidade."}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Button variant="outline" onClick={onCancel}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSubmit} disabled={saving || isLoading}>
+                                {saving || isLoading ? "Salvando..." : isEditing ? "Atualizar" : "Criar"}
+                            </Button>
+                        </div>
+                    </div>
+                    {/* Mobile header */}
+                    <div className="flex md:hidden items-center gap-3">
+                        <button onClick={onCancel} className="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border/40 transition-colors">
+                            <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
+                        <div className="flex-1">
+                            <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                {isEditing ? "Editar Vídeo" : "Novo Vídeo"}
+                            </h1>
+                        </div>
+                        <Button size="sm" onClick={handleSubmit} disabled={saving || isLoading}>
+                            {saving || isLoading ? "..." : isEditing ? "Salvar" : "Criar"}
+                        </Button>
+                    </div>
                 </div>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="w-fit">
-                    <TabsTrigger value="dados">Dados do Vídeo</TabsTrigger>
-                    <TabsTrigger value="vinculacoes">Vinculações</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="dados" className="mt-6 space-y-6">
-                    <FadeIn>
+            {/* Content */}
+            <div className="max-w-[1300px] mx-auto w-full px-4 md:px-6 py-6">
+                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                    {/* Left Column */}
+                    <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                         <FormSection title="Informações do Vídeo" description="Preencha os detalhes principais do vídeo.">
                             <div className="space-y-5">
                                 <Input label="Título" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do vídeo" error={!!errors.title} errorMessage={errors.title} />
@@ -162,12 +179,14 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                                 <Input label="Tags (separadas por vírgula)" name="tags" value={tags.join(", ")} onChange={(e) => setTags(e.target.value.split(",").map((t) => t.trim()).filter(Boolean))} placeholder="tag1, tag2, tag3" />
                             </div>
                         </FormSection>
-                    </FadeIn>
-                </TabsContent>
+                    </div>
 
-                <TabsContent value="vinculacoes" className="mt-6 space-y-6">
-                    <FadeIn>
-                        <FormSection title="Vinculações" description="Associe este vídeo a um produto, serviço ou coleção.">
+                    {/* Right Column */}
+                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                        {/* Sidebar Card: Vinculações */}
+                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Vinculações</h3>
                             <div className="space-y-5">
                                 <div>
                                     <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
@@ -188,7 +207,7 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                                             </button>
                                         </div>
                                     ) : (
-                                        <Button variant="outline" type="button" onClick={() => setShowProductSheet(true)}>
+                                        <Button variant="outline" type="button" onClick={() => setShowProductSheet(true)} className="w-full">
                                             Selecionar Produto
                                         </Button>
                                     )}
@@ -212,7 +231,7 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                                             </button>
                                         </div>
                                     ) : (
-                                        <Button variant="outline" type="button" onClick={() => setShowServiceSheet(true)}>
+                                        <Button variant="outline" type="button" onClick={() => setShowServiceSheet(true)} className="w-full">
                                             Selecionar Serviço
                                         </Button>
                                     )}
@@ -226,10 +245,20 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                                     prefix={<LinkIcon size={18} />}
                                 />
                             </div>
-                        </FormSection>
-                    </FadeIn>
-                </TabsContent>
-            </Tabs>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Mobile Bottom Action Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <Button variant="outline" onClick={onCancel} className="flex-1 h-12">
+                    Cancelar
+                </Button>
+                <Button onClick={handleSubmit} disabled={saving || isLoading} className="flex-1 h-12">
+                    {saving || isLoading ? "Salvando..." : isEditing ? "Atualizar" : "Criar"}
+                </Button>
+            </div>
 
             <SelectVideoProductSheet
                 isOpen={showProductSheet}

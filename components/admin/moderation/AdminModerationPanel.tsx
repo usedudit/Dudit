@@ -12,12 +12,13 @@ import {
     removeImage, editVariant, hideReview, editReview,
     updatePartnerRiskScore, saveModerationChanges, deleteModerationTarget, deleteVariant,
 } from "@/app/actions/admin/moderation-v2"
-import { getModerationQueue, approveModeration, rejectModeration } from "@/app/actions/admin/moderation"
+import { getAdminCommunityVideos, approveModeration, rejectModeration } from "@/app/actions/admin/moderation"
 import type {
     FetchedProduct, FetchedVariant, FetchedService,
     FetchedRecurringPlan, FetchedPartner, FetchedReview,
 } from "@/lib/admin/types"
 import { formatDate } from "@/lib/utils"
+import Pagination from "@/components/reusable/Pagination"
 
 type SearchType = "product" | "service" | "recurring_plan" | "partner" | "review"
 
@@ -39,17 +40,7 @@ const RISK_LEVELS = [
 
 type ModerationTab = "manual" | "videos"
 
-interface VideoQueueItem {
-    id: string
-    partner_id: string
-    title: string | null
-    description: string | null
-    video_thumbnail: string | null
-    moderation_status: string
-    views_count: number
-    created_at: string
-    partner_store_name?: string
-}
+const ITEMS_PER_PAGE = 12
 
 export function AdminModerationPanel() {
     const [activeModerationTab, setActiveModerationTab] = useState<ModerationTab>("manual")
@@ -62,10 +53,12 @@ export function AdminModerationPanel() {
     const [activeTab, setActiveTab] = useState("general")
     const scrollRef = useRef<HTMLDivElement>(null)
 
-    const [videos, setVideos] = useState<VideoQueueItem[]>([])
+    const [videos, setVideos] = useState<any[]>([])
+    const [videosTotal, setVideosTotal] = useState(0)
+    const [videosPage, setVideosPage] = useState(1)
     const [videosLoading, setVideosLoading] = useState(false)
     const [videoActionPending, setVideoActionPending] = useState<string | null>(null)
-    const [videoToReject, setVideoToReject] = useState<VideoQueueItem | null>(null)
+    const [videoToReject, setVideoToReject] = useState<any>(null)
     const [rejectReason, setRejectReason] = useState("")
 
     const handleSearch = () => {
@@ -94,22 +87,14 @@ export function AdminModerationPanel() {
         }
     }
 
-    const loadVideos = useCallback(async () => {
+    const loadVideos = useCallback(async (page: number) => {
         setVideosLoading(true)
         try {
-            const queue = await getModerationQueue("pending_moderation", 10)
-            const videoItems = (queue?.data || []).filter((item: any) => item.type === "community_video")
-            setVideos(videoItems.map((v: any) => ({
-                id: v.id,
-                partner_id: v.partner_id,
-                title: v.title,
-                description: v.description,
-                video_thumbnail: v.video_thumbnail,
-                moderation_status: v.moderation_status,
-                views_count: v.views_count || 0,
-                created_at: v.created_at,
-                partner_store_name: v.owner_store_name,
-            })))
+            const res = await getAdminCommunityVideos(page, ITEMS_PER_PAGE)
+            if (res.success) {
+                setVideos(res.data || [])
+                setVideosTotal(res.total || 0)
+            }
         } catch (e) {
             console.error(e)
         } finally {
@@ -119,17 +104,17 @@ export function AdminModerationPanel() {
 
     useEffect(() => {
         if (activeModerationTab === "videos") {
-            loadVideos()
+            loadVideos(videosPage)
         }
-    }, [activeModerationTab, loadVideos])
+    }, [activeModerationTab, videosPage, loadVideos])
 
-    const handleApproveVideo = async (video: VideoQueueItem) => {
-        setVideoActionPending(video.id)
+    const handleApproveVideo = async (videoId: string) => {
+        setVideoActionPending(videoId)
         try {
-            const res = await approveModeration(video.id, "community_video")
+            const res = await approveModeration(videoId, "community_video")
             if (res.success) {
                 toast.success("Vídeo aprovado!")
-                loadVideos()
+                loadVideos(videosPage)
             } else {
                 toast.error(res.error || "Erro ao aprovar")
             }
@@ -151,7 +136,7 @@ export function AdminModerationPanel() {
                 toast.success("Vídeo rejeitado!")
                 setVideoToReject(null)
                 setRejectReason("")
-                loadVideos()
+                loadVideos(videosPage)
             } else {
                 toast.error(res.error || "Erro ao rejeitar")
             }
@@ -160,6 +145,8 @@ export function AdminModerationPanel() {
         }
     }
 
+    const totalPages = Math.max(1, Math.ceil(videosTotal / ITEMS_PER_PAGE))
+
     const data = result?.data
     const rtype = result?.type as SearchType | undefined
     const hasVariants = rtype === "product" && ((data as FetchedProduct)?.variants?.length ?? 0) > 0
@@ -167,7 +154,7 @@ export function AdminModerationPanel() {
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+            <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
                 <div ref={scrollRef} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
                     {/* Sticky Header */}
                     <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
@@ -196,28 +183,26 @@ export function AdminModerationPanel() {
                             {/* Manual Search Controls */}
                             {activeModerationTab === "manual" && (
                                 <div className="flex flex-col md:flex-row gap-3 pb-3">
-                                    <div className="flex gap-2 items-center flex-1">
-                                        <div className="w-44">
+                                    <div className="flex gap-2 items-center flex-wrap flex-1">
+                                        <Input
+                                            name="search-id"
+                                            placeholder={`ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...`}
+                                            value={searchId}
+                                            onChange={(e) => setSearchId(e.target.value)}
+                                            onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()}
+                                            className="h-[42px] w-64"
+                                            variant="full-rounded"
+                                        />
+                                        <div className="w-40">
                                             <FormDropdown
                                                 options={SEARCH_TYPES}
                                                 value={searchType}
                                                 setValue={(v) => { setSearchType(v as SearchType); setResult(null); setError("") }}
                                             />
                                         </div>
-                                        <div className="flex gap-2 flex-1">
-                                            <Input
-                                                name="search-id"
-                                                placeholder={`ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...`}
-                                                value={searchId}
-                                                onChange={(e) => setSearchId(e.target.value)}
-                                                onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()}
-                                                className="flex-1"
-                                                variant="full-rounded"
-                                            />
-                                            <Button variant="default" onClick={handleSearch} disabled={isPending} isLoading={isPending}>
-                                                <SearchIcon size={18} /> Buscar
-                                            </Button>
-                                        </div>
+                                        <Button variant="default" onClick={handleSearch} disabled={isPending} isLoading={isPending} className="h-[42px]">
+                                            <SearchIcon size={18} /> Buscar
+                                        </Button>
                                     </div>
                                 </div>
                             )}
@@ -239,10 +224,10 @@ export function AdminModerationPanel() {
 
                     {/* Content Area */}
                     {activeModerationTab === "manual" ? (
-                        <>
+                        <div className="max-w-[1300px] mx-auto">
                             {/* Error State */}
                             {error && (
-                                <div className="max-w-[1300px] mx-auto px-4 md:px-6 pt-6">
+                                <div className="px-4 md:px-6 pt-6">
                                     <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-center">
                                         <AlertTriangleIcon size={40} className="mx-auto mb-3 text-red-400" />
                                         <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
@@ -252,7 +237,7 @@ export function AdminModerationPanel() {
 
                             {/* Manual Result Tab Content */}
                             {result && (
-                                <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                                <div className="px-4 md:px-6 py-6 min-h-[400px]">
                                     {activeTab === "general" && (
                                         <FadeIn key="general" className="block">
                                             {rtype === "product" && <ProductGeneral data={data as FetchedProduct} isPending={isPending} onRefresh={handleRefresh} />}
@@ -274,10 +259,10 @@ export function AdminModerationPanel() {
                                     )}
                                 </div>
                             )}
-                        </>
+                        </div>
                     ) : (
                         /* Videos Tab */
-                        <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6 min-h-[400px]">
                             {videosLoading ? (
                                 <div className="flex items-center justify-center min-h-[300px]">
                                     <ThreeDotsLoader />
@@ -295,60 +280,85 @@ export function AdminModerationPanel() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {videos.map((video) => (
-                                        <div
-                                            key={video.id}
-                                            className="flex items-center gap-4 bg-white dark:bg-dark-surface rounded-xl border border-gray-100 dark:border-dark-border p-4 hover:shadow-sm transition-shadow"
-                                        >
-                                            <div className="w-16 aspect-[9/16] rounded-lg overflow-hidden bg-brand-gray dark:bg-dark-border shrink-0 relative">
-                                                {video.video_thumbnail ? (
-                                                    <img src={video.video_thumbnail} alt="" className="w-full h-full object-cover" loading="lazy" />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full">
-                                                        <PlayIcon className="w-5 h-5 text-brand-inactive-text" />
+                                <>
+                                    <div className="space-y-3">
+                                        {videos.map((video) => (
+                                            <div
+                                                key={video.id}
+                                                className="flex items-center gap-4 bg-white dark:bg-dark-surface rounded-xl border border-gray-100 dark:border-dark-border p-3 hover:shadow-sm transition-shadow"
+                                            >
+                                                <div
+                                                    className="w-28 aspect-[9/16] rounded-lg overflow-hidden bg-brand-gray dark:bg-dark-border shrink-0 relative cursor-pointer group"
+                                                    onClick={() => video.video_url && window.open(video.video_url, "_blank")}
+                                                >
+                                                    {video.video_thumbnail ? (
+                                                        <img src={video.video_thumbnail} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                                    ) : (
+                                                        <div className="flex items-center justify-center h-full">
+                                                            <PlayIcon className="w-5 h-5 text-brand-inactive-text" />
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                                        <PlayIcon className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                                     </div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                        {video.title || "Sem título"}
-                                                    </h3>
-                                                    <Badge variant="orange" className="text-xs whitespace-nowrap">
-                                                        Pendente
-                                                    </Badge>
                                                 </div>
-                                                <div className="flex items-center gap-4 text-xs text-brand-inactive-text mt-1">
-                                                    <span>{video.partner_store_name || "Parceiro desconhecido"}</span>
-                                                    <span>{video.views_count} visualizações</span>
-                                                    <span>{video.created_at ? formatDate(video.created_at) : ""}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                            {video.title || "Sem título"}
+                                                        </h3>
+                                                        <Badge variant="orange" className="text-xs whitespace-nowrap">
+                                                            Pendente
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-xs text-brand-inactive-text mt-1 flex-wrap">
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                            {video.partner_store_name}
+                                                        </span>
+                                                        <span>{video.views_count} visualizações</span>
+                                                        {video.duration > 0 && (
+                                                            <span>{Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, "0")}</span>
+                                                        )}
+                                                        <span>{video.created_at ? formatDate(video.created_at) : ""}</span>
+                                                    </div>
+                                                    {video.description && (
+                                                        <p className="text-xs text-brand-inactive-text mt-1 line-clamp-1">{video.description}</p>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-2 shrink-0">
+                                                    <Button
+                                                        variant="filled"
+                                                        size="sm"
+                                                        onClick={() => handleApproveVideo(video.id)}
+                                                        disabled={videoActionPending === video.id}
+                                                        isLoading={videoActionPending === video.id}
+                                                        className="h-[34px] bg-green-600 hover:bg-green-700"
+                                                    >
+                                                        <CheckCircleIcon size={15} /> Aprovar
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => { setVideoToReject(video); setRejectReason("") }}
+                                                        disabled={videoActionPending === video.id}
+                                                        className="h-[34px] text-red-500 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                    >
+                                                        <CancelCircleIcon size={15} /> Rejeitar
+                                                    </Button>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 shrink-0">
-                                                <Button
-                                                    variant="filled"
-                                                    size="sm"
-                                                    onClick={() => handleApproveVideo(video)}
-                                                    disabled={videoActionPending === video.id}
-                                                    isLoading={videoActionPending === video.id}
-                                                    className="bg-green-600 hover:bg-green-700"
-                                                >
-                                                    <CheckCircleIcon size={16} /> Aprovar
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => { setVideoToReject(video); setRejectReason("") }}
-                                                    disabled={videoActionPending === video.id}
-                                                    className="text-red-500 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                >
-                                                    <CancelCircleIcon size={16} /> Rejeitar
-                                                </Button>
-                                            </div>
+                                        ))}
+                                    </div>
+                                    {totalPages > 1 && (
+                                        <div className="mt-6">
+                                            <Pagination
+                                                currentPage={videosPage}
+                                                totalPages={totalPages}
+                                                onPageChange={setVideosPage}
+                                            />
                                         </div>
-                                    ))}
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
@@ -399,7 +409,11 @@ export function AdminModerationPanel() {
     )
 }
 
-// ─── Shared Sub-components ──────────────────────────────────────────────────
+// ─── The remaining sub-components (SidebarCard, TwoColLayout, ProductGeneral,
+//      ServiceGeneral, RecurringPlanGeneral, PartnerGeneral, PartnerGallery,
+//      VariationsTab, ReviewGeneral, VariantCard, ImagePreview, SaveFooter,
+//      PartnerInfo) are unchanged from the original file.
+// ─── They are included below for completeness ──────────────────────────────
 
 function PartnerInfo({ partner }: { partner: { id: string; store_name: string; risk_score: number } | null }) {
     if (!partner) return null
@@ -461,8 +475,6 @@ function SaveFooter({ riskScore, onRiskScoreChange, notes, onNotesChange, onSave
         </div>
     )
 }
-
-// ─── Variant Card ────────────────────────────────────────────────────────────
 
 function VariantCard({ variant, isPending, onRefresh, partnerId }: { variant: FetchedVariant; isPending: boolean; onRefresh: () => void; partnerId?: string }) {
     const [editName, setEditName] = useState(variant.variant_name)
@@ -529,8 +541,6 @@ function VariantCard({ variant, isPending, onRefresh, partnerId }: { variant: Fe
     )
 }
 
-// ─── General Tabs (Two-column ERP layout) ────────────────────────────────────
-
 function SidebarCard({ title, children, topStrip = true }: { title: string; children: React.ReactNode; topStrip?: boolean }) {
     return (
         <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
@@ -549,8 +559,6 @@ function TwoColLayout({ left, right }: { left: React.ReactNode; right: React.Rea
         </div>
     )
 }
-
-// ─── Product General ────────────────────────────────────────────────────────
 
 function ProductGeneral({ data, isPending, onRefresh }: { data: FetchedProduct; isPending: boolean; onRefresh: () => void }) {
     const [editName, setEditName] = useState(data.name)
@@ -654,8 +662,6 @@ function ProductGeneral({ data, isPending, onRefresh }: { data: FetchedProduct; 
     )
 }
 
-// ─── Service General ─────────────────────────────────────────────────────────
-
 function ServiceGeneral({ data, isPending, onRefresh }: { data: FetchedService; isPending: boolean; onRefresh: () => void }) {
     const [editName, setEditName] = useState(data.name)
     const [editDesc, setEditDesc] = useState(data.description || "")
@@ -756,8 +762,6 @@ function ServiceGeneral({ data, isPending, onRefresh }: { data: FetchedService; 
     )
 }
 
-// ─── Recurring Plan General ──────────────────────────────────────────────────
-
 function RecurringPlanGeneral({ data, isPending, onRefresh }: { data: FetchedRecurringPlan; isPending: boolean; onRefresh: () => void }) {
     const [editName, setEditName] = useState(data.name)
     const [editDesc, setEditDesc] = useState(data.description || "")
@@ -844,8 +848,6 @@ function RecurringPlanGeneral({ data, isPending, onRefresh }: { data: FetchedRec
     )
 }
 
-// ─── Partner General ─────────────────────────────────────────────────────────
-
 function PartnerGeneral({ data, isPending, onRefresh }: { data: FetchedPartner; isPending: boolean; onRefresh: () => void }) {
     const [editName, setEditName] = useState(data.store_name)
     const [editDesc, setEditDesc] = useState(data.store_description || "")
@@ -922,8 +924,6 @@ function PartnerGeneral({ data, isPending, onRefresh }: { data: FetchedPartner; 
     )
 }
 
-// ─── Partner Gallery Tab ─────────────────────────────────────────────────────
-
 function PartnerGallery({ data, isPending, onRefresh }: { data: FetchedPartner; isPending: boolean; onRefresh: () => void }) {
     const [riskScore, setRiskScore] = useState("0")
     const [notes, setNotes] = useState("")
@@ -979,8 +979,6 @@ function PartnerGallery({ data, isPending, onRefresh }: { data: FetchedPartner; 
     )
 }
 
-// ─── Variations Tab ──────────────────────────────────────────────────────────
-
 function VariationsTab({ data, isPending, onRefresh }: { data: FetchedProduct; isPending: boolean; onRefresh: () => void }) {
     const partnerId = data.partner?.id
 
@@ -1003,8 +1001,6 @@ function VariationsTab({ data, isPending, onRefresh }: { data: FetchedProduct; i
         </div>
     )
 }
-
-// ─── Review General ──────────────────────────────────────────────────────────
 
 function ReviewGeneral({ data, isPending, onRefresh }: { data: FetchedReview; isPending: boolean; onRefresh: () => void }) {
     const [editComment, setEditComment] = useState(data.comment || "")

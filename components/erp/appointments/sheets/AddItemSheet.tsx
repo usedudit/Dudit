@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Package, SearchIcon, XIcon, CheckCircleIcon } from "@/lib/icons"
-import { Button, Input, FormDropdown, ThreeDotsLoader } from "@/components/reusable"
+import { Package, SearchIcon, XIcon, PlusIcon } from "@/lib/icons"
+import { Button, Input, FormDropdown, ThreeDotsLoader, IconPlaceholder } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { searchProductsForAppointmentItems } from "@/app/actions/erp/appointment-items"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
@@ -30,6 +30,8 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
     const [usageType, setUsageType] = useState<string>('consumed')
     const [isManualMode, setIsManualMode] = useState(false)
     const [manualName, setManualName] = useState("")
+    const [showResults, setShowResults] = useState(false)
+    const searchRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         if (!isOpen) {
@@ -40,17 +42,20 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
             setUsageType('consumed')
             setIsManualMode(false)
             setManualName("")
+            setShowResults(false)
         }
     }, [isOpen])
 
     useEffect(() => {
         if (!searchQuery || searchQuery.trim().length < 2) {
             setSearchResults([])
+            setShowResults(false)
             return
         }
 
         const timer = setTimeout(async () => {
             setIsLoading(true)
+            setShowResults(true)
             try {
                 const results = await searchProductsForAppointmentItems(searchQuery)
                 setSearchResults(results)
@@ -63,6 +68,23 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
 
         return () => clearTimeout(timer)
     }, [searchQuery])
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowResults(false)
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [])
+
+    const handleProductSelect = useCallback((product: any) => {
+        setSelectedProduct(product)
+        setShowResults(false)
+        setManualName("")
+        setIsManualMode(false)
+    }, [])
 
     const handleConfirm = useCallback(() => {
         if (isManualMode) {
@@ -84,7 +106,18 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
         onClose()
     }, [isManualMode, manualName, selectedProduct, quantity, usageType, onConfirm, onClose])
 
+    const handleManualClick = useCallback(() => {
+        setIsManualMode(true)
+        if (searchQuery.trim()) {
+            setManualName(searchQuery.trim())
+        }
+        setShowResults(false)
+    }, [searchQuery])
+
     const canConfirm = isManualMode ? manualName.trim().length > 0 : selectedProduct !== null
+
+    const showSearch = !selectedProduct && !isManualMode
+    const showSelectionForm = selectedProduct || isManualMode
 
     return (
         <AnimatePresence>
@@ -107,7 +140,11 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
                             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                    {selectedProduct ? selectedProduct.name : 'Adicionar Item'}
+                                    {selectedProduct
+                                        ? selectedProduct.name
+                                        : isManualMode
+                                            ? 'Adicionar item manual'
+                                            : 'Adicionar Item'}
                                 </h2>
                                 <Button variant="filled" onClick={onClose} size="icon">
                                     <XIcon className="h-5 w-5" />
@@ -115,70 +152,83 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                             </header>
 
                             <div className="flex-1 space-y-6 overflow-y-auto p-6 custom-scrollbar">
-                                {!selectedProduct && (
-                                    <>
-                                        <div className="relative">
-                                            <Input
-                                                label=""
-                                                name="search"
-                                                placeholder="Buscar produto por nome ou SKU..."
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                                className="mb-0"
-                                            />
-                                        </div>
+                                {/* SEARCH STEP */}
+                                {showSearch && (
+                                    <div ref={searchRef} className="relative">
+                                        <Input
+                                            label=""
+                                            name="search"
+                                            placeholder="Buscar produto por nome ou SKU..."
+                                            value={searchQuery}
+                                            onChange={(e) => {
+                                                setSearchQuery(e.target.value)
+                                                setShowResults(true)
+                                            }}
+                                            onFocus={() => {
+                                                if (searchResults.length > 0 || isLoading) setShowResults(true)
+                                            }}
+                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                            className="mb-0"
+                                        />
 
-                                        {isLoading && (
-                                            <div className="p-4"><ThreeDotsLoader /></div>
-                                        )}
-
-                                        {searchResults.length > 0 && !isLoading && (
-                                            <div className="space-y-1">
-                                                {searchResults.map((product) => (
-                                                    <button
-                                                        key={product.id}
-                                                        onClick={() => setSelectedProduct(product)}
-                                                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-brand-gray dark:hover:bg-dark-border transition-colors text-left"
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                            {product.image ? (
-                                                                <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
-                                                            ) : (
-                                                                <Package size={18} className="text-brand-inactive-text" />
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">{product.name}</p>
-                                                            <p className="text-[11px] text-brand-inactive-text">SKU: {product.sku}</p>
-                                                        </div>
-                                                        <div className="text-right shrink-0">
-                                                            <p className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${product.stock > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
-                                                                {product.stock} em estoque
-                                                            </p>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {searchQuery.length >= 2 && searchResults.length === 0 && !isLoading && (
-                                            <div className="text-center py-8">
-                                                <p className="text-sm text-brand-inactive-text mb-4">Nenhum produto encontrado</p>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setIsManualMode(true)
-                                                        setManualName(searchQuery)
-                                                    }}
+                                        <AnimatePresence>
+                                            {showResults && searchQuery.length >= 2 && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 5 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: 5 }}
+                                                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
                                                 >
-                                                    Adicionar "{searchQuery}" manualmente
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </>
+                                                    {isLoading ? (
+                                                        <div className="p-4"><ThreeDotsLoader /></div>
+                                                    ) : searchResults.length > 0 ? (
+                                                        searchResults.map((product) => (
+                                                            <button
+                                                                key={product.id}
+                                                                onClick={() => handleProductSelect(product)}
+                                                                className="w-full flex items-center gap-3 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors text-left"
+                                                            >
+                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/50 shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                    {product.image ? (
+                                                                        <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                                                    ) : (
+                                                                        <Package size={18} className="text-brand-inactive-text" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">{product.name}</p>
+                                                                    <p className="text-[11px] text-brand-inactive-text">SKU: {product.sku}</p>
+                                                                </div>
+                                                                <div className="text-right shrink-0">
+                                                                    <p className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${product.stock > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+                                                                        {product.stock} em estoque
+                                                                    </p>
+                                                                </div>
+                                                            </button>
+                                                        ))
+                                                    ) : (
+                                                        <div className="p-4 text-center text-sm text-brand-inactive-text">
+                                                            Nenhum produto encontrado
+                                                        </div>
+                                                    )}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
                                 )}
 
+                                {/* "Adicionar item manual" link - always visible when searching */}
+                                {showSearch && (
+                                    <Button
+                                        variant="link"
+                                        onClick={handleManualClick}
+                                    >
+                                        <PlusIcon size={14} strokeWidth={3} />
+                                        Adicionar item manual
+                                    </Button>
+                                )}
+
+                                {/* SELECTED PRODUCT VIEW */}
                                 {selectedProduct && (
                                     <div className="space-y-6">
                                         <div className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/20">
@@ -199,7 +249,11 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                             <Button
                                                 variant="link"
                                                 className="ml-auto shrink-0"
-                                                onClick={() => setSelectedProduct(null)}
+                                                onClick={() => {
+                                                    setSelectedProduct(null)
+                                                    setSearchQuery("")
+                                                    setSearchResults([])
+                                                }}
                                             >
                                                 Trocar
                                             </Button>
@@ -207,6 +261,7 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                     </div>
                                 )}
 
+                                {/* MANUAL MODE */}
                                 {isManualMode && (
                                     <div>
                                         <Input
@@ -219,7 +274,8 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                     </div>
                                 )}
 
-                                {(selectedProduct || isManualMode) && (
+                                {/* USAGE TYPE & QUANTITY */}
+                                {showSelectionForm && (
                                     <>
                                         <div>
                                             <FormDropdown
@@ -249,7 +305,7 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                 )}
                             </div>
 
-                            {(selectedProduct || isManualMode) && (
+                            {showSelectionForm && (
                                 <div className="border-t border-brand-border dark:border-dark-border p-6">
                                     <Button
                                         variant="default"
@@ -257,7 +313,6 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                         onClick={handleConfirm}
                                         disabled={!canConfirm}
                                     >
-                                        <CheckCircleIcon size={18} className="mr-2" />
                                         Adicionar Item
                                     </Button>
                                 </div>

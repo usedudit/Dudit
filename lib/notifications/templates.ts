@@ -420,12 +420,14 @@ export function buildNotificationContent(
             if (audience === "seller") {
                 return {
                     title: "❌ Pedido cancelado",
-                    message: `O pedido ${orderRef} de ${customer} foi cancelado.`,
+                    message: `O pedido ${orderRef} de ${customer} foi cancelado.${ctx.cancellationNote ? ` Motivo: ${ctx.cancellationNote}.` : ""}`,
                 }
             }
             return {
                 title: "💔 Pedido cancelado",
-                message: `Seu pedido ${orderRef} em ${store} foi cancelado. Se tiver dúvidas, fale conosco. 🥺`,
+                message: ctx.cancellationNote
+                    ? `Seu pedido ${orderRef} em ${store} foi cancelado. Motivo: ${ctx.cancellationNote}.`
+                    : `Seu pedido ${orderRef} em ${store} foi cancelado. Se tiver dúvidas, fale conosco. 🥺`,
             }
         case "order_refunded":
             if (audience === "seller") {
