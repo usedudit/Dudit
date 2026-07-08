@@ -1,8 +1,6 @@
-"use client"
-
 import React, { useMemo } from "react"
 import { motion } from "framer-motion"
-import { Package, AlertTriangleIcon } from "@/lib/icons"
+import { Package, AlertTriangleIcon, InfoIcon } from "@/lib/icons"
 import { IconPlaceholder } from "@/components/reusable"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -19,12 +17,14 @@ interface ItemEntry {
     image?: string | null
     sku?: string | null
     stock?: number
+    minStock?: number
 }
 
 interface AppointmentItemsStepProps {
     items: ItemEntry[]
     onItemsChange: (items: ItemEntry[]) => void
     services: any[]
+    partnerPlan?: string
 }
 
 function resolveResourcesFromServices(services: any[]): ItemEntry[] {
@@ -64,7 +64,7 @@ const usageTypeLabels: Record<string, { label: string; color: string }> = {
     reference: { label: 'Referência', color: 'text-gray-500 bg-gray-50 dark:bg-gray-800 border-gray-200' },
 }
 
-export function AppointmentItemsStep({ items, onItemsChange, services }: AppointmentItemsStepProps) {
+export function AppointmentItemsStep({ items, onItemsChange, services, partnerPlan }: AppointmentItemsStepProps) {
     const hasItems = items.length > 0
 
     const handleQuantityChange = (key: string, quantity: number) => {
@@ -91,6 +91,8 @@ export function AppointmentItemsStep({ items, onItemsChange, services }: Appoint
         )
     }
 
+    const isAdvancedPlan = partnerPlan === 'crescer' || partnerPlan === 'escalar'
+
     return (
         <motion.div
             key="items"
@@ -105,16 +107,28 @@ export function AppointmentItemsStep({ items, onItemsChange, services }: Appoint
                 </h3>
                 <p className="text-brand-inactive-text dark:text-dark-body text-sm mb-6">
                     Ajuste a quantidade de cada item para este agendamento.
+                    {isAdvancedPlan && (
+                        <span className="ml-2 text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/10 px-2 py-0.5 rounded">
+                            Estoque verificado antes de confirmar
+                        </span>
+                    )}
                 </p>
             </div>
 
             <div className="space-y-3">
                 {items.map((item) => {
                     const typeInfo = usageTypeLabels[item.usageType] || usageTypeLabels.reference
+                    const isConsumed = item.usageType === 'consumed'
+                    const currentStock = item.stock ?? 0
+                    const projectedStock = currentStock - item.quantity
+                    const minStock = item.minStock ?? 0
+                    const willGoNegative = isConsumed && projectedStock < 0
+                    const willGoBelowMin = isConsumed && minStock > 0 && projectedStock < minStock
+
                     return (
                         <div
                             key={item.key}
-                            className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                            className={`flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface ${(willGoNegative || willGoBelowMin) && isAdvancedPlan ? 'border-amber-300 dark:border-amber-800/30 bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
                         >
                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
                                 {item.image ? (
@@ -136,6 +150,30 @@ export function AppointmentItemsStep({ items, onItemsChange, services }: Appoint
                                         {typeInfo.label}
                                     </span>
                                 </div>
+                                {isConsumed && item.stock !== undefined && (
+                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                                            willGoNegative ? 'text-red-600 bg-red-50 border-red-100' :
+                                            willGoBelowMin ? 'text-amber-600 bg-amber-50 border-amber-100' :
+                                            projectedStock <= minStock && minStock > 0 ? 'text-amber-600 bg-amber-50 border-amber-100' :
+                                            'text-emerald-600 bg-emerald-50 border-emerald-100'
+                                        }`}>
+                                            {willGoNegative ? (
+                                                <>
+                                                    <AlertTriangleIcon size={10} className="mr-0.5" />
+                                                    Estoque ficará {projectedStock} (negativo)
+                                                </>
+                                            ) : willGoBelowMin ? (
+                                                <>
+                                                    <InfoIcon size={10} className="mr-0.5" />
+                                                    Abaixo do mínimo ({projectedStock}/{minStock})
+                                                </>
+                                            ) : (
+                                                `Estoque após: ${projectedStock} ${minStock > 0 ? `(mín: ${minStock})` : ''}`
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
                                 {item.stock !== undefined && item.stock <= 0 && item.usageType !== 'reference' && (
                                     <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-600 font-medium">
                                         <AlertTriangleIcon size={10} />

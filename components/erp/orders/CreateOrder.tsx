@@ -1534,7 +1534,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
 
                                         {(() => {
-                                            const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "A Receber"})` : "";
+                                            const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
                                             const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && originalPaymentMethod && originalPaymentMethod !== "Não informado"
                                                 ? `Mercado Pago (${originalPaymentMethod})${pendingSuffix}`
                                                 : `${originalPaymentMethod || "Não informado"}${pendingSuffix}`;

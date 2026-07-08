@@ -80,6 +80,8 @@ const getLocalTimeString = (d: Date) => {
 export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData }: ServiceOrderFormProps) {
     const { toast } = useToast()
     const [activeTab, setActiveTab] = useState("general")
+    const isLocked = editData?.payment_status === "paid" || editData?.payment_status === "partially_paid"
+
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
 
     const [services, setServices] = useState<any[]>(() => {
@@ -472,7 +474,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         if (hasEmptyProduct) {
             newErrors.add("productsName")
         }
-        const hasEmptyProductPrice = products.some(p => p.isManual && (!p.product_price || Number(p.product_price) <= 0))
+        const hasEmptyProductPrice = products.some(p => p.isManual && (!p.unit_price || Number(p.unit_price) <= 0))
         if (hasEmptyProductPrice) {
             newErrors.add("productsPrice")
         }
@@ -903,9 +905,11 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button onClick={handleSave} disabled={saving} leftIcon={<SaveIcon size={18} />}>
-                                            {saving ? "Salvando..." : editData ? "Salvar" : "Criar OS"}
-                                        </Button>
+                                        {!isLocked && (
+                                            <Button onClick={handleSave} disabled={saving} leftIcon={<SaveIcon size={18} />}>
+                                                {saving ? "Salvando..." : editData ? "Salvar" : "Criar OS"}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -940,6 +944,15 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                         {/* Tab Content */}
                         <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            {isLocked && (
+                                <div className="mb-6">
+                                    <InfoCard
+                                        title="Ordem de Serviço Bloqueada"
+                                        message="Esta Ordem de Serviço possui pagamentos registrados (Parcialmente Paga ou Paga) e não pode mais ser alterada."
+                                        color="orange"
+                                    />
+                                </div>
+                            )}
                             <AnimatePresence mode="wait">
                                 {activeTab === "general" && (
                                     <FadeIn key="general" className="grid grid-cols-12 gap-y-8 md:gap-y-0 w-full">
@@ -950,6 +963,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     placeholder="Ex: Manutenção de ar condicionado"
                                                     value={title}
                                                     onChange={(e) => setTitle(e.target.value)}
+                                                    disabled={isLocked}
                                                     error={fieldErrors.has("title")}
                                                     errorMessage={fieldErrors.has("title") ? "O título é obrigatório" : undefined}
                                                 />
@@ -957,10 +971,11 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                                             <FormSection title="Descrição">
                                                 <textarea
-                                                    className="w-full min-h-[120px] px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green resize-y"
+                                                    className="w-full min-h-[120px] px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green resize-y disabled:opacity-50"
                                                     placeholder="Descreva o serviço a ser realizado..."
                                                     value={description}
                                                     onChange={(e) => setDescription(e.target.value)}
+                                                    disabled={isLocked}
                                                 />
                                             </FormSection>
 
@@ -970,6 +985,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         label="Data de abertura"
                                                         value={openingDate}
                                                         onChange={setOpeningDate}
+                                                        disabled={isLocked}
                                                         placeholder="Data de hoje"
                                                     />
 
@@ -977,6 +993,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         label="Hora de abertura"
                                                         value={openingTime}
                                                         onChange={(time) => setOpeningTime(time)}
+                                                        disabled={isLocked}
                                                         placeholder="Agora"
                                                     />
 
@@ -984,6 +1001,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         label="Data prevista de conclusão"
                                                         value={expectedDate}
                                                         onChange={setExpectedDate}
+                                                        disabled={isLocked}
                                                         placeholder="Selecionar data"
                                                     />
 
@@ -991,6 +1009,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         label="Hora prevista para conclusão"
                                                         value={expectedCompletionTime}
                                                         onChange={(time) => setExpectedCompletionTime(time)}
+                                                        disabled={isLocked}
                                                         placeholder="14:30"
                                                     />
 
@@ -998,6 +1017,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         label="Status"
                                                         value={status}
                                                         setValue={(val) => setStatus(val)}
+                                                        disabled={isLocked}
                                                         options={Object.entries(SERVICE_ORDER_STATUS_META).map(([value, meta]) => ({
                                                             value,
                                                             label: meta.label,
@@ -1008,6 +1028,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         label="Prioridade"
                                                         value={priority}
                                                         setValue={(val) => setPriority(val)}
+                                                        disabled={isLocked}
                                                         options={[
                                                             { value: "baixa", label: "Baixa" },
                                                             { value: "media", label: "Média" },
@@ -1020,6 +1041,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         label="Responsável Técnico"
                                                         value={assignedUserId}
                                                         setValue={(val) => setAssignedUserId(val)}
+                                                        disabled={isLocked}
                                                         options={teamMembers.map(m => ({
                                                             value: m.userId,
                                                             label: m.fullName || m.email || "Sem Nome",
@@ -1034,6 +1056,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         placeholder="0h 0m"
                                                         value={estimatedHours}
                                                         onChange={(val) => setEstimatedHours(val)}
+                                                        disabled={isLocked}
                                                     />
                                                 </div>
                                             </FormSection>
@@ -1045,7 +1068,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                 {selectedCustomer ? (
                                                     <CustomerCard
                                                         customer={selectedCustomer}
-                                                        onRemove={() => {
+                                                        onRemove={isLocked ? undefined : () => {
                                                             setCustomerId("")
                                                             setCustomerName("")
                                                             setSelectedCustomer(null)
@@ -1057,7 +1080,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                             ? "border-brand-red dark:border-brand-red-dark"
                                                             : "border-brand-border dark:border-dark-border"
                                                             }`}
-                                                        onClick={() => setShowCustomerSheet(true)}
+                                                        onClick={isLocked ? undefined : () => setShowCustomerSheet(true)}
                                                     >
                                                         <div className={`absolute top-0 left-0 w-full h-1 ${fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"
                                                             }`}></div>
@@ -1065,7 +1088,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                             icon={UserIcon}
                                                             title="Nenhum cliente selecionado"
                                                             subtitle="Selecione um cliente para vincular à ordem de serviço."
-                                                            itemButton={{
+                                                            itemButton={isLocked ? undefined : {
                                                                 text: "Selecionar Cliente",
                                                                 action: () => setShowCustomerSheet(true),
                                                                 variant: "outline",
@@ -1076,7 +1099,6 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                 )}
                                             </div>
 
-                                            {/* Totals & Payment Section */}
                                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-6">
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                                     Pagamento
@@ -1087,7 +1109,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                         icon={TagIcon}
                                                         title="Aplicar desconto"
                                                         description={couponId || discountValue > 0 ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique na OS"}
-                                                        onClick={() => setIsDiscountModalOpen(true)}
+                                                        onClick={isLocked ? undefined : () => setIsDiscountModalOpen(true)}
                                                         className="px-4 py-3 gap-4 cursor-pointer border border-brand-border dark:border-dark-border rounded-xl"
                                                     />
 
@@ -1169,8 +1191,9 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             <Input
                                                 label=""
                                                 name="serviceSearch"
-                                                placeholder="Buscar serviços para adicionar..."
+                                                placeholder={isLocked ? "OS bloqueada para edições" : "Buscar serviços para adicionar..."}
                                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                                disabled={isLocked}
                                                 value={servicesBucket.searchQuery}
                                                 onChange={(e) => {
                                                     servicesBucket.setSearchQuery(e.target.value)
@@ -1245,7 +1268,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     icon={WrenchIcon}
                                                     title="Nenhum serviço adicionado"
                                                     subtitle="Busque serviços no campo acima ou adicione um serviço avulso manualmente."
-                                                    itemButton={{
+                                                    itemButton={isLocked ? undefined : {
                                                         text: "Adicionar serviço manual",
                                                         action: addBlankService,
                                                         variant: "outline",
@@ -1311,6 +1334,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     value={unitPrice}
                                                                                     onChange={(val) => updateServiceField(index, "service_price", val)}
                                                                                     className="mb-0"
+                                                                                    disabled={isLocked}
                                                                                 />
                                                                             </div>
                                                                         </td>
@@ -1320,6 +1344,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     value={qty}
                                                                                     onChange={(val) => updateServiceField(index, "quantity", val)}
                                                                                     size="md"
+                                                                                    disabled={isLocked}
                                                                                 />
                                                                             </div>
                                                                         </td>
@@ -1342,7 +1367,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     </button>
                                                                                 ) : svc.isManual ? (
                                                                                     <button
-                                                                                        onClick={() => updateServiceField(index, "isEditing", true)}
+                                                                                        onClick={isLocked ? undefined : () => updateServiceField(index, "isEditing", true)}
+                                                                                         disabled={isLocked}
                                                                                         className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                                                         title="Editar"
                                                                                     >
@@ -1350,7 +1376,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     </button>
                                                                                 ) : null}
                                                                                 <button
-                                                                                    onClick={() => handleRemoveService(svc.service_id || svc.id)}
+                                                                                    onClick={isLocked ? undefined : () => handleRemoveService(svc.service_id || svc.id)}
+                                                                                     disabled={isLocked}
                                                                                     className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
                                                                                     title="Remover"
                                                                                 >
@@ -1414,6 +1441,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     value={unitPrice}
                                                                                     onChange={(val) => updateServiceField(index, "service_price", val)}
                                                                                     className="mb-0"
+                                                                                    disabled={isLocked}
                                                                                 />
                                                                             </div>
                                                                         </div>
@@ -1435,14 +1463,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                             </button>
                                                                         ) : svc.isManual ? (
                                                                             <button
-                                                                                onClick={() => updateServiceField(index, "isEditing", true)}
+                                                                                onClick={isLocked ? undefined : () => updateServiceField(index, "isEditing", true)}
+                                                                                         disabled={isLocked}
                                                                                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
                                                                             >
                                                                                 <EditIcon size={14} />
                                                                             </button>
                                                                         ) : null}
                                                                         <button
-                                                                            onClick={() => handleRemoveService(svc.service_id || svc.id)}
+                                                                            onClick={isLocked ? undefined : () => handleRemoveService(svc.service_id || svc.id)}
+                                                                                     disabled={isLocked}
                                                                             className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
                                                                         >
                                                                             <TrashIcon size={14} />
@@ -1460,6 +1490,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     variant="link"
                                                     onClick={addBlankService}
                                                     className="pl-0 mt-2"
+                                                    disabled={isLocked}
                                                 >
                                                     <PlusIcon size={14} strokeWidth={3} />
                                                     Adicionar serviço manual
@@ -1486,8 +1517,9 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             <Input
                                                 label=""
                                                 name="productSearch"
-                                                placeholder="Buscar produtos para adicionar..."
+                                                placeholder={isLocked ? "OS bloqueada para edições" : "Buscar produtos para adicionar..."}
                                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                                disabled={isLocked}
                                                 value={productsBucket.searchQuery}
                                                 onChange={(e) => {
                                                     productsBucket.setSearchQuery(e.target.value)
@@ -1535,7 +1567,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                         <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{prod.sku}</div>
                                                                     </div>
                                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), null, [], { productId: prod.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
+                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), (prod as any).promotional_price && Number((prod as any).promotional_price) < Number(prod.price || 0) ? Number((prod as any).promotional_price) : null, activePromotions, { productId: prod.id, categoryId: (prod as any).category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
                                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                             {prod.stock} em estoque
                                                                         </div>
@@ -1556,7 +1588,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     icon={PackageIcon}
                                                     title="Nenhum produto adicionado"
                                                     subtitle="Busque produtos no campo acima ou adicione um produto avulso manualmente."
-                                                    itemButton={{
+                                                    itemButton={isLocked ? undefined : {
                                                         text: "Adicionar produto manual",
                                                         action: addBlankProduct,
                                                         variant: "outline",
@@ -1626,6 +1658,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     value={unitPrice}
                                                                                     onChange={(val) => updateProductField(index, "unit_price", val)}
                                                                                     className="mb-0"
+                                                                                    disabled={isLocked}
                                                                                 />
                                                                             </div>
                                                                         </td>
@@ -1635,6 +1668,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     value={qty}
                                                                                     onChange={(val) => updateProductField(index, "quantity", val)}
                                                                                     size="md"
+                                                                                    disabled={isLocked}
                                                                                 />
                                                                                 {!prod.isManual && Number(prod.stock || 0) <= 0 && (
                                                                                     <Tooltip text="Produto sem estoque disponível no momento">
@@ -1666,7 +1700,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     </button>
                                                                                 ) : prod.isManual ? (
                                                                                     <button
-                                                                                        onClick={() => updateProductField(index, "isEditing", true)}
+                                                                                        onClick={isLocked ? undefined : () => updateProductField(index, "isEditing", true)}
+                                                                                         disabled={isLocked}
                                                                                         className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                                                         title="Editar"
                                                                                     >
@@ -1674,7 +1709,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     </button>
                                                                                 ) : null}
                                                                                 <button
-                                                                                    onClick={() => handleRemoveProduct(prod.product_id || prod.id)}
+                                                                                    onClick={isLocked ? undefined : () => handleRemoveProduct(prod.product_id || prod.id)}
+                                                                                    disabled={isLocked}
                                                                                     className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
                                                                                     title="Remover"
                                                                                 >
@@ -1753,6 +1789,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                     value={unitPrice}
                                                                                     onChange={(val) => updateProductField(index, "unit_price", val)}
                                                                                     className="mb-0"
+                                                                                    disabled={isLocked}
                                                                                 />
                                                                             </div>
                                                                         </div>
@@ -1774,14 +1811,16 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                             </button>
                                                                         ) : prod.isManual ? (
                                                                             <button
-                                                                                onClick={() => updateProductField(index, "isEditing", true)}
+                                                                                onClick={isLocked ? undefined : () => updateProductField(index, "isEditing", true)}
+                                                                                         disabled={isLocked}
                                                                                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
                                                                             >
                                                                                 <EditIcon size={14} />
                                                                             </button>
                                                                         ) : null}
                                                                         <button
-                                                                            onClick={() => handleRemoveProduct(prod.product_id || prod.id)}
+                                                                            onClick={isLocked ? undefined : () => handleRemoveProduct(prod.product_id || prod.id)}
+                                                                                    disabled={isLocked}
                                                                             className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
                                                                         >
                                                                             <TrashIcon size={14} />
@@ -1860,11 +1899,13 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                     {/* Mobile Bottom Action Bar */}
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         <Button variant="outline" onClick={handleBack} disabled={saving} className="flex-1 h-12">
-                            Cancelar
+                            {isLocked ? "Voltar" : "Cancelar"}
                         </Button>
-                        <Button onClick={handleSave} disabled={saving} className="flex-1 h-12" leftIcon={<SaveIcon size={18} />}>
-                            {saving ? "Salvando..." : editData ? "Salvar" : "Criar OS"}
-                        </Button>
+                        {!isLocked && (
+                            <Button onClick={handleSave} disabled={saving} className="flex-1 h-12" leftIcon={<SaveIcon size={18} />}>
+                                {saving ? "Salvando..." : editData ? "Salvar" : "Criar OS"}
+                            </Button>
+                        )}
                     </div>
                 </Tabs>
             </div>

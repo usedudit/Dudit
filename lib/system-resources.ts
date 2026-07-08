@@ -125,7 +125,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "deliveries",
     label: "Entregas",
-    description: "Expedição, rotas, entregadores e dashboard de entregas.",
+    description: "Expedição e rotas.",
     module: "operations",
     minimumPlan: "crescer",
   },

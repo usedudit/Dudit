@@ -24,8 +24,8 @@ type BadgeVariant = "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "g
 const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {
   paid: { label: "Pago", variant: "green" },
   partially_paid: { label: "Parcialmente Pago", variant: "orange" },
-  pending: { label: "A Receber", variant: "orange" },
-  unpaid: { label: "A Receber", variant: "orange" },
+  pending: { label: "Pendente", variant: "gray" },
+  unpaid: { label: "Pendente", variant: "gray" },
   cancelled: { label: "Cancelado", variant: "red" },
   in_process: { label: "Em análise", variant: "orange" },
   shipped: { label: "Enviado", variant: "blue" },

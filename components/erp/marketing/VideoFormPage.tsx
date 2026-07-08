@@ -4,9 +4,11 @@ import React, { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Button, Input, FormTextarea, Badge, FormSection } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
+import CommunityVideoUploadSection from "./CommunityVideoUploadSection"
 import SelectVideoProductSheet from "./SelectVideoProductSheet"
 import SelectVideoServiceSheet from "./SelectVideoServiceSheet"
-import { ChevronLeftIcon, LinkIcon, PlayIcon } from "@/lib/icons"
+import { ChevronLeftIcon, LinkIcon } from "@/lib/icons"
+import type { VideoMetadata } from "@/lib/video/shared"
 import { supabaseBrowser } from "@/lib/supabase/browser-client"
 
 interface VideoFormPageProps {
@@ -16,16 +18,21 @@ interface VideoFormPageProps {
     isLoading?: boolean
 }
 
+const EMPTY_VIDEO: VideoMetadata = {
+    video_type: null,
+    video_url: null,
+    video_thumbnail: null,
+    video_duration: null,
+    video_provider_id: null,
+}
+
 export default function VideoFormPage({ video, onSave, onCancel, isLoading }: VideoFormPageProps) {
     const isEditing = !!video
     const [saving, setSaving] = useState(false)
 
     const [title, setTitle] = useState("")
     const [description, setDescription] = useState("")
-    const [videoUrl, setVideoUrl] = useState("")
-    const [videoThumbnail, setVideoThumbnail] = useState("")
-    const [publishedAt, setPublishedAt] = useState("")
-    const [duration, setDuration] = useState(0)
+    const [videoMeta, setVideoMeta] = useState<VideoMetadata>(EMPTY_VIDEO)
     const [tags, setTags] = useState<string[]>([])
 
     const [linkedProductId, setLinkedProductId] = useState<string | null>(null)
@@ -46,10 +53,13 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
         if (video) {
             setTitle(video.title || "")
             setDescription(video.description || "")
-            setVideoUrl(video.video_url || "")
-            setVideoThumbnail(video.video_thumbnail || "")
-            setPublishedAt(video.published_at ? video.published_at.split("T")[0] : "")
-            setDuration(video.duration || 0)
+            setVideoMeta({
+                video_type: video.video_type || null,
+                video_url: video.video_url || null,
+                video_thumbnail: video.video_thumbnail || null,
+                video_duration: video.duration || video.video_duration || null,
+                video_provider_id: video.video_provider_id || null,
+            })
             setTags(video.tags || [])
             setLinkedProductId(video.linked_product_id || null)
             setLinkedServiceId(video.linked_service_id || null)
@@ -89,10 +99,10 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
     const validate = useCallback(() => {
         const errs: Record<string, string> = {}
         if (!title.trim()) errs.title = "O título é obrigatório"
-        if (!videoUrl.trim()) errs.videoUrl = "A URL do vídeo é obrigatória"
+        if (!videoMeta.video_url) errs.videoUrl = "Adicione um vídeo"
         setErrors(errs)
         return Object.keys(errs).length === 0
-    }, [title, videoUrl])
+    }, [title, videoMeta.video_url])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -102,10 +112,11 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
             await onSave({
                 title: title.trim(),
                 description: description.trim(),
-                video_url: videoUrl.trim(),
-                video_thumbnail: videoThumbnail.trim() || null,
-                published_at: publishedAt ? new Date(publishedAt).toISOString() : null,
-                duration,
+                video_url: videoMeta.video_url,
+                video_thumbnail: videoMeta.video_thumbnail,
+                duration: videoMeta.video_duration ? Math.round(videoMeta.video_duration) : null,
+                video_type: videoMeta.video_type,
+                video_provider_id: videoMeta.video_provider_id,
                 tags,
                 linked_product_id: linkedProductId,
                 linked_service_id: linkedServiceId,
@@ -170,12 +181,10 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                             <div className="space-y-5">
                                 <Input label="Título" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do vídeo" error={!!errors.title} errorMessage={errors.title} />
                                 <FormTextarea label="Descrição" name="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição do vídeo..." rows={4} />
-                                <Input label="URL do Vídeo" name="videoUrl" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://..." prefix={<PlayIcon size={18} />} error={!!errors.videoUrl} errorMessage={errors.videoUrl} />
-                                <Input label="URL da Thumbnail" name="videoThumbnail" value={videoThumbnail} onChange={(e) => setVideoThumbnail(e.target.value)} placeholder="https://..." />
-                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                    <Input label="Publicado em" name="publishedAt" type="date" value={publishedAt} onChange={(e) => setPublishedAt(e.target.value)} />
-                                    <Input label="Duração (segundos)" name="duration" type="number" value={duration.toString()} onChange={(e) => setDuration(Number(e.target.value))} />
-                                </div>
+                                <CommunityVideoUploadSection
+                                    video={videoMeta}
+                                    onChange={setVideoMeta}
+                                />
                                 <Input label="Tags (separadas por vírgula)" name="tags" value={tags.join(", ")} onChange={(e) => setTags(e.target.value.split(",").map((t) => t.trim()).filter(Boolean))} placeholder="tag1, tag2, tag3" />
                             </div>
                         </FormSection>

@@ -327,8 +327,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             case "pending":
             case "unpaid":
                 return {
-                    label: "A Receber",
-                    color: "text-brand-orange dark:text-orange-400",
+                    label: "Pendente",
+                    color: "text-brand-inactive-text dark:text-dark-body",
                     Icon: ClockIcon,
                 };
             case "cancelled":
@@ -418,7 +418,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const canEdit = order.situation !== "cancelled"
     const isPickupOrder = order.delivery_type === "pickup" || Number(order.delivery_fee || 0) <= 0
 
-    const isMarketplaceOrder = order.order_source === "Marketplace" || order.order_source === "Online Store"
+    const isMarketplaceOrder = order.order_source === "Marketplace" || order.order_source === "Online Store" || order.order_source === "Vitrine Online"
 
     const itemsBaseSubtotal = (sortedOrderItems || []).reduce(
         (sum: number, item: any) => sum + Number(item.subtotal || item.product_price * item.quantity || 0), 0
@@ -436,7 +436,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     // Detect if order has services vs products for dynamic timeline labels
     const orderItems = order.order_items || []
-    const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking")
+    const hasOnlyServices = order.order_source === "admin_service_order" || (orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking"))
     const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking")
     const hasMixedItems = hasAnyService && !hasOnlyServices
 
@@ -942,8 +942,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 <PaymentRow
                                                                     label={
                                                                         order.payment_method === "exchange" ? "Crédito de troca" :
-                                                                        order.payment_method === "store_credit" ? "Vale-compra utilizado" :
-                                                                        "Desconto do Método"
+                                                                            order.payment_method === "store_credit" ? "Vale-compra utilizado" :
+                                                                                "Desconto do Método"
                                                                     }
                                                                     value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                             )}
@@ -995,7 +995,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <InfoCard
                                                             title="Troco Necessário"
                                                             message={`O cliente pagará em dinheiro e precisa de troco para ${formatCurrency(payWithAmount)}. Levar ${formatCurrency(cashChangeAmount)} de troco.`}
-                                                            color="orange" />
+                                                            color="blue" />
                                                     )}
 
                                                     <CustomerCard

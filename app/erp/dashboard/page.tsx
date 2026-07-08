@@ -4,6 +4,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { GeneralTab } from "@/components/erp/dashboard/widgets/GeneralTab"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
+import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { normalizeBusinessInfo } from "@/lib/business-info"
@@ -47,24 +48,26 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
         <>
             <ERPPageHeader title={activeStore?.storeName ?? "Dashboard"} />
             <FadeIn className="p-4">
-                <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-                    <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                Dashboard
-                            </h1>
-                            <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
-                        </div>
-                        <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-                            <GlobalPeriodFilter />
+                <DashboardProvider>
+                    <div className="w-full space-y-6 pt-4 px-4 md:px-8">
+                        <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                    Dashboard
+                                </h1>
+                                <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                    {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                            </div>
+                            <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                                <GlobalPeriodFilter />
+                            </Suspense>
+                        </header>
+                        <Suspense fallback={<DashboardSkeleton />}>
+                            <GeneralTab partnerId={partnerId} sells={sells} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />
                         </Suspense>
-                    </header>
-                    <Suspense fallback={<DashboardSkeleton />}>
-                        <GeneralTab partnerId={partnerId} sells={sells} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />
-                    </Suspense>
-                </div>
+                    </div>
+                </DashboardProvider>
             </FadeIn>
         </>
     )

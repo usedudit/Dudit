@@ -269,8 +269,29 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                     <div className="h-px bg-brand-border dark:bg-dark-border w-full mb-6" />
 
                                                     {/* Items List */}
+                                                    {(() => {
+                                                        const itemsBaseSubtotal = (order.order_items || []).reduce(
+                                                            (sum: number, i: any) => sum + Number(i.subtotal ?? Number(i.product_price || 0) * Number(i.quantity || 0)),
+                                                            0
+                                                        )
+                                                        const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || 0))
+                                                        const pmDiscount = Math.max(0, Number(order.payment_method_discount_amount || 0))
+                                                        const pmExtra = Math.max(0, Number(order.payment_method_extra_amount || 0))
+                                                        const subtotalVal = Number(order.subtotal_value || 0) > 0
+                                                            ? Number(order.subtotal_value || 0)
+                                                            : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscount + pmDiscount - pmExtra
+                                                        const hasItemDiscount = itemsBaseSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsBaseSubtotal - subtotalVal) > 0.005
+                                                        const itemDiscountRatio = hasItemDiscount ? subtotalVal / itemsBaseSubtotal : 1
+                                                        const getDiscountedPrice = (item: any) => {
+                                                            const basePrice = Number(item.product_price || 0)
+                                                            if (item.is_gift || item.is_promotional) return basePrice
+                                                            if (!hasItemDiscount) return basePrice
+                                                            return Math.round(basePrice * itemDiscountRatio * 100) / 100
+                                                        }
+                                                        return (
                                                     <div className="space-y-4">
                                                         {order.order_items?.map((item: any) => {
+                                                            const discountedPrice = getDiscountedPrice(item)
                                                             const itemImage = getPrimaryProductDisplayImage({
                                                                 images: item.products?.images || item.services?.images || null,
                                                                 video_thumbnail: item.products?.video_thumbnail || null,
@@ -310,7 +331,28 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                                 <div className="flex items-center gap-2 text-xs mt-1">
                                                                                     <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
                                                                                     <span className="text-brand-border dark:text-dark-border">|</span>
-                                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(item.product_price, item.products?.unit)}</span>
+                                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                                        {(() => {
+                                                                                            const basePrice = Number(item.product_price || 0)
+                                                                                            if (item.is_gift) {
+                                                                                                return (
+                                                                                                    <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                                    </span>
+                                                                                                )
+                                                                                            }
+                                                                                            if (hasItemDiscount && Math.abs(basePrice - discountedPrice) > 0.005) {
+                                                                                                return (
+                                                                                                    <span className="flex items-center gap-1.5 inline-flex">
+                                                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatProductUnitPrice(basePrice, item.products?.unit)}</span>
+                                                                                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(discountedPrice, item.products?.unit)}</span>
+                                                                                                    </span>
+                                                                                                )
+                                                                                            }
+                                                                                            return formatProductUnitPrice(basePrice, item.products?.unit)
+                                                                                        })()}
+                                                                                    </span>
                                                                                 </div>
                                                                             </div>
                                                                         </div>
@@ -333,6 +375,8 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             );
                                                         })}
                                                     </div>
+                                                )
+                                            })()}
 
                                                     {/* Actions Footer */}
                                                     <div className="flex flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-brand-border dark:border-dark-border w-full flex-wrap">

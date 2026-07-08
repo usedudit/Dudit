@@ -288,6 +288,7 @@ export async function createServiceOrderAction(
       } catch { }
     }
 
+    await recalcTotals(admin, data.id)
     revalidatePath("/erp/service-orders")
     return { success: true, data, orderNumber }
   } catch (err: any) {
@@ -338,6 +339,15 @@ export async function addServicesToOrderAction(
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
     const admin = getAdminClient()
+
+    const { data: current } = await admin
+      .from("service_orders")
+      .select("payment_status")
+      .eq("id", serviceOrderId)
+      .single()
+    if (current?.payment_status === "paid" || current?.payment_status === "partially_paid") {
+      throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
+    }
 
     const validServiceIds = services.map(s => s.service_id).filter((id): id is string => !!id)
     let svcRows: any[] = []
@@ -395,6 +405,15 @@ export async function addProductsToOrderAction(
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
     const admin = getAdminClient()
+
+    const { data: current } = await admin
+      .from("service_orders")
+      .select("payment_status")
+      .eq("id", serviceOrderId)
+      .single()
+    if (current?.payment_status === "paid" || current?.payment_status === "partially_paid") {
+      throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
+    }
 
     const validProductIds = products.map(p => p.product_id).filter((id): id is string => !!id)
     let prodRows: any[] = []
@@ -800,8 +819,9 @@ export async function getServiceOrderByTokenAction(
         id, order_number, status, title, description, expected_completion_date, completed_at,
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
         customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
+        public_token,
         partners (
-          id, store_name, store_image_url, address, phone
+          id, store_name, store_image_url, phone
         )
       `)
       .eq("public_token", token)
@@ -815,8 +835,9 @@ export async function getServiceOrderByTokenAction(
           id, order_number, status, title, description, expected_completion_date, completed_at,
           total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
           customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
+          public_token,
           partners (
-            id, store_name, store_image_url, address, phone
+            id, store_name, store_image_url, phone
           )
         `)
         .eq("id", token)
@@ -824,7 +845,9 @@ export async function getServiceOrderByTokenAction(
       if (byId) {
         // Generate public_token on the fly for this OS
         if (!byId.public_token) {
-          await admin.from("service_orders").update({ public_token: token }).eq("id", token)
+          const newToken = crypto.randomUUID()
+          await admin.from("service_orders").update({ public_token: newToken }).eq("id", token)
+          byId.public_token = newToken
         }
         row = byId
       } else {
@@ -832,13 +855,14 @@ export async function getServiceOrderByTokenAction(
       }
     }
 
-    const [services, products, attachments, historyRes, statusHistoryRes, saleRes] = await Promise.all([
+    const [services, products, attachments, historyRes, statusHistoryRes, saleRes, addressRes] = await Promise.all([
       admin.from("service_order_services").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_products").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_attachments").select("file_name, file_key, file_type, category, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       admin.from("audit_logs").select("id, action_type, change_lines, created_at").eq("entity_type", "service_order").eq("entity_id", row.id).order("created_at", { ascending: false }).limit(50),
       admin.from("service_order_history").select("*").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       row.sale_id ? admin.from("sales").select("id, sale_number, total_amount, discount_amount, final_amount, paid_amount, payment_status, status, created_at").eq("id", row.sale_id).single() : Promise.resolve({ data: null }),
+      admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").eq("partner_id", row.partner_id),
     ])
 
     const customerName = (row.customer_snapshot as any)?.name || null
@@ -866,6 +890,13 @@ export async function getServiceOrderByTokenAction(
       assignedUserName = profile?.full_name || null
     }
 
+    const addressesList = addressRes.data || []
+    const addressRow = addressesList.find((a: any) => a.is_default) || addressesList[0]
+    let partnerAddress = "Endereço não cadastrado"
+    if (addressRow) {
+      partnerAddress = `${addressRow.street || ""}, ${addressRow.number || "S/N"}${addressRow.complement ? ` - ${addressRow.complement}` : ""}${addressRow.neighborhood ? ` - ${addressRow.neighborhood}` : ""}, ${addressRow.city || ""} - ${addressRow.state || ""}`.replace(/\s+/g, ' ').trim()
+    }
+
     const serviceOrder = {
       id: row.id,
       partner_id: row.partner_id,
@@ -887,8 +918,10 @@ export async function getServiceOrderByTokenAction(
       metadata: row.metadata,
       lockout_until: row.lockout_until,
       assigned_user_name: assignedUserName,
+      public_token: row.public_token,
       partners: row.partners ? {
         ...(Array.isArray(row.partners) ? row.partners[0] : row.partners),
+        address: partnerAddress,
         plan_tier: planTier,
       } : null,
     }
@@ -906,6 +939,7 @@ export async function getServiceOrderByTokenAction(
       },
     }
   } catch (err: any) {
+    console.error("Error in getServiceOrderByTokenAction:", err)
     return { success: false, error: err.message || "Ordem de serviço não encontrada" }
   }
 }
@@ -952,6 +986,10 @@ export async function updateServiceOrderAction(
       .single()
 
     if (getErr || !current) throw new Error("Ordem de serviço não encontrada")
+
+    if (current.payment_status === "paid" || current.payment_status === "partially_paid") {
+      throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
+    }
 
     const updateData: any = {}
     if (input.title !== undefined) updateData.title = input.title
@@ -1005,6 +1043,7 @@ export async function updateServiceOrderAction(
       changeLines: changes.length > 0 ? changes : ["Dados da OS atualizados"],
     })
 
+    await recalcTotals(admin, serviceOrderId)
     revalidatePath("/erp/service-orders")
     return { success: true, data }
   } catch (err: any) {
@@ -1021,6 +1060,15 @@ export async function syncServiceOrderServicesAction(
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requirePermission(partnerId, "service_orders", "edit")
     const admin = getAdminClient()
+
+    const { data: current } = await admin
+      .from("service_orders")
+      .select("payment_status")
+      .eq("id", serviceOrderId)
+      .single()
+    if (current?.payment_status === "paid" || current?.payment_status === "partially_paid") {
+      throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
+    }
 
     // 1. Delete all existing services
     const { error: delErr } = await admin
@@ -1079,6 +1127,15 @@ export async function syncServiceOrderProductsAction(
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requirePermission(partnerId, "service_orders", "edit")
     const admin = getAdminClient()
+
+    const { data: current } = await admin
+      .from("service_orders")
+      .select("payment_status")
+      .eq("id", serviceOrderId)
+      .single()
+    if (current?.payment_status === "paid" || current?.payment_status === "partially_paid") {
+      throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
+    }
 
     // 1. Delete all existing products
     const { error: delErr } = await admin
@@ -1140,6 +1197,10 @@ export async function confirmServiceOrderPaymentAction(payload: {
     amount: number
     paymentMethodId?: string | null
     installmentNumber?: number
+    adjustmentType?: string
+    adjustmentAmount?: number
+    feeBearer?: string
+    amountReceived?: number
   }>
   paymentProvider?: string | null
   mpPaymentId?: string | null
@@ -1174,7 +1235,57 @@ export async function confirmServiceOrderPaymentAction(payload: {
     const orderServices = servicesRes.data || []
     const orderProducts = productsRes.data || []
 
-    const totalAmount = Number(order.total_amount || 0)
+    // Calculate subtotal (merchandise/services base total)
+    const subtotal = orderServices.reduce((acc: number, s: any) => acc + Number(s.total_price || 0), 0) +
+                     orderProducts.reduce((acc: number, p: any) => acc + Number(p.total_price || 0), 0)
+
+    // Calculate discount amount from order discount fields
+    let discountAmount = 0
+    if (order.discount_type === "percentage") {
+      discountAmount = subtotal * (Number(order.discount_value || 0) / 100)
+    } else if (order.discount_type === "fixed") {
+      discountAmount = Number(order.discount_value || 0)
+    } else if (order.discount_type === "coupon") {
+      discountAmount = Number(order.coupon_discount_amount || 0)
+    }
+
+    const otherCosts = Number(order.other_costs || 0)
+    const baseFinalAmount = subtotal - discountAmount + otherCosts
+
+    // Aggregate payment method adjustments
+    let paymentMethodDiscountAmount = 0
+    let paymentMethodExtraAmount = 0
+    let interestAmount = 0
+    let feeAmount = 0
+    let originalAmount = 0
+
+    if (payload.paymentBreakdown && Array.isArray(payload.paymentBreakdown)) {
+      for (const entry of payload.paymentBreakdown) {
+        const amt = Number(entry.amount || 0)
+        const adjAmt = Number(entry.adjustmentAmount || 0)
+        const received = Number(entry.amountReceived || 0)
+        const adjType = entry.adjustmentType || "none"
+        const bearer = entry.feeBearer || "merchant"
+
+        if (adjType === "interest" || (adjType === "fee" && bearer === "customer")) {
+          paymentMethodExtraAmount += adjAmt
+          interestAmount += adjAmt
+          originalAmount += received
+        } else if (adjType === "fee" && bearer === "merchant") {
+          feeAmount += adjAmt
+          originalAmount += received
+        } else if (adjType === "discount") {
+          paymentMethodDiscountAmount += adjAmt
+          originalAmount += received
+        } else {
+          originalAmount += amt
+        }
+      }
+    } else {
+      originalAmount = payload.paidAmount
+    }
+
+    const finalAmount = baseFinalAmount - paymentMethodDiscountAmount + paymentMethodExtraAmount
 
     // Map payment status to valid sales table values
     const salePaymentStatus = payload.paymentStatus === "unpaid" ? "pending" : payload.paymentStatus
@@ -1215,9 +1326,9 @@ export async function confirmServiceOrderPaymentAction(payload: {
         .insert({
           partner_id: payload.partnerId,
           customer_id: order.customer_id || null,
-          total_amount: totalAmount,
-          discount_amount: Number(order.discount_value || 0) + Number(order.coupon_discount_amount || 0),
-          final_amount: totalAmount,
+          total_amount: subtotal,
+          discount_amount: discountAmount,
+          final_amount: finalAmount,
           paid_amount: payload.paidAmount,
           payment_status: salePaymentStatus,
           status: saleStatus,
@@ -1283,9 +1394,9 @@ export async function confirmServiceOrderPaymentAction(payload: {
       const { error: saleUpdateError } = await supabase
         .from("sales")
         .update({
-          total_amount: totalAmount,
-          discount_amount: Number(order.discount_value || 0) + Number(order.coupon_discount_amount || 0),
-          final_amount: totalAmount,
+          total_amount: subtotal,
+          discount_amount: discountAmount,
+          final_amount: finalAmount,
           paid_amount: payload.paidAmount,
           payment_status: salePaymentStatus,
           status: saleStatus,
@@ -1308,18 +1419,26 @@ export async function confirmServiceOrderPaymentAction(payload: {
       .limit(1)
       .maybeSingle()
 
+    const paymentMethodSummary = payload.paymentMethod
+      ? [{ method: payload.paymentMethod, amount: payload.paidAmount }]
+      : []
+
     if (!existingOrder?.id) {
       const orderNumber = saleNumber || `OS-${String(order.id).slice(0, 8).toUpperCase()}`
-      const paymentMethodSummary = payload.paymentMethod
-        ? [{ method: payload.paymentMethod, amount: payload.paidAmount }]
-        : []
 
       await supabase.from("orders").insert({
         partner_id: payload.partnerId,
         order_number: orderNumber,
         customer_name: (order.customer_snapshot as any)?.name || null,
         buyer_id: order.customer_id || null,
-        total_amount: totalAmount,
+        total_amount: finalAmount,
+        subtotal_value: subtotal,
+        discount_value: order.discount_value || 0,
+        discount_type: order.discount_type || "fixed",
+        discount_amount: discountAmount,
+        payment_method_discount_amount: paymentMethodDiscountAmount,
+        payment_method_extra_amount: paymentMethodExtraAmount,
+        additional_costs: otherCosts,
         paid_amount: payload.paidAmount,
         situation: saleStatus,
         delivery_status: "not_sent",
@@ -1331,6 +1450,24 @@ export async function confirmServiceOrderPaymentAction(payload: {
         created_at: new Date().toISOString(),
         created_by: user.id,
       })
+    } else {
+      await supabase
+        .from("orders")
+        .update({
+          total_amount: finalAmount,
+          subtotal_value: subtotal,
+          discount_value: order.discount_value || 0,
+          discount_type: order.discount_type || "fixed",
+          discount_amount: discountAmount,
+          payment_method_discount_amount: paymentMethodDiscountAmount,
+          payment_method_extra_amount: paymentMethodExtraAmount,
+          additional_costs: otherCosts,
+          paid_amount: payload.paidAmount,
+          situation: saleStatus,
+          payment_method: payload.paymentMethod || null,
+          payment_breakdown: JSON.stringify(paymentMethodSummary),
+        })
+        .eq("id", existingOrder.id)
     }
 
     // 6. Create or update transaction in `transactions` table (if paidAmount > 0)
@@ -1345,8 +1482,10 @@ export async function confirmServiceOrderPaymentAction(payload: {
         .maybeSingle()
 
       const nowIso = new Date().toISOString()
-      if (!existingPaymentTx?.id) {
-        const { error: txError } = await supabase
+      let txId = existingPaymentTx?.id || null
+
+      if (!txId) {
+        const { data: insertedTx, error: txError } = await supabase
           .from("transactions")
           .insert({
             partner_id: payload.partnerId,
@@ -1362,32 +1501,81 @@ export async function confirmServiceOrderPaymentAction(payload: {
             notes: null,
             payment_type: payload.paymentMethod || "Ordem de Serviço",
             payment_method_id: (payload.paymentBreakdown && payload.paymentBreakdown[0]?.paymentMethodId) || null,
-            original_amount: payload.paidAmount,
-            interest_amount: null,
-            fee_amount: 0,
+            original_amount: originalAmount,
+            interest_amount: interestAmount > 0 ? interestAmount : null,
+            fee_amount: feeAmount,
+            discount_amount: paymentMethodDiscountAmount > 0 ? paymentMethodDiscountAmount : null,
             transaction_type: "income",
             origin: "system",
             reference_note: txRefNote,
             account_id: payload.financeAccountId || null,
             created_by_user_id: user.id,
           })
+          .select("id")
+          .single()
 
         if (txError) throw txError
+        txId = insertedTx?.id || null
       } else {
-        await supabase
+        const { error: txError } = await supabase
           .from("transactions")
           .update({
             amount: payload.paidAmount,
-            original_amount: payload.paidAmount,
+            original_amount: originalAmount,
+            interest_amount: interestAmount > 0 ? interestAmount : null,
+            fee_amount: feeAmount,
+            discount_amount: paymentMethodDiscountAmount > 0 ? paymentMethodDiscountAmount : null,
             payment_type: payload.paymentMethod || "Ordem de Serviço",
             payment_method_id: (payload.paymentBreakdown && payload.paymentBreakdown[0]?.paymentMethodId) || null,
             account_id: payload.financeAccountId || null,
           })
-          .eq("id", existingPaymentTx.id)
+          .eq("id", txId)
+
+        if (txError) throw txError
+      }
+
+      // Sync transaction_payments
+      if (txId && payload.paymentBreakdown && Array.isArray(payload.paymentBreakdown)) {
+        let paymentLine = 0
+        const paymentsToInsert = payload.paymentBreakdown.map((entry: any) => {
+          paymentLine++
+          const amt = Number(entry.amount || 0)
+          const received = Number(entry.amountReceived || 0)
+          const adjAmt = Number(entry.adjustmentAmount || 0)
+          const adjType = entry.adjustmentType || "none"
+          const bearer = entry.feeBearer || "merchant"
+
+          let entryInterest = 0
+          let entryDiscount = 0
+
+          if (adjType === "interest" || (adjType === "fee" && bearer === "customer")) {
+            entryInterest = adjAmt
+          } else if (adjType === "discount") {
+            entryDiscount = adjAmt
+          }
+
+          return {
+            partner_id: payload.partnerId,
+            transaction_id: txId,
+            amount: amt,
+            base_amount: received,
+            interest_amount: entryInterest,
+            discount_amount: entryDiscount,
+            payment_method_id: entry.paymentMethodId || null,
+            created_by_user_id: user.id,
+            idempotency_key: `${payload.partnerId}:${saleId}:line${paymentLine}:${entry.paymentMethodId || 'none'}`,
+          }
+        }).filter((p: any) => p.amount > 0)
+
+        if (paymentsToInsert.length > 0) {
+          await supabase.from("transaction_payments").delete().eq("transaction_id", txId)
+          const { error: insPayErr } = await supabase.from("transaction_payments").insert(paymentsToInsert)
+          if (insPayErr) console.error("Error inserting transaction_payments:", insPayErr)
+        }
       }
     }
 
-    // 6. Sync goals
+    // 7. Sync goals
     const sellerUserId = order.assigned_user_id || user.id
     if (sellerUserId) {
       try {
@@ -1397,7 +1585,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
           supabase: adminClient,
           partnerId: payload.partnerId,
           sellerUserId,
-          saleAmount: totalAmount,
+          saleAmount: finalAmount,
           createdByUserId: user.id,
         })
       } catch (err) {
@@ -1428,6 +1616,8 @@ export async function confirmServiceOrderPaymentAction(payload: {
     return { success: false, error: err.message || "Erro ao processar pagamento da ordem de serviço" }
   }
 }
+
+
 
 export async function saveServiceOrderSpecificationsAction(
   partnerId: string,

@@ -17,7 +17,7 @@ import { formatCurrency as brl } from "@/lib/utils";
 import { Button, IconPlaceholder } from "@/components/reusable";
 import { useRouter } from "next/navigation";
 
-export function SummaryCards({ metrics }: { metrics: any[] }) {
+export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], variant?: "grid" | "horizontal" }) {
   const icons = [MoneyIcon, SalesIcon, TagIcon, Users];
 
   const parseTrend = (trendStr: string) => {
@@ -42,6 +42,45 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
     return null;
   }
 
+  if (variant === "horizontal") {
+    return (
+      <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-brand-border dark:divide-dark-border w-full">
+        {metrics.slice(0, 4).map((metric, i) => {
+          const CardIcon = icons[i % icons.length];
+          const { percent, isPositive, change, vsText } = parseTrend(metric.trend);
+
+          return (
+            <div key={i} className="p-6 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <CardIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                  </div>
+                  <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{metric.title}</span>
+                </div>
+                <span
+                  className={`text-[12px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 ${isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
+                    }`}
+                >
+                  <span>{percent.split(" ")[0]}</span>
+                  <span>{percent.split(" ")[1]}</span>
+                  <span>{percent.split(" ")[2]}</span>
+                </span>
+              </div>
+
+              <div className="flex items-baseline space-x-2 mt-2">
+                <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{metric.value}</h2>
+                  <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+                  <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs {vsText}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full h-full">
       {metrics.slice(0, 4).map((metric, i) => {
@@ -52,7 +91,7 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
           <div key={i} className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
                   <CardIcon size={18} className="text-brand-dark dark:text-dark-heading" />
                 </div>
                 <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{metric.title}</span>
@@ -124,7 +163,10 @@ export function Cashflow({ revenueData, totalRevenue, compareLabel }: { revenueD
 
   return (
     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
-      <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+          <MoneyIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+        </div>
         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Receita Total</h3>
       </div>
 
@@ -214,7 +256,10 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
   if (!alerts || alerts.length === 0) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1 flex flex-col justify-center min-h-[340px]">
-        <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+            <AlertCircleIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+          </div>
           <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Precisa de Atenção</h3>
         </div>
         <IconPlaceholder
@@ -228,7 +273,10 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
 
   return (
     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
-      <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+          <AlertCircleIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+        </div>
         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Precisa de Atenção</h3>
       </div>
 

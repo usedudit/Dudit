@@ -91,16 +91,27 @@ export function useEntityState() {
             // reacting to it belatedly. Skip to avoid stale override.
             return
         }
-        // Guard: if a user action happened very recently (<500ms), ignore
-        // searchParams updates since they're likely stale Next.js reactions
-        if (Date.now() - lastUserActionRef.current < 500) {
+        // Guard: if a user action happened very recently (<1500ms), ignore
+        // searchParams updates since they're likely stale Next.js reactions.
+        // Increased from 500ms to handle slower devices and concurrent rendering.
+        if (Date.now() - lastUserActionRef.current < 1500) {
+            return
+        }
+        // Extra safety: compare URL state with current local state.
+        // If they match, don't reset - prevents stale searchParams from
+        // closing the entity view after a replaceState.
+        const urlState = stateFromParams(new URLSearchParams(window.location.search))
+        if (
+            urlState.action === localState.action &&
+            urlState.entityId === localState.entityId &&
+            urlState.isOpen === localState.isOpen
+        ) {
             return
         }
         // External navigation detected (back/forward, link click, etc.)
         expectedHrefRef.current = actualHref
-        const urlState = stateFromParams(new URLSearchParams(window.location.search))
         setLocalState(urlState)
-    }, [searchParams])
+    }, [searchParams, localState])
 
     // ── Popstate handler for browser back/forward ────────────────────────
     useEffect(() => {

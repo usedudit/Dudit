@@ -357,6 +357,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                 listUnitPrice: Number(item.listUnitPrice ?? item.price ?? 0),
                 lineDiscountType: item.lineDiscountType ?? null,
                 lineDiscountValue: Number(item.lineDiscountValue ?? 0),
+                isManualPrice: Boolean((item as any).isManualPrice),
             })),
         })
     }, [])
@@ -413,7 +414,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                 unitPrice: item.price,
                 quantity: item.qty,
                 basePrice: item.listUnitPrice,
-                categoryId: products.find(p => p.id === item.productId)?.category?.id || null
+                categoryId: products.find(p => p.id === item.productId)?.category?.id || null,
+                isManualPrice: (item as any).isManualPrice,
             })),
             shippingCost: shippingFee,
             additionalCosts: otherCosts,
@@ -776,9 +778,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             .filter((item) => item.qty > 0))
     }, [products, notifyError])
 
-    const removeItem = useCallback((itemId: string) => {
-        setCart((prev) => prev.filter((item) => item.id !== itemId))
-    }, [])
+
 
     const persistDraft = async (opts?: { notifyOnSuccess?: boolean }) => {
         if (cart.length === 0) return null
@@ -822,6 +822,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                     listUnitPrice: item.listUnitPrice ?? item.price,
                     lineDiscountType: item.lineDiscountType ?? null,
                     lineDiscountValue: item.lineDiscountValue ?? null,
+                    isManualPrice: (item as any).isManualPrice || null,
                 })),
                 couponId: appliedCouponId,
                 couponCode: appliedCouponCode,
@@ -885,6 +886,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                     price: effectivePrice,
                     qty: Number((item.quantity ?? item.qty) || 0),
                     image: item.image || null,
+                    isManualPrice: Boolean(item.isManualPrice ?? item.is_manual_price),
                 }
             })
 
@@ -939,7 +941,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
         setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)
     }, [EMPTY_ORDER_SIGNATURE])
 
-    const removeDraft = async (preSaleId: string) => {
+    const removeDraft = useCallback(async (preSaleId: string) => {
         const result = await deletePreSaleDraftAction(partnerId, preSaleId)
         if (!result.success) {
             notifyError(result.error || "Não foi possível excluir a pré-venda.")
@@ -948,7 +950,17 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
 
         setPreSales((prev) => prev.filter((item) => item.id !== preSaleId))
         if (activePreSaleId === preSaleId) clearCurrentOrder()
-    }
+    }, [partnerId, activePreSaleId, clearCurrentOrder, notifyError])
+
+    const removeItem = useCallback((itemId: string) => {
+        setCart((prev) => {
+            const nextCart = prev.filter((item) => item.id !== itemId)
+            if (nextCart.length === 0 && activePreSaleId) {
+                removeDraft(activePreSaleId)
+            }
+            return nextCart
+        })
+    }, [activePreSaleId, removeDraft])
 
     const closePaymentModal = useCallback(() => {
         setIsPaymentModalOpen(false)
@@ -1185,8 +1197,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
     useEffect(() => {
         if (!editingItem) return
         setEditQty(editingItem.qty)
-        const list = editingItem.listUnitPrice ?? editingItem.price
-        setEditPrice(list)
+        setEditPrice(editingItem.price)
     }, [editingItem])
 
     useEffect(() => {
@@ -1210,16 +1221,24 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             return
         }
 
-        setCart((prev) => prev.map((item) => (item.id === editingItem.id
-            ? {
+        setCart((prev) => prev.map((item) => {
+            if (item.id !== editingItem.id) return item
+
+            const isPriceUnchanged = Math.abs(editPrice - editingItem.price) < 0.001
+            const originalListPrice = editingItem.listUnitPrice ?? editingItem.price
+            const newListUnitPrice = isPriceUnchanged ? originalListPrice : editPrice
+            const isManualPrice = !isPriceUnchanged || (editingItem as any).isManualPrice
+
+            return {
                 ...item,
                 qty: editQty,
                 price: editPrice,
-                listUnitPrice: editPrice,
-                lineDiscountType: null,
-                lineDiscountValue: null,
+                listUnitPrice: newListUnitPrice,
+                lineDiscountType: isPriceUnchanged ? item.lineDiscountType : null,
+                lineDiscountValue: isPriceUnchanged ? item.lineDiscountValue : null,
+                isManualPrice,
             }
-            : item)))
+        }))
         setEditingItem(null)
         notifySuccess("Item atualizado.")
     }

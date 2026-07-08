@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { motion } from "framer-motion"
-import { Button, Input, FormDropdown, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Input, FormDropdown, ThreeDotsLoader, FormTextarea } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -262,16 +262,14 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                     )}
                 </div>
 
-                {/* Observações */}
-                <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Observações Internas (Opcional)</label>
-                    <textarea
-                        className="w-full h-24 p-3 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-dark dark:focus:border-dark-body resize-none placeholder:text-brand-inactive-text"
-                        placeholder="Adicione informações detalhadas sobre este ajuste de estoque..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                    />
-                </div>
+                <FormTextarea
+                    label="Observações Internas (Opcional)"
+                    name="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Adicione informações detalhadas sobre este ajuste de estoque..."
+                    maxLength={120}
+                />
             </div>
 
             {/* Footer */}
@@ -281,7 +279,6 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                         Cancelar
                     </Button>
                     <Button
-                        variant="filled"
                         className="h-12 flex-1"
                         disabled={isSaving}
                         onClick={handleSave}

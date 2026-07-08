@@ -3,8 +3,8 @@
 import React, { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import DeliveryKanbanCard from "./DeliveryKanbanCard"
-import { IconPlaceholder } from "@/components/reusable"
-import { CheckCircleIcon } from "@/lib/icons"
+import { IconPlaceholder, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { CheckCircleIcon, ColumnsIcon, BlockedIcon, PlusIcon } from "@/lib/icons"
 
 interface DeliveryKanbanBoardProps {
     deliveries: any[]
@@ -19,6 +19,7 @@ export default function DeliveryKanbanBoard({
 }: DeliveryKanbanBoardProps) {
     // Tabs: "active" (Kanban with 4 columns) or "cancelled" (Grid of cancelled/failed deliveries)
     const [activeTab, setActiveTab] = useState<"active" | "cancelled">("active")
+    const [dragOverCol, setDragOverCol] = useState<string | null>(null)
 
     // Group deliveries by status
     const pendingDeliveries = deliveries.filter(
@@ -38,64 +39,76 @@ export default function DeliveryKanbanBoard({
             id: "pending",
             title: "Pendente",
             subtitle: "Novos pedidos",
-            colorClass: "bg-gray-400 dark:bg-zinc-500",
-            textClass: "text-gray-600 dark:text-zinc-400",
-            bgColClass: "from-gray-50/50 to-gray-100/30 dark:from-zinc-900/10 dark:to-zinc-800/10",
+            themeClass: "bg-blue-50/70 border-blue-100/50 text-blue-600 dark:bg-blue-950/20 dark:border-blue-900/30 dark:text-blue-400",
+            dotBgClass: "bg-blue-100 dark:bg-blue-900/40",
+            dotClass: "bg-blue-500",
+            badgeClass: "bg-blue-100/60 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300",
             items: pendingDeliveries,
         },
         {
             id: "preparing",
             title: "Em preparação",
-            subtitle: "Na cozinha / separação",
-            colorClass: "bg-orange-500",
-            textClass: "text-orange-600 dark:text-orange-400",
-            bgColClass: "from-orange-50/30 to-orange-100/10 dark:from-orange-950/5 dark:to-orange-900/5",
+            subtitle: "Na expedição / separação",
+            themeClass: "bg-amber-50/70 border-amber-100/50 text-amber-600 dark:bg-amber-950/20 dark:border-amber-900/30 dark:text-amber-400",
+            dotBgClass: "bg-amber-100 dark:bg-amber-900/40",
+            dotClass: "bg-amber-500",
+            badgeClass: "bg-amber-100/60 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300",
             items: preparingDeliveries,
         },
         {
             id: "sent",
             title: "Saiu para entrega",
             subtitle: "A caminho",
-            colorClass: "bg-blue-500",
-            textClass: "text-blue-600 dark:text-blue-400",
-            bgColClass: "from-blue-50/30 to-blue-100/10 dark:from-blue-950/5 dark:to-blue-900/5",
+            themeClass: "bg-rose-50/70 border-rose-100/50 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400",
+            dotBgClass: "bg-rose-100 dark:bg-rose-900/40",
+            dotClass: "bg-rose-500",
+            badgeClass: "bg-rose-100/60 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300",
             items: sentDeliveries,
         },
         {
             id: "delivered",
             title: "Entregue",
             subtitle: "Concluída",
-            colorClass: "bg-emerald-500",
-            textClass: "text-emerald-600 dark:text-emerald-400",
-            bgColClass: "from-emerald-50/30 to-emerald-100/10 dark:from-emerald-950/5 dark:to-emerald-900/5",
+            themeClass: "bg-emerald-50/70 border-emerald-100/50 text-emerald-600 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400",
+            dotBgClass: "bg-emerald-100 dark:bg-emerald-900/40",
+            dotClass: "bg-emerald-500",
+            badgeClass: "bg-emerald-100/60 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300",
             items: deliveredDeliveries,
         },
     ]
 
+    const handleDragOver = (e: React.DragEvent, colId: string) => {
+        e.preventDefault()
+        setDragOverCol(colId)
+    }
+
+    const handleDragLeave = () => {
+        setDragOverCol(null)
+    }
+
+    const handleDrop = (e: React.DragEvent, targetStatus: string) => {
+        e.preventDefault()
+        setDragOverCol(null)
+        const deliveryId = e.dataTransfer.getData("text/plain")
+        if (deliveryId && onQuickStatusChange) {
+            onQuickStatusChange(deliveryId, targetStatus)
+        }
+    }
+
     return (
         <div className="flex flex-col h-full w-full px-4 md:px-8">
-            {/* Tab Switcher - Pill style */}
-            <div className="flex justify-center md:justify-start mb-6">
-                <div className="bg-brand-slate dark:bg-dark-border p-1 rounded-full flex gap-1 shadow-sm border border-brand-border dark:border-dark-border/40">
-                    <button
-                        onClick={() => setActiveTab("active")}
-                        className={`px-6 py-2 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === "active"
-                            ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-sm"
-                            : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-                            }`}
-                    >
-                        Entregas Ativas ({pendingDeliveries.length + preparingDeliveries.length + sentDeliveries.length + deliveredDeliveries.length})
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("cancelled")}
-                        className={`px-6 py-2 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === "cancelled"
-                            ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-sm"
-                            : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-                            }`}
-                    >
-                        Canceladas / Falhas ({cancelledDeliveries.length})
-                    </button>
-                </div>
+            {/* Standard ERP Tab Switcher */}
+            <div className="mb-6 px-4 md:px-0">
+                <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as "active" | "cancelled")}>
+                    <TabsList className="px-0">
+                        <TabsTrigger value="active" icon={ColumnsIcon}>
+                            Entregas Ativas ({pendingDeliveries.length + preparingDeliveries.length + sentDeliveries.length + deliveredDeliveries.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="cancelled" icon={BlockedIcon}>
+                            Canceladas / Falhas ({cancelledDeliveries.length})
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
             </div>
 
             <AnimatePresence mode="wait">
@@ -114,25 +127,32 @@ export default function DeliveryKanbanBoard({
                                 key={col.id}
                                 className="flex-none w-[310px] sm:w-[330px] lg:w-auto snap-center flex flex-col h-full min-h-[500px]"
                             >
-                                {/* Column Header */}
-                                <div className="flex items-center justify-between mb-3 px-1 shrink-0">
+                                {/* Clean Column Header Pill */}
+                                <div className={`flex items-center justify-between p-3 rounded-full border ${col.themeClass} shrink-0 mb-4`}>
                                     <div className="flex items-center gap-2 min-w-0">
-                                        <span className={`w-2.5 h-2.5 rounded-full ${col.colorClass}`} />
-                                        <h3 className="font-extrabold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${col.dotBgClass}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${col.dotClass}`} />
+                                        </span>
+                                        <h3 className="font-bold text-xs truncate">
                                             {col.title}
                                         </h3>
-                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body font-bold">
-                                            ({col.items.length})
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${col.badgeClass}`}>
+                                            {col.items.length}
                                         </span>
                                     </div>
-                                    <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-medium truncate max-w-[100px]">
-                                        {col.subtitle}
-                                    </span>
+                                    <PlusIcon className="w-3.5 h-3.5 opacity-60 shrink-0" />
                                 </div>
 
-                                {/* Column Body / Card Container */}
+                                {/* Column Body / Card Container with Drag & Drop */}
                                 <div
-                                    className={`flex-1 flex flex-col gap-3.5 p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-gradient-to-b ${col.bgColClass} overflow-y-auto max-h-[calc(100vh-320px)] min-h-[400px] custom-scrollbar`}
+                                    onDragOver={(e) => handleDragOver(e, col.id)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, col.id)}
+                                    className={`flex-1 flex flex-col gap-3.5 p-3 rounded-2xl border transition-all duration-200 ${
+                                        dragOverCol === col.id
+                                            ? "bg-gray-100/70 border-brand-green/30 dark:bg-zinc-800/40 dark:border-brand-green/30"
+                                            : "border-transparent bg-gray-50/30 dark:bg-zinc-900/10"
+                                    } overflow-y-auto max-h-[calc(100vh-320px)] min-h-[400px] custom-scrollbar`}
                                 >
                                     <AnimatePresence mode="popLayout">
                                         {col.items.length === 0 ? (

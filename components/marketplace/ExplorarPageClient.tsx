@@ -434,7 +434,7 @@ export function ExplorarPageClient({
         const parts = slug.split("-")
         const state = parts.pop()?.toUpperCase() || ""
         const cityKey = parts.join("-")
-        
+
         let city = COMMON_CITY_ACCENTS[cityKey]
         if (!city) {
             city = parts
@@ -1031,7 +1031,7 @@ export function ExplorarPageClient({
     }, [filteredResults, categoriesWithProducts, currentType, selectedCategories, query])
 
     const pageTitle = useMemo(() => {
-        const citySuffix = selectedCitySlug 
+        const citySuffix = selectedCitySlug
             ? (selectedCitySlug === "brasil" ? " no Brasil" : ` em ${formatCitySlug(selectedCitySlug)}`)
             : ""
         if (query) return `Resultados para "${query}"${citySuffix}`
@@ -1200,8 +1200,8 @@ export function ExplorarPageClient({
                             {/* 1. SEÇÕES BANNERS (Descubra o que tem em...) */}
                             <div className="w-full">
                                 <h2 className="text-lg lg:text-2xl font-bold text-brand-dark mb-4 animate-fade-in">
-                                    {selectedCitySlug 
-                                        ? `Descubra o que tem em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}` 
+                                    {selectedCitySlug
+                                        ? `Descubra o que tem em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}`
                                         : "Descubra o que tem por perto"}
                                 </h2>
                                 <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -1215,9 +1215,8 @@ export function ExplorarPageClient({
                                                     setSelectedSection(nextSection)
                                                     updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, nextSection)
                                                 }}
-                                                className={`shrink-0 w-[220px] sm:w-[260px] h-[110px] rounded-[16px] bg-gradient-to-r ${banner.gradient} p-4 flex flex-col justify-between text-left text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none border-2 ${
-                                                    isActive ? 'border-brand-green ring-2 ring-brand-green/30' : 'border-transparent'
-                                                }`}
+                                                className={`shrink-0 w-[220px] sm:w-[260px] h-[110px] rounded-[16px] bg-gradient-to-r ${banner.gradient} p-4 flex flex-col justify-between text-left text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none border-2 ${isActive ? 'border-brand-green ring-2 ring-brand-green/30' : 'border-transparent'
+                                                    }`}
                                             >
                                                 <div className="flex justify-between items-start">
                                                     <span className="text-xs font-semibold uppercase tracking-wider opacity-90">{banner.subtitle}</span>
@@ -1464,7 +1463,7 @@ export function ExplorarPageClient({
                                                 </div>
                                             ) : (
                                                 <div className={viewMode === "grid"
-                                                    ? `grid ${currentType === 'vitrines' ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-3 md:gap-4 lg:gap-6 mt-4`
+                                                    ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-3 md:gap-4 lg:gap-6 mt-4`
                                                     : "rounded-lg border border-gray-100 bg-white mt-4"
                                                 }>
                                                     {filteredResults.map((item, index) => {

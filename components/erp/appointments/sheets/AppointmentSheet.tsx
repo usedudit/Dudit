@@ -7,7 +7,7 @@ import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePick
 import { getAvailableTimeSlotsAction, getAppointmentOrderDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
-import { getAppointmentItemsAction } from '@/app/actions/erp/appointment-items';
+import { getAppointmentItemsAction, fetchProductsByIdsAction, getPartnerPlanAction } from '@/app/actions/erp/appointment-items';
 import { AppointmentItemsStep, resolveResourcesFromServices } from './AppointmentItemsStep';
 import AddItemSheet from './AddItemSheet';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
@@ -106,6 +106,10 @@ export const AppointmentSheet = ({
     const [savedAppointmentItems, setSavedAppointmentItems] = useState<any[]>([]);
     const [activeDetailTab, setActiveDetailTab] = useState<'general' | 'stock'>('general');
     const [isLoadingItems, setIsLoadingItems] = useState(false);
+    const [partnerPlan, setPartnerPlan] = useState<string>('free');
+    const [isStockCheckOpen, setIsStockCheckOpen] = useState(false);
+    const [stockCheckItems, setStockCheckItems] = useState<any[]>([]);
+    const [pendingNextStep, setPendingNextStep] = useState<{ fn: () => void } | null>(null);
 
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
@@ -716,7 +720,18 @@ export const AppointmentSheet = ({
                 setCurrentView('summary');
                 setCameFromSummary(false);
             } else if (initialTimeSlot) {
-                setCurrentView('summary');
+                const updatedServices = selectedServices.map(s => {
+                    const staff = staffSource.find(sm => sm.id === selectedStaffId);
+                    return {
+                        ...s,
+                        staffId: selectedStaffId,
+                        staff: staff ? staff.name : 'Desconhecido'
+                    }
+                });
+                setSelectedServices(updatedServices);
+                const resolvedItems = resolveResourcesFromServices(updatedServices);
+                setSelectedItems(resolvedItems);
+                setCurrentView('items');
             } else {
                 setCurrentView('datetime');
             }
@@ -748,6 +763,38 @@ export const AppointmentSheet = ({
             setCurrentView('items');
         }
         else if (currentView === 'items') {
+            // Stock verification for Crescer/Escalar plans before proceeding
+            const itemsToCheck = selectedItems.filter((item: any) => 
+                item.usageType === 'consumed' && item.productId && item.stock !== undefined
+            )
+            const hasStockIssues = itemsToCheck.some((item: any) => {
+                const projectedStock = (item.stock || 0) - (item.quantity || 0)
+                const minStock = item.minStock || 0
+                return projectedStock < 0 || projectedStock < minStock
+            })
+            
+            if (hasStockIssues && (partnerPlan === 'crescer' || partnerPlan === 'escalar')) {
+                const stockIssues = itemsToCheck.map((item: any) => {
+                    const projectedStock = (item.stock || 0) - (item.quantity || 0)
+                    const minStock = item.minStock || 0
+                    return {
+                        ...item,
+                        projectedStock,
+                        minStock,
+                        issue: projectedStock < 0 ? 'negativo' : 'abaixo do mínimo'
+                    }
+                }).filter(i => i.projectedStock < 0 || i.projectedStock < i.minStock)
+                
+                setStockCheckItems(stockIssues)
+                setPendingNextStep({
+                    fn: () => {
+                        setCurrentView('summary')
+                    }
+                })
+                setIsStockCheckOpen(true)
+                return
+            }
+            
             // Flow: Items -> Summary
             setCurrentView('summary');
         }
@@ -933,18 +980,22 @@ export const AppointmentSheet = ({
             }
         }
         else if (currentView === 'items') {
-            setCurrentView('datetime');
+            if (initialTimeSlot) {
+                setCurrentView('client');
+            } else {
+                setCurrentView('datetime');
+            }
         }
         else if (currentView === 'summary') {
             if (mode === 'create') {
                 if (initialTimeSlot) {
-                    setCurrentView('client');
+                    const resolvedItems = resolveResourcesFromServices(selectedServices);
+                    setSelectedItems(resolvedItems);
+                    setCurrentView('items');
                 } else {
-                    // Creating: Go back to Items
                     setCurrentView('items');
                 }
             } else {
-                // Viewing: Close sheet
                 onClose();
             }
         }
@@ -1128,6 +1179,53 @@ export const AppointmentSheet = ({
         })
         return () => { cancelled = true }
     }, [appointment?.id, mode])
+
+    // Fetch partner plan for stock verification feature
+    useEffect(() => {
+        if (!partnerId) return
+        let cancelled = false
+        getPartnerPlanAction().then(res => {
+            if (!cancelled) setPartnerPlan(res.slug || 'free')
+        }).catch(() => {
+            if (!cancelled) setPartnerPlan('free')
+        })
+        return () => { cancelled = true }
+    }, [partnerId])
+
+    // Enrich selectedItems with product data (images, stock) when they change
+    useEffect(() => {
+        if (!selectedItems.length || !partnerId) return
+        
+        const itemsNeedingEnrichment = selectedItems.filter(
+            (item: any) => item.productId && (!item.image || item.stock === undefined)
+        )
+        
+        if (itemsNeedingEnrichment.length === 0) return
+        
+        let cancelled = false
+        const productIds = itemsNeedingEnrichment.map((item: any) => item.productId)
+        
+        fetchProductsByIdsAction(productIds).then((products: any[]) => {
+            if (!cancelled && products.length > 0) {
+                const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
+                setSelectedItems(prevItems => prevItems.map((item: any) => {
+                    const product = item.productId ? productsMap[item.productId] : null
+                    if (product && (!item.image || item.stock === undefined)) {
+                        return {
+                            ...item,
+                            image: item.image || product.image,
+                            stock: item.stock !== undefined ? item.stock : product.stock,
+                            minStock: product.minStock,
+                            sku: item.sku || product.sku,
+                        }
+                    }
+                    return item
+                }))
+            }
+        }).catch(() => {})
+        
+        return () => { cancelled = true }
+    }, [selectedItems, partnerId])
 
     const VIEW_STATUS_OPTIONS = [
         { value: 'Reservado', label: 'Reservado' },
@@ -1647,6 +1745,7 @@ export const AppointmentSheet = ({
                             items={selectedItems}
                             onItemsChange={setSelectedItems}
                             services={selectedServices}
+                            partnerPlan={partnerPlan}
                         />
                     )}
 
@@ -2771,6 +2870,71 @@ export const AppointmentSheet = ({
                 variant="danger"
                 isDestructive
             />
+
+            {/* Stock Check Modal */}
+            <AnimatePresence>
+                {isStockCheckOpen && (
+                    <DefaultModal
+                        isOpen={true}
+                        onClose={() => {
+                            setIsStockCheckOpen(false)
+                            setPendingNextStep(null)
+                        }}
+                        title="Atenção: Estoque baixo"
+                    >
+                        <div className="space-y-4">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                Os seguintes itens terão estoque {' '}
+                                <span className="font-bold text-red-600">negativo ou abaixo do mínimo</span>
+                                {' '}após este agendamento:
+                            </p>
+                            <div className="max-h-60 overflow-y-auto space-y-2">
+                                {stockCheckItems.map((item: any, idx: number) => (
+                                    <div key={idx} className="p-3 rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800/20">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{item.name}</p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    Estoque atual: <span className="font-bold">{item.stock || 0}</span>
+                                                    {item.minStock > 0 && (
+                                                        <> | Mínimo: <span className="font-bold">{item.minStock}</span></>
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-red-600 text-sm">
+                                                    Projetado: {item.projectedStock}
+                                                </p>
+                                                <p className="text-xs text-red-600">
+                                                    ({item.issue === 'negativo' ? 'Estoque negativo' : 'Abaixo do mínimo'})
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center">
+                                Deseja prosseguir mesmo assim?
+                            </p>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setIsStockCheckOpen(false)}>Cancelar</Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={() => {
+                                        setIsStockCheckOpen(false)
+                                        if (pendingNextStep) {
+                                            pendingNextStep.fn()
+                                            setPendingNextStep(null)
+                                        }
+                                    }}
+                                >
+                                    Prosseguir mesmo assim
+                                </Button>
+                            </div>
+                        </div>
+                    </DefaultModal>
+                )}
+            </AnimatePresence>
 
             {isMobile ? (
                 <BottomSheet isOpen={true} onClose={handleCloseAttempt}>

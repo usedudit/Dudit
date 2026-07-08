@@ -12,8 +12,6 @@ import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
 import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
@@ -250,8 +248,8 @@ export default async function ExplorarPage({
     const resolvedParams = await params
     const resolvedSearchParams = await searchParams
 
-    const slug = resolvedParams.slug || []
-    const firstSlug = slug[0] || ""
+    let slug = resolvedParams.slug || []
+    let firstSlug = slug[0] || ""
 
     const user = await getCurrentUser()
     const sessionData = user
@@ -271,43 +269,10 @@ export default async function ExplorarPage({
         }
         : null
 
-    // Se não tem slug, redireciona para a localização do usuário
+    // Se não tem slug, mostra Brasil inteiro (como /explorar/brasil)
     if (!firstSlug) {
-        if (userProfile?.city && userProfile?.state) {
-            // Usuário logado: redireciona para cidade-estado
-            const normalizedCity = userProfile.city
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/\s+/g, "-")
-            const stateCode = userProfile.state.toLowerCase()
-            redirect(`/explorar/${normalizedCity}-${stateCode}`)
-        } else {
-            // Usuário não logado: tenta pegar estado dos cookies
-            const cookieStore = await cookies()
-            const savedState = cookieStore.get("dudit_state")?.value
-            if (savedState) {
-                const stateCode = savedState.toLowerCase()
-                redirect(`/explorar/estado-${stateCode}`)
-            }
-
-            // Se tem query de busca, redireciona para Brasil inteiro
-            const searchQuery = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : null
-            if (searchQuery) {
-                redirect(`/explorar/brasil?q=${encodeURIComponent(searchQuery)}`)
-            }
-        }
-
-        // Se não conseguir determinar localização, mostra loader
-        return (
-            <>
-                <MarketplaceHeader />
-                <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
-                    <ThreeDotsLoader />
-                </div>
-                <MarketplaceFooter />
-            </>
-        )
+        slug = ["brasil"]
+        firstSlug = "brasil"
     }
 
     // Detecta se é um estado (formato: "estado-sp") ou uma cidade

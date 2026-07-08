@@ -2,6 +2,7 @@
 
 import React from "react"
 import { CreditCardIcon, MoneyIcon } from "@/lib/icons"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 
 const PixIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -20,7 +21,12 @@ export function PaymentMethodIndicator({
 }) {
     if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body truncate">Não informado</span>
     
-    const parts = label.split(",").map(p => p.trim()).filter(Boolean)
+    const parts = label.split(",")
+        .map(p => p.trim())
+        .filter(Boolean)
+        .map(p => formatPaymentMethodLabel(p, null))
+        .filter(Boolean)
+
     if (parts.length > 1) {
         if (simplifyMultiple) {
             return <PaymentMethodIndicatorKeyed part="Múltiplos meios" simplify={simplify} />

@@ -4,6 +4,7 @@ import React, { useState, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, ListItem } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
+import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
 import {
   DashboardPieChart, DashboardLineChart, DashboardBarChart, CHART_COLORS
 } from "@/components/erp/dashboard/charts/DashboardCharts"
@@ -116,8 +117,10 @@ function InsightsCard({ insights, title = "Insights" }: { insights: Insight[]; t
 
 function CardHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <div className="flex items-center gap-2 mb-6">
-      <Icon size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
+    <div className="flex items-center space-x-3 mb-6">
+      <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+        <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
+      </div>
       <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
     </div>
   )
@@ -180,6 +183,13 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
     ticketMedio: salesData.metrics.ticketMedio, previousTicketMedio: 0,
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   const kpis = [
     { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend },
     { title: "Receita Líquida", value: salesData.metrics.netRevenueFormatted, trend: "" },
@@ -207,23 +217,30 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Register Insights in global client context */}
+      <InsightsRegister insights={mappedInsights} />
+
       <SectionHeader title="Relatório de Vendas" onExport={onExport} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={kpis} variant="horizontal" />
+        </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução de Vendas" />
             <DashboardLineChart data={evoData} />
           </div>
         </div>
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
           <ReportRankingCard
             title="Produtos Mais Vendidos"
             items={salesData.topProducts.slice(0, 5).map(p => ({ id: p.id, label: p.label, value: p.value, subtitle: p.subtitle }))}
             variant="compact"
+            icon={ShoppingCartIcon}
           />
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <div className="flex items-center justify-between mb-2">
@@ -239,8 +256,9 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TagIcon} title="Canal" />
             <div className="flex justify-center">
@@ -254,13 +272,14 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
             </div>
           </div>
         </div>
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={ClockIcon} title="Pedidos por Hora" />
             <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} />
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
@@ -279,22 +298,25 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
             title="Menos Vendidos"
             items={salesData.leastSoldProducts.map(p => ({ id: p.id, label: p.label, value: `${p.value} un.` }))}
             variant="compact"
+            icon={ArrowDownIcon}
           />
         </div>
       </div>
+
       {salesData.topServices.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-8">
             <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
               <CardHeader icon={WrenchIcon} title="Serviços Mais Vendidos" />
               <DashboardBarChart data={salesData.topServices.map(s => ({ label: s.label, value: s.value }))} />
             </div>
           </div>
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-4">
             <ReportRankingCard
               title="Maior Margem"
               items={salesData.topMarginProducts.map(p => ({ id: p.id, label: p.label, value: `${p.margin}%` }))}
               variant="compact"
+              icon={AwardIcon}
             />
           </div>
         </div>
@@ -318,6 +340,13 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
     topProductPreviousSales: 0,
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   const kpis = [
     ...productsData.metrics.slice(0, 4).map((m: any) => ({ title: m.title, value: m.value, trend: m.detail || "" })),
     ...(stockValue > 0 ? [{ title: "Valor em Estoque", value: brl(stockValue), trend: "" }] : []),
@@ -334,13 +363,19 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Register Insights in global client context */}
+      <InsightsRegister insights={mappedInsights} />
+
       <SectionHeader title="Relatório de Produtos" onExport={onExport} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={kpis} variant="horizontal" />
+        </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TagIcon} title="Categorias mais Vendidas" />
             <div className="flex justify-center">
@@ -355,27 +390,30 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
             </div>
           )}
         </div>
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução de Vendas" />
             <DashboardLineChart data={evoData} />
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <ReportTableCard
             title="Estoque Crítico"
             columns={[{ key: "title", header: "Produto" }, { key: "subtitle", header: "Categoria" }, { key: "value", header: "Estoque" }]}
             data={(productsData.criticalStock || []).map((s: any) => ({ id: s.id, title: s.title, subtitle: s.subtitle, value: s.value }))}
             onRowClick={() => router.push("/erp/products")}
+            icon={PackageIcon}
           />
         </div>
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-4">
           <ReportRankingCard
             title="Mais Vendidos"
             items={(productsData.topProducts || []).slice(0, 6).map((p: any) => ({ id: p.id, label: p.title, value: p.value }))}
             variant="compact"
+            icon={AwardIcon}
           />
         </div>
       </div>
@@ -396,6 +434,13 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
     topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   const kpis = [
     { title: "Total",       value: String(customerData.totalCustomers), trend: "" },
     { title: "Ativos",       value: String(customerData.activeCustomers), trend: "" },
@@ -415,23 +460,30 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Register Insights in global client context */}
+      <InsightsRegister insights={mappedInsights} />
+
       <SectionHeader title="Relatório de Clientes" onExport={onExport} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={kpis} variant="horizontal" />
+        </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Ativos vs Novos" />
             <DashboardLineChart data={evoData} />
           </div>
         </div>
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
           <ReportRankingCard
             title="Top Clientes"
             items={customerData.topCustomers.slice(0, 5).map(c => ({ id: c.id, label: c.label, value: c.value, subtitle: c.subtitle }))}
             variant="compact"
+            icon={AwardIcon}
           />
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <div className="flex items-center justify-between mb-2">
@@ -445,20 +497,23 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-4">
           <ReportRankingCard
             title="Clientes VIP"
             items={customerData.vipCustomers.slice(0, 6).map(c => ({ id: c.id, label: c.label, value: c.value, subtitle: `${c.orders} pedidos` }))}
             variant="compact"
+            icon={AwardIcon}
           />
         </div>
-        <div className="lg:col-span-7">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-[40px] font-bold text-brand-dark dark:text-dark-heading">{customerData.recurringCustomers}</p>
-              <p className="text-sm text-brand-inactive-text">clientes recorrentes</p>
-              <p className="text-xs text-brand-inactive-text mt-1">de {customerData.totalCustomers} no total</p>
+        <div className="lg:col-span-8">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+            <CardHeader icon={Users} title="Recorrência de Clientes" />
+            <div className="flex-1 flex flex-col items-center justify-center py-6">
+              <p className="text-[48px] font-bold text-brand-green dark:text-dark-heading leading-none">{customerData.recurringCustomers}</p>
+              <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mt-2">clientes recorrentes</p>
+              <p className="text-xs text-brand-inactive-text mt-1">de um total de {customerData.totalCustomers} clientes cadastrados</p>
             </div>
           </div>
         </div>
@@ -478,6 +533,13 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
     onTimeRate: deliveryData.metrics.onTimeRate,
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   const kpis = [
     { title: "Total", value: String(deliveryData.metrics.total), trend: "" },
     { title: "Pendentes", value: String(deliveryData.metrics.pending), trend: "" },
@@ -496,19 +558,25 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Register Insights in global client context */}
+      <InsightsRegister insights={mappedInsights} />
+
       <SectionHeader title="Relatório de Entregas" onExport={onExport} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={kpis} variant="horizontal" />
+        </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Entregas por Período" />
             <DashboardLineChart data={evoData} />
           </div>
         </div>
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TruckIcon} title="Situação" />
             <div className="flex justify-center">
@@ -522,24 +590,35 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <ReportTableCard
             title="Últimas Entregas"
             columns={[{ key: "id", header: "ID", render: (v: string) => v.slice(0, 8) }, { key: "status", header: "Status" }, { key: "deliveryPerson", header: "Entregador" }, { key: "date", header: "Data" }, { key: "duration", header: "Duração" }]}
             data={deliveryData.recentDeliveries}
+            icon={TruckIcon}
           />
         </div>
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-4">
           {deliveryData.deliveryPersonRanking.length > 0 ? (
             <ReportRankingCard
               title="Ranking de Entregadores"
               items={deliveryData.deliveryPersonRanking.slice(0, 6).map(p => ({ id: p.id, label: p.name, value: String(p.deliveries), subtitle: "entregas" }))}
               variant="compact"
+              icon={AwardIcon}
             />
           ) : (
-            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex items-center justify-center h-full">
-              <p className="text-sm text-brand-inactive-text">Sem entregadores</p>
+            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col h-full">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                  <AwardIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                </div>
+                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Ranking de Entregadores</h3>
+              </div>
+              <div className="flex-1 flex items-center justify-center py-8">
+                <p className="text-sm text-brand-inactive-text">Sem entregadores ativos no período.</p>
+              </div>
             </div>
           )}
         </div>
@@ -575,38 +654,49 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <SectionHeader title="Ordens de Serviço" onExport={onExport} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
-        <div className="lg:col-span-5">
-          <ReportRankingCard
-            title="Ranking por Responsável"
-            items={serviceOrdersData.assigneeRanking.slice(0, 5).map(a => ({ id: a.id, label: a.name, value: String(a.count), subtitle: `R$ ${Math.round(a.revenue).toLocaleString("pt-BR")}` }))}
-            variant="compact"
-          />
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={kpis} variant="horizontal" />
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-            <CardHeader icon={ListIcon} title="Por Status" />
-            <div className="flex justify-center">
-              <DashboardPieChart data={statusData} totalValue={String(serviceOrdersData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" />
-            </div>
-          </div>
-        </div>
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução" />
             <DashboardLineChart data={evoData} />
           </div>
         </div>
+        <div className="lg:col-span-4">
+          <ReportRankingCard
+            title="Ranking por Responsável"
+            items={serviceOrdersData.assigneeRanking.slice(0, 5).map(a => ({ id: a.id, label: a.name, value: String(a.count), subtitle: `R$ ${Math.round(a.revenue).toLocaleString("pt-BR")}` }))}
+            variant="compact"
+            icon={AwardIcon}
+          />
+        </div>
       </div>
-      <ReportTableCard
-        title="Últimas OS"
-        columns={[{ key: "orderNumber", header: "Número" }, { key: "title", header: "Título" }, { key: "status", header: "Status" }, { key: "total", header: "Total" }, { key: "date", header: "Data" }]}
-        data={serviceOrdersData.recentOrders}
-        onRowClick={() => router.push("/erp/service-orders")}
-      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        <div className="lg:col-span-8">
+          <ReportTableCard
+            title="Últimas OS"
+            columns={[{ key: "orderNumber", header: "Número" }, { key: "title", header: "Título" }, { key: "status", header: "Status" }, { key: "total", header: "Total" }, { key: "date", header: "Data" }]}
+            data={serviceOrdersData.recentOrders}
+            onRowClick={() => router.push("/erp/service-orders")}
+            icon={ListIcon}
+          />
+        </div>
+        <div className="lg:col-span-4">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+            <CardHeader icon={ListIcon} title="Por Status" />
+            <div className="flex justify-center flex-1 items-center">
+              <DashboardPieChart data={statusData} totalValue={String(serviceOrdersData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -706,6 +796,13 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
     topSource: marketingData.topSource, topSourcePercent: marketingData.topSourcePercent,
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   const kpis = [
     { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "" },
     { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total` },
@@ -725,43 +822,38 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Register Insights in global client context */}
+      <InsightsRegister insights={mappedInsights} />
+
       <SectionHeader title="Relatório de Marketing" onExport={onExport} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-            <CardHeader icon={TagIcon} title="Faturamento por Canal" />
-            <div className="flex justify-center">
-              <DashboardPieChart data={sourceData} totalValue={marketingData.totalRevenueFormatted} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" />
-            </div>
-          </div>
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={kpis} variant="horizontal" />
         </div>
-        <div className="lg:col-span-7">
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução" />
             <DashboardLineChart data={evoData} />
           </div>
         </div>
+        <div className="lg:col-span-4">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+            <CardHeader icon={TagIcon} title="Faturamento por Canal" />
+            <div className="flex justify-center flex-1 items-center">
+              <DashboardPieChart data={sourceData} totalValue={marketingData.totalRevenueFormatted} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" />
+            </div>
+          </div>
+        </div>
       </div>
+
       {marketingData.topCoupons.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-          <div className="lg:col-span-5">
-            <ReportRankingCard
-              title="Cupons Mais Usados"
-              items={marketingData.topCoupons.slice(0, 6).map(c => ({
-                id: c.id,
-                label: c.code,
-                value: `${c.usageCount} usos`,
-                subtitle: c.discountType === "percentage" ? `${c.discountValue}%` : brl(c.discountValue),
-              }))}
-              variant="compact"
-            />
-          </div>
-          <div className="lg:col-span-7">
-            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+          <div className="lg:col-span-8">
+            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
               <CardHeader icon={MegaphoneIcon} title="Campanhas" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {marketingData.campaigns.slice(0, 6).map(c => (
@@ -773,6 +865,19 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                 {marketingData.campaigns.length === 0 && <p className="text-sm text-brand-inactive-text col-span-2">Nenhuma campanha cadastrada.</p>}
               </div>
             </div>
+          </div>
+          <div className="lg:col-span-4">
+            <ReportRankingCard
+              title="Cupons Mais Usados"
+              items={marketingData.topCoupons.slice(0, 6).map(c => ({
+                id: c.id,
+                label: c.code,
+                value: `${c.usageCount} usos`,
+                subtitle: c.discountType === "percentage" ? `${c.discountValue}%` : brl(c.discountValue),
+              }))}
+              variant="compact"
+              icon={TagIcon}
+            />
           </div>
         </div>
       )}
@@ -790,6 +895,13 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
     topStaffName: productivityData.staffRanking[0]?.label, topStaffRevenue: productivityData.staffRanking[0]?.revenue,
     staffCount: productivityData.staffRanking.length, totalRevenue: productivityData.metrics.totalRevenue,
   })
+
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
 
   const kpis = [
     { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "" },
@@ -810,13 +922,25 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Register Insights in global client context */}
+      <InsightsRegister insights={mappedInsights} />
+
       <SectionHeader title="Relatório de Produtividade" onExport={onExport} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={kpis} variant="horizontal" />
+        </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-8">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+            <CardHeader icon={TrendingUpIcon} title="Atendimentos por Dia" />
+            <DashboardLineChart data={evoData} />
+          </div>
+        </div>
+        <div className="lg:col-span-4">
           <ReportRankingCard
             title="Ranking da Equipe"
             items={productivityData.staffRanking.slice(0, 6).map(s => ({
@@ -826,15 +950,11 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
               subtitle: `Ticket: R$ ${s.ticketMedio}`,
             }))}
             variant="compact"
+            icon={AwardIcon}
           />
         </div>
-        <div className="lg:col-span-7">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-            <CardHeader icon={TrendingUpIcon} title="Atendimentos por Dia" />
-            <DashboardLineChart data={evoData} />
-          </div>
-        </div>
       </div>
+
       {goalData && goalData.totalCount > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
           <div className="lg:col-span-12">
@@ -975,25 +1095,38 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
     expenseTotal: Number(financialData.metrics.find((m: any) => m.title.includes("Despesas"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Register Insights in global client context */}
+      <InsightsRegister insights={mappedInsights} />
+
       <SectionHeader title="Relatório Financeiro" onExport={async (fmt) => {
         const rows = [["Saldo", financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value || "R$ 0,00"]]
         if (fmt === "csv") exportCSV("financeiro", ["Indicador", "Valor"], rows)
         else await exportXLSX("financeiro", [{ name: "Financeiro", headers: ["Indicador", "Valor"], rows }])
       }} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={financialData.metrics} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
+        <div className="lg:col-span-12">
+          <SummaryCards metrics={financialData.metrics} variant="horizontal" />
+        </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={MoneyIcon} title="Fluxo de Caixa" />
             <DashboardLineChart data={cashflowData} />
           </div>
         </div>
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={ChartIcon} title="Distribuição Financeira" />
             <div className="flex justify-center">
@@ -1010,24 +1143,9 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-            <CardHeader icon={ListIcon} title="Últimas Movimentações" />
-            <div className="space-y-4">
-              {(financialData.latestMovements || []).slice(0, 5).map(m => (
-                <div key={m.id} className="flex items-center justify-between py-1">
-                  <div>
-                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{m.title}</p>
-                    <p className="text-[11px] text-brand-inactive-text">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
-                  </div>
-                  <span className={`text-[13px] font-bold ${m.tone === "red" ? "text-brand-red" : "text-brand-green"}`}>{m.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={CreditCardIcon} title="Contas Vencidas / Pendentes" />
             {(financialData.overdueAccounts || []).length === 0 ? (
@@ -1045,6 +1163,22 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                 ))}
               </div>
             )}
+          </div>
+        </div>
+        <div className="lg:col-span-4">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+            <CardHeader icon={ListIcon} title="Últimas Movimentações" />
+            <div className="space-y-4">
+              {(financialData.latestMovements || []).slice(0, 5).map(m => (
+                <div key={m.id} className="flex items-center justify-between py-1">
+                  <div>
+                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{m.title}</p>
+                    <p className="text-[11px] text-brand-inactive-text">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
+                  </div>
+                  <span className={`text-[13px] font-bold ${m.tone === "red" ? "text-brand-red" : "text-brand-green"}`}>{m.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

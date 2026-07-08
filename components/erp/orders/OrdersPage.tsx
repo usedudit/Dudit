@@ -301,7 +301,7 @@ export default function OrdersPage({
     const filterSections: FilterSectionConfig[] = useMemo(
         () => [
             { id: "datePeriod", title: "Data do pedido", type: "date-period" },
-            { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "A Receber", "Enviado", "Cancelado", "Em análise"] },
+            { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
             {
                 id: "channel",
                 title: "Canal",
@@ -329,10 +329,17 @@ export default function OrdersPage({
                     delivered: { label: "Entregue", icon: <CheckCircleIcon size={12} />, color: "green" },
                     cancelled: { label: "Cancelado", icon: <CancelCircleIcon size={12} />, color: "red" },
                     in_process: { label: "Em análise", icon: <ClockIcon size={12} />, color: "yellow" },
-                    pending: { label: "A Receber", icon: <ClockIcon size={12} />, color: "orange" },
-                    unpaid: { label: "A Receber", icon: <ClockIcon size={12} />, color: "orange" },
+                    pending: { label: "Pendente", icon: <ClockIcon size={12} />, color: "gray" },
+                    unpaid: { label: "Pendente", icon: <ClockIcon size={12} />, color: "gray" },
                 }
                 const statusInfo = statusMap[o.situation] || { label: o.situation, icon: <ClockIcon size={12} />, color: "gray" }
+                
+                if (o.situation === "partially_paid") {
+                    statusInfo.label = "Parcialmente Pago"
+                    statusInfo.color = "orange"
+                    statusInfo.icon = <PartiallyPaidIcon size={12} />
+                }
+
                 const deliveryInfo = getDeliveryStatusMeta(o.delivery_status) as any
 
                 const deliveryIconMap: Record<string, React.ReactNode> = {
@@ -342,17 +349,10 @@ export default function OrdersPage({
                     delivered: <CheckCircleIcon size={12} />,
                     pickup_available: <DeliveryPickupIcon size={12} />,
                     delivery_failed: <DeliveryFailedIcon size={12} />,
-                    cancelled: <CancelCircleIcon size={12} />,
-                }
-
-                if (o.situation === "partially_paid") {
-                    statusInfo.label = "Parcialmente Pago"
-                    statusInfo.color = "orange"
-                    statusInfo.icon = <PartiallyPaidIcon size={12} />
                 }
 
                 const orderItems = o.order_items || []
-                const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking")
+                const hasOnlyServices = o.order_source === "admin_service_order" || (orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking"))
                 const deliveryType = o.delivery_type || "delivery"
 
                 return {

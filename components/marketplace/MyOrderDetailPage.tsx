@@ -541,7 +541,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         const orderItems = order?.order_items || []
         const returnedQtyMap: Record<string, number> = {}
         const requests = order?.return_requests || []
-        
+
         requests.forEach((rr: any) => {
             if (rr.deleted_at) return
             const status = String(rr.status || "").toUpperCase()
@@ -553,12 +553,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 }
             })
         })
-        
+
         orderItems.forEach((item: any) => {
             const returned = returnedQtyMap[item.id] || 0
             remaining[item.id] = Math.max(0, (item.quantity || 0) - returned)
         })
-        
+
         return remaining
     }, [order])
 
@@ -768,8 +768,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const shippingVal = Math.max(0, Number(pricingSnapshot?.deliveryFee ?? order.delivery_fee ?? order.shipping_total ?? 0));
     const subtotalVal = Number(pricingSnapshot?.subtotal ?? order.subtotal_original ?? itemsSubtotal);
     const totalVal = Number(order.total_amount || 0);
-    const wantsChange = order.wants_change ?? order.wantsChange ?? false;
-    const payWithAmount = Number(order.pay_with_amount ?? order.payWithAmount ?? 0);
+    const cashEntry = Array.isArray(order.payment_breakdown)
+        ? order.payment_breakdown.find((entry: any) => {
+            const m = String(entry?.method || "").toLowerCase().trim();
+            return m === "cash" || m === "dinheiro";
+        })
+        : null
+    const wantsChange = cashEntry?.wantsChange ?? order.wants_change ?? order.wantsChange ?? false;
+    const payWithAmount = Number(cashEntry?.payWithAmount ?? order.pay_with_amount ?? order.payWithAmount ?? 0);
     const changeAmount = Math.max(0, payWithAmount > 0 && wantsChange ? payWithAmount - totalVal : 0);
 
     const hasItemDiscount = itemsSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsSubtotal - subtotalVal) > 0.005
@@ -1204,7 +1210,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             />
                                             <DetailRow
                                                 label="Data do Pedido"
-                                                value={`${dateStrFull} às ${dateStrTime}`}
+                                                value={`${dateStrFull}`}
                                             />
                                         </FormSection>
                                     </div>

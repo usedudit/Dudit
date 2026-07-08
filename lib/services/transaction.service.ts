@@ -29,7 +29,7 @@ function normalizeMethod(value?: string | null) {
     if (m.includes("pix")) return "pix"
     if (m.includes("boleto") || m.includes("bolbradesco")) return "boleto"
     if (m.includes("cart") || m.includes("credito") || m.includes("débito") || m.includes("debito")) return "cartao"
-    if (m.includes("dinheiro")) return "dinheiro"
+    if (m.includes("dinheiro") || m.includes("cash")) return "dinheiro"
     return m
 }
 
@@ -115,10 +115,10 @@ function buildEntries(orderData: OrderDataForTransaction): Array<{
     const fromBreakdown = (orderData.payment_breakdown || [])
         .map((entry) => ({
             method: normalizePaymentLabel(entry.method),
-            amount: Number(entry.effectiveAmount ?? entry.amount ?? 0),
+            amount: Number(entry.amount ?? entry.effectiveAmount ?? 0),
             paymentMethodId: entry.paymentMethodId || null,
             installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
-            amountReceived: Number(entry.amountReceived ?? entry.effectiveAmount ?? entry.amount ?? 0),
+            amountReceived: Number(entry.amountReceived ?? entry.amount ?? entry.effectiveAmount ?? 0),
             adjustmentType: entry.adjustmentType || 'none',
             adjustmentAmount: Number(entry.adjustmentAmount || 0),
             feeBearer: entry.feeBearer || null,

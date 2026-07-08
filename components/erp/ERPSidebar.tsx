@@ -51,8 +51,6 @@ const navItems: NavItem[] = [
             { label: "PDV (Frente de Caixa)", href: "/erp/pdv" },
             { label: "Devoluções", href: "/erp/returns" },
             { label: "Expedição e Entregas", href: "/erp/logistics" },
-            { label: "Dashboard de Entregas", href: "/erp/logistics/dashboard" },
-            { label: "Entregadores", href: "/erp/logistics/drivers" },
         ],
     },
     {
@@ -141,8 +139,6 @@ const navItems: NavItem[] = [
 
 const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/logistics": "crescer",
-    "/erp/logistics/dashboard": "crescer",
-    "/erp/logistics/drivers": "crescer",
     "/erp/resumo-financeiro": "crescer",
     "/erp/transactions": "crescer",
     "/erp/contas-a-pagar": "crescer",
@@ -371,6 +367,7 @@ export function ERPSidebar() {
 
                 // Direct link item (no submenu) - check access
                 if (newItem.href && !newItem.submenu) {
+                    if (newItem.href === "/erp/inicio") return newItem
                     const directMinimumPlan = newItem.href ? PLAN_GATED_MINIMUM[newItem.href] : undefined
                     const planGateKept = Boolean(directMinimumPlan) && !hasMinimumPlan(planSlug, directMinimumPlan!)
                     if (canAccess(newItem.href) || planGateKept) return newItem

@@ -734,7 +734,7 @@ const AppointmentsPage = ({
                             )}
                         </AnimatePresence>
 
-                        <div className="max-w-[1300px] mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                             {/* Desktop Header */}
                             <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                                 <div className="flex flex-col gap-2 pt-1">
@@ -807,7 +807,7 @@ const AppointmentsPage = ({
                                 isExporting={isExporting}
                             />
 
-                            <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full">
+                            <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full md:px-8">
 
                                 <AnimatePresence mode="wait">
                                     {/* Mobile/Tablet View (Always render cards) */}

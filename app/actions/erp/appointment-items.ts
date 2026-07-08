@@ -29,50 +29,68 @@ export async function getAppointmentItemsAction(appointmentId: string) {
         await requirePermission(ctx.partnerId, "appointments", "view")
         const supabase = createAdminClient()
 
-        const { data, error } = await supabase
+        // First query: fetch appointment items (no joins - fast)
+        const { data: itemsData, error: itemsError } = await supabase
             .from("appointment_items")
-            .select(`
-                id,
-                appointment_id,
-                product_id,
-                variant_id,
-                service_id,
-                name,
-                quantity,
-                usage_type,
-                created_at,
-                updated_at,
-                products:product_id(name, sku, stock_quantity, images),
-                services:service_id(name)
-            `)
+            .select("id, appointment_id, product_id, variant_id, service_id, name, quantity, usage_type, created_at, updated_at")
             .eq("appointment_id", appointmentId)
             .order("created_at", { ascending: true })
             .limit(500)
 
-        if (error) {
-            console.error("getAppointmentItemsAction error:", error)
+        if (itemsError) {
+            console.error("getAppointmentItemsAction error:", itemsError)
             return errorResponse("Erro ao buscar itens do agendamento")
         }
 
-        const items = (data || []).map((item: any) => ({
-            id: item.id,
-            appointmentId: item.appointment_id,
-            productId: item.product_id,
-            variantId: item.variant_id,
-            serviceId: item.service_id,
-            name: item.name,
-            quantity: item.quantity,
-            usageType: item.usage_type,
-            createdAt: item.created_at,
-            updatedAt: item.updated_at,
-            product: item.products ? {
-                name: item.products.name,
-                sku: item.products.sku,
-                image: item.products.images?.[0] || null,
-                stock: item.products.stock_quantity || 0,
-            } : null,
-            serviceName: item.services?.name || null,
-        }))
+        // Batch-fetch product data for items with product_id
+        const productIds = Array.from(new Set((itemsData || []).map((i: any) => i.product_id).filter((id: any): id is string => !!id))) as string[]
+        let productsMap: Record<string, any> = {}
+        if (productIds.length > 0) {
+            const { data: products } = await supabase
+                .from("products")
+                .select("id, name, sku, stock_quantity, images")
+                .in("id", productIds)
+            for (const p of products || []) {
+                productsMap[p.id] = p
+            }
+        }
+
+        // Batch-fetch service names for items with service_id
+        const serviceIds = Array.from(new Set((itemsData || []).map((i: any) => i.service_id).filter((id: any): id is string => !!id))) as string[]
+        let servicesMap: Record<string, any> = {}
+        if (serviceIds.length > 0) {
+            const { data: svcs } = await supabase
+                .from("services")
+                .select("id, name")
+                .in("id", serviceIds)
+            for (const s of svcs || []) {
+                servicesMap[s.id] = s
+            }
+        }
+
+        const items = (itemsData || []).map((item: any) => {
+            const p = item.product_id ? productsMap[item.product_id] : null
+            const s = item.service_id ? servicesMap[item.service_id] : null
+            return {
+                id: item.id,
+                appointmentId: item.appointment_id,
+                productId: item.product_id,
+                variantId: item.variant_id,
+                serviceId: item.service_id,
+                name: item.name,
+                quantity: item.quantity,
+                usageType: item.usage_type,
+                createdAt: item.created_at,
+                updatedAt: item.updated_at,
+                product: p ? {
+                    name: p.name,
+                    sku: p.sku,
+                    image: p.images?.[0] || null,
+                    stock: p.stock_quantity || 0,
+                } : null,
+                serviceName: s?.name || null,
+            }
+        })
 
         return successResponse(items)
     } catch (err: any) {
@@ -308,6 +326,59 @@ export async function handleAppointmentItemsStockMovement(params: {
         await invalidateProductCache(pid, partnerId, 'update', { silent: true })
     }
     revalidateStockMovements(partnerId)
+}
+
+export async function fetchProductsByIdsAction(productIds: string[]) {
+    try {
+        if (!productIds.length) return []
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return []
+        const supabase = createAdminClient()
+        const { data } = await supabase
+            .from("products")
+            .select("id, name, sku, stock_quantity, min_stock_quantity, images")
+            .eq("partner_id", ctx.partnerId)
+            .in("id", productIds)
+        return (data || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku || 'N/A',
+            stock: p.stock_quantity || 0,
+            minStock: p.min_stock_quantity || 0,
+            image: p.images?.[0] || null,
+        }))
+    } catch (err) {
+        console.error("fetchProductsByIdsAction error:", err)
+        return []
+    }
+}
+
+export async function getPartnerPlanAction() {
+    try {
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return { slug: 'free' }
+
+        const supabase = createAdminClient()
+        const { data: subscription } = await supabase
+            .from("subscriptions")
+            .select("plan_id, status")
+            .eq("partner_id", ctx.partnerId)
+            .in("status", ["active", "trialing", "past_due"])
+            .single()
+
+        if (!subscription) return { slug: 'free' }
+
+        const { data: plan } = await supabase
+            .from("plans")
+            .select("slug")
+            .eq("id", subscription.plan_id)
+            .single()
+
+        return { slug: plan?.slug || 'free' }
+    } catch (err) {
+        console.error("getPartnerPlanAction error:", err)
+        return { slug: 'free' }
+    }
 }
 
 export async function searchProductsForAppointmentItems(query: string) {

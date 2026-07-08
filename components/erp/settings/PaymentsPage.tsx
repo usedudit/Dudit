@@ -248,7 +248,7 @@ export function PaymentsPage({
                                             )}
 
                                             {/* Entrada (sinal) */}
-                                            <FormSection title="Entrada (down payment)">
+                                            <FormSection title="Entrada (down payment)" hasSeparator>
                                                 <div className="space-y-6">
                                                     <div className="flex items-center justify-between py-3">
                                                         <div>

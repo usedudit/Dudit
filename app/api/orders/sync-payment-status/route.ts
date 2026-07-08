@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       const { validateMpTransactionAmount } = await import("@/lib/payments/mp-order-payment-update")
       const validation = validateMpTransactionAmount(order, Number(paymentData.transaction_amount))
       if (!validation.ok) {
-        SecureLogger.error("Payment amount mismatch — possible fraud", {
+        SecureLogger.error("Payment amount mismatch - possible fraud", {
           paidAmount: paymentData.transaction_amount,
           orderAmount: validation.expectedAmount,
           orderId,
@@ -213,12 +213,12 @@ export async function POST(request: NextRequest) {
       const updateData: Record<string, unknown> = approvedUpdate
         ? { ...approvedUpdate, updated_at: new Date().toISOString() }
         : {
-            situation: newOrderStatus,
-            payment_method: paymentData.payment_method?.type || order.payment_method,
-            payment_provider: "Mercado Pago",
-            updated_at: new Date().toISOString(),
-            payment_breakdown,
-          }
+          situation: newOrderStatus,
+          payment_method: paymentData.payment_method?.type || order.payment_method,
+          payment_provider: "Mercado Pago",
+          updated_at: new Date().toISOString(),
+          payment_breakdown,
+        }
 
       const { data: updatedOrder, error: updateError } = await supabaseAdmin
         .from("orders")

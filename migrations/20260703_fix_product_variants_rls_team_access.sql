@@ -13,7 +13,7 @@
 --     * UPDATE / DELETE: owner-only (partners.user_id = auth.uid()) -> ignored
 --       team members and was not a reliable second layer.
 --
--- IMPORTANT — role source of truth:
+-- IMPORTANT - role source of truth:
 --   The RBAC refactor (20260505_rbac_roles_table.sql) made `partner_users.role_id`
 --   (lowercase: owner/admin/manager/operator/delivery) the source of truth. The
 --   application (team.ts, invitations.ts, authorization.ts) reads/writes ONLY
@@ -21,7 +21,7 @@
 --   defaults to 'OPERATOR' for new rows. Therefore these policies gate on
 --   role_id, NOT the stale legacy `role` column.
 --   (Note: migration 950's policies still reference the legacy `role` column and
---    are effectively stale for team members — tracked separately. RLS is only a
+--    are effectively stale for team members - tracked separately. RLS is only a
 --    backstop there because the app mutates via the service-role client.)
 --
 -- This migration:

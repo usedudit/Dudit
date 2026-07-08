@@ -252,11 +252,11 @@ export async function calculatePaymentMethodAmountsAction(input: {
                 paymentMethod: instConfig,
                 installmentNumber: i,
             })
-            const hasInterest = Boolean(instFee)
-            const totalToCharge = hasInterest && calc.adjustmentType === "fee" && calc.feeBearer === "customer"
-                ? round2(calc.amountReceived + calc.adjustmentAmount)
-                : (hasInterest && calc.adjustmentType === "discount"
-                    ? round2(calc.amountReceived - calc.adjustmentAmount)
+            const hasInterest = Boolean(instFee && Number(instFee.feePercent || 0) > 0.009 && instConfig.feeBearer === "customer")
+            const totalToCharge = calc.adjustmentType === "discount"
+                ? round2(calc.amountReceived - calc.adjustmentAmount)
+                : (calc.adjustmentType === "fee" && calc.feeBearer === "customer"
+                    ? round2(calc.amountReceived + calc.adjustmentAmount)
                     : calc.effectiveAmount)
             installmentOptions.push({
                 installments: i,

@@ -21,6 +21,7 @@ interface ReportRankingCardProps {
   valueLabel?: string
   className?: string
   variant?: "default" | "compact"
+  icon?: React.ElementType
 }
 
 function RankBadge({ position }: { position: number }) {
@@ -50,6 +51,7 @@ export function ReportRankingCard({
   valueLabel,
   className,
   variant = "default",
+  icon: Icon
 }: ReportRankingCardProps) {
   const ranked = items.slice(0, maxItems)
 
@@ -58,7 +60,16 @@ export function ReportRankingCard({
       "bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border",
       className
     )}>
-      <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-6">{title}</h3>
+      {Icon ? (
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+            <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
+          </div>
+          <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+        </div>
+      ) : (
+        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-6">{title}</h3>
+      )}
 
       <div className="space-y-4">
         {ranked.map((item, i) => (

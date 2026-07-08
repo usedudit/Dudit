@@ -67,6 +67,7 @@ interface PaymentMethod {
     fee_percent?: number | null
     fee_fixed?: number | null
     discount_percent?: number | null
+    fee_bearer?: "merchant" | "customer"
     card_brand?: string | null
     max_installments?: number | null
     pix_key_type?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
@@ -97,6 +98,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
         is_online_default: false,
         fee_percent: 0,
         fee_fixed: 0,
+        fee_bearer: "merchant" as "merchant" | "customer",
         discount_percent: 0,
         card_brand: null as string | null,
         max_installments: 1,
@@ -128,6 +130,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                     is_online_default: false,
                     fee_percent: 0,
                     fee_fixed: 0,
+                    fee_bearer: "merchant" as const,
                     discount_percent: 0,
                     card_brand: null,
                     max_installments: 1,
@@ -160,6 +163,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                         is_online_default: m.is_online_default ?? false,
                         fee_percent: Number(m.fee_percent || 0),
                         fee_fixed: Number(m.fee_fixed || 0),
+                        fee_bearer: (m.fee_bearer || "merchant") as "merchant" | "customer",
                         discount_percent: Number(m.discount_percent || 0),
                         card_brand: m.card_brand || null,
                         max_installments: Number(m.max_installments || 1),
@@ -183,7 +187,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
             }
         }
         loadDetails()
-    }, [editingMethod, notifyError])
+    }, [editingMethod]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const [isInstallmentModalOpen, setIsInstallmentModalOpen] = useState(false)
 
@@ -229,6 +233,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                 isOnlineDefault: formData.is_online_default,
                 feePercent: Number(formData.fee_percent || 0),
                 feeFixed: Number(formData.fee_fixed || 0),
+                feeBearer: formData.fee_bearer || "merchant",
                 discountPercent: Number(formData.discount_percent || 0),
                 maxInstallments: isCredit ? Number(formData.max_installments || 1) : 1,
                 supportsInstallments: isCredit && formData.supports_installments,
@@ -512,6 +517,15 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                             <SidebarCard hasTopStrip>
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Taxas e Custos</h3>
                                 <div className="grid grid-cols-1 gap-6">
+                                    <FormDropdown
+                                        label="Quem paga a taxa?"
+                                        value={formData.fee_bearer}
+                                        setValue={(val: any) => setFormData({ ...formData, fee_bearer: val })}
+                                        options={[
+                                            { value: "merchant", label: "Empresa (absorve)" },
+                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                        ]}
+                                    />
                                     <PercentageInput
                                         label="Taxa Administrativa (%)"
                                         value={formData.fee_percent}
@@ -673,7 +687,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
 
                 {/* Content Body */}
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-8">
-                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                    <div className="pmax-w-[1300px] mx-auto min-h-[400px]">
                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
 
                             {/* Left Column */}
@@ -944,6 +958,15 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                 <SidebarCard hasTopStrip>
                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Taxas e Custos</h3>
                                     <div className="grid grid-cols-1 gap-6">
+                                        <FormDropdown
+                                            label="Quem paga a taxa?"
+                                            value={formData.fee_bearer}
+                                            setValue={(val: any) => setFormData({ ...formData, fee_bearer: val })}
+                                            options={[
+                                                { value: "merchant", label: "Empresa (absorve)" },
+                                                { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                            ]}
+                                        />
                                         <PercentageInput
                                             label="Taxa Administrativa (%)"
                                             value={formData.fee_percent}

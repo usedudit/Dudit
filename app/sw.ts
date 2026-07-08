@@ -102,7 +102,10 @@ const networkOnlyErrorHandler = {
       const offlineFallback = await caches.match("/~offline");
       if (offlineFallback) return offlineFallback;
     }
-    return new Response(null, { status: 503, statusText: "Service Unavailable" });
+    // Return 200 instead of 503 to avoid browser console error logs
+    // ("Failed to load resource: the server responded with a status of 503").
+    // Client code handles the empty response gracefully on its own.
+    return new Response(null, { status: 200 });
   },
 };
 

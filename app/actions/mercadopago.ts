@@ -223,3 +223,44 @@ export async function getMpAcceptedPaymentMethodsPublicAction(partnerId: string)
     ...(partner.mp_accepted_payment_methods as Partial<MpAcceptedPaymentMethods> || {}),
   }
 }
+
+export async function checkMercadoPagoPaymentStatusAction(paymentId: string) {
+  const user = await requireUser()
+  const supabase = await getSupabaseServerClient()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
+
+  if (!/^\d+$/.test(paymentId)) {
+    return { error: "ID de pagamento inválido" }
+  }
+
+  const { getValidMercadoPagoAccessToken } = await import("@/lib/mercadopago/token-manager")
+  let mpAccessToken: string
+  try {
+    mpAccessToken = await getValidMercadoPagoAccessToken(ctx.partnerId)
+  } catch (err: any) {
+    return { error: "Configuração de pagamento indisponível" }
+  }
+
+  try {
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: {
+        Authorization: `Bearer ${mpAccessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      return { error: "Falha ao consultar pagamento no Mercado Pago" }
+    }
+
+    const paymentData = await response.json()
+    return {
+      success: true,
+      status: paymentData.status,
+      statusDetail: paymentData.status_detail,
+    }
+  } catch (error: any) {
+    return { error: error.message }
+  }
+}

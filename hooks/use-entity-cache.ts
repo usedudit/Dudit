@@ -3,6 +3,8 @@
 import { useCallback, useSyncExternalStore } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
+const FETCH_TIMEOUT_MS = 20_000 // 20s timeout for background detail fetches
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface CacheEntry<T> {
@@ -78,6 +80,17 @@ function subscribe(cacheKey: string, callback: () => void) {
     }
 }
 
+// ── Timeout helper ────────────────────────────────────────────────────────────
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(`Fetch timed out after ${ms}ms`)), ms),
+        ),
+    ])
+}
+
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useEntityCache<TListItem extends { id: string }, TDetail extends { id: string }>(
@@ -112,8 +125,9 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             for (const item of items) {
                 if (!item.id) continue
                 const existing = cacheMap.get(item.id)
-                // Don't overwrite a full-detail entry with partial list data
-                if (existing && !existing.partial && Date.now() - existing.timestamp < staleTime) continue
+                // NEVER overwrite a full-detail entry with partial list data,
+                // regardless of staleTime. A full entry is always more complete.
+                if (existing && !existing.partial) continue
                 const detail = listToDetail ? listToDetail(item) : item
                 cacheMap.set(item.id, { data: detail as TDetail, timestamp: Date.now(), partial: !!listToDetail })
                 changed = true
@@ -122,7 +136,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                 notifySubscribers(cacheKey)
             }
         },
-        [cacheMap, cacheKey, listToDetail, staleTime],
+        [cacheMap, cacheKey, listToDetail],
     )
 
     // ── Get entity (cache-first, fetch if stale/missing/partial) ─────────
@@ -146,7 +160,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             if (needsFetch) {
                 const flightKey = `${cacheKey}:${id}`
                 if (!inFlightRequests.has(flightKey)) {
-                    const promise = getDetailFn(id)
+                    const promise = withTimeout(getDetailFn(id), FETCH_TIMEOUT_MS)
                         .then((detail) => {
                             if (detail) {
                                 // Full detail: set partial=false so it won't refetch
@@ -174,7 +188,9 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             // Return cached data immediately (SWR pattern), or null if nothing cached
             return {
                 data: entry?.data ?? null,
-                isLoading: !entry || !!entry.partial,
+                // isLoading only when NO data at all (not even partial).
+                // If partial data exists, show it immediately while background fetch completes.
+                isLoading: !entry,
                 isStale: !!entry?.partial || (!!entry && Date.now() - entry.timestamp >= staleTime),
             }
         },
@@ -192,7 +208,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             const flightKey = `${cacheKey}:${id}`
             if (inFlightRequests.has(flightKey)) return // Already fetching
 
-            const promise = getDetailFn(id)
+            const promise = withTimeout(getDetailFn(id), FETCH_TIMEOUT_MS)
                 .then((detail) => {
                     if (detail) {
                         cacheMap.set(id, { data: detail, timestamp: Date.now() })

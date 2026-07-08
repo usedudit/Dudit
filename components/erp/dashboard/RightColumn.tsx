@@ -14,6 +14,7 @@ import {
   TagIcon,
   AlertCircleIcon
 } from "@/lib/icons";
+import { Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { IconPlaceholder } from "@/components/reusable";
 
@@ -54,7 +55,10 @@ export function TopCategories({ categoriesData }: { categoriesData: any[] }) {
 
   return (
     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
-      <div className="flex flex-wrap items-center justify-between mb-8 gap-4">
+      <div className="flex items-center space-x-3 mb-8">
+        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+          <TagIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+        </div>
         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Principais Categorias</h3>
       </div>
 
@@ -103,7 +107,10 @@ export function RecentActivities({ activities }: { activities: any[] }) {
   if (!activities || activities.length === 0) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1 flex flex-col justify-center min-h-[340px]">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center space-x-3 mb-8">
+          <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+            <Activity size={18} className="text-brand-dark dark:text-dark-heading" />
+          </div>
           <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
         </div>
         <IconPlaceholder
@@ -170,7 +177,12 @@ export function RecentActivities({ activities }: { activities: any[] }) {
   return (
     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
       <div className="flex justify-between items-center mb-8">
-        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+            <Activity size={18} className="text-brand-dark dark:text-dark-heading" />
+          </div>
+          <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
+        </div>
         <button className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
           <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
         </button>

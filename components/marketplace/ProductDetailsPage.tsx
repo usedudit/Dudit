@@ -1075,7 +1075,7 @@ export function ProductDetailsPageClient({
                                     <span className="text-sm text-brand-inactive-text line-through font-normal">
                                         {formatMoney(pricing.original)}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]">
                                         <TagIcon className="w-3 h-3 fill-current shrink-0" />
                                         <span>Oferta Especial</span>
                                     </span>

@@ -4,6 +4,7 @@ import { memo } from "react"
 import { formatCurrency } from "@/lib/utils"
 import { Badge, Button } from "@/components/reusable"
 import type { PDVCustomer, PDVPreSale } from "@/lib/types/pdv"
+import { TrashIcon } from "lucide-react"
 
 type Props = {
   preSale: PDVPreSale
@@ -35,11 +36,12 @@ export const POSPreSaleCard = memo(function POSPreSaleCard({ preSale, index, cus
           {onDelete && (
             <Button
               variant="outlinered"
-              className="h-7 px-2 text-xs font-bold"
+              className="h-7"
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete(e)
               }}
+              leftIcon={<TrashIcon size={14} className="text-brand-red" />}
             >
               Excluir
             </Button>

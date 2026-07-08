@@ -495,7 +495,6 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
 
     return (
         <div className="flex flex-col h-full min-h-[600px] relative overflow-hidden">
-
             {/* Header Row with Days */}
             <div className="flex h-16 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10 flex-shrink-0">
                 <div className="w-48 flex-shrink-0 border-r border-brand-border dark:border-dark-border flex items-center justify-center bg-gray-50 dark:bg-zinc-900/50">
@@ -539,7 +538,6 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                             <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-10 h-10 shrink-0 text-xs" />
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">{staff.name}</span>
-                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[100px]">{staff.role}</span>
                             </div>
                         </div>
                     ))}

@@ -324,19 +324,16 @@ export function BalancePaymentCollector({
   if (remainingBalance <= 0.009) {
     return (
       <div className="rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 p-4 text-sm font-semibold text-green-700 dark:text-green-400 text-center">
-        Pedido quitado — nenhum saldo restante.
+        Pedido quitado - nenhum saldo restante.
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 overflow-hidden mb-2">
         {!isLocked && view !== "methods" && (
-          <Button
-            variant="outline"
-            size="icon"
-            className="w-9 h-9 shrink-0"
+          <button
             onClick={() => {
               if (view === "method_type_select" || view === "split_method_select") {
                 setView(view === "split_method_select" ? "split" : "methods")
@@ -346,13 +343,14 @@ export function BalancePaymentCollector({
               setSelectedMethod(null)
               onValidityChange?.(false)
             }}
+            className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors shrink-0"
           >
-            <ChevronLeftIcon size={18} />
-          </Button>
+            <ChevronLeftIcon size={20} />
+          </button>
         )}
-        <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-          {isLocked ? `Receber saldo (${selectedMethod?.name || lockedMethodLabel})` : `Receber saldo (${view === "methods" ? "escolha o método" : selectedMethod?.name || "registrar"})`}
-        </h4>
+        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading truncate">
+          {isLocked ? `Receber saldo (${selectedMethod?.name || lockedMethodLabel})` : (view === "methods" ? "Método de Pagamento" : selectedMethod?.name || "Registrar")}
+        </h2>
       </div>
 
       {!isLocked && view === "methods" && (
@@ -450,7 +448,7 @@ export function BalancePaymentCollector({
           {splitLegs.map((leg, idx) => (
             <div key={leg.id} className="space-y-2">
               <label className="text-xs font-bold text-brand-inactive-text uppercase">
-                {leg.method || `Método ${idx + 1}`} — valor
+                {leg.method || `Método ${idx + 1}`} - valor
               </label>
               <MoneyPaymentView
                 amount={leg.amount}

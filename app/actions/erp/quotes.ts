@@ -139,9 +139,9 @@ export async function getERPQuotesPageAction(
             const mappedData = rowsWithCreator.map((row: any) => {
                 const mappedRow = {
                     ...row,
-                user_profiles: (row.user_id || row.created_by_user_id)
-                    ? { full_name: creatorNameById.get(String(row.user_id || row.created_by_user_id)) || "Sistema" }
-                    : null,
+                    user_profiles: (row.user_id || row.created_by_user_id)
+                        ? { full_name: creatorNameById.get(String(row.user_id || row.created_by_user_id)) || "Sistema" }
+                        : null,
                 }
                 if (
                     row.expiration_date &&
@@ -2195,7 +2195,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         const customName = item.custom_name.trim();
                         const productName = item.products.name || "";
                         const suffix = customName.startsWith(productName)
-                            ? customName.slice(productName.length).replace(/^[\s-–—]+/, "").trim()
+                            ? customName.slice(productName.length).replace(/^[\s-–-]+/, "").trim()
                             : customName;
 
                         const match = item.products.product_variants.find(

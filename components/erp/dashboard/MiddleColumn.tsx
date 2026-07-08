@@ -2,6 +2,7 @@
 
 import { formatCurrency as brl } from "@/lib/utils";
 import { DashboardPieChart, CHART_COLORS } from "./charts/DashboardCharts";
+import { CreditCardIcon } from "@/lib/icons";
 
 export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData: any[], revenueChartTrend: string }) {
     const totalRevenue = (originData || []).reduce((acc, o) => acc + Number(o.value), 0);
@@ -9,7 +10,10 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
 
     return (
         <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col h-full">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-3 mb-8">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <CreditCardIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                </div>
                 <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Origem da Receita</h3>
             </div>
 

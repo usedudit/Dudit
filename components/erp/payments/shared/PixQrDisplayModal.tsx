@@ -12,8 +12,11 @@ interface PixQrDisplayModalProps {
   qrCode: string
   payload: string
   amount: number
-  onConfirmPayment: () => void
+  onConfirmPayment?: () => void
   isConfirming?: boolean
+  onVerifyPayment?: () => void
+  isVerifying?: boolean
+  onSendWhatsApp?: () => void
 }
 
 export function PixQrDisplayModal({
@@ -24,6 +27,9 @@ export function PixQrDisplayModal({
   amount,
   onConfirmPayment,
   isConfirming = false,
+  onVerifyPayment,
+  isVerifying = false,
+  onSendWhatsApp,
 }: PixQrDisplayModalProps) {
   const { toast } = useToast()
 
@@ -112,15 +118,37 @@ export function PixQrDisplayModal({
           </Button>
         </div>
 
-        {/* Confirm Button */}
-        <Button
-          variant="filled"
-          onClick={onConfirmPayment}
-          isLoading={isConfirming}
-          className="w-full h-12 flex items-center justify-center font-bold text-sm bg-brand-green hover:bg-brand-green/90 text-white rounded-xl shadow-sm"
-        >
-          Pagamento Recebido
-        </Button>
+        {onVerifyPayment && (
+          <Button
+            variant="filled"
+            onClick={onVerifyPayment}
+            isLoading={isVerifying}
+            className="w-full h-12 flex items-center justify-center font-bold text-sm bg-brand-green hover:bg-brand-green/90 text-white rounded-xl shadow-sm"
+          >
+            Verificar pagamento
+          </Button>
+        )}
+
+        {onConfirmPayment && (
+          <Button
+            variant="filled"
+            onClick={onConfirmPayment}
+            isLoading={isConfirming}
+            className="w-full h-12 flex items-center justify-center font-bold text-sm bg-brand-green hover:bg-brand-green/90 text-white rounded-xl shadow-sm"
+          >
+            Pagamento Recebido
+          </Button>
+        )}
+
+        {onSendWhatsApp && (
+          <Button
+            variant="outline"
+            onClick={onSendWhatsApp}
+            className="w-full h-12 mt-3 flex items-center justify-center font-bold text-sm border-brand-border text-brand-dark rounded-xl shadow-sm"
+          >
+            Enviar via WhatsApp
+          </Button>
+        )}
       </div>
     </DefaultModal>
   )

@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
 import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button } from "@/components/reusable"
+import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { PlusIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
@@ -186,16 +187,28 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             {!isQuickMode && (
                                 <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
                             )}
-                            <MoneyInput
-                                label="Preço de Venda"
-                                name="price"
-                                value={productData.price || ""}
-                                onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
-                                disabled={!isEditing || !showPrice}
-                                required={showPrice}
-                                error={fieldErrors?.has("price")}
-                                errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
-                            />
+                            <div className="flex flex-col">
+                                <MoneyInput
+                                    label="Preço de Venda"
+                                    name="price"
+                                    value={productData.price || ""}
+                                    onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
+                                    disabled={!isEditing || !showPrice}
+                                    required={showPrice}
+                                    error={fieldErrors?.has("price")}
+                                    errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
+                                />
+                                {isEditing && showPrice && (
+                                    <SalePriceCalculator
+                                        costPrice={Number(productData.costPrice || 0)}
+                                        sellingPrice={Number(productData.price || 0)}
+                                        onApply={(cost, sell) => {
+                                            handleFieldChange({ target: { name: "costPrice", value: cost } })
+                                            handleFieldChange({ target: { name: "price", value: sell } })
+                                        }}
+                                    />
+                                )}
+                            </div>
                             <MoneyInput
                                 label="Preço Promocional"
                                 name="promotional_price"

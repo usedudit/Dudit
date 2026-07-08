@@ -1,6 +1,6 @@
 /**
  * Server-side checkout amounts for marketplace (deposit vs integral).
- * Single source of truth — frontend must display these values as-is.
+ * Single source of truth - frontend must display these values as-is.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -34,6 +34,15 @@ export async function computeMarketplaceCheckoutAmounts(
   },
 ): Promise<{ success: true; data: MarketplaceCheckoutAmounts } | { success: false; error: string }> {
   const serviceCartIds = params.cartItemIds
+
+  // Ensure cart fulfillment mode matches the selected delivery type
+  // (cart items may still have pickup/default mode from when they were added)
+  const fulfillmentMode = params.deliveryType === "delivery" ? "delivery" : "pickup"
+  await adminClient
+    .from("cart_items")
+    .update({ fulfillment_mode: fulfillmentMode, updated_at: new Date().toISOString() })
+    .in("id", params.cartItemIds)
+    .eq("user_id", params.userId)
 
   // Ensure cart reflects payDepositOnly for deposit pricing
   if (params.depositAvailable) {

@@ -564,12 +564,14 @@ export async function getCustomerByIdAction(customerId: string) {
   // Dynamically add mobile property for compatibility with frontend components
   ;(customer as any).mobile = customer.phone
 
-  // Aggregate order stats for KPI display (by customer id AND user_id)
-  const buyerIds = [customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean)
+  // Aggregate order stats for KPI display (by buyer_id AND customer_id)
+  const buyerIds = [customer.user_id, customer.marketplace_user_id].filter(Boolean)
+  const conditions = [`customer_id.eq.${customer.id}`]
+  if (buyerIds.length > 0) conditions.push(`buyer_id.in.(${buyerIds.join(",")})`)
   const { data: orderAgg } = await supabase
     .from("orders")
     .select("total_amount, created_at")
-    .in("buyer_id", buyerIds)
+    .or(conditions.join(","))
     .neq("situation", "cancelled")
 
   if (orderAgg) {
@@ -613,11 +615,10 @@ export async function getCustomerOrdersAction(customerId: string) {
     return { orders: [] }
   }
 
-  const buyerIds = [customer.user_id, customer.id, customer.marketplace_user_id].filter(Boolean)
+  const buyerIds = [customer.user_id, customer.marketplace_user_id].filter(Boolean)
 
-  if (buyerIds.length === 0) {
-    return { orders: [], stats: null }
-  }
+  const orderConditions = [`customer_id.eq.${customer.id}`]
+  if (buyerIds.length > 0) orderConditions.push(`buyer_id.in.(${buyerIds.join(",")})`)
 
   const { data: orders, error } = await adminDb
     .from("orders")
@@ -637,7 +638,7 @@ export async function getCustomerOrdersAction(customerId: string) {
       notes,
       order_items ( id, quantity, service_id, line_type )
     `)
-    .in("buyer_id", buyerIds)
+    .or(orderConditions.join(","))
     .order("created_at", { ascending: false })
     .limit(50)
 
@@ -646,10 +647,13 @@ export async function getCustomerOrdersAction(customerId: string) {
   }
 
   // Aggregate stats across ALL orders (no limit) for accurate KPIs
+  const statsConditions = [`customer_id.eq.${customer.id}`]
+  if (buyerIds.length > 0) statsConditions.push(`buyer_id.in.(${buyerIds.join(",")})`)
+
   const { data: statsRaw } = await adminDb
     .from("orders")
     .select("total_amount, created_at, situation")
-    .in("buyer_id", buyerIds)
+    .or(statsConditions.join(","))
     .neq("situation", "cancelled")
 
   let stats = null
@@ -899,25 +903,27 @@ export async function getERPCustomersPageAction(
       }
     }))
 
-    // Aggregate order stats for this page of customers
+    // Aggregate order stats for this page of customers (by buyer_id OR customer_id)
     const customerIds = items.map((c: any) => c.id).filter(Boolean)
     if (customerIds.length > 0) {
       const { data: orderAgg } = await supabase
         .from("orders")
-        .select("buyer_id, total_amount, created_at")
-        .in("buyer_id", customerIds)
+        .select("buyer_id, customer_id, total_amount, created_at")
+        .or(`buyer_id.in.(${customerIds.join(",")}),customer_id.in.(${customerIds.join(",")})`)
         .neq("situation", "cancelled")
 
       if (orderAgg) {
         const statsMap = new Map<string, { orders_count: number; total_spent: number; last_order_at: string | null }>()
         for (const o of orderAgg) {
-          const prev = statsMap.get(o.buyer_id) || { orders_count: 0, total_spent: 0, last_order_at: null }
+          const key = customerIds.includes(o.buyer_id) ? o.buyer_id : o.customer_id
+          if (!key) continue
+          const prev = statsMap.get(key) || { orders_count: 0, total_spent: 0, last_order_at: null }
           prev.orders_count++
           prev.total_spent += Number(o.total_amount) || 0
           if (o.created_at && (!prev.last_order_at || o.created_at > prev.last_order_at)) {
             prev.last_order_at = o.created_at
           }
-          statsMap.set(o.buyer_id, prev)
+          statsMap.set(key, prev)
         }
         for (const item of items) {
           const stats = statsMap.get(item.id)

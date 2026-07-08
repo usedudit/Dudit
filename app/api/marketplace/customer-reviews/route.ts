@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
     .eq("id", customerId)
     .maybeSingle()
 
-  const userId = customer?.user_id || customer?.marketplace_user_id
-  if (!userId) {
+  const userIds = [customer?.user_id, customer?.marketplace_user_id].filter(Boolean)
+  if (userIds.length === 0) {
     return NextResponse.json({ reviews: [] })
   }
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       products(name, images, slug, unit),
       services(name, images, slug, unit)
     `)
-    .eq("user_id", userId)
+    .in("user_id", userIds)
     .order("created_at", { ascending: false })
     .limit(50)
 

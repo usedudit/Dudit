@@ -5,6 +5,7 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { ReportsPage } from "@/components/erp/reports/ReportsPage"
 import { ReportsSkeleton } from "@/components/erp/reports/ReportsSkeleton"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
+import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
 import {
     getDashboardFinancialData,
     getDashboardProductsData,
@@ -59,7 +60,7 @@ export default async function ERPReportsPage(props: {
         checkPermission(partnerId, "customers", "view").then(res => res.allowed ? getCustomerReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "orders", "view").then(res => res.allowed ? getReturnsReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDeliveryReportData(partnerId, period).catch(() => null) : null),
-        checkPermission(partnerId, "coupons", "view").then(res => res.allowed ? getMarketingReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "products", "view").then(res => res.allowed ? getMarketingReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getProductivityReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "service_orders", "view").then(res => res.allowed ? getServiceOrderReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getGoalReportData(partnerId, period).catch(() => null) : null),
@@ -78,40 +79,42 @@ export default async function ERPReportsPage(props: {
         <>
             <ERPPageHeader title={activeStore?.storeName ?? "Relatórios"} />
             <FadeIn className="p-4">
-                <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-                    <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                Relatórios
-                            </h1>
-                            <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
-                        </div>
-                        <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-                            <GlobalPeriodFilter />
-                        </Suspense>
-                    </header>
+                <DashboardProvider>
+                    <div className="w-full space-y-6 pt-4 px-4 md:px-8">
+                        <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                    Relatórios
+                                </h1>
+                                <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                    {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                            </div>
+                            <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                                <GlobalPeriodFilter />
+                            </Suspense>
+                        </header>
 
-                    <Suspense fallback={<ReportsSkeleton />}>
-                        <ReportsPage
-                            sells={sells}
-                            period={period}
-                            productsData={productsData}
-                            servicesData={servicesData}
-                            financialData={financialData}
-                            salesData={salesData}
-                            customerData={customerData}
-                            returnsData={returnsData}
-                            deliveryData={deliveryData}
-                            marketingData={marketingData}
-                            productivityData={productivityData}
-                            serviceOrdersData={serviceOrdersData}
-                            goalData={goalData}
-                            stockValue={stockValue}
-                        />
-                    </Suspense>
-                </div>
+                        <Suspense fallback={<ReportsSkeleton />}>
+                            <ReportsPage
+                                sells={sells}
+                                period={period}
+                                productsData={productsData}
+                                servicesData={servicesData}
+                                financialData={financialData}
+                                salesData={salesData}
+                                customerData={customerData}
+                                returnsData={returnsData}
+                                deliveryData={deliveryData}
+                                marketingData={marketingData}
+                                productivityData={productivityData}
+                                serviceOrdersData={serviceOrdersData}
+                                goalData={goalData}
+                                stockValue={stockValue}
+                            />
+                        </Suspense>
+                    </div>
+                </DashboardProvider>
             </FadeIn>
         </>
     )

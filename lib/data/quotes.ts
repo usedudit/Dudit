@@ -124,7 +124,7 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                     const customName = item.custom_name.trim();
                     const productName = item.products.name || "";
                     const suffix = customName.startsWith(productName)
-                        ? customName.slice(productName.length).replace(/^[\s-–—]+/, "").trim()
+                        ? customName.slice(productName.length).replace(/^[\s-–-]+/, "").trim()
                         : customName;
 
                     const match = item.products.product_variants.find(

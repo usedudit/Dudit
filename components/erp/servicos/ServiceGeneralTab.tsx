@@ -3,6 +3,7 @@
 import type React from "react"
 import { useMemo } from "react"
 import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard } from "@/components/reusable"
+import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 import FormTextarea from "@/components/reusable/FormTextarea"
@@ -187,16 +188,28 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                         {isQuickMode ? (
                             !isFree && (
-                                <MoneyInput
-                                    label={serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
-                                    name="price"
-                                    value={serviceData.price || ""}
-                                    onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
-                                    disabled={!isEditing || !showPrice}
-                                    required={showPrice}
-                                    error={fieldErrors?.has("price")}
-                                    errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
-                                />
+                                <div className="flex flex-col">
+                                    <MoneyInput
+                                        label={serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
+                                        name="price"
+                                        value={serviceData.price || ""}
+                                        onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
+                                        disabled={!isEditing || !showPrice}
+                                        required={showPrice}
+                                        error={fieldErrors?.has("price")}
+                                        errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
+                                    />
+                                    {isEditing && showPrice && (
+                                        <SalePriceCalculator
+                                            costPrice={Number(serviceData.cost_price || 0)}
+                                            sellingPrice={Number(serviceData.price || 0)}
+                                            onApply={(cost, sell) => {
+                                                handleFieldChange({ target: { name: "cost_price", value: cost } })
+                                                handleFieldChange({ target: { name: "price", value: sell } })
+                                            }}
+                                        />
+                                    )}
+                                </div>
                             )
                         ) : (
                             <FormDropdown
@@ -220,16 +233,28 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     {!isFree && !isQuickMode && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
                             <MoneyInput label="Custo do Serviço" name="cost_price" value={serviceData.cost_price || ""} onChange={(val) => handleFieldChange({ target: { name: "cost_price", value: val } })} disabled={!isEditing || !showPrice} />
-                            <MoneyInput
-                                label={serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
-                                name="price"
-                                value={serviceData.price || ""}
-                                onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
-                                disabled={!isEditing || !showPrice}
-                                required={showPrice}
-                                error={fieldErrors?.has("price")}
-                                errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
-                            />
+                            <div className="flex flex-col">
+                                <MoneyInput
+                                    label={serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
+                                    name="price"
+                                    value={serviceData.price || ""}
+                                    onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
+                                    disabled={!isEditing || !showPrice}
+                                    required={showPrice}
+                                    error={fieldErrors?.has("price")}
+                                    errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
+                                />
+                                {isEditing && showPrice && (
+                                    <SalePriceCalculator
+                                        costPrice={Number(serviceData.cost_price || 0)}
+                                        sellingPrice={Number(serviceData.price || 0)}
+                                        onApply={(cost, sell) => {
+                                            handleFieldChange({ target: { name: "cost_price", value: cost } })
+                                            handleFieldChange({ target: { name: "price", value: sell } })
+                                        }}
+                                    />
+                                )}
+                            </div>
                             <MoneyInput
                                 label="Preço Promocional"
                                 name="promotional_price"

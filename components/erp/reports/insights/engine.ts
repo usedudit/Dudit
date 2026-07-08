@@ -106,7 +106,7 @@ export function generateSalesInsights(input: SalesInsightInput): Insight[] {
   } else if (revenuePct < -5) {
     insights.push({
       id: "sales-revenue-down",
-      message: `Faturamento caiu ${Math.abs(revenuePct)}% — vale revisar suas estratégias de venda.`,
+      message: `Faturamento caiu ${Math.abs(revenuePct)}% - vale revisar suas estratégias de venda.`,
       tone: "negative",
       category: "Vendas",
       priority: 1,
@@ -134,7 +134,7 @@ export function generateSalesInsights(input: SalesInsightInput): Insight[] {
   if (ticketPct > 5) {
     insights.push({
       id: "sales-ticket-up",
-      message: `Ticket médio subiu ${ticketPct}% — seus clientes estão comprando mais por pedido.`,
+      message: `Ticket médio subiu ${ticketPct}% - seus clientes estão comprando mais por pedido.`,
       tone: "positive",
       category: "Vendas",
       priority: 3,
@@ -199,7 +199,7 @@ export function generateProductsInsights(input: ProductsInsightInput): Insight[]
     } else if (prodPct < -20) {
       insights.push({
         id: "prod-top-down",
-        message: `${input.topProductName} vendeu ${Math.abs(prodPct)}% menos — vale investigar.`,
+        message: `${input.topProductName} vendeu ${Math.abs(prodPct)}% menos - vale investigar.`,
         tone: "warning",
         category: "Produtos",
         priority: 2,
@@ -216,7 +216,7 @@ export function generateServicesInsights(input: ServicesInsightInput): Insight[]
   if (input.totalAppointments > 0 && input.attendanceRate < 70) {
     insights.push({
       id: "serv-attendance-low",
-      message: `Taxa de comparecimento é de ${input.attendanceRate}% — ${Math.round(100 - input.attendanceRate)}% dos clientes não compareceram.`,
+      message: `Taxa de comparecimento é de ${input.attendanceRate}% - ${Math.round(100 - input.attendanceRate)}% dos clientes não compareceram.`,
       tone: "warning",
       category: "Serviços",
       priority: 1,
@@ -283,7 +283,7 @@ export function generateFinancialInsights(input: FinancialInsightInput): Insight
   if (input.receivable > input.payable * 1.5) {
     insights.push({
       id: "fin-healthy",
-      message: `A receber (${brl(input.receivable)}) é maior que a pagar (${brl(input.payable)}) — situação confortável.`,
+      message: `A receber (${brl(input.receivable)}) é maior que a pagar (${brl(input.payable)}) - situação confortável.`,
       tone: "positive",
       category: "Financeiro",
       priority: 2,
@@ -399,7 +399,7 @@ export function generateMarketingInsights(input: MarketingInsightInput): Insight
     if (input.couponUsageRate > 30) {
       insights.push({
         id: "mkt-coupon-high",
-        message: `${Math.round(input.couponUsageRate)}% dos pedidos usam cupom — a margem pode estar comprometida.`,
+        message: `${Math.round(input.couponUsageRate)}% dos pedidos usam cupom - a margem pode estar comprometida.`,
         tone: "warning",
         category: "Marketing",
         priority: 2,
@@ -424,7 +424,7 @@ export function generateReturnsInsights(input: ReturnsInsightInput): Insight[] {
   if (input.returnRate > 10) {
     insights.push({
       id: "ret-rate-high",
-      message: `Taxa de devolução de ${input.returnRate}% — acima do ideal.`,
+      message: `Taxa de devolução de ${input.returnRate}% - acima do ideal.`,
       tone: "negative",
       category: "Trocas/Devoluções",
       priority: 1,
@@ -451,7 +451,7 @@ export function generateReturnsInsights(input: ReturnsInsightInput): Insight[] {
   } else if (returnPct < -10) {
     insights.push({
       id: "ret-rate-down",
-      message: `Taxa de devolução caiu ${Math.abs(returnPct)}% — ótimo sinal.`,
+      message: `Taxa de devolução caiu ${Math.abs(returnPct)}% - ótimo sinal.`,
       tone: "positive",
       category: "Trocas/Devoluções",
       priority: 2,
@@ -510,7 +510,7 @@ export function generateDeliveryInsights(input: DeliveryInsightInput): Insight[]
     if (timePct < -5) {
       insights.push({
         id: "del-time-down",
-        message: `Tempo médio de entrega caiu ${Math.abs(timePct)}% — mais eficiência.`,
+        message: `Tempo médio de entrega caiu ${Math.abs(timePct)}% - mais eficiência.`,
         tone: "positive",
         category: "Entregas",
         priority: 2,

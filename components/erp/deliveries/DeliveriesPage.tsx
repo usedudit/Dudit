@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -89,39 +90,12 @@ export default function DeliveriesPage({
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [filters, setFilters] = useState<{ status: string[] }>({ status: [] })
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [wrapper, setWrapper] = useState<"list" | "create" | "detail">("list")
-    const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null)
 
-    // Sync URL search params -> wrapper state
-    useEffect(() => {
-        const createParam = searchParams.get("create")
-        const viewParam = searchParams.get("view")
-        if (createParam === "true") {
-            setWrapper("create")
-            setSelectedDeliveryId(null)
-        } else if (viewParam) {
-            setWrapper("detail")
-            setSelectedDeliveryId(viewParam)
-        } else {
-            setWrapper("list")
-            setSelectedDeliveryId(null)
-        }
-    }, [searchParams])
+    // Use standard ERP page URL handling pattern
+    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
 
-    const navigateTo = useCallback((newWrapper: "list" | "create" | "detail", deliveryId: string | null = null) => {
-        const params = new URLSearchParams(searchParams.toString())
-        if (newWrapper === "create") {
-            params.set("create", "true")
-            params.delete("view")
-        } else if (newWrapper === "detail" && deliveryId) {
-            params.set("view", deliveryId)
-            params.delete("create")
-        } else {
-            params.delete("create")
-            params.delete("view")
-        }
-        router.push(`${pathname}?${params.toString()}`, { scroll: false })
-    }, [router, searchParams])
+    const wrapper = entityState.action === "create" ? "create" : entityState.action === "view" ? "detail" : "list"
+    const selectedDeliveryId = entityState.entityId
 
     const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})
     const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -366,14 +340,14 @@ export default function DeliveriesPage({
                 <FadeIn key="create" className="w-full h-full">
                     <CreateDeliveryPage
                         partnerId={partnerId}
-                        onBack={() => { setCreatePrefillOrderIds(null); navigateTo("list") }}
-                        onSuccess={() => { setCreatePrefillOrderIds(null); navigateTo("list") }}
+                        onBack={() => { setCreatePrefillOrderIds(null); closeEntity() }}
+                        onSuccess={() => { setCreatePrefillOrderIds(null); closeEntity() }}
                         initialOrderIds={createPrefillOrderIds || undefined}
                     />
                 </FadeIn>
-            ) : wrapper === "detail" && selectedDeliveryId ? (
+             ) : wrapper === "detail" && selectedDeliveryId ? (
                 <FadeIn key="detail" className="w-full h-full">
-                    <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => navigateTo("list")} />
+                    <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => closeEntity()} />
                 </FadeIn>
             ) : (
                 <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -395,7 +369,7 @@ export default function DeliveriesPage({
                                 >
                                     Gerar sugestões
                                 </Button>
-                                <Button onClick={() => navigateTo("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
+                                <Button onClick={() => openEntity("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
                                     Nova entrega
                                 </Button>
                             </div>
@@ -405,7 +379,7 @@ export default function DeliveriesPage({
                             search={search}
                             onSearchChange={setSearch}
                             onOpenFilter={() => setIsFilterOpen(true)}
-                            onAdd={() => navigateTo("create")}
+                            onAdd={() => openEntity("create")}
                             viewMode={viewMode}
                             onViewModeChange={setViewMode}
                             addDisabled={!!planGate}
@@ -435,7 +409,7 @@ export default function DeliveriesPage({
                                                     action: () => openPlanUpgrade("crescer"),
                                                 } : {
                                                     text: "Adicionar primeira entrega",
-                                                    action: () => navigateTo("create"),
+                                                    action: () => openEntity("create"),
                                                 }
                                             }
                                         />
@@ -444,13 +418,13 @@ export default function DeliveriesPage({
                                     <FadeIn key="kanban" className="w-full">
                                         <DeliveryKanbanBoard
                                             deliveries={mapped}
-                                            onDetails={(id) => navigateTo("detail", id)}
+                                            onDetails={(id) => openEntity("view", id)}
                                             onQuickStatusChange={handleQuickStatusChange}
                                         />
                                     </FadeIn>
                                 ) : viewMode === "grid" ? (
                                     <FadeIn key="grid" className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => navigateTo("detail", delivery.id)} />)}
+                                        {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => openEntity("view", delivery.id)} />)}
                                     </FadeIn>
                                 ) : (
                                     <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
@@ -484,7 +458,7 @@ export default function DeliveriesPage({
                                                 </thead>
                                                 <tbody>
                                                     {paginated.map((delivery) => (
-                                                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => navigateTo("detail", delivery.id)} />
+                                                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => openEntity("view", delivery.id)} />
                                                     ))}
                                                 </tbody>
                                             </table>
@@ -554,7 +528,7 @@ export default function DeliveriesPage({
                                             const ids = (sug.orders || []).map((o: any) => o.id).filter(Boolean)
                                             setSuggestionsOpen(false)
                                             setCreatePrefillOrderIds(ids)
-                                            navigateTo("create")
+                                            openEntity("create")
                                         }}
                                     >
                                         Criar entrega

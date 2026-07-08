@@ -39,6 +39,7 @@ type DraftItemInput = {
     originalPrice?: number | null
     isPromotional?: boolean
     promotionId?: string | null
+    isManualPrice?: boolean | null
 }
 
 type DraftUpsertInput = {
@@ -226,6 +227,7 @@ function normalizeDraftItems(items: DraftItemInput[]) {
         original_price: item.originalPrice != null ? Number(item.originalPrice) : null,
         is_promotional: Boolean(item.isPromotional),
         promotion_id: item.promotionId || null,
+        is_manual_price: Boolean(item.isManualPrice),
     }))
 
     for (const item of normalized) {
@@ -577,6 +579,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
             unitPrice: Number(item.unit_price || 0),
             quantity: Number(item.quantity || 0),
             basePrice: item.list_unit_price != null ? Number(item.list_unit_price) : Number(item.unit_price || 0),
+            isManualPrice: item.is_manual_price,
         })),
         shippingCost: shippingFee,
         additionalCosts: otherCosts,
@@ -617,6 +620,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
                     original_price: Number(prod.price || 0),
                     is_promotional: true,
                     promotion_id: promo.id,
+                    is_manual_price: false,
                 })
             } else {
                 const serv = giftServices.find((s: any) => s.id === giftId)
@@ -637,6 +641,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
                         original_price: Number(serv.price || 0),
                         is_promotional: true,
                         promotion_id: promo.id,
+                        is_manual_price: false,
                     })
                 }
             }

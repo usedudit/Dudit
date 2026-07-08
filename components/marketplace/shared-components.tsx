@@ -376,7 +376,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {!hidePromoBadge && showPrice && pricing.badgeVariant && (
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap
                                 ${pricing.badgeVariant === "blue" ? "bg-[#2968c8]" : "bg-[#ff7a00]"}`}>
                                 {pricing.badgeVariant === "blue" ? (
                                     <>

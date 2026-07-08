@@ -183,7 +183,7 @@ function normalizePaymentMethodLabel(value?: string | null) {
 
 
 function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) {
-    const normalizedEntries = (entries || [])
+    const mapped = (entries || [])
         .map((entry) => {
             const amt = Math.max(0, Number(entry?.amount || 0))
             const effectiveAmt = entry?.effectiveAmount != null ? Math.max(0, Number(entry.effectiveAmount)) : amt
@@ -201,9 +201,8 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
                 installmentNumber: Math.max(1, Math.floor(Number(entry?.installmentNumber || 1))),
             }
         })
-        .filter((entry) => entry.method && entry.effectiveAmount > 0.009)
 
-    return normalizedEntries
+    return mapped.filter((entry) => entry.method && (entry.effectiveAmount > 0.009 || mapped.length === 1))
 }
 
 type ApplyPaymentMethodPricingResult =
@@ -778,14 +777,14 @@ export async function createFinancialTransactionsForReceivedAmount(
             const newEntry = newBreakdown[i]
             if (!newEntry?.method) continue
 
-            const newReceived = Number(newEntry.amountReceived ?? newEntry.effectiveAmount ?? newEntry.amount ?? 0)
+            const newReceived = Number(newEntry.amount ?? newEntry.amountReceived ?? newEntry.effectiveAmount ?? 0)
 
             const oldEntry = oldBreakdown.find((old: any) => 
                 old?.method === newEntry.method && 
                 old?.paymentMethodId === newEntry.paymentMethodId
             ) || oldBreakdown[i]
 
-            const oldReceived = oldEntry ? Number(oldEntry.amountReceived ?? oldEntry.effectiveAmount ?? oldEntry.amount ?? 0) : 0
+            const oldReceived = oldEntry ? Number(oldEntry.amount ?? oldEntry.amountReceived ?? oldEntry.effectiveAmount ?? 0) : 0
             const delta = newReceived - oldReceived
 
             if (delta > 0.009) {
@@ -1681,7 +1680,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         )
     }
 
-    if (paymentState.paidAmount > 0.009) {
+    if (paymentState.paidAmount > 0.009 && paymentState.situation === "paid") {
         await createFinancialTransactionsForReceivedAmount(supabase, {
             orderId: order.id,
             orderNumber: order.order_number,
@@ -2308,7 +2307,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const orderError = orderUpdateResult.error
     if (orderError) return { error: orderError.message }
 
-    if (paymentState.paidAmount > (currentOrder.paid_amount || 0) + 0.009) {
+    if (paymentState.paidAmount > (currentOrder.paid_amount || 0) + 0.009 && paymentState.situation === "paid") {
         await createFinancialTransactionsForReceivedAmount(supabase, {
             orderId: orderId,
             orderNumber: currentOrder.order_number || orderId,
@@ -3001,7 +3000,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             if (error) return { error: error.message }
             paymentProcessedCount += 1
 
-            if (paymentState.paidAmount > (order.paid_amount || 0) + 0.009) {
+            if (paymentState.paidAmount > (order.paid_amount || 0) + 0.009 && paymentState.situation === "paid") {
                 const oldBreakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
                 const newBreakdown = payload.paymentBreakdown || (
                     paymentState.situation === "paid"
@@ -3594,7 +3593,8 @@ export async function getERPOrdersPageAction(
                 return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                 order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
                 payment_method,
-                payment_breakdown
+                payment_breakdown,
+                payment_provider
             `
 
         const selectWithPosSale = `

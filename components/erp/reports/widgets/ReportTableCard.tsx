@@ -29,6 +29,7 @@ interface ReportTableCardProps {
   detailLabel?: string
   onRowClick?: (row: TableRow) => void
   className?: string
+  icon?: React.ElementType
 }
 
 export function ReportTableCard({
@@ -41,6 +42,7 @@ export function ReportTableCard({
   detailLabel = "Ver Detalhes",
   onRowClick,
   className,
+  icon: Icon
 }: ReportTableCardProps) {
   const router = useRouter()
   const [page, setPage] = useState(0)
@@ -53,7 +55,16 @@ export function ReportTableCard({
       className
     )}>
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+        {Icon ? (
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+              <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
+            </div>
+            <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+          </div>
+        ) : (
+          <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+        )}
         {data.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-medium text-brand-inactive-text">

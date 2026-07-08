@@ -144,6 +144,7 @@ export type PricingItem = {
   /** Base price before any discount (product.price) */
   basePrice?: number | null
   categoryId?: string | null
+  isManualPrice?: boolean | null
 }
 
 export type PricingCoupon = {
@@ -275,6 +276,9 @@ function isItemInScope(
   item: CartUnit,
   promo: PricingPromotion,
 ): boolean {
+  if (item.isManualPrice && promo.applyScope !== ApplyScope.ENTIRE_CART) {
+    return false
+  }
   const applyScope = promo.applyScope
   if (applyScope === ApplyScope.ENTIRE_CART) {
     return true
@@ -299,6 +303,7 @@ interface CartUnit {
   categoryId?: string | null
   originalPrice: number
   currentPrice: number
+  isManualPrice?: boolean
 }
 
 export function calculateOrderPricing(input: PricingInput): PricingResult {
@@ -341,6 +346,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         categoryId: item.categoryId || null,
         originalPrice: baseP,
         currentPrice: manualEffective, // start with manual price
+        isManualPrice: Boolean(item.isManualPrice),
       })
     }
   }

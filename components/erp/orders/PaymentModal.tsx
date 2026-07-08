@@ -20,14 +20,14 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem } from '@/components/reusable';
+import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem, IconPlaceholder } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { calculatePaymentMethodAmountsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
-import { getMercadoPagoStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
+import { getMercadoPagoStatusAction, checkMercadoPagoPaymentStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
@@ -272,10 +272,14 @@ const PaymentModal = ({
     const [savingPixKey, setSavingPixKey] = useState(false);
 
     // Toggles
-    const [paymentPendingType, setPaymentPendingType] = useState<'none' | 'unpaid' | 'pending_stock'>('none');
-    const [isPendingDelivery, setIsPendingDelivery] = useState(false);
-    const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
-    const [showDeliveryStatusModal, setShowDeliveryStatusModal] = useState(false);
+    const paymentPendingType = 'none';
+    const setPaymentPendingType = (v: any) => { };
+    const isPendingDelivery = false;
+    const setIsPendingDelivery = (v: any) => { };
+    const showPaymentStatusModal = false;
+    const setShowPaymentStatusModal = (v: any) => { };
+    const showDeliveryStatusModal = false;
+    const setShowDeliveryStatusModal = (v: any) => { };
     const [cashCalculatorInput, setCashCalculatorInput] = useState("");
 
     // Mercado Pago State
@@ -302,8 +306,56 @@ const PaymentModal = ({
     const [depositMpPixData, setDepositMpPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
     const [depositMpPaymentId, setDepositMpPaymentId] = useState<string | null>(null);
     const [generatingDepositPix, setGeneratingDepositPix] = useState(false);
+    const [showDepositPixModal, setShowDepositPixModal] = useState(false);
+    const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
+
+    const handleVerifyDepositPayment = async () => {
+        if (!depositMpPaymentId) return;
+        setIsCheckingDepositStatus(true);
+        try {
+            const res = await checkMercadoPagoPaymentStatusAction(depositMpPaymentId);
+            if (res && 'success' in res && res.success) {
+                if (res.status === "approved") {
+                    toast({ title: "Sinal Pago!", description: "O pagamento do sinal foi confirmado." });
+                    setShowDepositPixModal(false);
+                    setDepositMpPixData(null);
+                    setDepositMpPaymentId(null);
+                    invalidate();
+                } else {
+                    toast({ title: "Aguardando pagamento", description: "O Pix do sinal ainda não consta como pago." });
+                }
+            } else {
+                toast({
+                    title: "Erro ao verificar",
+                    description: (res && 'error' in res ? res.error : null) || "Não foi possível consultar o status do pagamento.",
+                    variant: "destructive"
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Ocorreu um erro ao verificar o pagamento.", variant: "destructive" });
+        } finally {
+            setIsCheckingDepositStatus(false);
+        }
+    };
+
+    const handleSendDepositWhatsApp = () => {
+        if (!depositMpPixData || !customer?.phone) return;
+        const formattedAmount = formatCurrency(depositChargeAmount);
+        const messageText = `Olá, *${customer?.name || "Cliente"}*! 🌟\n\n` +
+            `Aqui está o código Pix Copia e Cola para o pagamento do sinal do seu pedido no valor de *${formattedAmount}*:\n\n` +
+            `\`${depositMpPixData.qrCode}\`\n\n` +
+            `Assim que realizar o pagamento, nosso sistema irá confirmar de forma automática! 😉`;
+        const encodedMsg = encodeURIComponent(messageText);
+        const phone = String(customer.phone).replace(/\D/g, "");
+        window.open(`https://wa.me/55${phone}?text=${encodedMsg}`, "_blank");
+    };
 
     const handleGenerateDepositCharge = async () => {
+        if (depositMpPixData) {
+            setShowDepositPixModal(true);
+            return;
+        }
         if (depositChargeAmount <= 0.009) {
             toast({ title: "Sinal indisponível", description: "Configure o valor do sinal para este pedido.", variant: "destructive" });
             return;
@@ -322,6 +374,7 @@ const PaymentModal = ({
             if (res?.pixData?.qrCode) {
                 setDepositMpPixData({ qrCode: res.pixData.qrCode, qrCodeBase64: res.pixData.qrCodeBase64 });
                 setDepositMpPaymentId(res.mpPaymentId);
+                setShowDepositPixModal(true);
                 toast({ title: "Pix gerado", description: "Cobrança de sinal criada via Mercado Pago." });
             } else {
                 toast({ title: "Erro", description: res?.error || "Falha ao gerar Pix.", variant: "destructive" });
@@ -1403,7 +1456,8 @@ const PaymentModal = ({
         setView("method_type_select");
     };
 
-    const buildConfirmPayload = () => {
+    const buildConfirmPayload = (isUnpaidRegister?: boolean) => {
+        const isUnpaid = isUnpaidRegister || (view !== 'split' && paymentBaseAmount === 0);
         const splitFinalCharged =
             view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
                 ? splitPreview.finalTotal
@@ -1420,7 +1474,7 @@ const PaymentModal = ({
                     return {
                         method: payment.method,
                         amount: finalAmt,
-                        amountReceived: paymentPendingType !== 'none' ? 0 : Number(pr?.amountReceived ?? payment.amount ?? 0),
+                        amountReceived: isUnpaid ? 0 : Number(pr?.amountReceived ?? payment.amount ?? 0),
                         adjustmentType: pr?.adjustmentType || 'none',
                         adjustmentPercent: Number(pr?.adjustmentPercent || 0),
                         adjustmentAmount: Number(pr?.adjustmentAmount || 0),
@@ -1439,36 +1493,50 @@ const PaymentModal = ({
                     if (isMarketplaceOrder && originalPaymentMethod) {
                         return formatPaymentMethodToFullLabel(originalPaymentMethod);
                     }
-                    const selectedMethodObj = activeMethods.find((method: any) => method.id === selectedMethodId);
+                    const selectedMethodObj = selectedMethodId ? activeMethods.find((method: any) => method.id === selectedMethodId) : null;
                     if (selectedMethodObj) {
                         return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
+                    }
+                    if (isUnpaid) {
+                        return 'Pendente';
                     }
                     const fallbackName = view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
                     return getFormattedMethodLabel(fallbackName, fallbackType);
                 })(),
-                amount: Number(totalPaidCalculated || 0),
-                amountReceived: paymentPendingType !== 'none'
-                    ? 0
-                    : (view === 'money'
-                        ? (wantsChange ? Math.max(payWithAmount, totalPaidCalculated) : Math.max(paymentBaseAmount, totalPaidCalculated))
-                        : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0)),
+                amount: (() => {
+                    if (isUnpaid) {
+                        return Number(paymentCalculation?.effectiveAmount ?? chargeTarget ?? 0);
+                    }
+                    return Number(totalPaidCalculated || 0);
+                })(),
+                amountReceived: isUnpaid ? 0 : (view === 'money'
+                    ? (wantsChange ? Math.max(payWithAmount, totalPaidCalculated) : Math.max(paymentBaseAmount, totalPaidCalculated))
+                    : Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0)),
                 wantsChange: view === 'money' ? wantsChange : undefined,
                 payWithAmount: view === 'money' && wantsChange ? payWithAmount : undefined,
-                changeAmount: paymentPendingType !== 'none'
-                    ? 0
-                    : (view === 'money'
-                        ? (wantsChange
-                            ? Number((payWithAmount - totalPaidCalculated).toFixed(2))
-                            : (paymentBaseAmount > totalPaidCalculated
-                                ? Number((paymentBaseAmount - totalPaidCalculated).toFixed(2))
-                                : 0))
-                        : 0),
+                changeAmount: isUnpaid ? 0 : (view === 'money'
+                    ? (wantsChange
+                        ? Number((payWithAmount - totalPaidCalculated).toFixed(2))
+                        : (paymentBaseAmount > totalPaidCalculated
+                            ? Number((paymentBaseAmount - totalPaidCalculated).toFixed(2))
+                            : 0))
+                    : 0),
                 adjustmentType: paymentCalculation?.adjustmentType || 'none',
                 adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
                 adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
-                effectiveAmount: Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0),
-                netAmount: Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0),
+                effectiveAmount: (() => {
+                    if (isUnpaid) {
+                        return Number(paymentCalculation?.effectiveAmount ?? chargeTarget ?? 0);
+                    }
+                    return Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0);
+                })(),
+                netAmount: (() => {
+                    if (isUnpaid) {
+                        return Number(paymentCalculation?.netAmount ?? chargeTarget ?? 0);
+                    }
+                    return Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0);
+                })(),
                 feeBearer: paymentCalculation?.feeBearer || null,
                 paymentMethodId: selectedMethodId || null,
                 installmentNumber: Math.max(1, Number(installments || 1)),
@@ -1479,23 +1547,21 @@ const PaymentModal = ({
         const validExistingBreakdown = existingPaidAmount > 0.009 ? (existingPaymentBreakdown || []) : [];
 
         const mergedPaymentBreakdown = [...validExistingBreakdown, ...newPaymentBreakdown]
-            .filter((entry: any) => entry?.method && Number(entry?.amount || 0) > 0.009);
+            .filter((entry: any) => entry?.method && (Number(entry?.amount || 0) > 0.009 || isUnpaid));
 
         const paymentMethod = Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ') || 'Método não definido';
 
         const singleRegisterAmount =
-            view !== 'split' ? totalPaidCalculated : 0;
+            view !== 'split' ? (isUnpaid ? 0 : totalPaidCalculated) : 0;
 
         const paidToRegister =
-            paymentPendingType !== 'none'
-                ? existingPaidAmount
-                : (existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : singleRegisterAmount));
+            existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : singleRegisterAmount);
 
         return {
             paymentMethod: paymentMethod || 'Método não definido',
             paymentBreakdown: mergedPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
-            paymentStatus: paymentPendingType !== 'none' ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
+            paymentStatus: isUnpaid ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
             isPendingDelivery,
             paidAmount: paidToRegister
         };
@@ -1525,7 +1591,7 @@ const PaymentModal = ({
 
     const handleGeneratePix = async () => {
         if (!selectedMethodId) return;
-        
+
         setIsGeneratingPix(true);
         try {
             const res = await getPaymentMethodDetailsAction(selectedMethodId);
@@ -1554,8 +1620,8 @@ const PaymentModal = ({
         }
     };
 
-    const handleStartProcessing = async (forcedPayload?: any) => {
-        if (view === 'money' && wantsChange && payWithAmount < totalPaidCalculated) {
+    const handleStartProcessing = async (forcedPayload?: any, isUnpaidRegister?: boolean) => {
+        if (view === 'money' && wantsChange && payWithAmount < totalPaidCalculated && !isUnpaidRegister) {
             toast({
                 title: "Valor de troco inválido",
                 description: `O valor pago (R$ ${payWithAmount.toFixed(2)}) deve ser maior ou igual ao valor a receber (R$ ${totalPaidCalculated.toFixed(2)}).`,
@@ -1565,7 +1631,7 @@ const PaymentModal = ({
         }
 
         const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
-        const payload = forcedPayload || buildConfirmPayload();
+        const payload = forcedPayload || buildConfirmPayload(isUnpaidRegister);
         setLastPaymentPayload(payload);
 
         if (payload?.isPreCreate) {
@@ -1600,7 +1666,7 @@ const PaymentModal = ({
             })
         }
 
-        const isPendingPayment = paymentPendingType !== 'none';
+        const isPendingPayment = isUnpaidRegister || paymentPendingType !== 'none';
         const snapshotTotalPaid = isPendingPayment ? existingPaidAmount : totalPaidCalculated;
         const snapshotIsUnderpaid = isPendingPayment ? (displayTransactionTotal > existingPaidAmount + 0.005) : isUnderpaid;
         const snapshotRemainingPartial = isPendingPayment ? Math.max(0, displayTransactionTotal - existingPaidAmount) : remainingPartial;
@@ -1856,41 +1922,18 @@ const PaymentModal = ({
                                             ) : (
                                                 <div className="grid grid-cols-1 gap-4">
                                                     {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && (
-                                                        <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-border/20 space-y-3">
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal</p>
-                                                                    <p className="text-xs text-brand-inactive-text">Pix Mercado Pago — {formatCurrency(depositChargeAmount)}</p>
-                                                                </div>
-                                                                <Button variant="filled" onClick={handleGenerateDepositCharge} isLoading={generatingDepositPix}>
-                                                                    Gerar Pix
-                                                                </Button>
-                                                            </div>
-                                                            {depositMpPixData && (
-                                                                <div className="flex flex-col items-center gap-2 pt-2 border-t border-dashed border-brand-border">
-                                                                    <img src={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`} alt="QR Code sinal" className="w-36 h-36" />
-                                                                    <div className="w-full flex gap-2">
-                                                                        <input readOnly value={depositMpPixData.qrCode} className="flex-1 px-3 py-2 rounded-lg bg-gray-50 text-xs border border-brand-border truncate" />
-                                                                        <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(depositMpPixData.qrCode)}>
-                                                                            <CopyIcon size={16} />
-                                                                        </Button>
-                                                                    </div>
-                                                                    {customer?.phone && (
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            className="w-full text-xs"
-                                                                            onClick={() => {
-                                                                                const msg = encodeURIComponent(`Olá! Segue o Pix para pagamento do sinal: ${depositMpPixData.qrCode}`);
-                                                                                window.open(`https://wa.me/55${String(customer.phone).replace(/\D/g, "")}?text=${msg}`, "_blank");
-                                                                            }}
-                                                                        >
-                                                                            Enviar via WhatsApp
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                         <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-border/20">
+                                                             <div className="flex items-center justify-between gap-3">
+                                                                 <div>
+                                                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal</p>
+                                                                     <p className="text-xs text-brand-inactive-text">Pix Mercado Pago - {formatCurrency(depositChargeAmount)}</p>
+                                                                 </div>
+                                                                 <Button variant="filled" onClick={handleGenerateDepositCharge} isLoading={generatingDepositPix}>
+                                                                     {depositMpPixData ? "Visualizar Pix" : "Gerar Pix"}
+                                                                 </Button>
+                                                             </div>
+                                                         </div>
+                                                     )}
                                                     <div className="grid grid-cols-2 gap-4">
                                                         {availableMethodTypes.has("cash") && (
                                                             <PaymentMethodCard
@@ -1966,52 +2009,17 @@ const PaymentModal = ({
                                                             </button>
                                                         )}
                                                     </div>
-                                                </div>)}
 
-                                            <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
-
-                                            {!lockPaymentCompletion && (
-                                                <div className="grid grid-cols-1 gap-4 mb-4">
-                                                    <div
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${paymentPendingType !== 'none' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
-                                                        onClick={() => setShowPaymentStatusModal(true)}
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                                                            <ClockIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                    {!lockPaymentCompletion && (
+                                                        <div className="mt-4">
+                                                            <Button
+                                                                variant="outline"
+                                                                className="w-full h-12 text-sm font-bold border-brand-border dark:border-dark-border"
+                                                                onClick={() => handleStartProcessing(undefined, true)}
+                                                            >
+                                                                Registrar venda (sem pagamento)
+                                                            </Button>
                                                         </div>
-                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de pagamento</span>
-                                                        {paymentPendingType !== 'none' && (
-                                                            <Badge variant={paymentPendingType === 'pending_stock' ? 'orange' : 'gray'}>
-                                                                {paymentPendingType === 'pending_stock' ? 'A receber' : 'Pendente'}
-                                                            </Badge>
-                                                        )}
-                                                        <ChevronRightIcon className="ml-auto text-brand-inactive-text shrink-0" size={18} />
-                                                    </div>
-
-                                                    {!hidePendingDelivery && (
-                                                        <div
-                                                            className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
-                                                            onClick={() => setShowDeliveryStatusModal(true)}
-                                                        >
-                                                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                                                                <TruckIcon size={18} className="text-brand-dark dark:text-dark-heading" />
-                                                            </div>
-                                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                {deliveryMethod === 'pickup' ? 'Retirada pendente' : 'Entrega pendente'}
-                                                            </span>
-                                                            {isPendingDelivery && (
-                                                                <Badge variant="orange">
-                                                                    {deliveryMethod === 'pickup' ? 'Não preparado' : 'Não enviado'}
-                                                                </Badge>
-                                                            )}
-                                                            <ChevronRightIcon className="ml-auto text-brand-inactive-text shrink-0" size={18} />
-                                                        </div>
-                                                    )}
-
-                                                    {paymentPendingType !== 'none' && (
-                                                        <Button variant="filled" className="w-full h-12" onClick={() => handleStartProcessing()}>
-                                                            Registrar venda {paymentPendingType === 'pending_stock' ? '(pendente)' : '(não pago)'}
-                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
@@ -2022,7 +2030,7 @@ const PaymentModal = ({
                                         <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("w-full h-full flex flex-col items-center px-2", isSinglePricingBusy && "opacity-60")}>
                                             {isMarketplaceOrder && (
                                                 <div className="w-full max-w-sm mb-4">
-                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o  método de pagamento." />
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o  método de pagamento." />
                                                 </div>
                                             )}
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
@@ -2114,7 +2122,7 @@ const PaymentModal = ({
                                         <motion.div key="store_credit" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
                                                 {isMarketplaceOrder && (
-                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                                 <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-xl p-4 text-sm mb-2 text-center w-full">
@@ -2145,7 +2153,7 @@ const PaymentModal = ({
                                         <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
                                                 {isMarketplaceOrder && (
-                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                                 <div className="min-w-0 flex-1">
@@ -2275,7 +2283,7 @@ const PaymentModal = ({
                                         <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto", isSinglePricingBusy && "opacity-60")}>
                                             {isMarketplaceOrder && (
                                                 <div className="w-full mb-4">
-                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace — não é possível alterar o método de pagamento." />
+                                                    <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 </div>
                                             )}
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
@@ -2727,12 +2735,13 @@ const PaymentModal = ({
                                     transition={standardTransition}
                                     className="w-full h-full flex flex-col items-center justify-center p-8 text-center"
                                 >
-                                    <div className="w-32 h-32 rounded-full bg-brand-red flex items-center justify-center mb-6 relative">
-                                        <div className="absolute inset-0 rounded-full bg-brand-red"></div>
-                                        <CancelCircleIcon size={56} className="text-white" />
-                                    </div>
-                                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Não foi possível concluir a venda</h2>
-                                    <p className="text-brand-inactive-text dark:text-dark-body max-w-md">{errorMessage}</p>
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                        imageAlt="Não foi possível concluir a venda"
+                                        title="Não foi possível concluir a venda"
+                                        subtitle={errorMessage}
+                                    />
                                 </motion.div>
                             )}
 
@@ -2947,61 +2956,7 @@ const PaymentModal = ({
                 </AnimatePresence>
             </div>
 
-            {/* Payment Status Selection Modal */}
-            <DefaultModal
-                isOpen={showPaymentStatusModal}
-                onClose={() => setShowPaymentStatusModal(false)}
-                title="Status do pagamento"
-                maxWidth="sm"
-            >
-                <div className="flex flex-col gap-3">
-                    <ListItem
-                        icon={CancelCircleIcon}
-                        title="Pagamento não realizado"
-                        description="quero deixar o estoque sem alterações"
-                        showChevron={false}
-                        onClick={() => {
-                            setPaymentPendingType(prev => prev === 'unpaid' ? 'none' : 'unpaid');
-                            setShowPaymentStatusModal(false);
-                        }}
-                        right={paymentPendingType === 'unpaid' ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
-                        className={`px-4 py-3 gap-4 ${paymentPendingType === 'unpaid' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}`}
-                    />
-                    <ListItem
-                        icon={ClockIcon}
-                        title="Pagamento pendente"
-                        description="Ainda não recebi, mas quero reservar o estoque para meu cliente"
-                        showChevron={false}
-                        onClick={() => {
-                            setPaymentPendingType(prev => prev === 'pending_stock' ? 'none' : 'pending_stock');
-                            setShowPaymentStatusModal(false);
-                        }}
-                        right={paymentPendingType === 'pending_stock' ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
-                        className={`px-4 py-3 gap-4 ${paymentPendingType === 'pending_stock' ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}`}
-                    />
-                </div>
-            </DefaultModal>
 
-            {/* Delivery Status Selection Modal */}
-            <DefaultModal
-                isOpen={showDeliveryStatusModal}
-                onClose={() => setShowDeliveryStatusModal(false)}
-                title={deliveryMethod === 'pickup' ? 'Status da retirada' : 'Status da entrega'}
-                maxWidth="sm"
-            >
-                <ListItem
-                    icon={TruckIcon}
-                    title={deliveryMethod === 'pickup' ? 'Cliente vai retirar no local' : 'Entrega vai ser realizada ainda'}
-                    description={deliveryMethod === 'pickup' ? 'Cliente retirará o pedido pessoalmente' : 'A entrega será realizada em breve'}
-                    showChevron={false}
-                    onClick={() => {
-                        setIsPendingDelivery(prev => !prev);
-                        setShowDeliveryStatusModal(false);
-                    }}
-                    right={isPendingDelivery ? <CheckCircleIcon size={20} className="text-brand-green" /> : undefined}
-                    className={`px-4 py-3 gap-4 ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : ''}`}
-                />
-            </DefaultModal>
 
             {showWarningModal && (
                 <AlertModal
@@ -3063,6 +3018,21 @@ const PaymentModal = ({
                         setPixQrData(null);
                         await handleStartProcessing();
                     }}
+                />
+            )}
+
+            {depositMpPixData && (
+                <PixQrDisplayModal
+                    isOpen={showDepositPixModal}
+                    onClose={() => {
+                        setShowDepositPixModal(false);
+                    }}
+                    qrCode={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`}
+                    payload={depositMpPixData.qrCode}
+                    amount={depositChargeAmount}
+                    onVerifyPayment={handleVerifyDepositPayment}
+                    isVerifying={isCheckingDepositStatus}
+                    onSendWhatsApp={customer?.phone ? handleSendDepositWhatsApp : undefined}
                 />
             )}
 

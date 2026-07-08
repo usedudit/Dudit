@@ -87,5 +87,16 @@ export function formatPaymentMethodLabel(
   const finalName = titleWords(displayName)
   const finalType = titleWords(typeLabel)
 
-  return finalName.toLowerCase() === finalType.toLowerCase() ? finalType : `${finalType} (${finalName})`
+  const nameLower = finalName.toLowerCase()
+  const typeLower = finalType.toLowerCase()
+
+  const isSameConcept = 
+    nameLower === typeLower ||
+    (typeLower === "dinheiro" && (nameLower === "cash" || nameLower === "money" || nameLower === "dinheiro" || nameLower === "espécie" || nameLower === "espece" || nameLower === "carteira")) ||
+    (typeLower === "pix" && nameLower === "pix") ||
+    (typeLower === "cartão de crédito" && (nameLower === "credito" || nameLower === "crédito" || nameLower === "credit" || nameLower === "credit_card" || nameLower === "creditcard")) ||
+    (typeLower === "cartão de débito" && (nameLower === "debito" || nameLower === "débito" || nameLower === "debit" || nameLower === "debit_card" || nameLower === "debitcard")) ||
+    (typeLower === "boleto" && (nameLower === "boleto" || nameLower === "boleto bancário" || nameLower === "boleto bancario"))
+
+  return isSameConcept ? finalType : `${finalType} (${finalName})`
 }
