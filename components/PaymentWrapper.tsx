@@ -603,7 +603,7 @@ export function PaymentWrapper({
                                 </div>
 
                                 <div className="flex gap-2 w-full mb-6">
-                                    <Input value={pixData?.qrCode || ""} onChange={() => { }} />
+                                    <Input value={pixData?.qrCode || ""} readOnly onChange={() => { }} />
                                     <Button
                                         variant="outline"
                                         onClick={handleCopyQrCode}

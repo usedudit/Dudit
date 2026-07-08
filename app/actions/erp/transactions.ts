@@ -1678,14 +1678,15 @@ export async function recordInstallmentPaymentAction(input: {
         if (resolvedAccountId) {
             updatePayload.account_id = resolvedAccountId
         }
+        const installmentNewPmLabel = input.paymentMethodId
+            ? await paymentMethodDisplayLabel(supabase, input.partnerId, input.paymentMethodId).catch(() => null)
+            : null
         if (input.paymentMethodId !== undefined) {
             updatePayload.payment_method_id = input.paymentMethodId || null
-            updatePayload.payment_type = await paymentMethodDisplayLabel(supabase, input.partnerId, input.paymentMethodId || null)
+            updatePayload.payment_type = installmentNewPmLabel || null
         }
         if (fullyPaid) {
             updatePayload.status = "paid"
-            // PERF: Use already-computed values instead of re-querying transaction_payments
-            // existingPayments (fetched at L1459) + finalPaid (computed at L1478) = total
             const existingTotal = (existingPayments || []).reduce(
                 (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
             )
@@ -1701,20 +1702,27 @@ export async function recordInstallmentPaymentAction(input: {
             .eq("partner_id", input.partnerId)
         if (updateErr) throw updateErr
 
+        const installmentDir = tx.transaction_type === "income" ? "recebido" : "pago"
+        const installmentPmLabel = installmentNewPmLabel
+        let installmentHistoryLine = fullyPaid
+            ? `Quitou a parcela - R$ ${finalPaid.toFixed(2)} ${installmentDir}`
+            : `Pagamento parcial de R$ ${finalPaid.toFixed(2)} ${installmentDir}`
+        if (installmentPmLabel || tx.payment_type) {
+            installmentHistoryLine += ` utilizando ${installmentPmLabel || tx.payment_type}`
+        }
+        if (interestAmount > 0) installmentHistoryLine += ` (Juros: R$ ${interestAmount.toFixed(2)})`
+        if (discountAmount > 0) installmentHistoryLine += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
+
         await logAuditEvent({
             partnerId: input.partnerId,
             actorUserId: userId,
             entityType: "transaction",
             entityId: input.transactionId,
-            actionType: "installment_paid",
-            changeLines: [
-                fullyPaid
-                    ? "registrou pagamento e quitou a parcela."
-                    : "registrou pagamento parcial da parcela.",
-            ],
+            actionType: fullyPaid ? "installment_paid" : "installment_partial_paid",
+            changeLines: [installmentHistoryLine],
             metadata: fullyPaid
                 ? { oldStatus: "Pendente", newStatus: "Pago" }
-                : null,
+                : { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: Math.max(0, originalAmount - paidAfter) },
             source: "manual",
         })
         await revalidateEntityTimeline("transaction", input.transactionId)
@@ -1768,13 +1776,52 @@ export async function recordRegularTransactionPaymentAction(input: {
             throw new Error("Valores de pagamento inválidos.")
         }
 
-        const finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
+        const { data: existingPayments, error: paymentsErr } = await supabase
+            .from("transaction_payments")
+            .select("amount, base_amount, interest_amount, discount_amount")
+            .eq("partner_id", input.partnerId)
+            .eq("transaction_id", input.transactionId)
+        if (paymentsErr) throw paymentsErr
+
+        const originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
+        const paidPrincipalSoFar = (existingPayments || []).reduce(
+            (acc: number, row: any) => acc + Number(row.base_amount ?? row.amount ?? 0), 0,
+        )
+        const remainingPrincipal = Math.max(0, Math.round((originalAmount - paidPrincipalSoFar) * 100) / 100)
+
+        const baseRequest = Math.max(0, Math.round(paymentAmount * 100) / 100)
+        let baseApplied = Math.min(remainingPrincipal, baseRequest)
+        baseApplied = Math.round(baseApplied * 100) / 100
+
+        let finalPaid = Math.round((baseApplied + interestAmount - discountAmount) * 100) / 100
         if (finalPaid <= 0) {
             throw new Error("O valor final pago (após juros e desconto) deve ser maior que zero.")
         }
 
-        const original = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
+        const fullyPaid = paidPrincipalSoFar + baseApplied + 0.0001 >= originalAmount
+        const paidAfter = paidPrincipalSoFar + baseApplied
         const nowIso = new Date().toISOString()
+        const idempotencyKey = `regular:${input.transactionId}:${nowIso}:${finalPaid}`
+
+        const { error: insertPaymentErr } = await supabase
+            .from("transaction_payments")
+            .insert({
+                partner_id: input.partnerId,
+                transaction_id: input.transactionId,
+                amount: finalPaid,
+                base_amount: baseApplied,
+                interest_amount: interestAmount,
+                discount_amount: discountAmount,
+                payment_method_id: input.paymentMethodId || null,
+                created_by_user_id: userId,
+                created_at: nowIso,
+            })
+        if (insertPaymentErr) {
+            if ((insertPaymentErr as any).code === "23505") {
+                throw new Error("Este pagamento já foi registrado.")
+            }
+            throw insertPaymentErr
+        }
 
         let resolvedAccountId = tx.account_id
         if (input.paymentMethodId) {
@@ -1801,15 +1848,17 @@ export async function recordRegularTransactionPaymentAction(input: {
             ? await paymentMethodDisplayLabel(supabase, input.partnerId, input.paymentMethodId)
             : tx.payment_type
 
+        const existingTotalPaid = (existingPayments || []).reduce(
+            (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
+        )
+        const totalPaidAmount = existingTotalPaid + finalPaid
+
         const updatePayload: Record<string, unknown> = {
-            status: "paid",
+            updated_at: nowIso,
             payment_date: nowIso,
             interest_amount: interestAmount > 0 ? interestAmount : (tx.interest_amount || null),
             discount_amount: discountAmount > 0 ? discountAmount : (tx.discount_amount || null),
-            original_amount: original,
-            paid_amount: finalPaid,
-            amount: finalPaid,
-            updated_at: nowIso,
+            paid_amount: totalPaidAmount > 0 ? totalPaidAmount : (tx.paid_amount || null),
         }
         if (resolvedAccountId) {
             updatePayload.account_id = resolvedAccountId
@@ -1817,6 +1866,12 @@ export async function recordRegularTransactionPaymentAction(input: {
         if (input.paymentMethodId !== undefined) {
             updatePayload.payment_method_id = input.paymentMethodId || null
             updatePayload.payment_type = pmTypeLabel || null
+        }
+        if (fullyPaid) {
+            updatePayload.status = "paid"
+            if (totalPaidAmount > 0) {
+                updatePayload.amount = totalPaidAmount
+            }
         }
 
         const { error: updateErr } = await supabase
@@ -1826,21 +1881,42 @@ export async function recordRegularTransactionPaymentAction(input: {
             .eq("partner_id", input.partnerId)
         if (updateErr) throw updateErr
 
+        const dir = tx.transaction_type === "income" ? "recebido" : "pago"
+        const pmLabel = pmTypeLabel || tx.payment_type || ""
+        let historyLine = `Pagou R$ ${finalPaid.toFixed(2)}`
+        if (pmLabel) historyLine += ` utilizando ${pmLabel}`
+        if (interestAmount > 0) historyLine += ` (Juros: R$ ${interestAmount.toFixed(2)})`
+        if (discountAmount > 0) historyLine += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
+        if (!fullyPaid) historyLine += ` - saldo restante: R$ ${Math.max(0, originalAmount - paidAfter).toFixed(2)}`
+
         await logAuditEvent({
             partnerId: input.partnerId,
             actorUserId: userId,
             entityType: "transaction",
             entityId: input.transactionId,
-            actionType: "paid",
-            changeLines: ["marcou esta transação como paga."],
-            metadata: { oldStatus: "Pendente", newStatus: "Pago" },
+            actionType: fullyPaid ? "paid" : "partial_paid",
+            changeLines: [historyLine],
+            metadata: fullyPaid
+                ? { oldStatus: "Pendente", newStatus: "Pago" }
+                : { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: Math.max(0, originalAmount - paidAfter) },
             source: "manual",
         })
 
         await revalidateEntityTimeline("transaction", input.transactionId)
         await revalidateTransactions(input.partnerId)
 
-        return { success: true as const }
+        return {
+            success: true as const,
+            data: {
+                originalAmount,
+                paidSoFar: paidPrincipalSoFar,
+                remainingBefore: remainingPrincipal,
+                paidNow: finalPaid,
+                principalApplied: baseApplied,
+                remainingAfter: Math.max(0, Math.round((originalAmount - paidAfter) * 100) / 100),
+                fullyPaid,
+            },
+        }
     } catch (e: any) {
         return { success: false as const, error: e.message || "Erro ao registrar pagamento" }
     }
@@ -1889,20 +1965,28 @@ export async function settleInstallmentGroupAction(input: {
         }
 
         // Log audit events for the transactions that were just settled
+        const settleCustomPayments = input.installmentPayments || []
         if (txIdsToLog.length > 0) {
             await Promise.allSettled(
-                txIdsToLog.map((transactionId: string) =>
-                    logAuditEvent({
+                txIdsToLog.map((transactionId: string) => {
+                    const matchedPayment = settleCustomPayments.find(p => p.transactionId === transactionId)
+                    const pAmt = matchedPayment?.paymentAmount || 0
+                    const pInt = matchedPayment?.interestAmount || 0
+                    const pDisc = matchedPayment?.discountAmount || 0
+                    let settleMsg = `Quitou a parcela - R$ ${(pAmt + pInt - pDisc).toFixed(2)}`
+                    if (pInt > 0) settleMsg += ` (Juros: R$ ${pInt.toFixed(2)})`
+                    if (pDisc > 0) settleMsg += ` (Desconto: R$ ${pDisc.toFixed(2)})`
+                    return logAuditEvent({
                         partnerId: input.partnerId,
                         actorUserId: userId,
                         entityType: "transaction",
                         entityId: transactionId,
                         actionType: "settled",
-                        changeLines: ["quitou esta parcela pelo comando «Quitar tudo»."],
+                        changeLines: [settleMsg],
                         metadata: { oldStatus: "Pendente", newStatus: "Pago" },
                         source: "manual",
-                    }),
-                ),
+                    })
+                }),
             )
         }
 
@@ -2051,13 +2135,16 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 "[recurring] occurrence_marked_paid",
                 JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
             )
+            let recurringMsg = `Marcou ocorrência recorrente como paga - R$ ${finalPaid.toFixed(2)}`
+            if (interestAmount > 0) recurringMsg += ` (Juros: R$ ${interestAmount.toFixed(2)})`
+            if (discountAmount > 0) recurringMsg += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
             await logAuditEvent({
                 partnerId: input.partnerId,
                 actorUserId: userId,
                 entityType: "transaction",
                 entityId: pendingTx.id,
                 actionType: "paid",
-                changeLines: ["marcou esta ocorrência como paga."],
+                changeLines: [recurringMsg],
                 metadata: { oldStatus: "Pendente", newStatus: "Pago" },
                 source: "manual",
             })
@@ -2138,13 +2225,16 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
         )
         if (newTx?.id) {
+            let recurringCreatedMsg = `Marcou ocorrência recorrente como paga - R$ ${finalPaid.toFixed(2)}`
+            if (interestAmount > 0) recurringCreatedMsg += ` (Juros: R$ ${interestAmount.toFixed(2)})`
+            if (discountAmount > 0) recurringCreatedMsg += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
             await logAuditEvent({
                 partnerId: input.partnerId,
                 actorUserId: userId,
                 entityType: "transaction",
                 entityId: newTx.id,
                 actionType: "created",
-                changeLines: ["marcou esta ocorrência como paga."],
+                changeLines: [recurringCreatedMsg],
                 source: "manual",
             })
             await revalidateEntityTimeline("transaction", newTx.id)

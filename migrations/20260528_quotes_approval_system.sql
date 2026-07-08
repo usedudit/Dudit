@@ -328,8 +328,9 @@ BEGIN
       WHERE id = p_quote_id;
       
       -- Insert failed audit log
-      INSERT INTO audit_logs (partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
+      INSERT INTO audit_logs (table_name, partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
       VALUES (
+        'quotes',
         v_quote.partner_id,
         'quote',
         p_quote_id,
@@ -445,8 +446,9 @@ BEGIN
       WHERE id = p_quote_id;
       
       -- Insert failed audit log
-      INSERT INTO audit_logs (partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
+      INSERT INTO audit_logs (table_name, partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
       VALUES (
+        'quotes',
         v_quote.partner_id,
         'quote',
         p_quote_id,

@@ -835,9 +835,10 @@ export default function TransactionsPage({
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
         setSelectedInstallmentForPayment(transaction as any)
+        const remainingFromPartial = transaction.paidAmount ? transaction.amount - transaction.paidAmount : transaction.amount
         const initialAmount = Number(
             transaction.installmentRemainingAmount ??
-            transaction.amount ??
+            (remainingFromPartial > 0 && remainingFromPartial < transaction.amount ? remainingFromPartial : transaction.amount) ??
             0
         )
         setPaymentAmount(String(initialAmount.toFixed(2)))

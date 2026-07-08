@@ -132,8 +132,9 @@ BEGIN
       WHERE id = p_so_id;
       
       -- Insert failed audit log
-      INSERT INTO audit_logs (partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
+      INSERT INTO audit_logs (table_name, partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
       VALUES (
+        'service_orders',
         v_so.partner_id,
         'service_order',
         p_so_id,
@@ -170,8 +171,9 @@ BEGIN
     WHERE id = p_so_id;
     
     -- Insert success audit log
-    INSERT INTO audit_logs (partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
+    INSERT INTO audit_logs (table_name, partner_id, entity_type, entity_id, action_type, change_lines, source, metadata)
     VALUES (
+      'service_orders',
       v_so.partner_id,
       'service_order',
       p_so_id,

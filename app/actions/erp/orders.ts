@@ -1571,6 +1571,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             original_price: null,
             is_promotional: false,
             promotion_id: null,
+            service_id: (item as any).serviceId || null,
+            line_type: (item as any).lineType || 'product',
+            fulfillment_mode: (item as any).fulfillmentMode || null,
         })),
         ...giftItemsToInsert
     ]
@@ -2375,6 +2378,9 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             original_price: null,
             is_promotional: false,
             promotion_id: null,
+            service_id: (item as any).serviceId || null,
+            line_type: (item as any).lineType || 'product',
+            fulfillment_mode: (item as any).fulfillmentMode || null,
         })),
         ...giftItemsToInsert
     ]

@@ -946,6 +946,22 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       }
     }
 
+    // -- Stock Movement Integration --
+    try {
+      const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
+      for (const row of createdRows) {
+        await handleAppointmentItemsStockMovement({
+          appointmentId: row.id,
+          partnerId,
+          oldStatus: null,
+          newStatus: row.status,
+          userId: user.id,
+        })
+      }
+    } catch (stockErr) {
+      console.error("[appointment_stock_create] failed to process movement:", stockErr)
+    }
+
     // Audit logs - run in parallel (each is an independent insert)
     await Promise.all(
       createdRows.map((row: any) =>

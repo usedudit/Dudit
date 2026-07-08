@@ -770,7 +770,7 @@ export const AppointmentSheet = ({
             const hasStockIssues = itemsToCheck.some((item: any) => {
                 const projectedStock = (item.stock || 0) - (item.quantity || 0)
                 const minStock = item.minStock || 0
-                return projectedStock < 0 || projectedStock < minStock
+                return projectedStock <= 0 || (minStock > 0 && projectedStock <= minStock)
             })
             
             if (hasStockIssues && (partnerPlan === 'crescer' || partnerPlan === 'escalar')) {
@@ -781,9 +781,9 @@ export const AppointmentSheet = ({
                         ...item,
                         projectedStock,
                         minStock,
-                        issue: projectedStock < 0 ? 'negativo' : 'abaixo do mínimo'
+                        issue: projectedStock <= 0 ? 'negativo' : 'abaixo do mínimo'
                     }
-                }).filter(i => i.projectedStock < 0 || i.projectedStock < i.minStock)
+                }).filter(i => i.projectedStock <= 0 || (i.minStock > 0 && i.projectedStock <= i.minStock))
                 
                 setStockCheckItems(stockIssues)
                 setPendingNextStep({

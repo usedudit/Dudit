@@ -71,7 +71,7 @@ export default function SpecificationsTab({
                 if (Array.isArray(parsed)) {
                     specsArray = parsed
                 }
-            } catch {}
+            } catch { }
         }
         setLocalSpecs(specsArray.map((s, i) => ({ ...s, id: i + Date.now() })))
     }, [serviceOrderId])
@@ -130,15 +130,19 @@ export default function SpecificationsTab({
             )}
 
             {isSpecsEmpty && !isEditing ? (
-                <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                    Nenhuma especificação
+                <div className="flex flex-col items-center justify-center text-center py-8">
+                    <IconPlaceholder
+                        icon={ArrowUpDownIcon}
+                        title="Nenhuma especificação"
+                        subtitle="Não foram encontradas especificações para esta OS"
+                    />
                 </div>
             ) : isSpecsEmpty ? (
                 <div className="flex flex-col items-center justify-center text-center py-8">
                     <IconPlaceholder
                         icon={ArrowUpDownIcon}
                         title="Nenhuma especificação"
-                        subtitle="Adicione características como IMEI, modelo, marca, cor."
+                        subtitle="Adicione características como IMEI, modelo, marca, cor"
                         itemButton={{
                             text: "Adicionar atributo",
                             action: addAttribute,

@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, FormTextarea } from "@/components/reusable"
+import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, FormTextarea, Separator, FormDropdown } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -982,159 +982,162 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                             )}
 
                                             <FormSection title="Produtos">
-                                                {preview.items.map((item: any) => {
-                                                    const d = getDecision(item.id)
-                                                    const isNew = item.match_status === "new"
-                                                    const isSimilar = item.match_status === "similar"
-                                                    const isMatched = item.match_status === "matched"
-                                                    const isSkipped = item.match_status === "skipped"
-                                                    const conflicts = safeConflicts(item.conflicts)
+                                                <div>
+                                                    {preview.items.map((item: any, itemIdx: number) => {
+                                                        const d = getDecision(item.id)
+                                                        const isNew = item.match_status === "new"
+                                                        const isSimilar = item.match_status === "similar"
+                                                        const isMatched = item.match_status === "matched"
+                                                        const isSkipped = item.match_status === "skipped"
+                                                        const conflicts = safeConflicts(item.conflicts)
 
-                                                    return (
-                                                        <div key={item.id} className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                                            <div className="bg-white dark:bg-dark-surface">
-                                                                <div className="p-4 flex items-start justify-between gap-4">
-                                                                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                                                                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border">
-                                                                            <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                        </div>
-                                                                        <div className="min-w-0">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{item.raw_name}</p>
-                                                                                <Badge variant={isNew ? "blue" : isSimilar ? "orange" : isSkipped ? "gray" : "green"}>
-                                                                                    {isSkipped ? "Ignorado" : isNew ? "Novo" : isSimilar ? "Conflito" : "Match"}
-                                                                                </Badge>
+                                                        return (
+                                                            <Fragment key={item.id}>
+                                                                {itemIdx > 0 && <Separator className="my-4" />}
+                                                                <div>
+                                                                    <div className="p-0 flex items-start justify-between gap-4">
+                                                                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                                                                            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border">
+                                                                                <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                                                             </div>
-                                                                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-                                                                                {item.raw_sku && <span className="text-xs text-brand-inactive-text">SKU: {item.raw_sku}</span>}
-                                                                                {item.raw_ean && <span className="text-xs text-brand-inactive-text">EAN: {item.raw_ean}</span>}
-                                                                                {item.raw_ncm && <span className="text-xs text-brand-inactive-text">NCM: {item.raw_ncm}</span>}
-                                                                                <span className="text-xs text-brand-inactive-text">Qtd: {item.raw_quantity}</span>
-                                                                                <span className="text-xs text-brand-inactive-text">Custo: R$ {Number(item.raw_unit_cost).toFixed(4)}</span>
-                                                                                <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2 mt-1">
-                                                                                {item.match_method && <p className="text-xs text-brand-green">Match por {item.match_method}</p>}
-                                                                                {item.match_confidence != null && (
-                                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.match_confidence >= 0.9
-                                                                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                                                                        : item.match_confidence >= 0.7
-                                                                                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                                                                            : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                                                                                        }`}>
-                                                                                        {Math.round(item.match_confidence * 100)}%
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            {conflicts.map((c: any, i: number) => (
-                                                                                <div key={i} className="flex items-center gap-1.5 mt-1 text-xs">
-                                                                                    {c.campo === "fornecedor_diferente" ? (
-                                                                                        <div className="flex flex-col gap-1 w-full">
-                                                                                            <span className="text-orange-600 font-semibold">
-                                                                                                Produto já vinculado a outro fornecedor ({c.valor_atual_name || "desconhecido"})
-                                                                                            </span>
-                                                                                            <div className="flex gap-3 mt-1">
-                                                                                                <label className="flex items-center gap-1 cursor-pointer">
-                                                                                                    <input
-                                                                                                        type="radio"
-                                                                                                        name={`supplier_${item.id}`}
-                                                                                                        value="add"
-                                                                                                        checked={supplierActions[item.id] === "add"}
-                                                                                                        onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "add" }))}
-                                                                                                        className="accent-brand-orange"
-                                                                                                    />
-                                                                                                    <span className="text-brand-dark text-xs">
-                                                                                                        Adicionar {preview?.supplier.name || "novo"} como fornecedor
-                                                                                                    </span>
-                                                                                                </label>
-                                                                                                <label className="flex items-center gap-1 cursor-pointer">
-                                                                                                    <input
-                                                                                                        type="radio"
-                                                                                                        name={`supplier_${item.id}`}
-                                                                                                        value="keep"
-                                                                                                        checked={supplierActions[item.id] === "keep"}
-                                                                                                        onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "keep" }))}
-                                                                                                        className="accent-brand-orange"
-                                                                                                    />
-                                                                                                    <span className="text-brand-dark text-xs">Manter vínculo atual</span>
-                                                                                                </label>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        <>
-                                                                                            <span className="font-bold text-brand-dark">{c.campo}:</span>
-                                                                                            <span className="text-yellow-600 line-through">{String(c.valor_atual ?? "")}</span>
-                                                                                            <ArrowRightIcon className="w-3 h-3 text-brand-inactive-text" />
-                                                                                            <span className="text-brand-green">{String(c.valor_xml ?? "")}</span>
-                                                                                        </>
+                                                                            <div className="min-w-0">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{item.raw_name}</p>
+                                                                                    <Badge variant={isNew ? "blue" : isSimilar ? "orange" : isSkipped ? "gray" : "green"}>
+                                                                                        {isSkipped ? "Ignorado" : isNew ? "Novo" : isSimilar ? "Conflito" : "Match"}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                                                                    {item.raw_sku && <span className="text-xs text-brand-inactive-text">SKU: {item.raw_sku}</span>}
+                                                                                    {item.raw_ean && <span className="text-xs text-brand-inactive-text">EAN: {item.raw_ean}</span>}
+                                                                                    {item.raw_ncm && <span className="text-xs text-brand-inactive-text">NCM: {item.raw_ncm}</span>}
+                                                                                    <span className="text-xs text-brand-inactive-text">Qtd: {item.raw_quantity}</span>
+                                                                                    <span className="text-xs text-brand-inactive-text">Custo: R$ {Number(item.raw_unit_cost).toFixed(4)}</span>
+                                                                                    <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2 mt-1">
+                                                                                    {item.match_method && <p className="text-xs text-brand-green">Match por {item.match_method}</p>}
+                                                                                    {item.match_confidence != null && (
+                                                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.match_confidence >= 0.9
+                                                                                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                                                                            : item.match_confidence >= 0.7
+                                                                                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                                                                                : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                                                                            }`}>
+                                                                                            {Math.round(item.match_confidence * 100)}%
+                                                                                        </span>
                                                                                     )}
                                                                                 </div>
-                                                                            ))}
+                                                                                {conflicts.map((c: any, ci: number) => (
+                                                                                    <div key={ci} className="flex items-center gap-1.5 mt-1 text-xs">
+                                                                                        {c.campo === "fornecedor_diferente" ? (
+                                                                                            <div className="flex flex-col gap-1 w-full">
+                                                                                                <span className="text-orange-600 font-semibold">
+                                                                                                    Produto já vinculado a outro fornecedor ({c.valor_atual_name || "desconhecido"})
+                                                                                                </span>
+                                                                                                <div className="flex gap-3 mt-1">
+                                                                                                    <label className="flex items-center gap-1 cursor-pointer">
+                                                                                                        <input
+                                                                                                            type="radio"
+                                                                                                            name={`supplier_${item.id}`}
+                                                                                                            value="add"
+                                                                                                            checked={supplierActions[item.id] === "add"}
+                                                                                                            onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "add" }))}
+                                                                                                            className="accent-brand-orange"
+                                                                                                        />
+                                                                                                        <span className="text-brand-dark text-xs">
+                                                                                                            Adicionar {preview?.supplier.name || "novo"} como fornecedor
+                                                                                                        </span>
+                                                                                                    </label>
+                                                                                                    <label className="flex items-center gap-1 cursor-pointer">
+                                                                                                        <input
+                                                                                                            type="radio"
+                                                                                                            name={`supplier_${item.id}`}
+                                                                                                            value="keep"
+                                                                                                            checked={supplierActions[item.id] === "keep"}
+                                                                                                            onChange={() => setSupplierActions(prev => ({ ...prev, [item.id]: "keep" }))}
+                                                                                                            className="accent-brand-orange"
+                                                                                                        />
+                                                                                                        <span className="text-brand-dark text-xs">Manter vínculo atual</span>
+                                                                                                    </label>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <>
+                                                                                                <span className="font-bold text-brand-dark">{c.campo}:</span>
+                                                                                                <span className="text-yellow-600 line-through">{String(c.valor_atual ?? "")}</span>
+                                                                                                <ArrowRightIcon className="w-3 h-3 text-brand-inactive-text" />
+                                                                                                <span className="text-brand-green">{String(c.valor_xml ?? "")}</span>
+                                                                                            </>
+                                                                                        )}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
 
-                                                                {isPreview && !isSkipped && (
-                                                                    <div className="px-4 pb-4 space-y-3">
-                                                                        <div className="flex flex-wrap gap-2">
-                                                                            {isMatched && (
-                                                                                <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
-                                                                                    onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
-                                                                                    Manter
-                                                                                </Button>
-                                                                            )}
-                                                                            {isSimilar && (
-                                                                                <>
+                                                                    {isPreview && !isSkipped && (
+                                                                        <div className="mt-3 space-y-3">
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {isMatched && (
                                                                                     <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
                                                                                         onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
-                                                                                        Manter cadastro
+                                                                                        Manter
                                                                                     </Button>
-                                                                                    <Button variant={d.decision === "update_fields" ? "default" : "outline"} size="sm"
-                                                                                        onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "update_fields" } }))}>
-                                                                                        Atualizar campos
-                                                                                    </Button>
-                                                                                </>
-                                                                            )}
-                                                                            <Button variant={d.decision === "create_product" ? "default" : "outline"} size="sm"
-                                                                                onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "create_product" } }))}>
-                                                                                Criar novo
-                                                                            </Button>
-                                                                            <Button variant={d.decision === "ignore" ? "default" : "outline"} size="sm"
-                                                                                onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "ignore" } }))}>
-                                                                                Ignorar
-                                                                            </Button>
-                                                                        </div>
-
-                                                                        {d.decision !== "ignore" && (
-                                                                            <div className="flex flex-wrap gap-3 pt-1">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="text-xs font-bold text-brand-dark">Estoque:</span>
-                                                                                    <select value={d.stock_action}
-                                                                                        onChange={(e) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], stock_action: e.target.value } }))}
-                                                                                        className="text-xs border border-brand-border rounded-lg px-2 py-1 bg-transparent text-brand-dark">
-                                                                                        <option value="add">Somar</option>
-                                                                                        <option value="weighted_average">Média ponderada</option>
-                                                                                        <option value="ignore">Não alterar</option>
-                                                                                    </select>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="text-xs font-bold text-brand-dark">Custo:</span>
-                                                                                    <select value={d.cost_action}
-                                                                                        onChange={(e) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], cost_action: e.target.value } }))}
-                                                                                        className="text-xs border border-brand-border rounded-lg px-2 py-1 bg-transparent text-brand-dark">
-                                                                                        <option value="update">Atualizar</option>
-                                                                                        <option value="weighted_average">Média ponderada</option>
-                                                                                        <option value="ignore">Não alterar</option>
-                                                                                    </select>
-                                                                                </div>
+                                                                                )}
+                                                                                {isSimilar && (
+                                                                                    <>
+                                                                                        <Button variant={d.decision === "keep_product" ? "default" : "outline"} size="sm"
+                                                                                            onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "keep_product" } }))}>
+                                                                                            Manter cadastro
+                                                                                        </Button>
+                                                                                        <Button variant={d.decision === "update_fields" ? "default" : "outline"} size="sm"
+                                                                                            onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "update_fields" } }))}>
+                                                                                            Atualizar campos
+                                                                                        </Button>
+                                                                                    </>
+                                                                                )}
+                                                                                <Button variant={d.decision === "create_product" ? "default" : "outline"} size="sm"
+                                                                                    onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "create_product" } }))}>
+                                                                                    Criar novo
+                                                                                </Button>
+                                                                                <Button variant={d.decision === "ignore" ? "default" : "outline"} size="sm"
+                                                                                    onClick={() => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], decision: "ignore" } }))}>
+                                                                                    Ignorar
+                                                                                </Button>
                                                                             </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
+
+                                                                            {d.decision !== "ignore" && (
+                                                                                <div className="flex items-center gap-4">
+                                                                                    <FormDropdown
+                                                                                        label="Estoque"
+                                                                                        value={d.stock_action}
+                                                                                        setValue={(val) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], stock_action: val } }))}
+                                                                                        options={[
+                                                                                            { value: "add", label: "Somar" },
+                                                                                            { value: "weighted_average", label: "Média ponderada" },
+                                                                                            { value: "ignore", label: "Não alterar" },
+                                                                                        ]}
+                                                                                    />
+                                                                                    <FormDropdown
+                                                                                        label="Custo"
+                                                                                        value={d.cost_action}
+                                                                                        setValue={(val) => setDecisions((prev: any) => ({ ...prev, [item.id]: { ...prev[item.id], cost_action: val } }))}
+                                                                                        options={[
+                                                                                            { value: "update", label: "Atualizar" },
+                                                                                            { value: "weighted_average", label: "Média ponderada" },
+                                                                                            { value: "ignore", label: "Não alterar" },
+                                                                                        ]}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </Fragment>
+                                                        )
+                                                    })}
+                                                </div>
                                             </FormSection>
                                         </div>
 

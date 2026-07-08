@@ -554,8 +554,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setInventoryAlreadyDeducted(Boolean(order.inventory_deducted))
 
                 if (order.order_items) {
-                    const nonServiceItems = (order.order_items as any[]).filter((item: any) => item.line_type !== 'service_booking')
-                    setItems(nonServiceItems.map((item: any) => ({
+                    setItems((order.order_items as any[]).map((item: any) => ({
                         id: item.id || Math.random().toString(36).substr(2, 9),
                         productId: item.product_id,
                         variantId: item.variant_id || null,
@@ -568,11 +567,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         image: item.product_variants?.image || item.products?.images?.[0] || item.image || item.product?.image || item.services?.images?.[0] || null,
                         sku: item.product_variants?.sku || item.sku || item.product?.sku || item.products?.sku || (item.services ? 'SERVIÇO' : ""),
                         stock: Number(item.product_variants?.stock_available ?? item.product_variants?.stock_quantity ?? item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
-                        allowSellWithoutStock: Boolean(item.products?.allow_sell_without_stock) || !!item.services,
+                        allowSellWithoutStock: Boolean(item.products?.allow_sell_without_stock) || !!item.services || item.line_type === 'service_booking',
                         unit: item.products?.unit || item.product?.unit || null,
                         isEditing: false,
-                        isManual: !item.product_id,
-                        isService: !!item.services || item.sku === 'SERVIÇO' || item.products?.sku === 'SERVIÇO'
+                        isManual: !item.product_id && item.line_type !== 'service_booking',
+                        isService: !!item.services || item.sku === 'SERVIÇO' || item.products?.sku === 'SERVIÇO' || item.line_type === 'service_booking',
+                        serviceId: item.service_id || null,
+                        lineType: item.line_type || 'product',
+                        fulfillmentMode: item.fulfillment_mode || null,
                     })))
                 }
 
@@ -1167,7 +1169,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 customName: item.name,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
-                sortOrder: idx
+                sortOrder: idx,
+                serviceId: item.serviceId || null,
+                lineType: item.lineType || 'product',
+                fulfillmentMode: item.fulfillmentMode || null,
             })),
             subtotal,
             discountValue: discountAmount,

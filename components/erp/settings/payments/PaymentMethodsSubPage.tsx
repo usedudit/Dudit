@@ -417,19 +417,22 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
         }
 
     const shouldActivateSelected = selectedMethods.length > 0 && selectedMethods.every((method) => !method.is_active)
-    const normalizedEditingMethod = editingPayment ? {
-        id: editingPayment.id,
-        name: editingPayment.name || "",
-        type: editingPayment.type || undefined,
-        payment_type: editingPayment.payment_type || undefined,
-        is_active: Boolean(editingPayment.is_active),
-        is_online_default: Boolean(editingPayment.is_online_default),
-        fee_percent: editingPayment.fee_percent ?? undefined,
-        fee_fixed: editingPayment.fee_fixed ?? undefined,
-        discount_percent: editingPayment.discount_percent ?? undefined,
-        card_brand: editingPayment.card_brand || undefined,
-        max_installments: editingPayment.max_installments ?? undefined,
-    } : null
+    const normalizedEditingMethod = useMemo(() => {
+        if (!editingPayment) return null
+        return {
+            id: editingPayment.id,
+            name: editingPayment.name || "",
+            type: editingPayment.type || undefined,
+            payment_type: editingPayment.payment_type || undefined,
+            is_active: Boolean(editingPayment.is_active),
+            is_online_default: Boolean(editingPayment.is_online_default),
+            fee_percent: editingPayment.fee_percent ?? undefined,
+            fee_fixed: editingPayment.fee_fixed ?? undefined,
+            discount_percent: editingPayment.discount_percent ?? undefined,
+            card_brand: editingPayment.card_brand || undefined,
+            max_installments: editingPayment.max_installments ?? undefined,
+        }
+    }, [editingPayment])
 
     const renderEmptyState = () => (
         <FadeIn className="flex flex-col items-center justify-center min-h-[420px] px-4">

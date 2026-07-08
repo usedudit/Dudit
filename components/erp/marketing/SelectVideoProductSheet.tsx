@@ -2,17 +2,19 @@
 
 import React, { useMemo, useState, useEffect } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon } from "@/lib/icons"
-import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
+import { Badge, Button, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils/formatters"
+import { getERPProductsPageAction } from "@/app/actions/erp/products"
 
 interface ProductItem {
     id: string
     name: string
     image?: string | null
+    images?: string[] | null
     price?: number
     is_active?: boolean
 }
@@ -20,30 +22,36 @@ interface ProductItem {
 interface SelectVideoProductSheetProps {
     isOpen: boolean
     onClose: () => void
-    products: ProductItem[]
+    partnerId: string
     selectedId: string | null
-    onSave: (id: string | null) => void
-    isLoading?: boolean
+    onSave: (id: string | null, name?: string) => void
 }
 
 export default function SelectVideoProductSheet({
     isOpen,
     onClose,
-    products,
+    partnerId,
     selectedId,
     onSave,
-    isLoading = false,
 }: SelectVideoProductSheetProps) {
     const [search, setSearch] = useState("")
     const [tempSelected, setTempSelected] = useState<string | null>(null)
+    const [products, setProducts] = useState<ProductItem[]>([])
+    const [loading, setLoading] = useState(false)
     const isMobile = useMediaQuery("(max-width: 768px)")
 
     useEffect(() => {
         if (isOpen) {
             setTempSelected(selectedId)
             setSearch("")
+            setLoading(true)
+            getERPProductsPageAction(partnerId, { cursor: null, limit: 200 })
+                .then((res) => {
+                    if (res.success) setProducts(res.items || [])
+                })
+                .finally(() => setLoading(false))
         }
-    }, [isOpen, selectedId])
+    }, [isOpen, partnerId, selectedId])
 
     const filteredProducts = useMemo(() => {
         const term = search.trim().toLowerCase()
@@ -57,8 +65,10 @@ export default function SelectVideoProductSheet({
         return sorted.filter((item) => item.name.toLowerCase().includes(term))
     }, [products, search])
 
+    const selectedProduct = tempSelected ? products.find((p) => p.id === tempSelected) : null
+
     const handleSave = () => {
-        onSave(tempSelected)
+        onSave(tempSelected, selectedProduct?.name)
         onClose()
     }
 
@@ -85,24 +95,18 @@ export default function SelectVideoProductSheet({
             </div>
 
             <div className="custom-scrollbar flex-1 overflow-y-auto p-0">
-                {isLoading ? (
-                    <div className="flex flex-col">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="flex animate-pulse items-center gap-4 border-b border-brand-border p-3.5 last:border-0 dark:border-dark-border">
-                                <div className="h-12 w-12 shrink-0 rounded-full bg-gray-100 dark:bg-dark-border" />
-                                <div className="min-w-0 flex-1 space-y-2">
-                                    <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-dark-border" />
-                                    <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-dark-border" />
-                                </div>
-                            </div>
-                        ))}
+                {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                        <ThreeDotsLoader />
                     </div>
                 ) : filteredProducts.length > 0 ? (
                     <div className="flex flex-col px-2 pb-2">
                         {filteredProducts.map((product) => {
                             const disabled = product.is_active === false
                             const isSelected = tempSelected === product.id
-                            const imageUrl = product.image ? getR2ImageUrl(product.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"
+                            const imageUrl = (product.images?.[0] || product.image)
+                                ? getR2ImageUrl(product.images?.[0] || product.image!, "thumbnail")
+                                : "https://img.dudit.com.br/static/Placeholder.png"
 
                             return (
                                 <div
@@ -123,7 +127,7 @@ export default function SelectVideoProductSheet({
                                     <img
                                         src={imageUrl}
                                         alt={product.name}
-                                        className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${product.image ? "object-cover" : "object-contain"}`}
+                                        className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border object-cover`}
                                     />
                                     <div className="min-w-0 flex-1">
                                         <div className="flex min-w-0 flex-wrap items-center gap-2">

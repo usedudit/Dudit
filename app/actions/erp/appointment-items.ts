@@ -29,10 +29,23 @@ export async function getAppointmentItemsAction(appointmentId: string) {
         await requirePermission(ctx.partnerId, "appointments", "view")
         const supabase = createAdminClient()
 
-        // First query: fetch appointment items (no joins - fast)
+        // Fetch appointment items with product and service details in a single query using joins
         const { data: itemsData, error: itemsError } = await supabase
             .from("appointment_items")
-            .select("id, appointment_id, product_id, variant_id, service_id, name, quantity, usage_type, created_at, updated_at")
+            .select(`
+                id, 
+                appointment_id, 
+                product_id, 
+                variant_id, 
+                service_id, 
+                name, 
+                quantity, 
+                usage_type, 
+                created_at, 
+                updated_at,
+                products(name, sku, stock_quantity, images),
+                services(name)
+            `)
             .eq("appointment_id", appointmentId)
             .order("created_at", { ascending: true })
             .limit(500)
@@ -42,35 +55,9 @@ export async function getAppointmentItemsAction(appointmentId: string) {
             return errorResponse("Erro ao buscar itens do agendamento")
         }
 
-        // Batch-fetch product data for items with product_id
-        const productIds = Array.from(new Set((itemsData || []).map((i: any) => i.product_id).filter((id: any): id is string => !!id))) as string[]
-        let productsMap: Record<string, any> = {}
-        if (productIds.length > 0) {
-            const { data: products } = await supabase
-                .from("products")
-                .select("id, name, sku, stock_quantity, images")
-                .in("id", productIds)
-            for (const p of products || []) {
-                productsMap[p.id] = p
-            }
-        }
-
-        // Batch-fetch service names for items with service_id
-        const serviceIds = Array.from(new Set((itemsData || []).map((i: any) => i.service_id).filter((id: any): id is string => !!id))) as string[]
-        let servicesMap: Record<string, any> = {}
-        if (serviceIds.length > 0) {
-            const { data: svcs } = await supabase
-                .from("services")
-                .select("id, name")
-                .in("id", serviceIds)
-            for (const s of svcs || []) {
-                servicesMap[s.id] = s
-            }
-        }
-
         const items = (itemsData || []).map((item: any) => {
-            const p = item.product_id ? productsMap[item.product_id] : null
-            const s = item.service_id ? servicesMap[item.service_id] : null
+            const p = item.products
+            const s = item.services
             return {
                 id: item.id,
                 appointmentId: item.appointment_id,
@@ -84,7 +71,7 @@ export async function getAppointmentItemsAction(appointmentId: string) {
                 updatedAt: item.updated_at,
                 product: p ? {
                     name: p.name,
-                    sku: p.sku,
+                    sku: p.sku || 'N/A',
                     image: p.images?.[0] || null,
                     stock: p.stock_quantity || 0,
                 } : null,
@@ -222,13 +209,13 @@ export async function handleAppointmentItemsStockMovement(params: {
 
     let action: 'reserve' | 'finalize' | 'release' | null = null
 
-    if (isWaiting(oldStatus) && isInProgress(newStatus)) {
+    if ((oldStatus === null || isWaiting(oldStatus)) && isInProgress(newStatus)) {
         action = 'reserve'
     } else if (isInProgress(oldStatus) && isCompleted(newStatus)) {
         action = 'finalize'
     } else if (isInProgress(oldStatus) && isCancelled(newStatus)) {
         action = 'release'
-    } else if (isWaiting(oldStatus) && isCompleted(newStatus)) {
+    } else if ((oldStatus === null || isWaiting(oldStatus)) && isCompleted(newStatus)) {
         action = 'finalize'
     }
 

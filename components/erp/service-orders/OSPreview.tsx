@@ -374,35 +374,43 @@ const OSPreview = ({
                                             </div>
                                         </div>
 
-                                        {(description || signatureImageKey) && (
+                                        {description && (
+                                            <div className="px-8 pb-6">
+                                                <div className="w-full border-t border-brand-border pt-6">
+                                                    <h4 className="font-bold text-xs mb-1.5 text-black">Observações</h4>
+                                                    <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
+                                                        {description}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {signatureImageKey && (
                                             <div className="px-8 pb-12">
-                                                <div className="grid grid-cols-2 gap-6 w-full border-t border-brand-border pt-6">
-                                                    <div>
-                                                        <h4 className="font-bold text-xs mb-1.5 text-black">Observações / Descrição</h4>
-                                                        <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
-                                                            {description || "Sem observações adicionais."}
-                                                        </p>
+                                                <div className="w-full border-t border-brand-border pt-6">
+                                                    <div className="flex flex-col items-start">
+                                                        <h4 className="font-bold text-xs mb-2 text-black">Assinatura do Cliente</h4>
+                                                        <img 
+                                                            src={buildImageUrl(signatureImageKey)} 
+                                                            alt="Assinatura" 
+                                                            className="max-h-[80px] object-contain border border-gray-200 rounded p-1 bg-white"
+                                                        />
+                                                        {signedAt && (
+                                                            <span className="text-[9px] text-gray-400 mt-1">
+                                                                Assinado em {new Date(signedAt).toLocaleDateString("pt-BR")} às {new Date(signedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    
-                                                    {signatureImageKey ? (
-                                                        <div className="flex flex-col items-center justify-center border-l border-brand-border pl-6">
-                                                            <h4 className="font-bold text-xs mb-2 text-black self-start">Assinatura do Cliente</h4>
-                                                            <img 
-                                                                src={buildImageUrl(signatureImageKey)} 
-                                                                alt="Assinatura" 
-                                                                className="max-h-[80px] object-contain border border-gray-200 rounded p-1 bg-white"
-                                                            />
-                                                            {signedAt && (
-                                                                <span className="text-[9px] text-gray-400 mt-1 block">
-                                                                    Assinado em {new Date(signedAt).toLocaleDateString("pt-BR")} às {new Date(signedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center justify-center border-l border-brand-border pl-6 text-gray-400 text-xs italic">
-                                                            Aguardando Assinatura do Cliente
-                                                        </div>
-                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {!description && !signatureImageKey && (
+                                            <div className="px-8 pb-12">
+                                                <div className="w-full border-t border-brand-border pt-6">
+                                                    <div className="flex items-center justify-center text-gray-400 text-xs italic">
+                                                        Aguardando Assinatura do Cliente
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

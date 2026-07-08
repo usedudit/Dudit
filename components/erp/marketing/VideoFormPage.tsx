@@ -9,13 +9,13 @@ import SelectVideoProductSheet from "./SelectVideoProductSheet"
 import SelectVideoServiceSheet from "./SelectVideoServiceSheet"
 import { ChevronLeftIcon, LinkIcon } from "@/lib/icons"
 import type { VideoMetadata } from "@/lib/video/shared"
-import { supabaseBrowser } from "@/lib/supabase/browser-client"
 
 interface VideoFormPageProps {
     video?: any
     onSave: (data: any) => Promise<void>
     onCancel: () => void
     isLoading?: boolean
+    partnerId?: string
 }
 
 const EMPTY_VIDEO: VideoMetadata = {
@@ -26,7 +26,7 @@ const EMPTY_VIDEO: VideoMetadata = {
     video_provider_id: null,
 }
 
-export default function VideoFormPage({ video, onSave, onCancel, isLoading }: VideoFormPageProps) {
+export default function VideoFormPage({ video, onSave, onCancel, isLoading, partnerId }: VideoFormPageProps) {
     const isEditing = !!video
     const [saving, setSaving] = useState(false)
 
@@ -35,17 +35,11 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
     const [videoMeta, setVideoMeta] = useState<VideoMetadata>(EMPTY_VIDEO)
     const [tags, setTags] = useState<string[]>([])
 
-    const [linkedProductId, setLinkedProductId] = useState<string | null>(null)
-    const [linkedServiceId, setLinkedServiceId] = useState<string | null>(null)
+    const [linkedItem, setLinkedItem] = useState<{ id: string; name: string; type: "product" | "service" } | null>(null)
     const [linkedCollectionUrl, setLinkedCollectionUrl] = useState("")
 
     const [showProductSheet, setShowProductSheet] = useState(false)
     const [showServiceSheet, setShowServiceSheet] = useState(false)
-
-    const [products, setProducts] = useState<any[]>([])
-    const [services, setServices] = useState<any[]>([])
-    const [loadingProducts, setLoadingProducts] = useState(false)
-    const [loadingServices, setLoadingServices] = useState(false)
 
     const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -61,40 +55,19 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                 video_provider_id: video.video_provider_id || null,
             })
             setTags(video.tags || [])
-            setLinkedProductId(video.linked_product_id || null)
-            setLinkedServiceId(video.linked_service_id || null)
+            if (video.linked_product_id) {
+                setLinkedItem({ id: video.linked_product_id, name: "", type: "product" })
+            } else if (video.linked_service_id) {
+                setLinkedItem({ id: video.linked_service_id, name: "", type: "service" })
+            } else {
+                setLinkedItem(null)
+            }
             setLinkedCollectionUrl(video.linked_collection_url || "")
         }
     }, [video])
 
-    useEffect(() => {
-        fetchProducts()
-        fetchServices()
-    }, [])
-
-    async function fetchProducts() {
-        setLoadingProducts(true)
-        try {
-            const { data } = await supabaseBrowser.from("products").select("id, name, image, price, is_active").order("name")
-            setProducts(data || [])
-        } catch (err) {
-            console.error(err)
-        } finally {
-            setLoadingProducts(false)
-        }
-    }
-
-    async function fetchServices() {
-        setLoadingServices(true)
-        try {
-            const { data } = await supabaseBrowser.from("services").select("id, name, image, price, is_active").order("name")
-            setServices(data || [])
-        } catch (err) {
-            console.error(err)
-        } finally {
-            setLoadingServices(false)
-        }
-    }
+    const linkedProductId = linkedItem?.type === "product" ? linkedItem.id : null
+    const linkedServiceId = linkedItem?.type === "service" ? linkedItem.id : null
 
     const validate = useCallback(() => {
         const errs: Record<string, string> = {}
@@ -201,15 +174,15 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                                     <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
                                         Produto Vinculado
                                     </label>
-                                    {linkedProductId ? (
+                                    {linkedItem?.type === "product" ? (
                                         <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
                                             <Badge variant="green" className="whitespace-nowrap">Vinculado</Badge>
                                             <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
-                                                {products.find((p) => p.id === linkedProductId)?.name || linkedProductId}
+                                                {linkedItem.name || linkedItem.id}
                                             </span>
                                             <button
                                                 type="button"
-                                                onClick={() => setLinkedProductId(null)}
+                                                onClick={() => setLinkedItem(null)}
                                                 className="text-sm text-red-500 hover:text-red-600"
                                             >
                                                 Remover
@@ -225,15 +198,15 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
                                     <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
                                         Serviço Vinculado
                                     </label>
-                                    {linkedServiceId ? (
+                                    {linkedItem?.type === "service" ? (
                                         <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
                                             <Badge variant="cyan" className="whitespace-nowrap">Vinculado</Badge>
                                             <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
-                                                {services.find((s) => s.id === linkedServiceId)?.name || linkedServiceId}
+                                                {linkedItem.name || linkedItem.id}
                                             </span>
                                             <button
                                                 type="button"
-                                                onClick={() => setLinkedServiceId(null)}
+                                                onClick={() => setLinkedItem(null)}
                                                 className="text-sm text-red-500 hover:text-red-600"
                                             >
                                                 Remover
@@ -272,18 +245,16 @@ export default function VideoFormPage({ video, onSave, onCancel, isLoading }: Vi
             <SelectVideoProductSheet
                 isOpen={showProductSheet}
                 onClose={() => setShowProductSheet(false)}
-                products={products}
+                partnerId={partnerId || ""}
                 selectedId={linkedProductId}
-                onSave={setLinkedProductId}
-                isLoading={loadingProducts}
+                onSave={(id, name) => setLinkedItem(id ? { id, name: name || "", type: "product" } : null)}
             />
             <SelectVideoServiceSheet
                 isOpen={showServiceSheet}
                 onClose={() => setShowServiceSheet(false)}
-                services={services}
+                partnerId={partnerId || ""}
                 selectedId={linkedServiceId}
-                onSave={setLinkedServiceId}
-                isLoading={loadingServices}
+                onSave={(id, name) => setLinkedItem(id ? { id, name: name || "", type: "service" } : null)}
             />
         </motion.div>
     )

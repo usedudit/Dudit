@@ -116,11 +116,35 @@ export default function VideosManagement() {
 
     const handleSave = async (data: any) => {
         if (isEditing && es.entityId) {
-            const result = await updateCommunityVideo(es.entityId, data)
+            const result = await updateCommunityVideo(es.entityId, {
+                title: data.title,
+                description: data.description,
+            })
             if (!result.success) throw new Error(result.error)
             toast({ title: "Vídeo atualizado" })
         } else {
-            const result = await createCommunityVideo({ ...data, partnerId })
+            let linkedItemType: "product" | "service" | "collection" | null = null
+            let linkedItemId: string | null = null
+            if (data.linked_product_id) {
+                linkedItemType = "product"
+                linkedItemId = data.linked_product_id
+            } else if (data.linked_service_id) {
+                linkedItemType = "service"
+                linkedItemId = data.linked_service_id
+            } else if (data.linked_collection_url) {
+                linkedItemType = "collection"
+                linkedItemId = data.linked_collection_url
+            }
+
+            const result = await createCommunityVideo({
+                title: data.title,
+                description: data.description,
+                videoUrl: data.video_url,
+                videoThumbnail: data.video_thumbnail,
+                duration: data.duration,
+                linkedItemType,
+                linkedItemId,
+            })
             if (!result.success) throw new Error(result.error)
             toast({ title: "Vídeo criado" })
         }
@@ -168,6 +192,7 @@ export default function VideosManagement() {
                         video={isEditing ? currentVideo : undefined}
                         onSave={handleSave}
                         onCancel={handleCancel}
+                        partnerId={partnerId}
                     />
                 ) : (
                     <FadeIn

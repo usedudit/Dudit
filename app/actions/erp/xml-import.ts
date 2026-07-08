@@ -719,6 +719,7 @@ export async function uploadXMLAction(
           reversed_at: null,
           reversed_by: null,
           errors: null,
+          created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", reimportId)

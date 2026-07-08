@@ -116,24 +116,37 @@ const TransactionListItem = React.memo(
                     )
 
                 case "status":
+                    const isPartiallyPaid = transaction.paidAmount != null && transaction.paidAmount > 0 && transaction.paidAmount < transaction.amount && String(transaction.rawStatus || "").toLowerCase() === "pending";
+                    const statusLabel = isPartiallyPaid
+                        ? (transaction.ledgerDirection === "in" ? "Parcialmente recebido" : "Parcialmente pago")
+                        : transaction.status;
+                    const statusVariant = isPartiallyPaid ? "orange" : transaction.statusVariant;
                     return (
                         <div className={`flex ${getJustifyClass(columns.find(c => c.id === 'status')?.align)}`}>
-                            <Badge variant={transaction.statusVariant} className="whitespace-nowrap">
-                                {transaction.status}
+                            <Badge variant={statusVariant} className="whitespace-nowrap">
+                                {statusLabel}
                             </Badge>
                         </div>
                     )
 
                 case "amount":
                     const isPaidRow = transaction.status === "Pago" || transaction.status === "Recebido" || String(transaction.rawStatus || "").toLowerCase() === "paid";
+                    const isPartial = transaction.paidAmount != null && transaction.paidAmount > 0 && transaction.paidAmount < transaction.amount && !isPaidRow;
                     const displayAmount = isPaidRow
                         ? (transaction.paidAmount && transaction.paidAmount > 0 ? transaction.paidAmount : transaction.amount)
                         : transaction.amount;
                     return (
-                        <span className={`text-[13px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
-                            {transaction.ledgerDirection === "in" ? "+ " : "- "}
-                            {formatCurrency(displayAmount)}
-                        </span>
+                        <div className="flex flex-col items-end gap-0.5">
+                            <span className={`text-[13px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                                {transaction.ledgerDirection === "in" ? "+ " : "- "}
+                                {formatCurrency(isPartial ? (transaction.paidAmount ?? 0) : displayAmount)}
+                            </span>
+                            {isPartial && (
+                                <span className="text-[11px] text-brand-inactive-text whitespace-nowrap">
+                                    de {formatCurrency(transaction.amount)}
+                                </span>
+                            )}
+                        </div>
                     )
 
                 case "actions":
@@ -158,7 +171,10 @@ const TransactionListItem = React.memo(
                             >
                                 {((String(transaction.rawStatus || "").toLowerCase() === "pending" || transaction.isOverdue) && !transaction.isInstallmentGroup && !transaction.isRecurringOccurrence && onMarkAsPaid) && (
                                     <DropdownItem onClick={() => onMarkAsPaid(transaction)}>
-                                        <MoneyIcon size={18} /> Marcar como {transaction.ledgerDirection === "in" ? "recebido" : "pago"}
+                                        <MoneyIcon size={18} /> {transaction.paidAmount && transaction.paidAmount > 0
+                                            ? `${transaction.ledgerDirection === "in" ? "Receber" : "Pagar"} saldo restante`
+                                            : `Marcar como ${transaction.ledgerDirection === "in" ? "recebido" : "pago"}`
+                                        }
                                     </DropdownItem>
                                 )}
                             </ActionsDropdown>

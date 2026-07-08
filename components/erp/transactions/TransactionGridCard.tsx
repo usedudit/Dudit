@@ -72,9 +72,18 @@ const TransactionGridCard = React.memo(
                                         <Badge variant="purple" icon={<RepeatIcon />} className="whitespace-nowrap scale-90 shrink-0" />
                                     </Tooltip>
                                 )}
-                                <Tooltip text={`Status: ${transaction.status}`}>
-                                    <Badge variant={transaction.statusVariant} className="whitespace-nowrap scale-90 shrink-0" />
-                                </Tooltip>
+                                {(() => {
+                                    const isPartial = transaction.paidAmount != null && transaction.paidAmount > 0 && transaction.paidAmount < transaction.amount && String(transaction.rawStatus || "").toLowerCase() === "pending";
+                                    const gridStatusLabel = isPartial
+                                        ? (transaction.ledgerDirection === "in" ? "Parcialmente recebido" : "Parcialmente pago")
+                                        : transaction.status;
+                                    const gridStatusVariant = isPartial ? "orange" : transaction.statusVariant;
+                                    return (
+                                        <Tooltip text={`Status: ${gridStatusLabel}`}>
+                                            <Badge variant={gridStatusVariant} className="whitespace-nowrap scale-90 shrink-0">{gridStatusLabel}</Badge>
+                                        </Tooltip>
+                                    );
+                                })()}
                             </div>
 
                             <div className="shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
@@ -91,17 +100,27 @@ const TransactionGridCard = React.memo(
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
-                    <div className="flex justify-between items-center w-full">
+                        <div className="flex justify-between items-center w-full">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
-                            <span className={`text-[15px] font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
-                                {transaction.ledgerDirection === "in" ? "+ " : "- "}
-                                {formatCurrency(
-                                    (transaction.status === "Pago" || transaction.status === "Recebido" || String(transaction.rawStatus || "").toLowerCase() === "paid")
-                                        ? (transaction.paidAmount && transaction.paidAmount > 0 ? transaction.paidAmount : transaction.amount)
-                                        : transaction.amount
-                                )}
-                            </span>
+                            {(() => {
+                                const isGridPaidRow = transaction.status === "Pago" || transaction.status === "Recebido" || String(transaction.rawStatus || "").toLowerCase() === "paid";
+                                const isGridPartial = transaction.paidAmount != null && transaction.paidAmount > 0 && transaction.paidAmount < transaction.amount && !isGridPaidRow;
+                                const gridDisplayAmount = isGridPaidRow
+                                    ? (transaction.paidAmount && transaction.paidAmount > 0 ? transaction.paidAmount : transaction.amount)
+                                    : (isGridPartial ? (transaction.paidAmount ?? 0) : transaction.amount);
+                                return (
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className={`text-[15px] font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                                            {transaction.ledgerDirection === "in" ? "+ " : "- "}
+                                            {formatCurrency(gridDisplayAmount)}
+                                        </span>
+                                        {isGridPartial && (
+                                            <span className="text-[11px] text-brand-inactive-text">de {formatCurrency(transaction.amount)}</span>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
                         <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-gray dark:bg-dark-border text-xs font-medium text-brand-inactive-text dark:text-dark-heading whitespace-nowrap">
                             Origem: {transaction.originSource || "Manual"}
@@ -152,7 +171,10 @@ const TransactionGridCard = React.memo(
                             >
                                 {((String(transaction.rawStatus || "").toLowerCase() === "pending" || transaction.isOverdue) && !transaction.isInstallmentGroup && !transaction.isRecurringOccurrence && onMarkAsPaid) && (
                                     <DropdownItem onClick={() => onMarkAsPaid(transaction)}>
-                                        <MoneyIcon size={18} /> Marcar como {transaction.ledgerDirection === "in" ? "recebido" : "pago"}
+                                        <MoneyIcon size={18} /> {transaction.paidAmount && transaction.paidAmount > 0
+                                            ? `${transaction.ledgerDirection === "in" ? "Receber" : "Pagar"} saldo restante`
+                                            : `Marcar como ${transaction.ledgerDirection === "in" ? "recebido" : "pago"}`
+                                        }
                                     </DropdownItem>
                                 )}
                             </ActionsDropdown>

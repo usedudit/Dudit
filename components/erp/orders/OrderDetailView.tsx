@@ -22,7 +22,8 @@ import {
     TabsTrigger,
     Input,
     ListItem,
-    FormSection
+    FormSection,
+    Pagination
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { usePermissions } from "@/lib/permission-context"
@@ -158,6 +159,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
     const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
     const [printModalOrderId, setPrintModalOrderId] = useState<string | null>(null)
+    const ITEMS_PER_PAGE = 8
+    const [itemPage, setItemPage] = useState(1)
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
@@ -388,6 +391,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         if (!a.is_gift && b.is_gift) return -1;
         return (a.sort_order || 0) - (b.sort_order || 0);
     });
+    const totalItemPages = Math.ceil(sortedOrderItems.length / ITEMS_PER_PAGE)
+    const paginatedItems = sortedOrderItems.slice((itemPage - 1) * ITEMS_PER_PAGE, itemPage * ITEMS_PER_PAGE)
+    useEffect(() => { setItemPage(1) }, [sortedOrderItems.length])
     const itemsLabel = itemCount === 1 ? "1 item" : `${itemCount} itens`
     const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
     const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))
@@ -721,7 +727,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                     <FormSection title="Itens do Pedido" hasSeparator className="mb-8">
                                                         <div className="space-y-4">
-                                                            {sortedOrderItems.map((item: any) => {
+                                                            {paginatedItems.map((item: any) => {
                                                                 const isService = !!item.service_id || item.line_type === "service_booking";
                                                                 const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                                 return (
@@ -859,6 +865,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             })}
                                                         </div>
                                                     </FormSection>
+
+                                                    {totalItemPages > 1 && (
+                                                        <div className="mt-2 mb-8">
+                                                            <Pagination currentPage={itemPage} totalPages={totalItemPages} onPageChange={setItemPage} />
+                                                        </div>
+                                                    )}
 
                                                     <FormSection title="Detalhes do Pagamento" hasSeparator>
                                                         <div className="space-y-3">
@@ -1090,9 +1102,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 })()}
 
                                                 {/* 4. Itens do Pedido */}
-                                                <FormSection title="Itens do Pedido" hasSeparator={false} className="mt-0">
+                                                <FormSection title="Itens do Pedido" hasSeparator={false} className="mb-8">
                                                     <div className="space-y-4">
-                                                        {sortedOrderItems.map((item: any) => {
+                                                        {paginatedItems.map((item: any) => {
                                                             const isService = !!item.service_id || item.line_type === "service_booking";
                                                             const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                             return (
@@ -1230,6 +1242,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         })}
                                                     </div>
                                                 </FormSection>
+
+                                                {totalItemPages > 1 && (
+                                                    <div className="mt-2">
+                                                        <Pagination currentPage={itemPage} totalPages={totalItemPages} onPageChange={setItemPage} inline />
+                                                    </div>
+                                                )}
 
                                                 {/* 5. Detalhes do Pagamento */}
                                                 <FormSection title="Detalhes do Pagamento" hasSeparator={true} className="mt-0">

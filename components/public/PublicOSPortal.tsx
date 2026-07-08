@@ -341,6 +341,11 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     {statusMeta.label}
                                                 </Badge>
                                             )}
+                                            {order.payment_status && order.payment_status !== "unpaid" && (
+                                                <Badge variant={order.payment_status === "paid" ? "green" : "orange"}>
+                                                    {order.payment_status === "paid" ? "Pago" : "Parcial"}
+                                                </Badge>
+                                            )}
                                         </div>
                                     </div>
 
@@ -422,7 +427,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                             </FormSection>
 
                                             {order.description && (
-                                                <FormSection title="Descrição / Observações" hasSeparator>
+                                                <FormSection title="Observações" hasSeparator>
                                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.description}</p>
                                                 </FormSection>
                                             )}
@@ -584,7 +589,22 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
                                 {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
                                 <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
-                                    <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
+                                    <div className={`${activeTab === "Visualização" ? "block" : "hidden"} space-y-4`}>
+                                        {order.customer_snapshot && (
+                                            <CustomerCard
+                                                customer={order.customer_snapshot}
+                                                address={order.customer_snapshot ? {
+                                                    street: order.customer_snapshot.street || order.customer_snapshot.address_street,
+                                                    number: order.customer_snapshot.number || order.customer_snapshot.address_number,
+                                                    complement: order.customer_snapshot.complement || order.customer_snapshot.address_complement,
+                                                    neighborhood: order.customer_snapshot.neighborhood || order.customer_snapshot.address_neighborhood,
+                                                    city: order.customer_snapshot.city || order.customer_snapshot.address_city,
+                                                    state: order.customer_snapshot.state || order.customer_snapshot.address_state || order.customer_snapshot.address_uf || order.customer_snapshot.uf,
+                                                    zipCode: order.customer_snapshot.zip_code || order.customer_snapshot.zipCode || order.customer_snapshot.address_zip_code,
+                                                } : null}
+                                                chrome="minimal"
+                                            />
+                                        )}
                                         <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
                                             <OSPreview
                                                 invoiceNumber={order.order_number}
@@ -614,6 +634,23 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
                         {/* RIGHT COLUMN: PREVIEW (DESKTOP ONLY) */}
                         <div className="hidden lg:flex lg:w-1/2 bg-brand-gray/30 dark:bg-dark-border/10 overflow-auto no-scrollbar relative flex-col h-full">
+                            {order.customer_snapshot && (
+                                <div className="px-4 pt-4">
+                                    <CustomerCard
+                                        customer={order.customer_snapshot}
+                                        address={order.customer_snapshot ? {
+                                            street: order.customer_snapshot.street || order.customer_snapshot.address_street,
+                                            number: order.customer_snapshot.number || order.customer_snapshot.address_number,
+                                            complement: order.customer_snapshot.complement || order.customer_snapshot.address_complement,
+                                            neighborhood: order.customer_snapshot.neighborhood || order.customer_snapshot.address_neighborhood,
+                                            city: order.customer_snapshot.city || order.customer_snapshot.address_city,
+                                            state: order.customer_snapshot.state || order.customer_snapshot.address_state || order.customer_snapshot.address_uf || order.customer_snapshot.uf,
+                                            zipCode: order.customer_snapshot.zip_code || order.customer_snapshot.zipCode || order.customer_snapshot.address_zip_code,
+                                        } : null}
+                                        chrome="minimal"
+                                    />
+                                </div>
+                            )}
                             <OSPreview
                                 invoiceNumber={order.order_number}
                                 orderDate={order.created_at}

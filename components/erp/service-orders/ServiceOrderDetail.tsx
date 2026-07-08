@@ -5,7 +5,7 @@ import { ShareModal } from "@/components/marketplace/ShareModal"
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import PaymentModal from "@/components/erp/orders/PaymentModal"
-import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon } from "@/lib/icons"
+import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
@@ -754,7 +754,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                     <SidebarCard hasTopStrip>
                                                         <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Assinatura Online</h3>
                                                         <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente visualizar e assinar online.</p>
-                                                        
+
                                                         <div className="space-y-3">
                                                             <Button
                                                                 variant="outline"
@@ -945,8 +945,12 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 </table>
                                             </div>
                                         ) : (
-                                            <div className="p-8 text-center text-sm text-brand-inactive-text bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                                Nenhum produto adicionado
+                                            <div className="flex flex-col items-center justify-center text-center py-8">
+                                                <IconPlaceholder
+                                                    icon={PackageIcon}
+                                                    title="Nenhum produto"
+                                                    subtitle="Não foram encontrados produtos para esta OS."
+                                                />
                                             </div>
                                         )}
                                     </FadeIn>

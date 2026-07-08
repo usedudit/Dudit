@@ -819,7 +819,7 @@ export async function getServiceOrderByTokenAction(
         id, order_number, status, title, description, expected_completion_date, completed_at,
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
         customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
-        public_token,
+        public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
         partners (
           id, store_name, store_image_url, phone
         )
@@ -835,7 +835,7 @@ export async function getServiceOrderByTokenAction(
           id, order_number, status, title, description, expected_completion_date, completed_at,
           total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
           customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
-          public_token,
+          public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
           partners (
             id, store_name, store_image_url, phone
           )
@@ -919,6 +919,12 @@ export async function getServiceOrderByTokenAction(
       lockout_until: row.lockout_until,
       assigned_user_name: assignedUserName,
       public_token: row.public_token,
+      payment_status: row.payment_status,
+      paid_amount: row.paid_amount,
+      payment_method: row.payment_method,
+      priority: row.priority,
+      estimated_hours: row.estimated_hours,
+      expected_completion_time: row.expected_completion_time,
       partners: row.partners ? {
         ...(Array.isArray(row.partners) ? row.partners[0] : row.partners),
         address: partnerAddress,
@@ -987,37 +993,36 @@ export async function updateServiceOrderAction(
 
     if (getErr || !current) throw new Error("Ordem de serviço não encontrada")
 
-    if (current.payment_status === "paid" || current.payment_status === "partially_paid") {
-      throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
-    }
+    const isPaid = current.payment_status === "paid" || current.payment_status === "partially_paid"
+    const allowedWhenPaid = ["internal_notes", "status", "priority", "expected_completion_date", "expected_completion_time", "estimated_hours", "specifications"]
 
     const updateData: any = {}
-    if (input.title !== undefined) updateData.title = input.title
-    if (input.description !== undefined) updateData.description = input.description
+    if (input.title !== undefined && !isPaid) updateData.title = input.title
+    if (input.description !== undefined && !isPaid) updateData.description = input.description
     if (input.internal_notes !== undefined) updateData.internal_notes = input.internal_notes
-    if (input.customer_id !== undefined) {
+    if (input.customer_id !== undefined && !isPaid) {
       updateData.customer_id = input.customer_id
       updateData.customer_snapshot = input.customer_id ? await getCustomerSnapshot(admin, input.customer_id) : null
     }
     if (input.expected_completion_date !== undefined) updateData.expected_completion_date = input.expected_completion_date
-    if (input.assigned_user_id !== undefined) updateData.assigned_user_id = input.assigned_user_id
+    if (input.assigned_user_id !== undefined && !isPaid) updateData.assigned_user_id = input.assigned_user_id
     if (input.status !== undefined) updateData.status = input.status
     if (input.priority !== undefined) updateData.priority = input.priority
     if (input.estimated_hours !== undefined) updateData.estimated_hours = input.estimated_hours
     if (input.expected_completion_time !== undefined) updateData.expected_completion_time = input.expected_completion_time
-    if (input.discount_value !== undefined) updateData.discount_value = input.discount_value
-    if (input.discount_type !== undefined) updateData.discount_type = input.discount_type
-    if (input.coupon_id !== undefined) updateData.coupon_id = input.coupon_id
-    if (input.coupon_code !== undefined) updateData.coupon_code = input.coupon_code
-    if (input.coupon_discount_amount !== undefined) updateData.coupon_discount_amount = input.coupon_discount_amount
-    if (input.other_costs !== undefined) updateData.other_costs = input.other_costs
-    if (input.payment_status !== undefined) updateData.payment_status = input.payment_status
-    if (input.paid_amount !== undefined) updateData.paid_amount = input.paid_amount
-    if (input.payment_method !== undefined) updateData.payment_method = input.payment_method
-    if (input.payment_breakdown !== undefined) {
+    if (input.discount_value !== undefined && !isPaid) updateData.discount_value = input.discount_value
+    if (input.discount_type !== undefined && !isPaid) updateData.discount_type = input.discount_type
+    if (input.coupon_id !== undefined && !isPaid) updateData.coupon_id = input.coupon_id
+    if (input.coupon_code !== undefined && !isPaid) updateData.coupon_code = input.coupon_code
+    if (input.coupon_discount_amount !== undefined && !isPaid) updateData.coupon_discount_amount = input.coupon_discount_amount
+    if (input.other_costs !== undefined && !isPaid) updateData.other_costs = input.other_costs
+    if (input.payment_status !== undefined && !isPaid) updateData.payment_status = input.payment_status
+    if (input.paid_amount !== undefined && !isPaid) updateData.paid_amount = input.paid_amount
+    if (input.payment_method !== undefined && !isPaid) updateData.payment_method = input.payment_method
+    if (input.payment_breakdown !== undefined && !isPaid) {
       updateData.payment_breakdown = input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null
     }
-    if (input.created_at !== undefined) updateData.created_at = input.created_at
+    if (input.created_at !== undefined && !isPaid) updateData.created_at = input.created_at
     if (input.specifications !== undefined) updateData.specifications = input.specifications.length > 0 ? input.specifications : null
     if (input.status !== undefined) updateData.status = input.status
 
@@ -1423,35 +1428,44 @@ export async function confirmServiceOrderPaymentAction(payload: {
       ? [{ method: payload.paymentMethod, amount: payload.paidAmount }]
       : []
 
-    if (!existingOrder?.id) {
+    let orderId: string | null = existingOrder?.id || null
+
+    if (!orderId) {
       const orderNumber = saleNumber || `OS-${String(order.id).slice(0, 8).toUpperCase()}`
 
-      await supabase.from("orders").insert({
-        partner_id: payload.partnerId,
-        order_number: orderNumber,
-        customer_name: (order.customer_snapshot as any)?.name || null,
-        buyer_id: order.customer_id || null,
-        total_amount: finalAmount,
-        subtotal_value: subtotal,
-        discount_value: order.discount_value || 0,
-        discount_type: order.discount_type || "fixed",
-        discount_amount: discountAmount,
-        payment_method_discount_amount: paymentMethodDiscountAmount,
-        payment_method_extra_amount: paymentMethodExtraAmount,
-        additional_costs: otherCosts,
-        paid_amount: payload.paidAmount,
-        situation: saleStatus,
-        delivery_status: "not_sent",
-        delivery_type: "pickup",
-        order_source: "admin_service_order",
-        payment_method: payload.paymentMethod || null,
-        payment_breakdown: JSON.stringify(paymentMethodSummary),
-        notes: orderRefNote,
-        created_at: new Date().toISOString(),
-        created_by: user.id,
-      })
+      const { data: newOrder, error: orderInsertErr } = await supabase
+        .from("orders")
+        .insert({
+          partner_id: payload.partnerId,
+          order_number: orderNumber,
+          customer_name: (order.customer_snapshot as any)?.name || null,
+          buyer_id: order.customer_id || null,
+          total_amount: finalAmount,
+          subtotal_value: subtotal,
+          discount_value: order.discount_value || 0,
+          discount_type: order.discount_type || "fixed",
+          discount_amount: discountAmount,
+          payment_method_discount_amount: paymentMethodDiscountAmount,
+          payment_method_extra_amount: paymentMethodExtraAmount,
+          additional_costs: otherCosts,
+          paid_amount: payload.paidAmount,
+          situation: saleStatus,
+          delivery_status: "not_sent",
+          delivery_type: "pickup",
+          order_source: "admin_service_order",
+          payment_method: payload.paymentMethod || null,
+          payment_breakdown: JSON.stringify(paymentMethodSummary),
+          notes: orderRefNote,
+          created_at: new Date().toISOString(),
+          created_by: user.id,
+        })
+        .select("id")
+        .single()
+
+      if (orderInsertErr) throw orderInsertErr
+      orderId = newOrder?.id || null
     } else {
-      await supabase
+      const { error: orderUpdateErr } = await supabase
         .from("orders")
         .update({
           total_amount: finalAmount,
@@ -1468,6 +1482,40 @@ export async function confirmServiceOrderPaymentAction(payload: {
           payment_breakdown: JSON.stringify(paymentMethodSummary),
         })
         .eq("id", existingOrder.id)
+
+      if (orderUpdateErr) throw orderUpdateErr
+    }
+
+    // Sync order_items from services and products
+    if (orderId && (orderServices.length > 0 || orderProducts.length > 0)) {
+      const orderItems = [
+        ...orderServices.map((s: any) => ({
+          order_id: orderId,
+          partner_id: payload.partnerId,
+          product_id: null,
+          variant_id: null,
+          product_name: s.service_name || "Mão de Obra",
+          unit_price: Number(s.service_price || 0),
+          quantity: Number(s.quantity || 1),
+          total_price: Number(s.total_price || 0),
+          line_type: "service_booking" as const,
+        })),
+        ...orderProducts.map((p: any) => ({
+          order_id: orderId,
+          partner_id: payload.partnerId,
+          product_id: p.product_id,
+          variant_id: p.variant_id || null,
+          product_name: p.product_name || "Produto",
+          unit_price: Number(p.unit_price || 0),
+          quantity: Number(p.quantity || 1),
+          total_price: Number(p.total_price || 0),
+          line_type: "product" as const,
+        })),
+      ]
+
+      await supabase.from("order_items").delete().eq("order_id", orderId)
+      const { error: itemsErr } = await supabase.from("order_items").insert(orderItems)
+      if (itemsErr) throw itemsErr
     }
 
     // 6. Create or update transaction in `transactions` table (if paidAmount > 0)
@@ -1832,6 +1880,7 @@ export async function signPublicServiceOrderAction(
       }
 
       await admin.from("audit_logs").insert({
+        table_name: 'service_orders',
         partner_id: order.partner_id,
         entity_type: 'service_order',
         entity_id: order.id,

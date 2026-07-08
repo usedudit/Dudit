@@ -1,6 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -204,10 +205,24 @@ export async function reorderCollectionItems(collectionId: string, orderedIds: s
   }
 }
 
-export async function getCollection(id: string) {
+export async function getItemCollectionIds(userId: string, itemType: string, itemId: string): Promise<string[]> {
   const supabase = await getSupabaseServerClient()
 
-  const { data: collection } = await supabase
+  const { data } = await supabase
+    .from("collection_items")
+    .select("collection_id, collections!inner(author_id)")
+    .eq("item_type", itemType)
+    .eq("item_id", itemId)
+    .eq("collections.author_id", userId)
+
+  if (!data) return []
+  return data.map((ci: any) => ci.collection_id)
+}
+
+export async function getCollection(id: string) {
+  const supabase = getAdminClient()
+
+  const { data: collection, error } = await supabase
     .from("collections")
     .select(`
       *,
@@ -221,6 +236,11 @@ export async function getCollection(id: string) {
     `)
     .eq("id", id)
     .single()
+
+  if (error) {
+    console.error("getCollection error:", error)
+    return null
+  }
 
   return collection
 }

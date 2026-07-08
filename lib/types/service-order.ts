@@ -98,3 +98,9 @@ export const SERVICE_ORDER_STATUS_META: Record<ServiceOrderStatus, { label: stri
   entregue:           { label: "Entregue",           variant: "green" },
   cancelada:          { label: "Cancelada",          variant: "red" },
 }
+
+export const PAYMENT_STATUS_META: Record<string, { label: string; variant: "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray" }> = {
+  paid:             { label: "Pago",             variant: "green" },
+  partially_paid:   { label: "Parcialmente Pago", variant: "orange" },
+  unpaid:           { label: "Não Pago",         variant: "gray" },
+}
