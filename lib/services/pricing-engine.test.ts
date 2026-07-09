@@ -392,7 +392,7 @@ describe("calculateOrderPricing", () => {
         discountPercent: 0,
         feePercent: 0,
         feeFixed: 0,
-        feeBearer: "merchant",
+        feeBearer: "customer",
         interestType: "fixed",
         interestValue: 3,
         installmentNumber: 2,
@@ -403,6 +403,26 @@ describe("calculateOrderPricing", () => {
     // interest = fixed(3%) + installment(2%) = 5% → interestAmount = 5
     // finalAmountWithPayment = 105
     expect(r.finalAmountWithPayment).toBe(105)
+    expect(r.paymentMethodInterestAmount).toBe(5)
+  })
+
+  it("calculates merchant-borne payment method interest without charging the customer", () => {
+    const r = calculateOrderPricing({
+      items: [{ unitPrice: 100, quantity: 1 }],
+      shippingCost: 0,
+      paymentMethod: {
+        discountPercent: 0,
+        feePercent: 0,
+        feeFixed: 0,
+        feeBearer: "merchant",
+        interestType: "fixed",
+        interestValue: 3,
+        installmentNumber: 2,
+        installmentFees: [{ installmentNumber: 2, feePercent: 2 }],
+      },
+    })
+
+    expect(r.finalAmountWithPayment).toBe(100)
     expect(r.paymentMethodInterestAmount).toBe(5)
   })
 
@@ -648,6 +668,7 @@ describe("calculateOrderPricing", () => {
       shippingCost: 0,
       paymentMethod: {
         discountPercent: 5,
+        feeBearer: "customer",
         interestType: "fixed",
         interestValue: 3, // 3% fixed interest rate
         installmentNumber: 1,

@@ -28,7 +28,7 @@ export type FinancialBreakdownData = {
 }
 
 export async function getOrderFinancialBreakdownAction(orderId: string, partnerId: string) {
-  await requirePartnerRouteAccess(partnerId, "orders", { specificPermission: "view" })
+  await requirePartnerRouteAccess(partnerId, "orders")
   const supabase = await getSupabaseServerClient()
   const admin = getAdminClient()
 

@@ -131,6 +131,7 @@ interface MarketplacePaymentPreview {
     methodName: string
     methodType: string
     maxInstallments: number
+    feeBearer?: "merchant" | "customer"
     finalAmount: number
     interestAmount: number
     feeAmount: number
@@ -142,8 +143,28 @@ interface MarketplacePaymentPreview {
         installmentValue: number
         hasInterest: boolean
         totalInterest: number
+        totalFee?: number
+        feeBearer?: "merchant" | "customer"
         finalAmount: number
     }[]
+}
+
+type MarketplaceInstallmentOption = NonNullable<MarketplacePaymentPreview["installmentOptions"]>[number]
+
+const formatCheckoutInstallmentOptionLabel = (opt: MarketplaceInstallmentOption) => {
+    const installmentsCount = Math.max(1, Number(opt.installments || 1))
+    const interestAmount = Number(opt.totalInterest || 0)
+    const feeAmount = Number(opt.totalFee || 0)
+    const pricingAmount = interestAmount + feeAmount
+    const pricingName = interestAmount > 0.009 && feeAmount > 0.009
+        ? "juros/taxa"
+        : interestAmount > 0.009
+            ? "juros"
+            : "taxa"
+    const pricingLabel = pricingAmount > 0.009
+        ? ` · ${formatCurrency(pricingAmount)} ${opt.feeBearer !== "merchant" ? `de ${pricingName}` : `${pricingName} absorvida`}`
+        : " sem juros"
+    return `${installmentsCount}x de ${formatCurrency(opt.installmentValue)}${pricingLabel}`
 }
 
 const fadeVariants = {
@@ -1055,7 +1076,8 @@ export function CheckoutPageClient() {
         const methodDiscount = paymentOption === "traditional" && paymentPreview?.success
             ? Number(paymentPreview.paymentMethodDiscountAmount || 0)
             : 0
-        const methodInterest = paymentOption === "traditional" && paymentPreview?.success
+        const passesPaymentCostToCustomer = paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant"
+        const methodInterest = passesPaymentCostToCustomer
             ? Number(paymentPreview.interestAmount || 0)
             : 0
         const chargedFee = Math.max(0, Number((
@@ -1115,10 +1137,10 @@ export function CheckoutPageClient() {
             Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0
                 ? { label: "Desconto", value: `- ${formatCurrency(paymentPreview.paymentMethodDiscountAmount)}` }
                 : null,
-            Number(paymentPreview.interestAmount || 0) > 0
+            paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.interestAmount || 0) > 0
                 ? { label: "Juros", value: `+ ${formatCurrency(paymentPreview.interestAmount)}` }
                 : null,
-            Number(paymentPreview.feeAmount || 0) > 0
+            paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0
                 ? { label: "Taxa", value: `+ ${formatCurrency(paymentPreview.feeAmount)}` }
                 : null,
             { label: "Total a cobrar", value: formatCurrency(checkoutTotalToCharge), isTotal: true },
@@ -1447,7 +1469,7 @@ export function CheckoutPageClient() {
                         <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
+                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.interestAmount || 0) > 0 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Juros</span>
@@ -1456,7 +1478,7 @@ export function CheckoutPageClient() {
                         <span>+{formatCurrency(paymentPreview.interestAmount)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.feeAmount || 0) > 0 && (
+                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                         <span className="flex items-center gap-2">
                             <span>Taxas</span>
@@ -1685,8 +1707,8 @@ export function CheckoutPageClient() {
         }
         if (paymentPreview?.success) {
             const methodDiscount = Number(paymentPreview.paymentMethodDiscountAmount || 0)
-            const methodInterest = Number(paymentPreview.interestAmount || 0)
-            const methodFee = Number(paymentPreview.feeAmount || 0)
+            const methodInterest = paymentPreview.feeBearer !== "merchant" ? Number(paymentPreview.interestAmount || 0) : 0
+            const methodFee = paymentPreview.feeBearer !== "merchant" ? Number(paymentPreview.feeAmount || 0) : 0
 
             if (methodDiscount > 0) {
                 msg += `- Desconto de Pagamento: -${formatCurrency(methodDiscount)}\n`
@@ -2348,7 +2370,7 @@ export function CheckoutPageClient() {
                                                                     options={
                                                                         paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
                                                                             value: String(opt.installments),
-                                                                            label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
+                                                                            label: formatCheckoutInstallmentOptionLabel(opt)
                                                                         })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                             const installmentNumber = index + 1
                                                                             const installmentAmount = paymentPreview?.installmentAmounts?.[index]
@@ -2430,7 +2452,7 @@ export function CheckoutPageClient() {
                                                             options={
                                                                 paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
                                                                     value: String(opt.installments),
-                                                                    label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
+                                                                    label: formatCheckoutInstallmentOptionLabel(opt)
                                                                 })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                     const installmentNumber = index + 1
                                                                     const installmentAmount = paymentPreview?.installmentAmounts?.[index]
@@ -2711,7 +2733,7 @@ export function CheckoutPageClient() {
                                                         options={
                                                             paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
                                                                 value: String(opt.installments),
-                                                                label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
+                                                                label: formatCheckoutInstallmentOptionLabel(opt)
                                                             })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                 const installmentNumber = index + 1
                                                                 const installmentAmount = paymentPreview?.installmentAmounts?.[index]
@@ -2815,13 +2837,13 @@ export function CheckoutPageClient() {
                                                 <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
+                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.interestAmount || 0) > 0 && (
                                             <div className="flex justify-between">
                                                 <span>Juros</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.interestAmount)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.feeAmount || 0) > 0 && (
+                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0 && (
                                             <div className="flex justify-between">
                                                 <span>Taxas</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.feeAmount)}</span>

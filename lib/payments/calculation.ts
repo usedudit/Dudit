@@ -82,7 +82,9 @@ export function calculatePaymentAmounts(input: PaymentCalculationInput): Payment
   // Step 2: installment interest over the discounted running total
   const totalInterestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
   const interestAmount = round2(currentTotal * (totalInterestPercent / 100))
-  currentTotal = toSafeMoney(currentTotal + interestAmount)
+  if (input.paymentMethod.feeBearer === "customer") {
+    currentTotal = toSafeMoney(currentTotal + interestAmount)
+  }
   const amountBeforeFee = currentTotal
 
   // Step 3: payment method fee over the running total after interest

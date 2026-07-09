@@ -74,8 +74,9 @@ export type PaymentBreakdownResult = {
 export function deriveAdjustmentType(pm: PaymentMethodFeeConfig): AdjustmentType {
   const dp = Math.max(0, Number(pm.discountPercent || 0))
   const fp = Math.max(0, Number(pm.feePercent || 0))
+  const fx = Math.max(0, Number(pm.feeFixed || 0))
   if (dp > 0) return "discount"
-  if (fp > 0) return "fee"
+  if (fp > 0 || fx > 0) return "fee"
   return "none"
 }
 
@@ -94,6 +95,7 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
   const adjustmentType = deriveAdjustmentType(pm)
   const discountPercent = Math.max(0, Number(pm.discountPercent || 0))
   const feePercent = Math.max(0, Number(pm.feePercent || 0))
+  const feeFixed = Math.max(0, Number(pm.feeFixed || 0))
   const feeBearer = (pm.feeBearer || "merchant") as "merchant" | "customer"
 
   let adjustmentPercent = 0
@@ -111,7 +113,7 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
     }
     case "fee": {
       adjustmentPercent = feePercent
-      adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100))
+      adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100) + feeFixed)
       if (feeBearer === "customer") {
         effectiveAmount = round2(amountReceived - adjustmentAmount)
         netAmount = effectiveAmount
@@ -123,7 +125,7 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
     }
     case "interest": {
       adjustmentPercent = feePercent
-      adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100))
+      adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100) + feeFixed)
       if (feeBearer === "customer") {
         effectiveAmount = round2(amountReceived - adjustmentAmount)
         netAmount = effectiveAmount

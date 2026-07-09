@@ -146,12 +146,22 @@ export function useEntityState() {
             const url = `${pathname}?${new URLSearchParams({ [action]: value }).toString()}`
 
             // 1. INSTANT: Update local state synchronously
+            const wasOpen = localStateRef.current.isOpen
             setLocalState({ action, entityId, isOpen: true })
             lastUserActionRef.current = Date.now()
             expectedHrefRef.current = url
 
-            // 2. INSTANT: Sync URL via replaceState (NO Next.js router = NO server revalidation)
-            window.history.replaceState(null, "", url)
+            // 2. INSTANT: Sync URL via pushState (so browser back button returns to the list page)
+            // If the entity modal was already open, we replace the state to avoid polluting history with multiple action steps
+            if (typeof window !== "undefined") {
+                const existingState = window.history.state
+                const stateObj = { ...existingState, isEntityOpen: true }
+                if (wasOpen) {
+                    window.history.replaceState(stateObj, "", url)
+                } else {
+                    window.history.pushState(stateObj, "", url)
+                }
+            }
         },
         [pathname],
     )
@@ -172,8 +182,15 @@ export function useEntityState() {
         lastUserActionRef.current = Date.now()
         expectedHrefRef.current = pathname
 
-        // 2. INSTANT: Sync URL via replaceState (NO Next.js router)
-        window.history.replaceState(null, "", pathname)
+        // 2. INSTANT: Sync URL
+        // If we pushed state to open this, use history.back() to clean up browser history
+        if (typeof window !== "undefined" && window.history.state?.isEntityOpen) {
+            window.history.back()
+        } else {
+            if (typeof window !== "undefined") {
+                window.history.replaceState(null, "", pathname)
+            }
+        }
     }, [pathname])
 
     // ── Derived booleans (from instant local state) ──────────────────────

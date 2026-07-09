@@ -7,7 +7,7 @@ import { PaymentMethodSchema } from "@/lib/validation/schemas"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { computePaymentLine } from "@/lib/payments/financial-engine"
+import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { recalculateSplitPaymentFromBaseAmounts, type SplitInputRow } from "@/lib/payments/split-breakdown"
 import { toCanonicalPaymentType, toLegacyPaymentType } from "@/lib/payments/payment-method"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
@@ -229,12 +229,6 @@ export async function calculatePaymentMethodAmountsAction(input: {
         })),
     }
 
-    const engine = computePaymentLine({
-        amountReceived: input.originalAmount,
-        paymentMethod: pmConfig,
-        installmentNumber: input.installmentNumber,
-    })
-
     const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
 
     const chosenType = toCanonicalPaymentType(method.type || method.payment_type)
@@ -243,61 +237,60 @@ export async function calculatePaymentMethodAmountsAction(input: {
 
     if (input.includeInstallmentOptions !== false && chosenType === "credit_card" && maxInst > 1) {
         for (let i = 1; i <= maxInst; i++) {
-            const instFee = (pmConfig.installmentFees || []).find((f: any) => f.installmentNumber === i)
-            const instConfig = instFee
-                ? { ...pmConfig, feePercent: Math.max(0, Number(instFee.feePercent || 0)) }
-                : { ...pmConfig, feePercent: 0 }
-            const calc = computePaymentLine({
-                amountReceived: Math.max(0, Number(input.originalAmount || 0)),
-                paymentMethod: instConfig,
+            const calc = calculatePaymentAmounts({
+                originalAmount: Math.max(0, Number(input.originalAmount || 0)),
+                paymentMethod: pmConfig,
                 installmentNumber: i,
             })
-            const hasInterest = Boolean(instFee && Number(instFee.feePercent || 0) > 0.009 && instConfig.feeBearer === "customer")
-            const totalToCharge = calc.adjustmentType === "discount"
-                ? round2(calc.amountReceived - calc.adjustmentAmount)
-                : (calc.adjustmentType === "fee" && calc.feeBearer === "customer"
-                    ? round2(calc.amountReceived + calc.adjustmentAmount)
-                    : calc.effectiveAmount)
             installmentOptions.push({
                 installments: i,
-                installmentValue: round2(totalToCharge / i),
-                hasInterest,
-                totalInterest: hasInterest ? calc.adjustmentAmount : 0,
-                finalAmount: totalToCharge
+                installmentValue: calc.installmentAmounts[0] || round2(calc.finalAmount / i),
+                hasInterest: calc.interestAmount > 0.009 && pmConfig.feeBearer === "customer",
+                totalInterest: calc.interestAmount,
+                totalFee: calc.feeAmount,
+                feeBearer: pmConfig.feeBearer,
+                finalAmount: calc.finalAmount
             })
         }
     }
 
-    const pmFinalAmount = engine.adjustmentType === "discount"
-        ? round2(engine.amountReceived - engine.adjustmentAmount)
-        : (engine.adjustmentType === "fee" && engine.feeBearer === "customer"
-            ? round2(engine.amountReceived + engine.adjustmentAmount)
-            : engine.effectiveAmount)
-
-    const pmDiscount = engine.adjustmentType === "discount"
-        ? round2(engine.amountReceived - pmFinalAmount)
+    const calc = calculatePaymentAmounts({
+        originalAmount: Math.max(0, Number(input.originalAmount || 0)),
+        paymentMethod: pmConfig,
+        installmentNumber: input.installmentNumber,
+    })
+    const adjustmentAmount = round2(Number(calc.paymentMethodDiscountAmount || 0) + Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0))
+    const adjustmentType = calc.paymentMethodDiscountAmount > 0.009
+        ? "discount"
+        : (calc.interestAmount > 0.009 ? "interest" : (calc.feeAmount > 0.009 ? "fee" : "none"))
+    const adjustmentPercent = adjustmentType === "discount"
+        ? calc.appliedDiscountPercent
+        : (adjustmentType === "interest" ? calc.appliedInterestPercent : calc.appliedFeePercent)
+    const absorbedAmount = pmConfig.feeBearer === "merchant"
+        ? round2(Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0))
         : 0
 
     return {
         success: true,
         installmentOptions,
-        finalAmount: pmFinalAmount,
-        paymentMethodDiscountAmount: pmDiscount,
-        feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
-        interestAmount: 0,
-        amountBeforeInterest: engine.amountReceived,
-        amountBeforeFee: engine.amountReceived,
-        installmentNumber: engine.adjustmentType === "fee" ? 1 : 0,
-        installmentAmounts: [pmFinalAmount],
-        appliedDiscountPercent: engine.adjustmentType === "discount" ? engine.adjustmentPercent : 0,
-        appliedFeePercent: engine.adjustmentType === "fee" ? engine.adjustmentPercent : 0,
-        appliedInterestPercent: 0,
-        amountReceived: engine.amountReceived,
-        adjustmentType: engine.adjustmentType,
-        adjustmentPercent: engine.adjustmentPercent,
-        adjustmentAmount: engine.adjustmentAmount,
-        effectiveAmount: pmFinalAmount,
-        netAmount: engine.netAmount,
+        finalAmount: calc.finalAmount,
+        paymentMethodDiscountAmount: calc.paymentMethodDiscountAmount,
+        feeAmount: calc.feeAmount,
+        interestAmount: calc.interestAmount,
+        amountBeforeInterest: calc.amountBeforeInterest,
+        amountBeforeFee: calc.amountBeforeFee,
+        installmentNumber: calc.installmentNumber,
+        installmentAmounts: calc.installmentAmounts,
+        appliedDiscountPercent: calc.appliedDiscountPercent,
+        appliedFeePercent: calc.appliedFeePercent,
+        appliedInterestPercent: calc.appliedInterestPercent,
+        amountReceived: calc.finalAmount,
+        adjustmentType,
+        adjustmentPercent,
+        adjustmentAmount,
+        effectiveAmount: calc.finalAmount,
+        netAmount: round2(calc.finalAmount - absorbedAmount),
+        feeBearer: pmConfig.feeBearer,
     }
 }
 

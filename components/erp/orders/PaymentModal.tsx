@@ -185,6 +185,26 @@ const getTargetViewForMethodType = (type: string) => {
     return "card"; // credit_card, debit_card, bank_transfer, other
 };
 
+const formatInstallmentOptionLabel = (opt: any) => {
+    const installmentsCount = Math.max(1, Number(opt?.installments || 1));
+    const installmentValue = Number(opt?.installmentValue || 0);
+    const finalAmount = Number(opt?.finalAmount || (installmentValue * installmentsCount));
+    const interestAmount = Number(opt?.totalInterest || 0);
+    const feeAmount = Number(opt?.totalFee || 0);
+    const pricingAmount = interestAmount + feeAmount;
+    const passesCostToCustomer = opt?.feeBearer !== "merchant";
+    const pricingName = interestAmount > 0.009 && feeAmount > 0.009
+        ? "juros/taxa"
+        : interestAmount > 0.009
+            ? "juros"
+            : "taxa";
+    const pricingLabel = pricingAmount > 0.009
+        ? ` · ${formatCurrency(pricingAmount)} ${passesCostToCustomer ? `de ${pricingName}` : `${pricingName} absorvida`}`
+        : "";
+    const freeInterestLabel = pricingAmount <= 0.009 ? " sem juros" : "";
+    return `${installmentsCount}x de ${formatCurrency(installmentValue)}${freeInterestLabel} (Total: ${formatCurrency(finalAmount)}${pricingLabel})`;
+};
+
 /** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) - manter os mesmos significados. */
 export type PaymentModalProps = {
     isOpen: boolean
@@ -1231,6 +1251,13 @@ const PaymentModal = ({
         : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total: displayTransactionTotal };
 
     const selectedMethodObj = selectedMethodId ? activeMethods.find((m: any) => m.id === selectedMethodId) : null;
+    const selectedMethodHasPaymentCost = Boolean(selectedMethodObj) && (
+        Number(selectedMethodObj?.fee_percent || 0) > 0.009 ||
+        Number(selectedMethodObj?.fee_fixed || 0) > 0.009 ||
+        Number(paymentCalculation?.interestAmount || 0) > 0.009 ||
+        Number(paymentCalculation?.feeAmount || 0) > 0.009 ||
+        installmentOptions.some((opt: any) => Number(opt?.totalInterest || 0) > 0.009 || Number(opt?.totalFee || 0) > 0.009)
+    );
 
     const getBaseAmountFromFinal = (finalAmt: number) => {
         if (!paymentCalculation?.success || !selectedMethodObj) {
@@ -2095,10 +2122,10 @@ const PaymentModal = ({
                                                     </button>
                                                 ))}
                                             </div>
-                                            {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
+                                            {selectedMethodObj && selectedMethodHasPaymentCost && !isMarketplaceOrder && (
                                                 <div className="w-full max-w-sm mt-4">
                                                     <FormDropdown
-                                                        label="Quem paga a taxa?"
+                                                        label="Quem paga taxa/juros?"
                                                         value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
                                                         setValue={(v: any) => setFeeBearerOverride(v)}
                                                         options={[
@@ -2169,9 +2196,9 @@ const PaymentModal = ({
                                                     />
                                                 </div>
 
-                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
+                                                {selectedMethodObj && selectedMethodHasPaymentCost && !isMarketplaceOrder && (
                                                     <FormDropdown
-                                                        label="Quem paga a taxa?"
+                                                        label="Quem paga taxa/juros?"
                                                         value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
                                                         setValue={(v: any) => setFeeBearerOverride(v)}
                                                         options={[
@@ -2313,7 +2340,7 @@ const PaymentModal = ({
                                                                 {(() => {
                                                                     if (installmentOptions.length > 0) {
                                                                         const opt = installmentOptions.find(o => String(o.installments) === installments) || installmentOptions[0];
-                                                                        return `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"} (Total: ${formatCurrency(opt.finalAmount || (opt.installmentValue * opt.installments))})`;
+                                                                        return formatInstallmentOptionLabel(opt);
                                                                     }
                                                                     const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
                                                                     if (view === 'card' && maxInst > 1) {
@@ -2334,7 +2361,7 @@ const PaymentModal = ({
                                                                     if (installmentOptions.length > 0) {
                                                                         return installmentOptions.map(opt => ({
                                                                             value: String(opt.installments),
-                                                                            label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"} (Total: ${formatCurrency(opt.finalAmount || (opt.installmentValue * opt.installments))})`
+                                                                            label: formatInstallmentOptionLabel(opt)
                                                                         }));
                                                                     }
                                                                     const maxInst = Math.max(1, Number(selectedMethodObj?.max_installments || 1));
@@ -2353,9 +2380,9 @@ const PaymentModal = ({
                                                         />
                                                     )
                                                 )}
-                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && !isMarketplaceOrder && (
+                                                {selectedMethodObj && selectedMethodHasPaymentCost && !isMarketplaceOrder && (
                                                     <FormDropdown
-                                                        label="Quem paga a taxa?"
+                                                        label="Quem paga taxa/juros?"
                                                         value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
                                                         setValue={(v: any) => setFeeBearerOverride(v)}
                                                         options={[

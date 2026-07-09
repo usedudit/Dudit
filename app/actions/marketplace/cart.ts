@@ -921,11 +921,7 @@ export async function checkoutCartAction(
   const persistedDeliveryFee = useServerValues ? deliveryFee : (normalizedSnapshot?.deliveryFee ?? deliveryFee)
   const persistedCouponDiscount = useServerValues ? couponDiscountAmount : (normalizedSnapshot?.couponDiscount ?? couponDiscountAmount)
   const persistedPaymentMethodDiscount = useServerValues ? paymentMethodDiscountAmount : (normalizedSnapshot?.paymentMethodDiscount ?? paymentMethodDiscountAmount)
-  const persistedPaymentMethodExtra = useServerValues
-    ? paymentMethodExtraAmount
-    : (normalizedSnapshot
-      ? roundMoney(normalizedSnapshot.paymentMethodInterest + normalizedSnapshot.paymentMethodFee)
-      : paymentMethodExtraAmount)
+  const persistedPaymentMethodExtra = paymentMethodExtraAmount
   const persistedTotal = useServerValues ? totalAmount : (normalizedSnapshot?.finalTotal ?? totalAmount)
   const persistedCheckoutPricing = (useServerValues ? null : normalizedSnapshot) || {
     subtotal: persistedSubtotal,

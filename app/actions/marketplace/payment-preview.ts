@@ -81,22 +81,13 @@ function marketplaceCalculateAmounts(input: {
   // Step 2: installment interest (marketplace-specific chaining)
   const totalInterestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
   const interestAmount = round2(currentTotal * (totalInterestPercent / 100))
-  currentTotal = toSafeMoney(currentTotal + interestAmount)
+  if (pm.feeBearer === "customer") {
+    currentTotal = toSafeMoney(currentTotal + interestAmount)
+  }
   const amountBeforeFee = currentTotal
 
-  // Step 3: fee (increases the amount when customer-borne)
-  const feeCalc = computePaymentLine({
-    amountReceived: currentTotal,
-    paymentMethod: {
-      discountPercent: 0,
-      feePercent,
-      feeFixed,
-      feeBearer: pm.feeBearer,
-      maxInstallments,
-      installmentFees: [],
-    },
-  })
-  const feeAmount = feeCalc.adjustmentType === "fee" ? feeCalc.adjustmentAmount : 0
+  // Step 3: administrative/fixed fee over the running total after interest.
+  const feeAmount = round2(((currentTotal * feePercent) / 100) + feeFixed)
   const finalAmount = pm.feeBearer === "customer"
     ? toSafeMoney(currentTotal + feeAmount)
     : currentTotal
@@ -175,8 +166,10 @@ export async function previewMarketplacePaymentAction(input: {
       installmentOptions.push({
         installments: i,
         installmentValue: calc.installmentAmounts[0] || 0,
-        hasInterest: calc.interestAmount > 0,
+        hasInterest: calc.interestAmount > 0 && feeConfig.feeBearer === "customer",
         totalInterest: calc.interestAmount,
+        totalFee: calc.feeAmount,
+        feeBearer: feeConfig.feeBearer,
         finalAmount: calc.finalAmount,
       })
     }
@@ -188,6 +181,7 @@ export async function previewMarketplacePaymentAction(input: {
     methodName: String(method.name || ""),
     methodType: chosenType,
     maxInstallments: Math.max(1, Number(method.max_installments || 1)),
+    feeBearer: feeConfig.feeBearer,
     installmentOptions,
     ...result,
   }

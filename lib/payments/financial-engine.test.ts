@@ -26,6 +26,22 @@ const feeCardMerchant: PaymentMethodFeeConfig = {
   maxInstallments: 1,
 }
 
+const fixedFeeCustomer: PaymentMethodFeeConfig = {
+  feePercent: 0,
+  feeFixed: 1.5,
+  feeBearer: "customer",
+  discountPercent: 0,
+  maxInstallments: 1,
+}
+
+const fixedFeeMerchant: PaymentMethodFeeConfig = {
+  feePercent: 0,
+  feeFixed: 1.5,
+  feeBearer: "merchant",
+  discountPercent: 0,
+  maxInstallments: 1,
+}
+
 const noAdjustment: PaymentMethodFeeConfig = {
   feePercent: 0,
   feeFixed: 0,
@@ -44,6 +60,11 @@ describe("deriveAdjustmentType", () => {
   it("returns fee when only feePercent > 0", () => {
     expect(deriveAdjustmentType(feeCardCustomer)).toBe("fee")
     expect(deriveAdjustmentType(feeCardMerchant)).toBe("fee")
+  })
+
+  it("returns fee when only feeFixed > 0", () => {
+    expect(deriveAdjustmentType(fixedFeeCustomer)).toBe("fee")
+    expect(deriveAdjustmentType(fixedFeeMerchant)).toBe("fee")
   })
 
   it("returns none when both are zero", () => {
@@ -96,6 +117,26 @@ describe("computePaymentLine - single payment", () => {
     expect(r.adjustmentAmount).toBe(3)
     expect(r.effectiveAmount).toBe(100)
     expect(r.netAmount).toBe(97)
+    expect(r.feeBearer).toBe("merchant")
+  })
+
+  it("fixed fee customer: received 10, effective 8.50, net 8.50, adjustment 1.50", () => {
+    const r = computePaymentLine({ amountReceived: 10, paymentMethod: fixedFeeCustomer })
+    expect(r.adjustmentType).toBe("fee")
+    expect(r.adjustmentPercent).toBe(0)
+    expect(r.adjustmentAmount).toBe(1.5)
+    expect(r.effectiveAmount).toBe(8.5)
+    expect(r.netAmount).toBe(8.5)
+    expect(r.feeBearer).toBe("customer")
+  })
+
+  it("fixed fee merchant: received 10, effective 10, net 8.50, adjustment 1.50", () => {
+    const r = computePaymentLine({ amountReceived: 10, paymentMethod: fixedFeeMerchant })
+    expect(r.adjustmentType).toBe("fee")
+    expect(r.adjustmentPercent).toBe(0)
+    expect(r.adjustmentAmount).toBe(1.5)
+    expect(r.effectiveAmount).toBe(10)
+    expect(r.netAmount).toBe(8.5)
     expect(r.feeBearer).toBe("merchant")
   })
 
