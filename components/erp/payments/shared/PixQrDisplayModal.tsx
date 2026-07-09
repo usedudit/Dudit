@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import { DefaultModal, Button, Separator, Input } from "@/components/reusable"
 import { CheckCircleIcon, CopyIcon, XIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
@@ -32,9 +32,12 @@ export function PixQrDisplayModal({
     onSendWhatsApp,
 }: PixQrDisplayModalProps) {
     const { toast } = useToast()
+    const [copied, setCopied] = useState(false)
 
     const handleCopy = () => {
         navigator.clipboard.writeText(payload)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
         toast({
             title: "Código Copiado",
             description: "O código Pix Copia e Cola foi copiado para a área de transferência.",

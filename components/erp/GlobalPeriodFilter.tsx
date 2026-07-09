@@ -5,7 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Dropdown, DropdownItem } from "@/components/reusable/Dropdown"
 import type { Period, CompareMode } from "@/lib/period-types"
 import { PERIOD_LABELS, COMPARE_PRESET_LABELS, PERIOD_OPTIONS, COMPARE_PRESETS, getPeriodDateRange, getCustomMaxDate } from "@/lib/period-types"
-import { Sparkles } from "lucide-react"
+import { FilterIcon, SparklesIcon } from "@/lib/icons"
 import { useDashboard } from "./dashboard/DashboardContext"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 
@@ -66,12 +66,6 @@ export function GlobalPeriodFilter() {
 
   const maxDate = getCustomMaxDate(period, new Date().toISOString().slice(0, 10))
 
-  const compareLabel = compare === "none"
-    ? "Comparar"
-    : compare === "custom"
-      ? `${compareFrom || "..."} - ${compareTo || "..."}`
-      : COMPARE_PRESET_LABELS[compare] || "Comparar"
-
   return (
     <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
       {insights && insights.length > 0 && (
@@ -79,7 +73,7 @@ export function GlobalPeriodFilter() {
           <SheetTrigger asChild>
             <button className="flex items-center gap-2 text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer">
               <div className="w-5 h-5 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                <Sparkles size={12} className="text-brand-green dark:text-emerald-400" />
+                <SparklesIcon size={12} className="text-brand-green dark:text-emerald-400" />
               </div>
               <span>Insights</span>
               <span className="bg-brand-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
@@ -91,7 +85,7 @@ export function GlobalPeriodFilter() {
             <SheetHeader className="pb-6 border-b border-brand-border/40 dark:border-dark-border/40">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                  <Sparkles size={18} className="text-brand-green dark:text-emerald-400" />
+                  <SparklesIcon size={18} className="text-brand-green dark:text-emerald-400" />
                 </div>
                 <div>
                   <SheetTitle className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</SheetTitle>
@@ -108,41 +102,42 @@ export function GlobalPeriodFilter() {
         </Sheet>
       )}
 
-      <Dropdown
-        align="right"
-        width="w-44"
-        trigger={
-          <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap">
-            {PERIOD_LABELS[period]}
-          </button>
-        }
-      >
-        {PERIOD_OPTIONS.map((p) => (
-          <DropdownItem key={p} onClick={() => {
-            updateParams({ period: p, compare: "", compareFrom: "", compareTo: "" })
-          }}>
-            {PERIOD_LABELS[p]}
-          </DropdownItem>
-        ))}
-      </Dropdown>
-
-      <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">vs</span>
-
-      <Dropdown
-        align="right"
-        width="w-52"
-        trigger={
-          <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap">
-            {compareLabel}
-          </button>
-        }
-      >
-        {COMPARE_PRESETS.map((c) => (
-          <DropdownItem key={c} onClick={() => handleCompareSelect(c)}>
-            {COMPARE_PRESET_LABELS[c]}
-          </DropdownItem>
-        ))}
-      </Dropdown>
+      <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full overflow-hidden">
+        <Dropdown
+          align="left"
+          width="w-44"
+          trigger={
+            <button className="flex items-center gap-1.5 text-[13px] font-bold text-brand-dark dark:text-dark-heading pl-4 pr-3 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer">
+              {PERIOD_LABELS[period]}
+            </button>
+          }
+        >
+          {PERIOD_OPTIONS.map((p) => (
+            <DropdownItem key={p} onClick={() => {
+              updateParams({ period: p, compare: "", compareFrom: "", compareTo: "" })
+            }}>
+              {PERIOD_LABELS[p]}
+            </DropdownItem>
+          ))}
+        </Dropdown>
+        <div className="w-px h-5 bg-brand-border dark:bg-dark-border" />
+        <Dropdown
+          align="right"
+          width="w-52"
+          showChevron={false}
+          trigger={
+            <button className="flex items-center justify-center w-9 h-9 rounded-full p-0 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors cursor-pointer text-brand-dark dark:text-dark-heading">
+              <FilterIcon size={14} />
+            </button>
+          }
+        >
+          {COMPARE_PRESETS.map((c) => (
+            <DropdownItem key={c} onClick={() => handleCompareSelect(c)}>
+              {COMPARE_PRESET_LABELS[c]}
+            </DropdownItem>
+          ))}
+        </Dropdown>
+      </div>
 
       {compare === "custom" && (
         <div className="flex items-center gap-2">

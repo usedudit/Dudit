@@ -2,22 +2,23 @@
 
 import React, { useState, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, ListItem } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, ListItem, Button, DefaultModal } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
 import {
   DashboardPieChart, DashboardLineChart, DashboardBarChart, CHART_COLORS
 } from "@/components/erp/dashboard/charts/DashboardCharts"
-import { ReportExportButton } from "./shared"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
+
 import { formatCurrency as brl } from "@/lib/utils"
 import {
   AnalyticsIcon, PackageIcon, WrenchIcon, TruckIcon, FileTextIcon,
   MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
   ChartIcon, ShoppingBagIcon, TagIcon, TrendingUpIcon, CreditCardIcon,
   ListIcon, AlertCircleIcon, CalendarIcon, ClockIcon, ArrowUpIcon, ArrowDownIcon,
-  SparklesIcon, ShoppingCartIcon, StarIcon, TargetIcon,
+  SparklesIcon, ShoppingCartIcon, StarIcon, TargetIcon, DownloadIcon,
 } from "@/lib/icons"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ReportTableCard, ReportRankingCard } from "./widgets"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData } from "@/lib/data/dashboard"
 import type {
@@ -94,27 +95,6 @@ const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray
   positive: "green", negative: "red", warning: "orange", info: "blue", neutral: "gray",
 }
 
-function InsightsCard({ insights, title = "Insights" }: { insights: Insight[]; title?: string }) {
-  if (insights.length === 0) return null
-  return (
-    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-      <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 mb-4">
-        <SparklesIcon size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
-        {title}
-      </h3>
-      <div className="space-y-3">
-        {insights.slice(0, 4).map((insight, i) => (
-          <InfoCard
-            key={insight.id || i}
-            color={INSIGHT_COLORS[insight.tone] || "gray"}
-            message={insight.message}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function CardHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
     <div className="flex items-center space-x-3 mb-6">
@@ -128,11 +108,122 @@ function CardHeader({ icon: Icon, title }: { icon: React.ElementType; title: str
 
 // ─────────────────────────── Header ───────────────────────────
 
-function SectionHeader({ title, onExport }: { title: string; onExport: (f: "csv" | "xlsx") => Promise<void> }) {
+function SectionHeader({ title, onExport, insights: sectionInsights }: { title: string; onExport: (f: "csv" | "xlsx") => Promise<void>; insights?: { message: string; color: string }[] }) {
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx" | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
+
+  const handleExport = async () => {
+    if (!exportFormat) return
+    setExportLoading(true)
+    try {
+      await onExport(exportFormat)
+      setExportOpen(false)
+      setExportFormat(null)
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   return (
     <div className="flex items-center justify-between">
       <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
-      <ReportExportButton onExport={onExport} />
+      <div className="flex items-center gap-2">
+        {sectionInsights && sectionInsights.length > 0 && (
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <button className="flex items-center gap-2 text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer">
+                <div className="w-5 h-5 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                  <SparklesIcon size={12} className="text-brand-green dark:text-emerald-400" />
+                </div>
+                <span>Insights</span>
+                <span className="bg-brand-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                  {sectionInsights.length}
+                </span>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-md p-6 border-l border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+              <SheetHeader className="pb-6 border-b border-brand-border/40 dark:border-dark-border/40">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <SparklesIcon size={18} className="text-brand-green dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <SheetTitle className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</SheetTitle>
+                    <SheetDescription className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">Análises automáticas sobre os seus resultados.</SheetDescription>
+                  </div>
+                </div>
+              </SheetHeader>
+              <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)] pr-1">
+                {sectionInsights.map((insight, i) => (
+                  <DashboardInsightInline key={i} message={insight.message} color={insight.color} />
+                ))}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
+
+        <button
+          onClick={() => setExportOpen(true)}
+          className="flex items-center gap-2 text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer"
+        >
+          <DownloadIcon size={14} />
+          <span>Exportar</span>
+        </button>
+
+        <DefaultModal
+          isOpen={exportOpen}
+          onClose={() => { setExportOpen(false); setExportFormat(null) }}
+          title="Exportar Relatório"
+          maxWidth="sm"
+          footer={
+            <div className="flex items-center justify-end gap-3 w-full pt-2">
+              <Button variant="outline" onClick={() => { setExportOpen(false); setExportFormat(null) }}>
+                Cancelar
+              </Button>
+              <Button variant="default" onClick={handleExport} disabled={!exportFormat || exportLoading} isLoading={exportLoading}>
+                Exportar
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-2">
+            <ListItem
+              icon={<div className="w-5 h-5 flex items-center justify-center text-brand-dark dark:text-dark-heading"><DownloadIcon size={16} /></div>}
+              title="CSV"
+              description="Arquivo de texto separado por vírgulas"
+              onClick={() => setExportFormat("csv")}
+              className={exportFormat === "csv" ? "ring-2 ring-brand-green" : ""}
+            />
+            <ListItem
+              icon={<div className="w-5 h-5 flex items-center justify-center text-brand-dark dark:text-dark-heading"><DownloadIcon size={16} /></div>}
+              title="Excel (XLSX)"
+              description="Planilha no formato do Excel"
+              onClick={() => setExportFormat("xlsx")}
+              className={exportFormat === "xlsx" ? "ring-2 ring-brand-green" : ""}
+            />
+          </div>
+        </DefaultModal>
+      </div>
+    </div>
+  )
+}
+
+function DashboardInsightInline({ message, color }: { message: string; color: string }) {
+  const colors: Record<string, { bg: string; text: string; bar: string; border: string }> = {
+    green: { bg: "bg-[#ecfdf5] dark:bg-emerald-900/20", text: "text-emerald-900 dark:text-emerald-100", bar: "bg-emerald-500", border: "border-emerald-100 dark:border-emerald-900/30" },
+    red: { bg: "bg-red-50 dark:bg-red-900/10", text: "text-red-700 dark:text-red-300/80", bar: "bg-red-400", border: "border-red-100 dark:border-red-900/30" },
+    orange: { bg: "bg-[#fff7ed] dark:bg-orange-900/20", text: "text-orange-700 dark:text-orange-300/80", bar: "bg-orange-500", border: "border-orange-100 dark:border-orange-900/30" },
+    blue: { bg: "bg-blue-50 dark:bg-blue-900/20", text: "text-blue-700 dark:text-blue-300/80", bar: "bg-blue-500", border: "border-blue-100 dark:border-blue-900/30" },
+  }
+  const c = colors[color] || colors.blue
+  return (
+    <div className={`${c.bg} ${c.border} rounded-xl px-4 py-4 border transition-all duration-200 hover:scale-[1.01] hover:shadow-xs`}>
+      <div className="flex gap-3 items-start">
+        <div className={`${c.bar} w-1.5 rounded-full self-stretch shrink-0 min-h-6`} />
+        <p className={`text-[14px] font-semibold leading-relaxed ${c.text}`}>{message}</p>
+      </div>
     </div>
   )
 }
@@ -220,7 +311,7 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
       {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Vendas" onExport={onExport} />
+      <SectionHeader title="Relatório de Vendas" onExport={onExport} insights={mappedInsights} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
@@ -366,7 +457,7 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
       {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Produtos" onExport={onExport} />
+      <SectionHeader title="Relatório de Produtos" onExport={onExport} insights={mappedInsights} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
@@ -463,7 +554,7 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
       {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Clientes" onExport={onExport} />
+      <SectionHeader title="Relatório de Clientes" onExport={onExport} insights={mappedInsights} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
@@ -561,7 +652,7 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
       {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Entregas" onExport={onExport} />
+      <SectionHeader title="Relatório de Entregas" onExport={onExport} insights={mappedInsights} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
@@ -713,6 +804,13 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
     returnCount: returnsData.returnCount,
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   const kpis = [
     { title: "Total Devoluções", value: String(returnsData.returnCount), trend: "" },
     { title: "Taxa Devolução", value: `${returnsData.returnRate}%`, trend: "" },
@@ -730,10 +828,11 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      <SectionHeader title="Trocas e Devoluções" onExport={onExport} />
+      <InsightsRegister insights={mappedInsights} />
+
+      <SectionHeader title="Trocas e Devoluções" onExport={onExport} insights={mappedInsights} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
-        <div className="lg:col-span-7"><SummaryCards metrics={kpis} /></div>
+        <div className="lg:col-span-12"><SummaryCards metrics={kpis} /></div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-7">
@@ -825,7 +924,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
       {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Marketing" onExport={onExport} />
+      <SectionHeader title="Relatório de Marketing" onExport={onExport} insights={mappedInsights} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
@@ -925,7 +1024,7 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
       {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Produtividade" onExport={onExport} />
+      <SectionHeader title="Relatório de Produtividade" onExport={onExport} insights={mappedInsights} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
@@ -1015,16 +1114,22 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
     topStaffRevenue,
   })
 
+  const mappedInsights = useMemo(() => {
+    return insights.map(ins => ({
+      message: ins.message,
+      color: INSIGHT_COLORS[ins.tone] || "blue"
+    }))
+  }, [insights])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <SectionHeader title="Relatório de Serviços" onExport={async (fmt) => {
         const rows = [["Atendimentos", String(servicesData.metrics[0]?.value || "0")]]
         if (fmt === "csv") exportCSV("servicos", ["Indicador", "Valor"], rows)
         else await exportXLSX("servicos", [{ name: "Serviços", headers: ["Indicador", "Valor"], rows }])
-      }} />
+      }} insights={mappedInsights} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-7"><SummaryCards metrics={servicesData.metrics} /></div>
-        <div className="lg:col-span-5"><InsightsCard insights={insights} /></div>
+        <div className="lg:col-span-12"><SummaryCards metrics={servicesData.metrics} /></div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-5">
@@ -1111,7 +1216,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
         const rows = [["Saldo", financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value || "R$ 0,00"]]
         if (fmt === "csv") exportCSV("financeiro", ["Indicador", "Valor"], rows)
         else await exportXLSX("financeiro", [{ name: "Financeiro", headers: ["Indicador", "Valor"], rows }])
-      }} />
+      }} insights={mappedInsights} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">

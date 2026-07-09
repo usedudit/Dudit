@@ -511,6 +511,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         const createdAt = localDate.toISOString()
 
         const payload: Record<string, any> = {
+            title: title.trim(),
             internal_notes: internalNotes.trim() || "",
             status,
             priority,
@@ -520,7 +521,6 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         }
 
         if (!isLocked) {
-            payload.title = title.trim()
             payload.description = description.trim() || ""
             payload.customer_id = customerId || null
             payload.assigned_user_id = assignedUserId || null
@@ -591,7 +591,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                 ...payload,
                 payment_status: "unpaid",
                 paid_amount: 0,
-            })
+            } as any)
 
             if (!res.success) {
                 toast({ description: res.error || "Erro ao criar OS" })
