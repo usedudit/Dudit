@@ -1881,6 +1881,7 @@ export async function signPublicServiceOrderAction(
 
       await admin.from("audit_logs").insert({
         table_name: 'service_orders',
+        action: 'SIGNED',
         partner_id: order.partner_id,
         entity_type: 'service_order',
         entity_id: order.id,

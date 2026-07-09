@@ -1,7 +1,8 @@
 import type React from "react"
 
 interface FormSectionProps {
-    title?: string
+    title?: string | React.ReactNode
+    titleRight?: React.ReactNode
     description?: string
     children: React.ReactNode
     className?: string
@@ -10,6 +11,7 @@ interface FormSectionProps {
 
 export const FormSection: React.FC<FormSectionProps> = ({
     title,
+    titleRight,
     description,
     children,
     className = "",
@@ -21,7 +23,10 @@ export const FormSection: React.FC<FormSectionProps> = ({
         )}
         <div className={`${hasSeparator ? "mt-8" : ""} ${className}`.trim()}>
             {title && (
-                <h2 className={`text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading ${description ? "mb-2" : "mb-6"}`}>{title}</h2>
+                <div className={`flex items-center justify-between ${description ? "mb-2" : "mb-6"}`}>
+                    <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">{title}</h2>
+                    {titleRight && <div className="shrink-0 ml-3">{titleRight}</div>}
+                </div>
             )}
             {description && (
                 <p className="text-sm text-brand-inactive-text mb-6">{description}</p>

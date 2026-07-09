@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, TagIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -55,7 +55,7 @@ interface VitrineCardProps {
     className?: string
 }
 
-export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]" }) => {
+export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]" }) => {
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
@@ -138,7 +138,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine, hideCity = fa
             </div>
         </Link>
     )
-}
+})
 
 interface CategoryListProps {
     vitrines?: any[]
@@ -267,7 +267,7 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge }) => {
+export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge }) => {
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
@@ -479,7 +479,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
             </Link>
         </div>
     );
-};
+});
 
 interface ProductCarouselProps {
     title: string
@@ -628,15 +628,27 @@ export const HorizontalCarousel = ({
         const el = scrollContainerRef.current
         if (el) {
             checkScroll()
-            el.addEventListener("scroll", checkScroll)
-            window.addEventListener("resize", checkScroll)
+            let rafId: number
+            let debounceTimer: ReturnType<typeof setTimeout>
+            const handleScroll = () => {
+                cancelAnimationFrame(rafId)
+                rafId = requestAnimationFrame(checkScroll)
+            }
+            const handleResize = () => {
+                clearTimeout(debounceTimer)
+                debounceTimer = setTimeout(checkScroll, 150)
+            }
+            el.addEventListener("scroll", handleScroll, { passive: true })
+            window.addEventListener("resize", handleResize, { passive: true })
 
             const timer = setTimeout(checkScroll, 500)
 
             return () => {
-                el.removeEventListener("scroll", checkScroll)
-                window.removeEventListener("resize", checkScroll)
+                el.removeEventListener("scroll", handleScroll)
+                window.removeEventListener("resize", handleResize)
                 clearTimeout(timer)
+                cancelAnimationFrame(rafId)
+                clearTimeout(debounceTimer)
             }
         }
     }, [items])
@@ -694,7 +706,7 @@ export const HorizontalCarousel = ({
             <div
                 ref={scrollContainerRef}
                 className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-3 px-1"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch', willChange: 'transform' }}
             >
                 {banner && (
                     <div className="snap-start shrink-0 w-[170px] h-auto">

@@ -955,15 +955,6 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                         {/* Tab Content */}
                         <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            {isLocked && (
-                                <div className="mb-6">
-                                    <InfoCard
-                                        title="Ordem de Serviço com Pagamento"
-                                        message="Esta OS possui pagamentos registrados. Apenas status, prioridade, data/hora prevista, tempo estimado, anexos e observações podem ser editados."
-                                        color="orange"
-                                    />
-                                </div>
-                            )}
                             <AnimatePresence mode="wait">
                                 {activeTab === "general" && (
                                     <FadeIn key="general" className="grid grid-cols-12 gap-y-8 md:gap-y-0 w-full">
@@ -1076,6 +1067,15 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                         {/* Right Column (Sidebar Card with Client Card and Totals) */}
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                                             <div>
+                                                {isLocked && (
+                                                    <div className="mb-6">
+                                                        <InfoCard
+                                                            title="Ordem de Serviço com Pagamento"
+                                                            message="Esta OS possui pagamentos registrados. Apenas status, prioridade, data/hora prevista, tempo estimado, anexos e observações podem ser editados."
+                                                            color="orange"
+                                                        />
+                                                    </div>
+                                                )}
                                                 {selectedCustomer ? (
                                                     <CustomerCard
                                                         customer={selectedCustomer}

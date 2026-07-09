@@ -43,6 +43,8 @@ import { parseAddressString } from "./CreateOrder"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import BottomSheet from "@/components/BottomSheet"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
+import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown"
+import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
     const cleanUnit = String(unit || "").trim().toLowerCase();
@@ -159,6 +161,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
     const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
     const [printModalOrderId, setPrintModalOrderId] = useState<string | null>(null)
+    const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
+    const [financialData, setFinancialData] = useState<FinancialBreakdownData | null>(null)
+    const [financialLoading, setFinancialLoading] = useState(false)
     const ITEMS_PER_PAGE = 8
     const [itemPage, setItemPage] = useState(1)
     const { error: notifyError } = useNotification()
@@ -223,6 +228,22 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         loadDelivery()
         return () => { mounted = false }
     }, [orderId, partnerId])
+
+    const loadFinancialBreakdown = useCallback(async () => {
+        if (financialData) {
+            setShowFinancialBreakdown(prev => !prev)
+            return
+        }
+        setFinancialLoading(true)
+        const res = await getOrderFinancialBreakdownAction(orderId, partnerId)
+        if (res.success) {
+            setFinancialData(res.data)
+            setShowFinancialBreakdown(true)
+        } else {
+            notifyError("Erro", res.error || "Erro ao carregar dados financeiros")
+        }
+        setFinancialLoading(false)
+    }, [orderId, partnerId, financialData, notifyError])
 
     useEffect(() => {
         async function loadHistory() {
@@ -872,7 +893,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         </div>
                                                     )}
 
-                                                    <FormSection title="Detalhes do Pagamento" hasSeparator>
+                                                    <FormSection
+                                                        title="Detalhes do Pagamento"
+                                                        titleRight={
+                                                            <button
+                                                                onClick={loadFinancialBreakdown}
+                                                                className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                                                            >
+                                                                {financialLoading ? "Carregando..." : showFinancialBreakdown ? "Ocultar lucro líquido" : "Ver lucro líquido"}
+                                                            </button>
+                                                        }
+                                                        hasSeparator>
                                                         <div className="space-y-3">
                                                             <PaymentRow
                                                                 label="Método de Pagamento"
@@ -986,6 +1017,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             </div>
                                                         </div>
                                                     </FormSection>
+
+                                                    {showFinancialBreakdown && financialData && (
+                                                        <FinancialBreakdownDisplay data={financialData} formatCurrency={formatCurrency} />
+                                                    )}
                                                 </div>
 
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
@@ -1014,27 +1049,91 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
                                                         address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
                                                         billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")} />
-                                                    {deliverySummary && deliverySummary.id && (
-                                                        <InfoCard
-                                                            title="Entrega vinculada"
-                                                            color="blue"
-                                                            message={
-                                                                [
-                                                                    deliverySummary.deliveryNumber
-                                                                        ? `Entrega #${deliverySummary.deliveryNumber}`
-                                                                        : `Entrega`,
-                                                                    deliverySummary.driverName
-                                                                        ? `Entregador: ${deliverySummary.driverName}`
-                                                                        : null,
-                                                                    deliverySummary.routeStep && deliverySummary.orderCount
-                                                                        ? `Rota: ${deliverySummary.routeStep}/${deliverySummary.orderCount}`
-                                                                        : null,
-                                                                ]
-                                                                    .filter(Boolean)
-                                                                    .join("\n")
-                                                            }
-                                                        />
-                                                    )}
+                                                    {(() => {
+                                                        const isPickup = order.delivery_type === "pickup"
+                                                        const hasDelivery = deliverySummary && deliverySummary.id
+                                                        if (!isPickup && !hasDelivery) return null
+                                                        return (
+                                                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                                                <div className="px-4 py-4 space-y-3">
+                                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {isPickup ? "Retirada" : "Entrega"}
+                                                                    </h3>
+                                                                    <div className="space-y-2 text-xs">
+                                                                        {isPickup ? (
+                                                                            <>
+                                                                                <div className="flex justify-between">
+                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Retirada no local</span>
+                                                                                </div>
+                                                                                {hasDelivery && deliverySummary.status && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.status}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {hasDelivery && deliverySummary.completedAt && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Retirada em</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(deliverySummary.completedAt)}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {!hasDelivery && order.delivery_status && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{order.delivery_status}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <div className="flex justify-between">
+                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Entrega no endereço</span>
+                                                                                </div>
+                                                                                {deliverySummary.deliveryNumber && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Nº Entrega</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">#{deliverySummary.deliveryNumber}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {deliverySummary.status && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.status}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {deliverySummary.driverName && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Entregador</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.driverName}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {deliverySummary.departureTime && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Saída</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(deliverySummary.departureTime)}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {deliverySummary.completedAt && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(deliverySummary.completedAt)}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {deliverySummary.routeStep && deliverySummary.orderCount && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Rota</span>
+                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.routeStep}/{deliverySummary.orderCount}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })()}
                                                 </div>
                                             </div>
 
@@ -1250,7 +1349,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 )}
 
                                                 {/* 5. Detalhes do Pagamento */}
-                                                <FormSection title="Detalhes do Pagamento" hasSeparator={true} className="mt-0">
+                                                <FormSection
+                                                    title="Detalhes do Pagamento"
+                                                    titleRight={
+                                                        <button
+                                                            onClick={loadFinancialBreakdown}
+                                                            className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                                                        >
+                                                            {financialLoading ? "Carregando..." : showFinancialBreakdown ? "Ocultar lucro líquido" : "Ver lucro líquido"}
+                                                        </button>
+                                                    }
+                                                    hasSeparator={true} className="mt-0">
                                                     <div className="space-y-3">
                                                         <PaymentRow
                                                             label="Método de Pagamento"
@@ -1360,6 +1469,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         </div>
                                                     </div>
                                                 </FormSection>
+
+                                                {showFinancialBreakdown && financialData && (
+                                                    <FinancialBreakdownDisplay data={financialData} formatCurrency={formatCurrency} />
+                                                )}
                                             </div>
                                         </FadeIn>
                                     </TabsContent>
@@ -1445,5 +1558,69 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 />
             )}
         </>
+    )
+}
+
+function FinancialBreakdownDisplay({ data, formatCurrency }: { data: FinancialBreakdownData; formatCurrency: (v: number) => string }) {
+    const Section = ({ section }: { section: FinancialBreakdownData["revenue"] }) => (
+        <div className="space-y-1.5">
+            <h4 className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-1.5">{section.label}</h4>
+            {section.lines.map((line, i) => (
+                <div key={i} className="flex justify-between text-[13px]">
+                    <span className="text-brand-inactive-text dark:text-dark-body">{line.label}</span>
+                    <span className={`font-semibold ${line.value >= 0 ? "text-brand-dark dark:text-dark-heading" : "text-brand-red"}`}>
+                        {line.value >= 0 ? formatCurrency(line.value) : `- ${formatCurrency(Math.abs(line.value))}`}
+                    </span>
+                </div>
+            ))}
+            {section.total != null && (
+                <div className="flex justify-between text-[13px] font-bold pt-1.5 border-t border-brand-border/50 dark:border-dark-border/50 mt-1.5">
+                    <span className="text-brand-dark dark:text-dark-heading">{section.label} total</span>
+                    <span className={section.total >= 0 ? "text-brand-green" : "text-brand-red"}>
+                        {section.total >= 0 ? formatCurrency(section.total) : `- ${formatCurrency(Math.abs(section.total))}`}
+                    </span>
+                </div>
+            )}
+        </div>
+    )
+
+    return (
+        <div className="mt-4 mb-2 bg-brand-gray/40 dark:bg-dark-border/10 rounded-xl border border-brand-border/40 dark:border-dark-border/40 p-4 space-y-4 text-sm">
+            <Section section={data.revenue} />
+
+            <div className="border-t border-brand-border/50 dark:border-dark-border/50" />
+
+            <Section section={data.discounts} />
+
+            <div className="border-t border-brand-border/50 dark:border-dark-border/50" />
+
+            <Section section={data.costs} />
+
+            <div className="border-t-2 border-brand-border dark:border-dark-border" />
+
+            <div className="space-y-1.5">
+                <div className="flex justify-between text-[13px] font-bold pt-1">
+                    <span className="text-brand-inactive-text dark:text-dark-body">Total das deduções</span>
+                    <span className="text-brand-red">{formatCurrency(Math.abs(data.totalDeductions))}</span>
+                </div>
+            </div>
+
+            <div className="border-t-2 border-brand-dark/20 dark:border-dark-heading/20" />
+
+            <div className="space-y-1.5">
+                <div className="flex justify-between text-sm font-bold">
+                    <span className="text-brand-dark dark:text-dark-heading">Lucro líquido</span>
+                    <span className={data.netProfit >= 0 ? "text-brand-green" : "text-brand-red"}>
+                        {data.netProfit >= 0 ? formatCurrency(data.netProfit) : `- ${formatCurrency(Math.abs(data.netProfit))}`}
+                    </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                    <span className="text-brand-inactive-text dark:text-dark-body">Margem líquida</span>
+                    <span className={`font-bold ${data.netMargin >= 0 ? "text-brand-green" : "text-brand-red"}`}>
+                        {data.netMargin >= 0 ? `${data.netMargin.toFixed(2)}%` : `-${Math.abs(data.netMargin).toFixed(2)}%`}
+                    </span>
+                </div>
+            </div>
+        </div>
     )
 }

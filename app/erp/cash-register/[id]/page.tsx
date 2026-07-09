@@ -22,7 +22,7 @@ export default async function CashSessionDetailsServer({ params }: { params: Pro
 
   return (
     <>
-      <ERPPageHeader title="Detalhes do Caixa" />
+      <ERPPageHeader title="Detalhes do Caixa" backHref="/erp/cash-register" isSubPage />
       <FadeIn className="p-4">
         <CashSessionDetailPage partnerId={partnerId} details={detailsResult.data} />
       </FadeIn>

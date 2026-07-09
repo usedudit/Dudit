@@ -914,7 +914,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 </Tabs >
 
                 {/* Modals */}
-                < UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
+                <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
 
                 <SavingStatusModal isOpen={isSaving} text={customerId ? "Salvando cliente..." : "Criando cliente..."} />
             </div >

@@ -79,6 +79,12 @@ export function useEntityState() {
     // Timestamp of last user action - prevents stale searchParams from overriding
     const lastUserActionRef = useRef(0)
 
+    // Keep a ref with the current localState for safe comparison inside effects
+    // (avoids needing localState in effect dependencies, which could cause
+    // race conditions when navigating between pages)
+    const localStateRef = useRef(localState)
+    localStateRef.current = localState
+
     // ── SECONDARY: Sync from URL on external navigation ──────────────────
     // This effect listens to Next.js searchParams changes. However, when we use
     // window.history.replaceState, Next.js may re-fire searchParams reactively
@@ -97,32 +103,35 @@ export function useEntityState() {
         if (Date.now() - lastUserActionRef.current < 1500) {
             return
         }
-        // Extra safety: compare URL state with current local state.
+        // Extra safety: compare URL state with current local state (via ref).
         // If they match, don't reset - prevents stale searchParams from
         // closing the entity view after a replaceState.
         const urlState = stateFromParams(new URLSearchParams(window.location.search))
         if (
-            urlState.action === localState.action &&
-            urlState.entityId === localState.entityId &&
-            urlState.isOpen === localState.isOpen
+            urlState.action === localStateRef.current.action &&
+            urlState.entityId === localStateRef.current.entityId &&
+            urlState.isOpen === localStateRef.current.isOpen
         ) {
             return
         }
         // External navigation detected (back/forward, link click, etc.)
         expectedHrefRef.current = actualHref
         setLocalState(urlState)
-    }, [searchParams, localState])
+    }, [searchParams])
 
     // ── Popstate handler for browser back/forward ────────────────────────
     useEffect(() => {
         const handlePopState = () => {
+            // Guard: if current pathname differs from our pathname, we've
+            // navigated to another page. Ignore stale popstate events.
+            if (window.location.pathname !== pathname) return
             const urlState = stateFromCurrentUrl()
             setLocalState(urlState)
             expectedHrefRef.current = window.location.href
         }
         window.addEventListener("popstate", handlePopState)
         return () => window.removeEventListener("popstate", handlePopState)
-    }, [])
+    }, [pathname])
 
     // ── Open: instant local state + instant URL sync ─────────────────────
 
@@ -130,6 +139,7 @@ export function useEntityState() {
         (action: EntityAction, id?: string) => {
             const value = action === "create" ? "true" : id || ""
             if (!value) return
+            if (typeof window !== "undefined" && window.location.pathname !== pathname) return
 
             const entityId = value === "true" ? null : value
 
@@ -149,6 +159,14 @@ export function useEntityState() {
     // ── Close: instant local state + instant URL sync ────────────────────
 
     const close = useCallback(() => {
+        // Safety: if the current URL pathname doesn't match this page's pathname,
+        // it means navigation already occurred. Don't replace the URL or we'd
+        // override the new page's history entry, causing a "back to previous page".
+        if (typeof window !== "undefined" && window.location.pathname !== pathname) {
+            setLocalState(CLOSED_STATE)
+            return
+        }
+
         // 1. INSTANT: Clear local state synchronously
         setLocalState(CLOSED_STATE)
         lastUserActionRef.current = Date.now()

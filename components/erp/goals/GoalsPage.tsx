@@ -323,6 +323,7 @@ export default function GoalsPage(props: {
                 sellers={props.sellers}
                 accounts={formAccounts || []}
                 initialGoal={editingGoal}
+                onBack={() => router.push("/erp/produtividade/metas")}
             />
         )
     }

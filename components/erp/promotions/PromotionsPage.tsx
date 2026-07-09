@@ -511,7 +511,7 @@ export default function PromotionsPage({
               campaign={formCampaign}
               scopeData={scopeData}
               promotions={promotions}
-              onClose={() => {
+               onBack={() => {
                 closeEntity()
                 afterMutation()
                 refreshPromotions()

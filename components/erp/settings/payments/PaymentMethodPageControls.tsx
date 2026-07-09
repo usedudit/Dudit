@@ -23,7 +23,6 @@ interface PaymentMethodPageControlsProps {
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
-    onAddMethod: () => void
     filters: FilterState
     setFilters: React.Dispatch<React.SetStateAction<FilterState>>
     viewMode: "list" | "grid"
@@ -35,7 +34,6 @@ export default function PaymentMethodPageControls({
     search,
     onSearchChange,
     onOpenFilter,
-    onAddMethod,
     filters,
     setFilters,
     viewMode,
@@ -107,18 +105,10 @@ export default function PaymentMethodPageControls({
                     <div className="flex-none flex items-center gap-2">
                         <Button
                             onClick={onOpenFilter}
-                            leftIcon={<FilterIcon size={18} />}
-                            className="h-[42px]"
+                            className="w-[42px] h-[42px] p-0 rounded-full"
+                            variant="outline"
                         >
-                            Filtros
-                        </Button>
-
-                        <Button
-                            onClick={onAddMethod}
-                            leftIcon={<PlusIcon size={18} />}
-                            className="h-[42px]"
-                        >
-                            Novo método
+                            <FilterIcon size={18} className="text-brand-inactive-text" />
                         </Button>
                     </div>
                 </div>

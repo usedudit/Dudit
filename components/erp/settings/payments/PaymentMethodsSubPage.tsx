@@ -8,7 +8,6 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
-import { PaymentMethodEditPage } from "./PaymentMethodEditPage"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
 import { deletePaymentMethodAction, getPaymentMethodsAction, updatePaymentMethodAction } from "@/app/actions/erp/payment-methods"
@@ -25,6 +24,8 @@ interface PaymentMethodsSubPageProps {
     partner: any
     paymentMethods: any[]
     handleBack: () => void
+    onEdit: (id: string) => void
+    onCreate?: () => void
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
     embedded?: boolean
 }
@@ -48,7 +49,7 @@ const LIST_COLUMNS = [
     { id: "actions", label: "Ações", align: "center" as const },
 ]
 
-export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, planGate, embedded }: PaymentMethodsSubPageProps) {
+export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onEdit, onCreate, planGate, embedded }: PaymentMethodsSubPageProps) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -61,8 +62,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
     const [page, setPage] = useState(1)
     const [selection, setSelection] = useState<{ ids: Set<string> }>({ ids: new Set() })
 
-    const [currentView, setCurrentView] = useState<"list" | "edit">("list")
-    const [editingPayment, setEditingPayment] = useState<PaymentMethodListItem | null>(null)
     const [methodToDelete, setMethodToDelete] = useState<PaymentMethodListItem | null>(null)
     const [bulkActionMode, setBulkActionMode] = useState<"activate" | "deactivate" | "delete" | null>(null)
     const [modals, setModals] = useState({ filter: false })
@@ -95,6 +94,14 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
         window.dispatchEvent(new CustomEvent(PAYMENT_METHODS_UPDATED_EVENT))
     }, [partner.id])
 
+    const handleReloadMethods = useCallback(async () => {
+        const result = await getPaymentMethodsAction(partner.id)
+        if (result.methods) {
+            setMethods(result.methods)
+            notifyPaymentMethodsChanged(result.methods)
+        }
+    }, [notifyPaymentMethodsChanged, partner.id])
+
     useEffect(() => {
         const handler = setTimeout(() => setDebouncedSearch(search), 350)
         return () => clearTimeout(handler)
@@ -107,6 +114,12 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
     useEffect(() => {
         setMethods(paymentMethods || [])
     }, [paymentMethods])
+
+    useEffect(() => {
+        const handler = () => handleReloadMethods()
+        window.addEventListener(PAYMENT_METHODS_UPDATED_EVENT, handler)
+        return () => window.removeEventListener(PAYMENT_METHODS_UPDATED_EVENT, handler)
+    }, [handleReloadMethods])
 
     useEffect(() => {
         setSelection((prev) => ({
@@ -383,14 +396,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
         await runBulkStatus(ids, action === "activate")
     }, [bulkActionMode, clearSelection, runBulkStatus, runDelete, selection.ids])
 
-    const handleReloadMethods = useCallback(async () => {
-        const result = await getPaymentMethodsAction(partner.id)
-        if (result.methods) {
-            setMethods(result.methods)
-            notifyPaymentMethodsChanged(result.methods)
-        }
-    }, [notifyPaymentMethodsChanged, partner.id])
-
     const emptyStateType: "no-data" | "no-results" = methods.length === 0 ? "no-data" : "no-results"
 
     const emptyStateContent = emptyStateType === "no-data"
@@ -400,8 +405,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
             imageSrc: "https://img.dudit.com.br/static/mascots/Aguarde.png",
             buttonText: "Adicionar primeiro método",
             onClick: () => {
-                setEditingPayment(null)
-                setCurrentView("edit")
+                onCreate?.()
             },
         }
         : {
@@ -417,23 +421,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
         }
 
     const shouldActivateSelected = selectedMethods.length > 0 && selectedMethods.every((method) => !method.is_active)
-    const normalizedEditingMethod = useMemo(() => {
-        if (!editingPayment) return null
-        return {
-            id: editingPayment.id,
-            name: editingPayment.name || "",
-            type: editingPayment.type || undefined,
-            payment_type: editingPayment.payment_type || undefined,
-            is_active: Boolean(editingPayment.is_active),
-            is_online_default: Boolean(editingPayment.is_online_default),
-            fee_percent: editingPayment.fee_percent ?? undefined,
-            fee_fixed: editingPayment.fee_fixed ?? undefined,
-            discount_percent: editingPayment.discount_percent ?? undefined,
-            card_brand: editingPayment.card_brand || undefined,
-            max_installments: editingPayment.max_installments ?? undefined,
-        }
-    }, [editingPayment])
-
     const renderEmptyState = () => (
         <FadeIn className="flex flex-col items-center justify-center min-h-[420px] px-4">
             <IconPlaceholder
@@ -485,10 +472,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
                         >
                             <div
                                 className="py-6 flex items-center gap-5 cursor-pointer active:scale-[0.98] transition-transform"
-                                onClick={() => {
-                                    setEditingPayment(method)
-                                    setCurrentView("edit")
-                                }}
+                                onClick={() => onEdit(method.id)}
                             >
                                 <div className="w-14 h-14 rounded-2xl bg-brand-gray/50 dark:bg-dark-border/30 shrink-0 flex items-center justify-center border border-brand-border/50 dark:border-dark-border/20 shadow-sm">
                                     {getPaymentIcon(method)}
@@ -548,10 +532,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
                             method={method}
                             selected={selection.ids.has(method.id)}
                             onSelect={() => handleSelectRow(method.id)}
-                            onEdit={(current) => {
-                                setEditingPayment(current)
-                                setCurrentView("edit")
-                            }}
+                            onEdit={(current) => onEdit(current.id)}
                             onDelete={(current) => setMethodToDelete(current)}
                         />
                     ))}
@@ -593,10 +574,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
                                     columns={LIST_COLUMNS}
                                     selected={selection.ids.has(method.id)}
                                     onSelect={handleSelectRow}
-                                    onEdit={(current) => {
-                                        setEditingPayment(current)
-                                        setCurrentView("edit")
-                                    }}
+                                    onEdit={(current) => onEdit(current.id)}
                                     onDelete={(current) => setMethodToDelete(current)}
                                 />
                             ))}
@@ -659,23 +637,18 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
 
     return (
         <>
-            {currentView === "list" && (
-                embedded ? (
+            {embedded ? (
                     <>
-                        <PaymentMethodPageControls
-                            search={search}
-                            onSearchChange={setSearch}
-                            onOpenFilter={() => setModals({ filter: true })}
-                            onAddMethod={() => {
-                                setEditingPayment(null)
-                                setCurrentView("edit")
-                            }}
-                            filters={filters}
-                            setFilters={setFilters}
-                            viewMode={viewMode}
-                            onViewModeChange={setViewMode}
-                            hasActiveFilters={hasActiveFilters}
-                        />
+                            <PaymentMethodPageControls
+                                search={search}
+                                onSearchChange={setSearch}
+                                onOpenFilter={() => setModals({ filter: true })}
+                                filters={filters}
+                                setFilters={setFilters}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewMode}
+                                hasActiveFilters={hasActiveFilters}
+                            />
 
                         <div className="mt-4">
                             <AnimatePresence mode="wait">
@@ -729,10 +702,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
                                             {/* Desktop action buttons */}
                                             <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                                 <Button
-                                                    onClick={() => {
-                                                        setEditingPayment(null)
-                                                        setCurrentView("edit")
-                                                    }}
+                                                    onClick={() => onCreate?.()}
                                                     leftIcon={<PlusIcon size={18} />}
                                                 >
                                                     Novo método
@@ -746,10 +716,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
                                             search={search}
                                             onSearchChange={setSearch}
                                             onOpenFilter={() => setModals({ filter: true })}
-                                            onAddMethod={() => {
-                                                setEditingPayment(null)
-                                                setCurrentView("edit")
-                                            }}
                                             filters={filters}
                                             setFilters={setFilters}
                                             viewMode={viewMode}
@@ -783,22 +749,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, pla
                         </div>
                     </FadeIn>
                 )
-            )}
-
-            {currentView === "edit" && (
-                <PaymentMethodEditPage
-                    partnerId={partner.id}
-                    editingMethod={normalizedEditingMethod}
-                    existingMethods={methods}
-                    embedded={embedded}
-                    onBack={async (shouldReload) => {
-                        setCurrentView("list")
-                        if (shouldReload) {
-                            await handleReloadMethods()
-                        }
-                    }}
-                />
-            )}
+            }
 
             <FilterSheet
                 isOpen={modals.filter}

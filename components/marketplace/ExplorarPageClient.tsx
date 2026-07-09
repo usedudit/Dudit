@@ -4,11 +4,9 @@ import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "rea
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HeroBanner, HorizontalCarousel } from "./shared-components"
-import { IconPlaceholder, Button, DefaultModal, RadioButton } from "@/components/reusable"
+import { IconPlaceholder, Button, DefaultModal, RadioButton, SkeletonLoader } from "@/components/reusable"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
-import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import {
     ArrowLeft,
@@ -40,6 +38,12 @@ import { ExplorarViewControls } from "./ExplorarViewControls"
 import { ExplorarFilterSidebar } from "./ExplorarFilterSidebar"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
+import type { HomeSection } from "@/app/actions/marketplace/discover"
+import { CategoryCarousel } from "./explorar-category-carousel"
+import { ExploreContentSkeleton } from "./explorar-skeleton"
+import { CATEGORY_SLUG_MAP, SECTIONS_BANNERS, FALLBACK_CATEGORIES, COMMON_CITY_ACCENTS } from "./explorar-constants"
+import type { SortOption, ViewMode } from "./explorar-constants"
+import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
 
 interface ExplorarPageClientProps {
     initialResults?: any[]
@@ -58,342 +62,13 @@ interface ExplorarPageClientProps {
     searchAds?: SponsoredAd[]
     isStateRoute?: boolean
     communityVideos?: any[]
+    homeSections?: HomeSection[]
 }
 
-type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
-type ViewMode = "grid" | "list"
-
-const CATEGORY_SLUG_MAP: { [key: string]: string } = {
-    "casa-e-utilidades": "Casa & Utilidades",
-    "moda-e-beleza": "Moda & Beleza",
-    "saude-e-bem-estar": "Saúde & Bem-estar",
-    "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
-    "auto-e-moto": "Auto & Moto",
-    "pets": "Pets",
-    "construcao-e-ferramentas": "Construção & Ferramentas",
-    "agro-e-jardim": "Agro & Jardim",
-    "infantil-e-brinquedos": "Infantil & Brinquedos",
-    "alimentacao": "Alimentação",
-    "outros": "Outros"
-}
-
-const SECTIONS_BANNERS = [
-    {
-        id: "promos",
-        title: "Em promoção",
-        subtitle: "Ofertas imperdíveis",
-        emoji: "🎯",
-        gradient: "from-[#FF6B35] to-[#FF8C42]"
-    },
-    {
-        id: "best-rated",
-        title: "Melhor avaliados",
-        subtitle: "Nota acima de 4.8",
-        emoji: "🏆",
-        gradient: "from-[#11998e] to-[#38ef7d]"
-    },
-    {
-        id: "best-sellers",
-        title: "Mais vendidos",
-        subtitle: "Os queridinhos da cidade",
-        emoji: "🔥",
-        gradient: "from-[#4facfe] to-[#00f2fe]"
-    }
-]
+;
 
 
-const CATEGORY_GRADIENTS = [
-    "from-[#FF8008] to-[#FFC837]", // Warm Orange/Yellow
-    "from-[#11998e] to-[#38ef7d]", // Fresh Green
-    "from-[#00c6ff] to-[#0072ff]", // Ocean Blue
-    "from-[#7F00FF] to-[#E100FF]", // Vivid Purple
-    "from-[#fe0979] to-[#ff6a00]", // Sunset Pink/Orange
-    "from-[#F7971E] to-[#FFD200]", // Golden Yellow
-    "from-[#4facfe] to-[#00f2fe]", // Sky Blue
-    "from-[#00b09b] to-[#96c93d]"  // Lime/Emerald
-]
 
-
-const FALLBACK_CATEGORIES = [
-    { name: "Casa & Utilidades", icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png" },
-    { name: "Moda & Beleza", icon_url: "https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png" },
-    { name: "Saúde & Bem-estar", icon_url: "https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png" },
-    { name: "Tecnologia & Eletrônicos", icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png" },
-    { name: "Auto & Moto", icon_url: "https://img.dudit.com.br/static/categories/products/Auto-e-moto.png" },
-    { name: "Pets", icon_url: "https://img.dudit.com.br/static/categories/products/Pets.png" },
-    { name: "Construção & Ferramentas", icon_url: "https://img.dudit.com.br/static/categories/products/Construcao-e-ferramentas.png" },
-    { name: "Agro & Jardim", icon_url: "https://img.dudit.com.br/static/categories/products/Agro-e-jardim.png" },
-    { name: "Infantil & Brinquedos", icon_url: "https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png" }
-]
-
-const COMMON_CITY_ACCENTS: Record<string, string> = {
-    "sao-paulo": "São Paulo",
-    "cambe": "Cambé",
-    "brasilia": "Brasília",
-    "goiania": "Goiânia",
-    "florianopolis": "Florianópolis",
-    "belem": "Belém",
-    "sao-luis": "São Luís",
-    "maceio": "Maceió",
-    "cuiaba": "Cuiabá",
-    "macapa": "Macapá",
-    "vitoria": "Vitória",
-    "ribeirao-preto": "Ribeirão Preto",
-    "sao-jose-dos-campos": "São José dos Campos",
-    "sao-bernardo-do-campo": "São Bernardo do Campo",
-    "sao-caetano-do-sul": "São Caetano do Sul",
-    "sao-jose-do-rio-preto": "São José do Rio Preto",
-    "sao-goncalo": "São Gonçalo",
-    "sao-joao-de-meriti": "São João de Meriti",
-    "sao-jose": "São José",
-    "petropolis": "Petrópolis",
-    "teresopolis": "Teresópolis",
-    "sao-carlos": "São Carlos",
-    "chapeco": "Chapecó",
-    "marilia": "Marília",
-    "paranagua": "Paranaguá",
-    "cacador": "Caçador",
-    "criciuma": "Criciúma",
-    "tubarao": "Tubarão",
-    "blumenau": "Blumenau",
-    "joinville": "Joinville",
-    "itajai": "Itajaí",
-    "balneario-camboriu": "Balneário Camboriú",
-    "sao-francisco-do-sul": "São Francisco do Sul",
-    "sao-joaquim": "São João",
-    "caxias-do-sul": "Caxias do Sul",
-    "maringa": "Maringá",
-    "cascavel": "Cascavel",
-    "ponta-grossa": "Ponta Grossa",
-    "foz-do-iguacu": "Foz do Iguaçu",
-    "guarapuava": "Guarapuava",
-    "paranavai": "Paranavaí",
-    "apucarana": "Apucarana",
-    "arapongas": "Arapongas",
-    "umuarama": "Umuarama",
-    "toledo": "Toledo",
-    "campo-mourao": "Campo Mourão",
-    "patos-de-minas": "Patos de Minas",
-    "pocos-de-caldas": "Poços de Caldas",
-    "juiz-de-fora": "Juiz de Fora",
-    "governador-valadares": "Governador Valadares",
-    "teofilo-otoni": "Teófilo Otoni",
-    "sao-joao-del-rei": "São João del-Rei",
-    "sao-lourenco": "São Lourenço",
-    "sao-sebastiao": "São Sebastião",
-    "ilhabela": "Ilhabela",
-    "ubatuba": "Ubatuba",
-    "guaruja": "Guarujá",
-    "aracaju": "Aracaju",
-    "joao-pessoa": "João Pessoa",
-};
-
-
-const ExploreContentSkeleton = ({ type, hasSection }: { type: string; hasSection?: boolean }) => {
-    return (
-        <div className="space-y-10 animate-pulse">
-            {type === 'tudo' && !hasSection && (
-                <div className="space-y-8">
-                    {/* Banners Row Skeleton */}
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <SkeletonLoader width={220} height={24} className="rounded" />
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2">
-                            {Array.from({ length: 3 }).map((_, i) => (
-                                <div key={i} className="shrink-0 w-[220px] sm:w-[260px]">
-                                    <SkeletonLoader height={110} className="rounded-[16px]" />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Sellers Row Skeleton */}
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <SkeletonLoader width={180} height={20} className="rounded" />
-                        </div>
-                        <div className="flex gap-4 overflow-x-auto scrollbar-none pb-2">
-                            {Array.from({ length: 4 }).map((_, i) => (
-                                <div key={i} className="shrink-0 w-[270px] sm:w-[320px]">
-                                    <SkeletonLoader height={140} className="rounded-[16px] mb-3" />
-                                    <div className="flex items-center gap-3">
-                                        <SkeletonLoader width={48} height={48} circle />
-                                        <div className="flex-1 space-y-2">
-                                            <SkeletonLoader width="60%" height={16} className="rounded" />
-                                            <SkeletonLoader width="40%" height={12} className="rounded" />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div>
-                <div className="mb-6">
-                    <SkeletonLoader width={200} height={24} className="rounded" />
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                    {Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="flex flex-col gap-3">
-                            <SkeletonLoader height={170} className="rounded-[16px]" />
-                            <SkeletonLoader height={16} width="85%" className="rounded" />
-                            <SkeletonLoader height={14} width="50%" className="rounded" />
-                            <div className="flex justify-between items-center pt-1 border-t border-gray-50 mt-2">
-                                <div className="flex items-center gap-2">
-                                    <SkeletonLoader width={24} height={24} circle />
-                                    <SkeletonLoader width={60} height={12} className="rounded" />
-                                </div>
-                                <SkeletonLoader width={40} height={14} className="rounded" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// Category carousel with horizontal scroll
-const CategoryCarousel = ({
-    categories,
-    selectedCategories,
-    onToggleCategory,
-    onSeeAllCategories,
-}: {
-    categories: { id?: string; name: string; icon_url: string | null }[]
-    selectedCategories: string[]
-    onToggleCategory: (catName: string) => void
-    onSeeAllCategories: () => void
-}) => {
-    const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const [showLeftArrow, setShowLeftArrow] = useState(false)
-    const [showRightArrow, setShowRightArrow] = useState(false)
-
-    const checkScroll = () => {
-        const el = scrollContainerRef.current
-        if (el) {
-            setShowLeftArrow(el.scrollLeft > 2)
-            setShowRightArrow(el.scrollLeft + el.clientWidth < el.scrollWidth - 5)
-        }
-    }
-
-    useEffect(() => {
-        const el = scrollContainerRef.current
-        if (el) {
-            checkScroll()
-            el.addEventListener("scroll", checkScroll)
-            window.addEventListener("resize", checkScroll)
-            const timer = setTimeout(checkScroll, 500)
-            return () => {
-                el.removeEventListener("scroll", checkScroll)
-                window.removeEventListener("resize", checkScroll)
-                clearTimeout(timer)
-            }
-        }
-    }, [categories])
-
-    const scroll = (direction: 'left' | 'right') => {
-        const el = scrollContainerRef.current
-        if (el) {
-            const scrollAmount = el.clientWidth * 0.75
-            el.scrollBy({
-                left: direction === 'left' ? -scrollAmount : scrollAmount,
-                behavior: 'smooth'
-            })
-        }
-    }
-
-    return (
-        <div className="w-full animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark">Categorias</h2>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={onSeeAllCategories}
-                        className="text-[13px] font-extrabold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
-                    >
-                        Ver tudo
-                    </button>
-                    <div className="hidden lg:flex items-center gap-1.5">
-                        {showLeftArrow && (
-                            <button
-                                onClick={() => scroll('left')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
-                            >
-                                <ChevronLeft className="w-4 h-4 text-brand-dark" />
-                            </button>
-                        )}
-                        {showRightArrow && (
-                            <button
-                                onClick={() => scroll('right')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
-                            >
-                                <ChevronRight className="w-4 h-4 text-brand-dark" />
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div
-                ref={scrollContainerRef}
-                className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-2 px-1"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-                {/* "Tudo" card */}
-                <div className="snap-start shrink-0 w-[110px]">
-                    <button
-                        onClick={() => onToggleCategory("__all__")}
-                        className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${selectedCategories.length === 0
-                            ? 'bg-brand-green text-white border-brand-green'
-                            : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
-                            }`}
-                    >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedCategories.length === 0 ? 'bg-white/20' : 'bg-brand-gray'
-                            }`}>
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="3" y="3" width="7" height="7" rx="1" />
-                                <rect x="14" y="3" width="7" height="7" rx="1" />
-                                <rect x="3" y="14" width="7" height="7" rx="1" />
-                                <rect x="14" y="14" width="7" height="7" rx="1" />
-                            </svg>
-                        </div>
-                        <span className="text-xs font-bold text-center leading-tight">Tudo</span>
-                    </button>
-                </div>
-
-                {/* Category cards */}
-                {(categories || []).map((cat) => {
-                    const isSelected = selectedCategories.includes(cat.name)
-                    return (
-                        <div key={cat.name} className="snap-start shrink-0 w-[110px]">
-                            <button
-                                onClick={() => onToggleCategory(cat.name)}
-                                className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${isSelected
-                                    ? 'bg-brand-green text-white border-brand-green'
-                                    : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
-                                    }`}
-                            >
-                                {cat.icon_url ? (
-                                    <img src={cat.icon_url} alt={cat.name} className="w-10 h-10 object-contain" />
-                                ) : (
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-white/20' : 'bg-brand-gray'
-                                        }`}>
-                                        <span className="text-lg">📦</span>
-                                    </div>
-                                )}
-                                <span className="text-[11px] font-bold text-center leading-tight line-clamp-2">{cat.name}</span>
-                            </button>
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
-    )
-}
 
 export function ExplorarPageClient({
     initialResults = [],
@@ -412,6 +87,7 @@ export function ExplorarPageClient({
     searchAds = [],
     isStateRoute = false,
     communityVideos = [],
+    homeSections = [],
 }: ExplorarPageClientProps & { hideHeaderAndFooter?: boolean }) {
     const router = useRouter()
     const pathname = usePathname()
@@ -927,7 +603,50 @@ export function ExplorarPageClient({
 
     const showFeaturedSections = currentType === 'tudo' && selectedCategories.length === 0 && !query && !selectedSection && rawItems.length > 0
 
+    const pageMode = useMemo((): PageMode => {
+        if (query || currentType !== 'tudo') return "search"
+        if (selectedSection) return "section-detail"
+        if (selectedCategories.length > 0) return "category"
+        return "sections"
+    }, [query, currentType, selectedSection, selectedCategories])
 
+    const isCategoryMode = pageMode === "category" && selectedCategories.length === 1
+    const categoryName = isCategoryMode ? selectedCategories[0] : null
+
+    const subcategoriesList = useMemo(() => {
+        if (!isCategoryMode || !categoryName) return []
+        const subs = new Set<string>()
+        dataToFilter.forEach(item => {
+            if (itemMatchesCategory(item, categoryName) && item.subcategoryName) {
+                subs.add(item.subcategoryName)
+            }
+        })
+        return [...subs].sort()
+    }, [isCategoryMode, categoryName, dataToFilter])
+
+    const categoryPromos = useMemo(() => {
+        if (!isCategoryMode) return []
+        return dataToFilter
+            .filter(item => itemMatchesCategory(item, categoryName!) && item.originalPrice !== undefined && item.originalPrice > item.price)
+            .slice(0, 20)
+    }, [isCategoryMode, categoryName, dataToFilter])
+
+    const categoryTopRated = useMemo(() => {
+        if (!isCategoryMode) return []
+        return dataToFilter
+            .filter(item => itemMatchesCategory(item, categoryName!) && (item.rating ?? 0) > 0)
+            .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 20)
+    }, [isCategoryMode, categoryName, dataToFilter])
+
+    const categoryStores = useMemo(() => {
+        if (!isCategoryMode) return []
+        return normalizedInitialResults
+            .filter(r => r.itemType === 'loja' && itemMatchesCategory(r, categoryName!))
+            .slice(0, 20)
+    }, [isCategoryMode, categoryName, normalizedInitialResults])
+
+    const showCategoryDiscoverySections = isCategoryMode && (subcategoriesList.length > 0 || categoryPromos.length > 0 || categoryTopRated.length > 0 || categoryStores.length > 0)
 
     const subcategoryGroups = useMemo(() => {
         if (selectedCategories.length === 0) return []
@@ -1157,6 +876,14 @@ export function ExplorarPageClient({
         )
     }
 
+    const filterConfig = useMemo(() => {
+        return getFilterConfig(selectedSection, pageMode)
+    }, [selectedSection, pageMode])
+
+    const contextualSortOptions = useMemo(() => {
+        return getSortOptionsForMode(pageMode, selectedSection)
+    }, [pageMode, selectedSection])
+
     const renderListingItem = (item: any) => {
         const userCoords = userProfile?.latitude && userProfile?.longitude
             ? { lat: userProfile.latitude, lng: userProfile.longitude }
@@ -1169,6 +896,142 @@ export function ExplorarPageClient({
         }
         return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} className="w-full" />
     }
+
+    // Renders the category discovery sections
+    const renderCategoryDiscoverSections = () => {
+        if (!showCategoryDiscoverySections) return null
+        return (
+            <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
+                {subcategoriesList.length > 0 && (
+                    <div className="w-full">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark">Subcategorias</h2>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2">
+                            {subcategoriesList.map((sub) => (
+                                <button
+                                    key={sub}
+                                    onClick={() => {/* would filter by subcategory */ }}
+                                    className="shrink-0 px-4 py-2 rounded-full border border-gray-200 bg-white text-sm font-bold text-brand-dark hover:border-brand-green hover:bg-green-50 transition-colors whitespace-nowrap"
+                                >
+                                    {sub}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {categoryPromos.length >= 2 && (
+                    <HorizontalCarousel
+                        title="🎯 Em promoção"
+                        subtitle={`Ofertas especiais em ${categoryName}`}
+                        items={categoryPromos}
+                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
+                        itemWidthClass="w-[190px] sm:w-[210px]"
+                    />
+                )}
+                {categoryTopRated.length >= 2 && (
+                    <HorizontalCarousel
+                        title="⭐ Melhor avaliados"
+                        subtitle={`Os favoritos em ${categoryName}`}
+                        items={categoryTopRated}
+                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
+                        itemWidthClass="w-[190px] sm:w-[210px]"
+                    />
+                )}
+                {categoryStores.length >= 2 && (
+                    <HorizontalCarousel
+                        title="🏪 Lojas que vendem"
+                        subtitle={`Vendedores de ${categoryName}`}
+                        items={categoryStores}
+                        renderItem={(item: any) => <VitrineCard vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />}
+                        itemWidthClass="w-[270px] sm:w-[320px]"
+                    />
+                )}
+            </div>
+        )
+    }
+
+    // Renders discover home sections
+    const renderHomeSections = () => {
+        if (!homeSections || homeSections.length === 0) return null
+        const sectionsToShow = homeSections.filter(s => s.items && s.items.length > 0)
+        if (sectionsToShow.length === 0) return null
+        return (
+            <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
+                {sectionsToShow.map((section) => {
+                    if (section.id === "topVitrines" || section.id === "topVitrines") {
+                        return (
+                            <HorizontalCarousel
+                                key={section.id}
+                                title={section.title}
+                                subtitle={section.subtitle}
+                                items={section.items}
+                                renderItem={(item: any) => <VitrineCard vitrine={item} className="w-full" />}
+                                itemWidthClass="w-[270px] sm:w-[320px]"
+                                onSeeAll={() => {
+                                    setCurrentType("vitrines")
+                                    updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
+                                }}
+                            />
+                        )
+                    }
+                    return (
+                        <HorizontalCarousel
+                            key={section.id}
+                            title={section.title}
+                            subtitle={section.subtitle}
+                            items={section.items}
+                            renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
+                            itemWidthClass="w-[190px] sm:w-[210px]"
+                            onSeeAll={() => {
+                                setSelectedSection(section.id)
+                                updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, section.id)
+                            }}
+                        />
+                    )
+                })}
+            </div>
+        )
+    }
+
+    // Renders the banners row
+    const renderBanners = () => {
+        if (pageMode !== "sections" && pageMode !== "category") return null
+        return (
+            <div className="w-full mb-6">
+                <h2 className="text-lg lg:text-2xl font-bold text-brand-dark mb-4 animate-fade-in">
+                    {selectedCitySlug
+                        ? `Descubra o que tem em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}`
+                        : "Descubra o que tem por perto"}
+                </h2>
+                <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {SECTIONS_BANNERS.map((banner) => {
+                        const isActive = selectedSection === banner.id
+                        return (
+                            <button
+                                key={banner.id}
+                                onClick={() => {
+                                    const nextSection = isActive ? null : banner.id
+                                    setSelectedSection(nextSection)
+                                    updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, nextSection)
+                                }}
+                                className={`shrink-0 w-[220px] sm:w-[260px] h-[110px] rounded-[16px] bg-gradient-to-r ${banner.gradient} p-4 flex flex-col justify-between text-left text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none border-2 ${isActive ? 'border-brand-green ring-2 ring-brand-green/30' : 'border-transparent'
+                                    }`}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <span className="text-xs font-semibold uppercase tracking-wider opacity-90">{banner.subtitle}</span>
+                                    <span className="text-2xl">{banner.emoji}</span>
+                                </div>
+                                <span className="text-lg font-bold leading-tight">{banner.title}</span>
+                            </button>
+                        )
+                    })}
+                </div>
+            </div>
+        )
+    }
+
+    const showCommunityVideos = communityVideos.length > 0
 
     return (
         <>
@@ -1194,54 +1057,25 @@ export function ExplorarPageClient({
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto px-4 max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
-                    {/* FEATURED SECTIONS - only on default explore page */}
-                    {showFeaturedSections && (
-                        <div className="mb-4 lg:mb-8 space-y-6 lg:space-y-10">
-                            {/* 1. SEÇÕES BANNERS (Descubra o que tem em...) */}
-                            <div className="w-full">
-                                <h2 className="text-lg lg:text-2xl font-bold text-brand-dark mb-4 animate-fade-in">
-                                    {selectedCitySlug
-                                        ? `Descubra o que tem em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}`
-                                        : "Descubra o que tem por perto"}
-                                </h2>
-                                <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                    {SECTIONS_BANNERS.map((banner) => {
-                                        const isActive = selectedSection === banner.id
-                                        return (
-                                            <button
-                                                key={banner.id}
-                                                onClick={() => {
-                                                    const nextSection = isActive ? null : banner.id
-                                                    setSelectedSection(nextSection)
-                                                    updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, nextSection)
-                                                }}
-                                                className={`shrink-0 w-[220px] sm:w-[260px] h-[110px] rounded-[16px] bg-gradient-to-r ${banner.gradient} p-4 flex flex-col justify-between text-left text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none border-2 ${isActive ? 'border-brand-green ring-2 ring-brand-green/30' : 'border-transparent'
-                                                    }`}
-                                            >
-                                                <div className="flex justify-between items-start">
-                                                    <span className="text-xs font-semibold uppercase tracking-wider opacity-90">{banner.subtitle}</span>
-                                                    <span className="text-2xl">{banner.emoji}</span>
-                                                </div>
-                                                <span className="text-lg font-bold leading-tight">{banner.title}</span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
+                    {/* BANNERS - Show in sections and category mode */}
+                    {renderBanners()}
 
-                            {/* 2. COMMUNITY VIDEOS */}
-                            {communityVideos.length > 0 && (
-                                <CommunityVideosCarousel
-                                    videos={communityVideos}
-                                    title="Vídeos da comunidade"
-                                />
-                            )}
-                        </div>
+                    {/* COMMUNITY VIDEOS - Show anytime there are videos */}
+                    {showCommunityVideos && (
+                        <CommunityVideosCarousel
+                            videos={communityVideos}
+                            title="Vídeos da comunidade"
+                        />
                     )}
 
+                    {/* CATEGORY DISCOVERY SECTIONS */}
+                    {renderCategoryDiscoverSections()}
+
+                    {/* HOME DISCOVER SECTIONS */}
+                    {pageMode === "sections" && renderHomeSections()}
 
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-                        {/* SIDEBAR (Desktop only) */}
+                        {/* SIDEBAR (Desktop only) - contextualizado */}
                         <ExplorarFilterSidebar
                             userProfile={userProfile}
                             selectedCitySlug={selectedCitySlug}
@@ -1261,23 +1095,20 @@ export function ExplorarPageClient({
                             onToggleCategory={toggleCategory}
                             selectedRadius={selectedRadius}
                             onRadiusChange={handleRadiusChange}
-
                             minPrice={minPrice}
                             onMinPriceChange={setMinPrice}
                             maxPrice={maxPrice}
                             onMaxPriceChange={setMaxPrice}
                             sortBy={sortBy}
-                            sortOptions={[
-                                { value: "relevancia", label: "Relevância" },
-                                { value: "preco_menor", label: "Menor Preço" },
-                                { value: "preco_maior", label: "Maior Preço" },
-                                { value: "recentes", label: "Mais Recentes" },
-                            ]}
+                            sortOptions={contextualSortOptions}
                             onSortChange={(val) => setSortBy(val as any)}
                             promoOn={promoOn}
                             onPromoToggle={() => setPromoOn(!promoOn)}
                             activeFiltersCount={activeFiltersCount}
                             onClearFilters={clearFilters}
+                            filterConfig={filterConfig}
+                            pageMode={pageMode}
+                            sectionId={selectedSection}
                         />
 
                         <div className="min-w-0 flex-1">
@@ -1298,7 +1129,7 @@ export function ExplorarPageClient({
                                 />
                             )}
 
-                            {/* Sponsored Ad Banner - Desktop smaller (lg:max-w-[900px]), responsive height */}
+                            {/* Sponsored Ad Banner */}
                             {exploreAds.length > 0 && (
                                 <div className="mb-6 rounded-lg overflow-hidden bg-gradient-to-r from-gray-100 to-gray-50 aspect-[16/5] lg:max-w-[900px]">
                                     <div className="w-full h-full flex items-center justify-center cursor-pointer">
@@ -1322,13 +1153,9 @@ export function ExplorarPageClient({
                                 </div>
                             )}
 
-                            <AnimatePresence mode="wait">
-                                <motion.div
-                                    key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
+                            <div
+                                key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
+                                style={{ animation: 'fadeIn 0.2s ease-out' }}
                                 >
                                     {isLoading || (isFetching && !isFetchingNextPage) ? (
                                         <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
@@ -1349,7 +1176,7 @@ export function ExplorarPageClient({
                                                 }}
                                             />
                                         </div>
-                                    ) : rawItems.length === 0 ? (
+                                    ) : rawItems.length === 0 && !isCategoryMode ? (
                                         <div className="flex justify-center">
                                             <IconPlaceholder
                                                 placeholderType="image"
@@ -1379,8 +1206,8 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : (
                                         <>
-                                            {/* Vendedores em destaque (Browse Mode) */}
-                                            {!query && currentType === 'tudo' && !selectedSection && vitrinesDestaque.length > 0 && (
+                                            {/* Vendedores em destaque (Sections Mode) */}
+                                            {pageMode === "sections" && !selectedSection && vitrinesDestaque.length > 0 && (
                                                 <div className="mb-6 animate-fade-in">
                                                     <HorizontalCarousel
                                                         title="Vendedores em destaque"
@@ -1522,8 +1349,7 @@ export function ExplorarPageClient({
                                         </>
                                     )}
 
-                                </motion.div>
-                            </AnimatePresence>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1553,23 +1379,19 @@ export function ExplorarPageClient({
                 onToggleCategory={toggleCategory}
                 selectedRadius={selectedRadius}
                 onRadiusChange={handleRadiusChange}
-
                 minPrice={minPrice}
                 onMinPriceChange={setMinPrice}
                 maxPrice={maxPrice}
                 onMaxPriceChange={setMaxPrice}
                 sortBy={sortBy}
-                sortOptions={[
-                    { value: "relevancia", label: "Relevância" },
-                    { value: "preco_menor", label: "Menor Preço" },
-                    { value: "preco_maior", label: "Maior Preço" },
-                    { value: "recentes", label: "Mais Recentes" },
-                ]}
+                sortOptions={contextualSortOptions}
                 onSortChange={(val) => setSortBy(val as any)}
                 promoOn={promoOn}
                 onPromoToggle={() => setPromoOn(!promoOn)}
                 activeFiltersCount={activeFiltersCount}
                 onClearFilters={clearFilters}
+                filterConfig={filterConfig}
+                pageMode={pageMode}
             />
 
             <ExplorarSortBottomSheet
@@ -1577,12 +1399,7 @@ export function ExplorarPageClient({
                 onClose={() => setIsSortBottomSheetOpen(false)}
                 sortBy={sortBy as any}
                 onSortChange={(val) => setSortBy(val as any)}
-                sortOptions={[
-                    { value: "relevancia", label: "Relevância" },
-                    { value: "preco_menor", label: "Menor Preço" },
-                    { value: "preco_maior", label: "Maior Preço" },
-                    { value: "recentes", label: "Mais Recentes" },
-                ]}
+                sortOptions={contextualSortOptions}
             />
 
             {/* ========================================================

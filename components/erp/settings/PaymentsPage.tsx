@@ -4,9 +4,10 @@ import React, { useState, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Tabs, TabsList, TabsTrigger, TabsContent, FormSection, FormDropdown, IconPlaceholder, SavingStatusModal, InfoCard } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
-import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
+import { ChevronLeftIcon, PlusIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
+import { PaymentMethodEditPage } from "./payments/PaymentMethodEditPage"
 import { getPickupPaymentPolicyAction, updatePickupPaymentPolicyAction } from "@/app/actions/partners/pickup-payment"
 import { getServiceCheckoutSettingsAction, updateServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
 import { useNotification } from "@/hooks/use-notification"
@@ -36,6 +37,10 @@ export function PaymentsPage({
     const [isScrolled, setIsScrolled] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+    // Edit/create state
+    const [editMethodId, setEditMethodId] = useState<string | null>(null)
+    const [isCreating, setIsCreating] = useState(false)
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -119,6 +124,26 @@ export function PaymentsPage({
         setIsSaving(false)
     }
 
+    const handleEditMethod = useCallback((id: string) => {
+        setEditMethodId(id)
+        setIsCreating(false)
+    }, [])
+
+    const handleCreateMethod = useCallback(() => {
+        setEditMethodId(null)
+        setIsCreating(true)
+    }, [])
+
+    const handleCloseEdit = useCallback((shouldReload?: boolean) => {
+        setEditMethodId(null)
+        setIsCreating(false)
+        if (shouldReload) {
+            window.dispatchEvent(new CustomEvent("payment-methods-updated"))
+        }
+    }, [])
+
+    const isEditing = editMethodId !== null || isCreating
+
     if (planGate) {
         return (
             <FadeIn>
@@ -154,6 +179,18 @@ export function PaymentsPage({
         )
     }
 
+    // Edit/create mode - show full-page edit
+    if (isEditing) {
+        return (
+            <PaymentMethodEditPage
+                partnerId={partner.id}
+                editingMethod={isCreating ? null : { id: editMethodId!, name: "", is_active: true }}
+                existingMethods={paymentMethods}
+                onBack={handleCloseEdit}
+            />
+        )
+    }
+
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
@@ -185,12 +222,18 @@ export function PaymentsPage({
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={onBack} disabled={isSaving}>
-                                            Cancelar
-                                        </Button>
-                                        <Button onClick={handleSaveSettings} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
-                                            {isSaving ? "Salvando..." : "Salvar"}
-                                        </Button>
+                                        {activeTab === "formas" ? (
+                                            <Button
+                                                onClick={handleCreateMethod}
+                                                leftIcon={<PlusIcon size={18} />}
+                                            >
+                                                Novo método
+                                            </Button>
+                                        ) : (
+                                            <Button onClick={handleSaveSettings} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
+                                                {isSaving ? "Salvando..." : "Salvar"}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -213,6 +256,8 @@ export function PaymentsPage({
                                             partner={partner}
                                             paymentMethods={paymentMethods}
                                             handleBack={onBack}
+                                            onEdit={handleEditMethod}
+                                            onCreate={handleCreateMethod}
                                             embedded
                                         />
                                     </motion.div>
@@ -326,15 +371,17 @@ export function PaymentsPage({
                     </div>
                 </Tabs>
 
-                {/* Mobile Bottom Action Bar */}
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                    <Button variant="outline" onClick={onBack} className="flex-1 h-12" disabled={isSaving}>
-                        Cancelar
-                    </Button>
-                    <Button onClick={handleSaveSettings} className="flex-1 h-12" disabled={isSaving}>
-                        Salvar
-                    </Button>
-                </div>
+                {/* Mobile Bottom Action Bar - only show on configuracoes tab */}
+                {activeTab === "configuracoes" && (
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                        <Button variant="outline" onClick={onBack} className="flex-1 h-12" disabled={isSaving}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSaveSettings} className="flex-1 h-12" disabled={isSaving}>
+                            Salvar
+                        </Button>
+                    </div>
+                )}
 
                 <SavingStatusModal isOpen={isSaving} text="Salvando configurações..." />
             </div>

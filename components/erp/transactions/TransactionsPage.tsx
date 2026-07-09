@@ -1970,7 +1970,7 @@ export default function TransactionsPage({
                     editRecurringTemplateId={editingRecurringTemplateId || undefined}
                     editRecurringTemplate={editingRecurringTemplateId ? recurringTemplates?.find((t: any) => t.id === editingRecurringTemplateId) : undefined}
                     forcedTab={forcedTab}
-                    onClose={() => {
+                    onBack={() => {
                         closeEntity()
                         setEditingRecurringTemplateId(null)
                     }}

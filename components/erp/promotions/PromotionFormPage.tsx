@@ -52,7 +52,7 @@ interface PromotionFormPageProps {
     campaign?: any
     scopeData: { products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[] }
     promotions: any[]
-    onClose: () => void
+    onBack: () => void
 }
 
 export default function PromotionFormPage({
@@ -61,7 +61,7 @@ export default function PromotionFormPage({
     campaign,
     scopeData,
     promotions,
-    onClose,
+    onBack,
 }: PromotionFormPageProps) {
     const { toast } = useToast()
     const { setHeaderOverride } = useSidebar()
@@ -111,9 +111,7 @@ export default function PromotionFormPage({
                 : campName || "Campanha"
     }, [currentMode, campName])
 
-    const handleBack = useCallback(() => {
-        onClose()
-    }, [onClose])
+    const handleBack = useCallback(() => onBack?.(), [onBack])
 
     useEffect(() => {
         setHeaderOverride({
@@ -310,7 +308,7 @@ export default function PromotionFormPage({
                 }
 
                 toast({ title: "Campanha e regra salvas com sucesso." })
-                onClose()
+                onBack()
             } else {
                 // Mode is "add" or "duplicate"
                 const res = await createCampaignAction(payload)
@@ -365,7 +363,7 @@ export default function PromotionFormPage({
                     }
 
                     toast({ title: "Campanha e regra salvas com sucesso." })
-                    onClose()
+                    onBack()
                 } else {
                     toast({ title: "Erro ao salvar campanha.", description: res.error, variant: "destructive" })
                 }
@@ -944,7 +942,7 @@ export default function PromotionFormPage({
                                             </Button>
                                         ) : (
                                             <>
-                                                <Button variant="outline" onClick={onClose} disabled={isSaving}>
+                                                <Button variant="outline" onClick={onBack} disabled={isSaving}>
                                                     Cancelar
                                                 </Button>
                                                 <Button onClick={handleSaveCampaign} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
@@ -1288,7 +1286,7 @@ export default function PromotionFormPage({
                             <>
                                 <Button
                                     variant="outline"
-                                    onClick={onClose}
+                                    onClick={onBack}
                                     disabled={isSaving}
                                     className="flex-1 h-12"
                                 >

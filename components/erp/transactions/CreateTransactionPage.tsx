@@ -80,7 +80,7 @@ interface CreateTransactionPageProps {
     partnerId: string
     categories: CategoryItem[]
     accounts: AccountItem[]
-    onClose: () => void
+    onBack: () => void
     onSuccess?: () => void
     /** When set, the page operates in edit mode with pre-filled data */
     editTransaction?: import("../../../lib/services/transactions.types").ERPTransaction
@@ -194,7 +194,7 @@ export default function CreateTransactionPage({
     partnerId,
     categories,
     accounts,
-    onClose,
+    onBack,
     onSuccess,
     editTransaction,
     editRecurringTemplateId,
@@ -426,18 +426,18 @@ export default function CreateTransactionPage({
 
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
 
-    const requestClose = useCallback(() => {
+    const handleBack = useCallback(() => {
         if (isDirty) {
             setShowDiscardModal(true)
         } else {
-            onClose()
+            onBack()
         }
-    }, [isDirty, onClose])
+    }, [isDirty, onBack])
 
     const confirmDiscard = useCallback(() => {
         setShowDiscardModal(false)
-        onClose()
-    }, [onClose])
+        onBack()
+    }, [onBack])
 
     const isIncomeExpense = txKind === "income" || txKind === "expense"
     const needsContactPanel = isIncomeExpense || txKind === "refund"
@@ -815,7 +815,7 @@ export default function CreateTransactionPage({
                 success("Recorrência atualizada!")
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
             } finally {
                 setIsSaving(false)
             }
@@ -867,7 +867,7 @@ export default function CreateTransactionPage({
                 success("Transação atualizada com sucesso!")
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
             } finally {
                 setIsSaving(false)
             }
@@ -906,7 +906,7 @@ export default function CreateTransactionPage({
                 success("Transferência registrada!")
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
             } finally {
                 setIsSaving(false)
             }
@@ -947,7 +947,7 @@ export default function CreateTransactionPage({
                 success("Ajuste registrado!")
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
             } finally {
                 setIsSaving(false)
             }
@@ -984,7 +984,7 @@ export default function CreateTransactionPage({
                 success("Reembolso registrado!")
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
             } finally {
                 setIsSaving(false)
             }
@@ -1044,7 +1044,7 @@ export default function CreateTransactionPage({
                 )
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
                 return
             }
 
@@ -1079,7 +1079,7 @@ export default function CreateTransactionPage({
                 success("Parcelamento criado com sucesso!")
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
                 return
             }
 
@@ -1109,7 +1109,7 @@ export default function CreateTransactionPage({
             success("Transação criada com sucesso!")
             onSuccess?.()
             debouncedRefresh()
-            onClose()
+            onBack()
         } finally {
             setIsSaving(false)
         }
@@ -1130,12 +1130,12 @@ export default function CreateTransactionPage({
                 setCancelRecurringOpen(false)
                 onSuccess?.()
                 debouncedRefresh()
-                onClose()
+                onBack()
             } finally {
                 setIsSaving(false)
             }
         })()
-    }, [editRecurringTemplateId, partnerId, error, success, onSuccess, debouncedRefresh, onClose])
+    }, [editRecurringTemplateId, partnerId, error, success, onSuccess, debouncedRefresh, onBack])
 
     const typeButtons: {
         id: TxKind
@@ -1734,7 +1734,7 @@ export default function CreateTransactionPage({
                                 <div
                                     className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}
                                 >
-                                    <Button variant="filled" onClick={requestClose} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -1759,7 +1759,7 @@ export default function CreateTransactionPage({
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={requestClose} disabled={isSaving}>
+                                        <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>
                                         <Button onClick={handleSave} disabled={isSaving}>
@@ -1917,7 +1917,7 @@ export default function CreateTransactionPage({
                     </div>
 
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-                        <Button variant="outline" onClick={requestClose} disabled={isSaving} className="flex-1 h-12">
+                        <Button variant="outline" onClick={handleBack} disabled={isSaving} className="flex-1 h-12">
                             Cancelar
                         </Button>
                         <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-12" leftIcon={<SaveIcon size={18} />}>

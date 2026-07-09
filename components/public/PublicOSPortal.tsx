@@ -379,6 +379,16 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                 )}
 
                                 <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
+                                    {/* Messages */}
+                                    {isFinalized && (
+                                        <div>
+                                            {order.signature_image_key ? (
+                                                <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`} color='green' />
+                                            ) : (
+                                                <InfoCard title='Ordem de serviço finalizada ou cancelada' message="" color='red' />
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* ─── TAB: DADOS GERAIS ─── */}
                                     {activeTab === "Dados Gerais" && (
@@ -447,34 +457,17 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                             )}
 
                                             {/* Sign Button */}
-                                            {!isFinalized ? (
+                                            {!isFinalized && (
                                                 <div className="pt-6 border-t border-brand-border dark:border-dark-border">
                                                     <Button
                                                         onClick={() => {
                                                             setSignerName(order.customer_name || "")
                                                             setShowSignModal(true)
                                                         }}
-                                                        className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm h-11"
+                                                        className="w-full h-12"
                                                     >
-                                                        ✓ Assinar Ordem de Serviço
+                                                        Assinar Ordem de Serviço
                                                     </Button>
-                                                </div>
-                                            ) : (
-                                                <div className="p-4 rounded-2xl border text-xs font-semibold text-left space-y-2">
-                                                    {order.signature_image_key ? (
-                                                        <div className="bg-green-50 border-green-100 text-green-800 p-2.5 rounded-xl space-y-1">
-                                                            <div className="font-bold text-sm text-green-900 flex items-center gap-1.5">
-                                                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                                                Assinado pelo cliente
-                                                            </div>
-                                                            <div>Assinatura capturada via portal público.</div>
-                                                            <div>Data da assinatura: {formatDateTime(order.signed_at)}</div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="bg-gray-50 border-brand-border text-brand-dark p-2.5 rounded-xl">
-                                                            Ordem de serviço finalizada ou cancelada.
-                                                        </div>
-                                                    )}
                                                 </div>
                                             )}
                                         </div>

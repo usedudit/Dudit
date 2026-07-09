@@ -275,7 +275,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                         </div>
 
                         {/* Content Body */}
-                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        <div className="px-3 md:px-6 md:py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             {isLoadingMembers ? (
                                 <div className="flex justify-center p-12">
                                     <ThreeDotsLoader />

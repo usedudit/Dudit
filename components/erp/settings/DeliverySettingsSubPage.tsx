@@ -66,6 +66,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
         isPickupEnabled: true,
         freeDeliveryThreshold: "",
         pickupPaymentPolicy: "require_online_payment" as "require_online_payment" | "allow_pickup_payment",
+        deliveryPayer: "customer" as "customer" | "seller",
     })
     const [rules, setRules] = useState<any[]>([])
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
@@ -95,6 +96,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                 isPickupEnabled: Boolean(res.settings.isPickupEnabled ?? true),
                 freeDeliveryThreshold: res.settings.freeDeliveryThreshold == null ? "" : String(res.settings.freeDeliveryThreshold),
                 pickupPaymentPolicy: "require_online_payment",
+            deliveryPayer: res.settings.deliveryPayer || "customer",
             })
             setChargeByDistance(Number(res.settings.extraKmPrice || 0) > 0 || res.settings.maxDeliveryKm != null)
             setRules(res.rules || [])
@@ -165,6 +167,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                                 isDeliveryEnabled: settings.isDeliveryEnabled,
                                                 isPickupEnabled: settings.isPickupEnabled,
                                                 freeDeliveryThreshold: settings.freeDeliveryThreshold ? Number(settings.freeDeliveryThreshold) : null,
+                                                deliveryPayer: settings.deliveryPayer,
                                             },
                                         })
                                         if (res.success) {
@@ -251,7 +254,6 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                         triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
                                     >
                                         <div className="space-y-6 pb-4">
-                                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Configure as taxas básicas e limites por distância para entrega</p>
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <MoneyInput
                                                     label="Taxa base"
@@ -365,10 +367,10 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                                         <table className="w-full border-separate border-spacing-0">
                                                             <thead>
                                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">Início</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Fim</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ">Tipo</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Valor</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">Início</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Fim</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Tipo</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Valor</th>
                                                                     <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
                                                                 </tr>
                                                             </thead>
@@ -451,6 +453,38 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                             </div>
                                         </>
                                     )}
+
+                                    <div className="border-t border-brand-border dark:border-dark-border" />
+                                    <div>
+                                        <div className="flex flex-col gap-2">
+                                            <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Quem paga a entrega</span>
+                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</span>
+                                            <div className="flex gap-2 mt-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSettings(s => ({ ...s, deliveryPayer: "customer" }))}
+                                                    className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
+                                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                        : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                        }`}
+                                                >
+                                                    Cliente
+                                                    <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSettings(s => ({ ...s, deliveryPayer: "seller" }))}
+                                                    className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
+                                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                        : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                        }`}
+                                                >
+                                                    Vendedor
+                                                    <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

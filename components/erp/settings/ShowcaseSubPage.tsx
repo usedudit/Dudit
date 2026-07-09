@@ -11,7 +11,7 @@ import {
     FormSection,
 } from "@/components/reusable"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
-import { ChevronLeftIcon, SaveIcon, Store, TrashIcon, PlusIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, TrashIcon, PlusIcon, WhatsappIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { usePermissions } from "@/lib/permission-context"
@@ -369,7 +369,7 @@ export const ShowcaseSubPage = ({
                                         <ListItem
                                             title="Receber apenas pelo WhatsApp"
                                             description="Ao finalizar o pedido, o cliente é redirecionado para o seu WhatsApp com a mensagem do pedido já estruturada."
-                                            icon={<MessageCircle className="text-brand-green" size={20} />}
+                                            icon={<WhatsappIcon className="text-brand-green" size={20} />}
                                             onClick={() => {
                                                 if (planSlug !== "free") {
                                                     setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })
@@ -377,12 +377,12 @@ export const ShowcaseSubPage = ({
                                             }}
                                             right={
                                                 planSlug === "free" ? (
-                                                     <RadioButton
-                                                         name="orderFlow"
-                                                         value="whatsapp"
-                                                         checked={true}
-                                                         onChange={() => {}}
-                                                     />
+                                                    <RadioButton
+                                                        name="orderFlow"
+                                                        value="whatsapp"
+                                                        checked={true}
+                                                        onChange={() => { }}
+                                                    />
                                                 ) : (
                                                     <RadioButton
                                                         name="orderFlow"

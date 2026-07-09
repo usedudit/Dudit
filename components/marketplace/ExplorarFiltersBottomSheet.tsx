@@ -5,6 +5,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { Button, Checkbox, Input } from "@/components/reusable"
 import { Check, MapPin } from "lucide-react"
 import { Separator } from "@/components/reusable/Separator"
+import type { FilterConfig, PageMode } from "./contextual-filters"
 
 interface ExplorarFiltersBottomSheetProps {
     isOpen: boolean
@@ -32,6 +33,8 @@ interface ExplorarFiltersBottomSheetProps {
     selectedRadius?: number | null
     onRadiusChange?: (radius: number | null) => void
     userProfile?: any
+    filterConfig?: FilterConfig
+    pageMode?: PageMode
 }
 
 export function ExplorarFiltersBottomSheet({
@@ -60,6 +63,8 @@ export function ExplorarFiltersBottomSheet({
     selectedRadius,
     onRadiusChange,
     userProfile,
+    filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    pageMode,
 }: ExplorarFiltersBottomSheetProps) {
     return (
         <BottomSheet isOpen={isOpen} onClose={onClose} title="Filtros">
@@ -80,26 +85,28 @@ export function ExplorarFiltersBottomSheet({
                 <Separator />
 
                 {/* Local Section */}
-                <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Local</h4>
-                    <button
-                        onClick={() => {
-                            onCitySelect()
-                            onClose()
-                        }}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors"
-                    >
-                        <span className="truncate">
-                            {selectedCitySlug
-                                ? formatCitySlug(selectedCitySlug)
-                                : "Selecionar cidade"}
-                        </span>
-                        <MapPin className="h-4 w-4 shrink-0 text-brand-green" />
-                    </button>
-                </section>
+                {filterConfig.showRadius !== false && (
+                    <section>
+                        <h4 className="mb-3 text-sm font-bold text-brand-dark">Local</h4>
+                        <button
+                            onClick={() => {
+                                onCitySelect()
+                                onClose()
+                            }}
+                            className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors"
+                        >
+                            <span className="truncate">
+                                {selectedCitySlug
+                                    ? formatCitySlug(selectedCitySlug)
+                                    : "Selecionar cidade"}
+                            </span>
+                            <MapPin className="h-4 w-4 shrink-0 text-brand-green" />
+                        </button>
+                    </section>
+                )}
 
                 {/* Raio de busca */}
-                {((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
+                {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
                     <section>
                         <h4 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h4>
                         <select
@@ -117,114 +124,122 @@ export function ExplorarFiltersBottomSheet({
                     </section>
                 )}
 
-
                 {/* Type Section */}
-                <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Tipo</h4>
-                    <div className="space-y-2">
-                        {typeOptions.map((option) => (
-                            <button
-                                key={option.value}
-                                onClick={() => onTypeChange(option.value)}
-                                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${currentType === option.value
-                                        ? "bg-[#ecfdf5] text-brand-green"
-                                        : "text-brand-dark hover:bg-gray-50"
-                                    }`}
-                            >
-                                <span>{option.label}</span>
-                                {currentType === option.value && (
-                                    <Check className="h-4 w-4" />
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                {/* Categories Section */}
-                <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Categorias</h4>
-                    <div className="max-h-[200px] space-y-2 overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-
-                        {activeCategoriesList.map((cat) => {
-                            const isSelected = selectedCategories.includes(cat.name)
-                            return (
+                {filterConfig.showType !== false && (
+                    <section>
+                        <h4 className="mb-3 text-sm font-bold text-brand-dark">Tipo</h4>
+                        <div className="space-y-2">
+                            {typeOptions.map((option) => (
                                 <button
-                                    key={cat.name}
-                                    onClick={() => onToggleCategory(cat.name)}
-                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
+                                    key={option.value}
+                                    onClick={() => onTypeChange(option.value)}
+                                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${currentType === option.value
                                             ? "bg-[#ecfdf5] text-brand-green"
                                             : "text-brand-dark hover:bg-gray-50"
                                         }`}
                                 >
-                                    <span
-                                        className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${isSelected
-                                                ? "border-brand-green bg-brand-green"
-                                                : "border-gray-200 bg-white"
+                                    <span>{option.label}</span>
+                                    {currentType === option.value && (
+                                        <Check className="h-4 w-4" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Categories Section */}
+                {filterConfig.showCategory !== false && activeCategoriesList.length > 0 && (
+                    <section>
+                        <h4 className="mb-3 text-sm font-bold text-brand-dark">
+                            {pageMode === "category" ? "Subcategorias" : "Categorias"}
+                        </h4>
+                        <div className="max-h-[200px] space-y-2 overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                            {activeCategoriesList.map((cat) => {
+                                const isSelected = selectedCategories.includes(cat.name)
+                                return (
+                                    <button
+                                        key={cat.name}
+                                        onClick={() => onToggleCategory(cat.name)}
+                                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
+                                                ? "bg-[#ecfdf5] text-brand-green"
+                                                : "text-brand-dark hover:bg-gray-50"
                                             }`}
                                     >
-                                        {isSelected && (
-                                            <Check className="h-3.5 w-3.5 text-white" />
+                                        <span
+                                            className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${isSelected
+                                                    ? "border-brand-green bg-brand-green"
+                                                    : "border-gray-200 bg-white"
+                                                }`}
+                                        >
+                                            {isSelected && (
+                                                <Check className="h-3.5 w-3.5 text-white" />
+                                            )}
+                                        </span>
+                                        {cat.icon_url && (
+                                            <img
+                                                src={cat.icon_url}
+                                                alt=""
+                                                className="h-5 w-5 object-contain"
+                                            />
                                         )}
-                                    </span>
-                                    {cat.icon_url && (
-                                        <img
-                                            src={cat.icon_url}
-                                            alt=""
-                                            className="h-5 w-5 object-contain"
-                                        />
-                                    )}
-                                    <span className="min-w-0 flex-1 truncate">
-                                        {cat.name}
-                                    </span>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </section>
+                                        <span className="min-w-0 flex-1 truncate">
+                                            {cat.name}
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </section>
+                )}
 
                 {/* Price Section */}
-                <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark">Preço</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Input
-                            value={minPrice}
-                            onChange={(e) => onMinPriceChange(e.target.value)}
-                            inputMode="decimal"
-                            placeholder="Min."
-                            className="h-10 text-sm"
-                        />
-                        <Input
-                            value={maxPrice}
-                            onChange={(e) => onMaxPriceChange(e.target.value)}
-                            inputMode="decimal"
-                            placeholder="Max."
-                            className="h-10 text-sm"
-                        />
-                    </div>
-                </section>
+                {filterConfig.showPrice !== false && (
+                    <section>
+                        <h4 className="mb-3 text-sm font-bold text-brand-dark">Preço</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Input
+                                value={minPrice}
+                                onChange={(e) => onMinPriceChange(e.target.value)}
+                                inputMode="decimal"
+                                placeholder="Min."
+                                className="h-10 text-sm"
+                            />
+                            <Input
+                                value={maxPrice}
+                                onChange={(e) => onMaxPriceChange(e.target.value)}
+                                inputMode="decimal"
+                                placeholder="Max."
+                                className="h-10 text-sm"
+                            />
+                        </div>
+                    </section>
+                )}
 
                 {/* Promo Section */}
-                <section>
-                    <button
-                        onClick={onPromoToggle}
-                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${promoOn
-                                ? "bg-[#ecfdf5] text-brand-green"
-                                : "text-brand-dark hover:bg-gray-50"
-                            }`}
-                    >
-                        <span
-                            className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${promoOn
-                                    ? "border-brand-green bg-brand-green"
-                                    : "border-gray-200 bg-white"
+                {filterConfig.showPromo !== false && (
+                    <section>
+                        <button
+                            onClick={onPromoToggle}
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${promoOn
+                                    ? "bg-[#ecfdf5] text-brand-green"
+                                    : "text-brand-dark hover:bg-gray-50"
                                 }`}
                         >
-                            {promoOn && (
-                                <Check className="h-3.5 w-3.5 text-white" />
-                            )}
-                        </span>
-                        Em promoção
-                    </button>
-                </section>
+                            <span
+                                className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${promoOn
+                                        ? "border-brand-green bg-brand-green"
+                                        : "border-gray-200 bg-white"
+                                    }`}
+                            >
+                                {promoOn && (
+                                    <Check className="h-3.5 w-3.5 text-white" />
+                                )}
+                            </span>
+                            Em promoção
+                        </button>
+                    </section>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4">

@@ -35,6 +35,7 @@ type GoalFormPageProps = {
   sellers: Array<{ id: string; name: string }>
   accounts: Array<{ id: string; name: string; type: string }>
   initialGoal?: any | null
+  onBack: () => void
 }
 
 const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
@@ -44,7 +45,7 @@ const SidebarCard = ({ children, className = "", hasTopStrip = false }: { childr
   </div>
 )
 
-export default function GoalFormPage({ partnerId, mode, sellers, accounts, initialGoal }: GoalFormPageProps) {
+export default function GoalFormPage({ partnerId, mode, sellers, accounts, initialGoal, onBack }: GoalFormPageProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
@@ -116,7 +117,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
 
   const isDirty = currentSnapshot !== initialSnapshot
   const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
-  const handleBack = useCallback(() => handleNavigation("/erp/produtividade/metas"), [handleNavigation])
+  const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 
   const assignedSellerNames = useMemo(
     () => sellers.filter((seller) => form.assignedUserIds.includes(seller.id)).map((seller) => seller.name),

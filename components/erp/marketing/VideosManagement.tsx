@@ -186,13 +186,14 @@ export default function VideosManagement() {
     return (
         <>
             <AnimatePresence mode="wait">
-                {isCreating || isEditing ? (
+                {isCreating || isEditing || isViewing ? (
                     <VideoFormPage
                         key="form"
-                        video={isEditing ? currentVideo : undefined}
+                        video={isEditing || isViewing ? currentVideo : undefined}
                         onSave={handleSave}
-                        onCancel={handleCancel}
+                        onBack={handleCancel}
                         partnerId={partnerId}
+                        readOnly={isViewing}
                     />
                 ) : (
                     <FadeIn

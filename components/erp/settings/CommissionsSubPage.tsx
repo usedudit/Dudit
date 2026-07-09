@@ -199,7 +199,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                         </div>
                     </div>
 
-                    <div className="px-3 md:px-6 lg:y-6 max-w-[1300px] mx-auto min-h-[400px]">
+                    <div className="px-3 md:px-6 md:py-6 max-w-[1300px] mx-auto min-h-[400px]">
                         {loading ? (
                             <div className="flex justify-center p-12">
                                 <ThreeDotsLoader />

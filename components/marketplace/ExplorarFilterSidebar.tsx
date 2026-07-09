@@ -3,6 +3,7 @@
 import { Button, Checkbox, FormDropdown, Input, MoneyInput } from "@/components/reusable"
 import { Check, MapPin, X } from "lucide-react"
 import { Separator } from "@/components/reusable/Separator"
+import type { FilterConfig, PageMode } from "./contextual-filters"
 
 interface ExplorarFilterSidebarProps {
     selectedCitySlug: string | null
@@ -28,6 +29,9 @@ interface ExplorarFilterSidebarProps {
     selectedRadius?: number | null
     onRadiusChange?: (radius: number | null) => void
     userProfile?: any
+    filterConfig?: FilterConfig
+    pageMode?: PageMode
+    sectionId?: string | null
 }
 
 export function ExplorarFilterSidebar({
@@ -54,6 +58,9 @@ export function ExplorarFilterSidebar({
     selectedRadius,
     onRadiusChange,
     userProfile,
+    filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    pageMode,
+    sectionId,
 }: ExplorarFilterSidebarProps) {
     return (
         <aside className="hidden lg:block lg:w-[280px] lg:shrink-0 border-r border-gray-100">
@@ -75,21 +82,23 @@ export function ExplorarFilterSidebar({
                 <Separator className="my-0" />
 
                 {/* Local Section */}
-                <section>
-                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Local</h3>
-                    <button
-                        onClick={onCitySelect}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors"
-                    >
-                        <span className="truncate">
-                            {selectedCitySlug ? formatCitySlug(selectedCitySlug) : "Selecionar cidade"}
-                        </span>
-                        <MapPin className="h-4 w-4 shrink-0 text-brand-green" />
-                    </button>
-                </section>
+                {filterConfig.showRadius !== false && (
+                    <section>
+                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Local</h3>
+                        <button
+                            onClick={onCitySelect}
+                            className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors"
+                        >
+                            <span className="truncate">
+                                {selectedCitySlug ? formatCitySlug(selectedCitySlug) : "Selecionar cidade"}
+                            </span>
+                            <MapPin className="h-4 w-4 shrink-0 text-brand-green" />
+                        </button>
+                    </section>
+                )}
 
                 {/* Raio de busca */}
-                {((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
+                {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
                     <section>
                         <h3 className="mb-3 text-sm font-bold text-brand-dark">Raio de busca</h3>
                         <select
@@ -107,88 +116,98 @@ export function ExplorarFilterSidebar({
                     </section>
                 )}
 
+                {/* Type Section */}
+                {filterConfig.showType !== false && (
+                    <section>
+                        <FormDropdown
+                            label="Tipo"
+                            value={currentType}
+                            setValue={onTypeChange}
+                            options={typeOptions.map(o => ({ value: o.value, label: o.label }))}
+                        />
+                    </section>
+                )}
 
-                {/* Type Section - Using FormDropdown */}
-                <section>
-                    <FormDropdown
-                        label="Tipo"
-                        value={currentType}
-                        setValue={onTypeChange}
-                        options={typeOptions.map(o => ({ value: o.value, label: o.label }))}
-                    />
-                </section>
-
-                {/* Categories Section - Using Checkbox */}
-                <section>
-                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Categorias</h3>
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-
-                        {activeCategoriesList.map((cat) => {
-                            const isSelected = selectedCategories.includes(cat.name)
-                            return (
-                                <label
-                                    key={cat.name}
-                                    className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                                >
-                                    <Checkbox
-                                        checked={isSelected}
-                                        onChange={() => onToggleCategory(cat.name)}
-                                    />
-                                    {cat.icon_url && (
-                                        <img
-                                            src={cat.icon_url}
-                                            alt=""
-                                            className="h-5 w-5 object-contain"
+                {/* Categories Section */}
+                {filterConfig.showCategory !== false && activeCategoriesList.length > 0 && (
+                    <section>
+                        <h3 className="mb-3 text-sm font-bold text-brand-dark">
+                            {pageMode === "category" ? "Subcategorias" : "Categorias"}
+                        </h3>
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                            {activeCategoriesList.map((cat) => {
+                                const isSelected = selectedCategories.includes(cat.name)
+                                return (
+                                    <label
+                                        key={cat.name}
+                                        className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                        <Checkbox
+                                            checked={isSelected}
+                                            onChange={() => onToggleCategory(cat.name)}
                                         />
-                                    )}
-                                    <span className="text-sm font-medium text-brand-dark truncate">
-                                        {cat.name}
-                                    </span>
-                                </label>
-                            )
-                        })}
-                    </div>
-                </section>
+                                        {cat.icon_url && (
+                                            <img
+                                                src={cat.icon_url}
+                                                alt=""
+                                                className="h-5 w-5 object-contain"
+                                            />
+                                        )}
+                                        <span className="text-sm font-medium text-brand-dark truncate">
+                                            {cat.name}
+                                        </span>
+                                    </label>
+                                )
+                            })}
+                        </div>
+                    </section>
+                )}
 
                 {/* Price Section */}
-                <section>
-                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Preço</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                        <MoneyInput
-                            value={minPrice}
-                            onChange={(v) => onMinPriceChange(String(v))}
-                            placeholder="Mín."
-                            className="h-10"
-                        />
-                        <MoneyInput
-                            value={maxPrice}
-                            onChange={(v) => onMaxPriceChange(String(v))}
-                            placeholder="Máx."
-                            className="h-10"
-                        />
-                    </div>
-                </section>
+                {filterConfig.showPrice !== false && (
+                    <section>
+                        <h3 className="mb-3 text-sm font-bold text-brand-dark">Preço</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                            <MoneyInput
+                                value={minPrice}
+                                onChange={(v) => onMinPriceChange(String(v))}
+                                placeholder="Mín."
+                                className="h-10"
+                            />
+                            <MoneyInput
+                                value={maxPrice}
+                                onChange={(v) => onMaxPriceChange(String(v))}
+                                placeholder="Máx."
+                                className="h-10"
+                            />
+                        </div>
+                    </section>
+                )}
 
-                {/* Sort Section - Using FormDropdown */}
-                <section>
-                    <FormDropdown
-                        label="Ordenar"
-                        value={sortBy}
-                        setValue={onSortChange}
-                        options={sortOptions.map(o => ({ value: o.value, label: o.label }))}
-                    />
-                </section>
-
-                {/* Promo Section - Using Checkbox */}
-                <section>
-                    <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                        <Checkbox
-                            checked={promoOn}
-                            onChange={onPromoToggle}
+                {/* Sort Section */}
+                {filterConfig.showSort !== false && (
+                    <section>
+                        <FormDropdown
+                            label="Ordenar"
+                            value={sortBy}
+                            setValue={onSortChange}
+                            options={sortOptions.map(o => ({ value: o.value, label: o.label }))}
                         />
-                        <span className="text-sm font-medium text-brand-dark">Em promoção</span>
-                    </label>
-                </section>
+                    </section>
+                )}
+
+                {/* Promo Section */}
+                {filterConfig.showPromo !== false && (
+                    <section>
+                        <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                            <Checkbox
+                                checked={promoOn}
+                                onChange={onPromoToggle}
+                            />
+                            <span className="text-sm font-medium text-brand-dark">Em promoção</span>
+                        </label>
+                    </section>
+                )}
             </div>
         </aside>
     )

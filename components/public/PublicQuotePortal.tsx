@@ -18,7 +18,8 @@ import {
     FormSection,
     DefaultModal,
     Input,
-    FormTextarea
+    FormTextarea,
+    InfoCard
 } from "@/components/reusable"
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -356,6 +357,20 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                                 {/* TABS CONTENT */}
                                 <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
+                                    {/* Messages */}
+                                    {isFinalized && (
+                                        <div>
+                                            {quote.status === "approved" ? (
+                                                <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${quote.approver_name || "Cliente"} - Data: ${formatDateTime(quote.approved_at)}`} color='green' />
+                                            ) : quote.status === "rejected" ? (
+                                                <InfoCard title='Recusado pelo cliente' message={`Autor: ${quote.approver_name || "Cliente"} - Data: ${formatDateTime(quote.rejected_at)}` + (quote.rejection_reason && ` - Motivo: ${quote.rejection_reason}`)} color='red' />
+                                            ) : quote.status === "expired" ? (
+                                                <InfoCard title="Proposta Expirada" message={`A proposta atingiu seu limite de validade em ${formatDateString(quote.expiration_date)} e expirou.`} color="orange" />
+                                            ) : (
+                                                <InfoCard title="Proposta Cancelada" message="Orçamento cancelado pelo vendedor." color="red" />
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* ─── TAB: DADOS GERAIS ─── */}
                                     {activeTab === "Dados Gerais" && (
@@ -399,53 +414,21 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                 </FormSection>
                                             )}
 
-                                            {/* Decision Action Buttons */}
-                                            {!isFinalized ? (
+                                            {isFinalized && (
                                                 <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-brand-border dark:border-dark-border">
                                                     <Button
-                                                        onClick={() => setShowApproveModal(true)}
-                                                        className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm h-11"
+                                                        onClick={() => setShowRejectModal(true)}
+                                                        variant="outlinered"
+                                                        className="flex-1 h-12"
                                                     >
-                                                        ✓ Aprovar proposta
+                                                        Recusar proposta
                                                     </Button>
                                                     <Button
-                                                        onClick={() => setShowRejectModal(true)}
-                                                        variant="outline"
-                                                        className="flex-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 font-bold text-sm h-11 border-red-200 dark:border-red-900/30"
+                                                        onClick={() => setShowApproveModal(true)}
+                                                        className="flex-1 h-12"
                                                     >
-                                                        ✕ Recusar proposta
+                                                        Aprovar proposta
                                                     </Button>
-                                                </div>
-                                            ) : (
-                                                <div className="p-4 rounded-2xl border text-xs font-semibold text-left space-y-2">
-                                                    {quote.status === "approved" ? (
-                                                        <div className="bg-green-50 border-green-100 text-green-800 p-2.5 rounded-xl space-y-1">
-                                                            <div className="font-bold text-sm text-green-900 flex items-center gap-1.5">
-                                                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                                                Aprovado pelo cliente
-                                                            </div>
-                                                            <div>Aprovador: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
-                                                            <div>Data: {formatDateTime(quote.approved_at)}</div>
-                                                        </div>
-                                                    ) : quote.status === "rejected" ? (
-                                                        <div className="bg-red-50 border-red-100 text-red-800 p-2.5 rounded-xl space-y-1">
-                                                            <div className="font-bold text-sm text-red-900 flex items-center gap-1.5">
-                                                                <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                                                                Recusado pelo cliente
-                                                            </div>
-                                                            <div>Autor: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
-                                                            <div>Data: {formatDateTime(quote.rejected_at)}</div>
-                                                            {quote.rejection_reason && <div className="mt-1.5 italic text-slate-500 bg-white/60 p-2 rounded-lg border border-red-100">"{quote.rejection_reason}"</div>}
-                                                        </div>
-                                                    ) : quote.status === "expired" ? (
-                                                        <div className="bg-orange-50 border-orange-100 text-brand-orange p-2.5 rounded-xl">
-                                                            A proposta atingiu seu limite de validade em <span className="font-bold">{formatDateString(quote.expiration_date)}</span> e expirou.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="bg-gray-50 border-brand-border text-brand-dark p-2.5 rounded-xl">
-                                                            Orçamento cancelado pelo vendedor.
-                                                        </div>
-                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -579,16 +562,17 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                     </div>
                 </div>
-            </Tabs>
+            </Tabs >
 
             {/* ─── MODAL: APPROVE PROPOSAL ─────────────────────────────────────── */}
-            <DefaultModal
+            < DefaultModal
                 isOpen={showApproveModal}
-                onClose={() => setShowApproveModal(false)}
+                onClose={() => setShowApproveModal(false)
+                }
                 title="Aprovar proposta"
                 maxWidth="md"
                 footer={
-                    <div className="flex gap-3 w-full">
+                    < div className="flex gap-3 w-full" >
                         <Button
                             variant="outline"
                             onClick={() => setShowApproveModal(false)}
@@ -603,12 +587,12 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         >
                             {isProcessingAction ? "Aprovando..." : "Confirmar aprovação"}
                         </Button>
-                    </div>
+                    </div >
                 }
             >
                 <div className="space-y-4 text-left">
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        {isClientEmailMatched 
+                        {isClientEmailMatched
                             ? `Você está conectado como ${currentUser.email} e pode aprovar esta proposta diretamente.`
                             : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
                         }
@@ -626,16 +610,16 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         </div>
                     )}
                 </div>
-            </DefaultModal>
+            </DefaultModal >
 
             {/* ─── MODAL: REJECT PROPOSAL ─────────────────────────────────────── */}
-            <DefaultModal
+            < DefaultModal
                 isOpen={showRejectModal}
                 onClose={() => setShowRejectModal(false)}
                 title="Recusar proposta"
                 maxWidth="md"
                 footer={
-                    <div className="flex gap-3 w-full">
+                    < div className="flex gap-3 w-full" >
                         <Button
                             variant="outline"
                             onClick={() => setShowRejectModal(false)}
@@ -650,12 +634,12 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         >
                             {isProcessingAction ? "Recusando..." : "Confirmar recusa"}
                         </Button>
-                    </div>
+                    </div >
                 }
             >
                 <div className="space-y-4 text-left">
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        {isClientEmailMatched 
+                        {isClientEmailMatched
                             ? `Você está conectado como ${currentUser.email} e pode recusar esta proposta diretamente.`
                             : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
                         }
@@ -682,7 +666,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         />
                     </div>
                 </div>
-            </DefaultModal>
-        </div>
+            </DefaultModal >
+        </div >
     )
 }

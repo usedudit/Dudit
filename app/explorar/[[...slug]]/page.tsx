@@ -3,6 +3,7 @@ import { ExplorarPageClient } from "@/components/marketplace/ExplorarPageClient"
 import { getCachedExploreProducts, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { resolveCityCoordsFromSlug } from "@/app/actions/marketplace/search"
 import { getCommunityVideos } from "@/app/actions/marketplace/community-videos"
+import { getHomeSections, type HomeSection } from "@/app/actions/marketplace/discover"
 import type { Metadata } from "next"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { parseMarketplaceType } from "@/lib/types/marketplace"
@@ -343,6 +344,32 @@ export default async function ExplorarPage({
         state,
     }
 
+    // Busca seções do discover para a página de explorar (quando não há query)
+    let homeSections: HomeSection[] = []
+    if (!query && !section && type === 'tudo' && !categorySlug) {
+        const resolvedCity = cidade && cidade !== "brasil"
+            ? await resolveCityAndStateFromSlug(cidade)
+            : null
+        const citySlug = cidade || "brasil"
+        const cityName = resolvedCity?.city || (cidade !== "brasil" ? cidade.split("-").slice(0, -1).join(" ") : "Brasil")
+        const stateUf = resolvedCity?.state || cidade.split("-").pop()?.toUpperCase() || ""
+        const scope = cidade === "brasil" || stateUf === "SP" ? "country" : "city"
+
+        try {
+            homeSections = await getHomeSections({
+                city: cityName,
+                state: stateUf,
+                stateOnly: false,
+                citySlug,
+                coords: refCoords,
+                userId: user?.id ?? null,
+                scope,
+            })
+        } catch (e) {
+            console.warn("[Explore] Failed to fetch home sections:", e)
+        }
+    }
+
     const [exploreAds, searchAds, communityVideosData] = await Promise.all([
         getSponsoredAdsForSlot("explore", adLocation),
         query ? getSponsoredAdsForSlot("search", adLocation) : Promise.resolve([] as SponsoredAd[]),
@@ -430,6 +457,7 @@ export default async function ExplorarPage({
                     searchAds={searchAds}
                     isStateRoute={isStateRoute}
                     communityVideos={communityVideosData.items}
+                    homeSections={homeSections}
                 />
             </Suspense>
 

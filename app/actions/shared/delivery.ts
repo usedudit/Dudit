@@ -17,6 +17,7 @@ function mapSettingsRow(row: any): DeliverySettings {
     isDeliveryEnabled: Boolean(row?.is_delivery_enabled ?? true),
     isPickupEnabled: Boolean(row?.is_pickup_enabled ?? true),
     freeDeliveryThreshold: row?.free_delivery_threshold == null ? null : Number(row.free_delivery_threshold),
+    deliveryPayer: row?.delivery_payer === "seller" ? "seller" : "customer",
   }
 }
 
@@ -76,6 +77,7 @@ export async function upsertPartnerDeliveryConfigAction(input: {
     isDeliveryEnabled: Boolean(input.settings.isDeliveryEnabled),
     isPickupEnabled: Boolean(input.settings.isPickupEnabled),
     freeDeliveryThreshold: input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold)),
+    deliveryPayer: input.settings.deliveryPayer === "seller" ? "seller" : "customer",
   }
 
   if (!normalized.isDeliveryEnabled && !normalized.isPickupEnabled) {
@@ -91,6 +93,7 @@ export async function upsertPartnerDeliveryConfigAction(input: {
     is_delivery_enabled: normalized.isDeliveryEnabled,
     is_pickup_enabled: normalized.isPickupEnabled,
     free_delivery_threshold: normalized.freeDeliveryThreshold,
+    delivery_payer: normalized.deliveryPayer,
     updated_at: new Date().toISOString(),
   })
 

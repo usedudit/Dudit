@@ -10,6 +10,7 @@ export type DeliverySettings = {
   isDeliveryEnabled: boolean
   isPickupEnabled: boolean
   freeDeliveryThreshold: number | null
+  deliveryPayer: "customer" | "seller"
 }
 
 export type DeliveryFeeRule = {

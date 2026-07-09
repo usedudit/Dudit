@@ -29,7 +29,7 @@ import { ReceiptScallopEdge } from '../POSComponents';
 
 const DEPOSIT_STATUS_LABELS: Record<string, string> = {
     pending: "Sinal pendente",
-    partially_paid: "Sinal pago — saldo pendente",
+    partially_paid: "Sinal pago - saldo pendente",
     paid: "Quitado",
     not_required: "Sem sinal",
 };
