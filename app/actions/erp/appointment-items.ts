@@ -43,7 +43,7 @@ export async function getAppointmentItemsAction(appointmentId: string) {
                 usage_type, 
                 created_at, 
                 updated_at,
-                products(name, sku, stock_quantity, images),
+                products(name, sku, stock_quantity, stock_available, images),
                 services(name)
             `)
             .eq("appointment_id", appointmentId)
@@ -73,7 +73,7 @@ export async function getAppointmentItemsAction(appointmentId: string) {
                     name: p.name,
                     sku: p.sku || 'N/A',
                     image: p.images?.[0] || null,
-                    stock: p.stock_quantity || 0,
+                    stock: p.stock_available ?? p.stock_quantity ?? 0,
                 } : null,
                 serviceName: s?.name || null,
             }
@@ -323,14 +323,14 @@ export async function fetchProductsByIdsAction(productIds: string[]) {
         const supabase = createAdminClient()
         const { data } = await supabase
             .from("products")
-            .select("id, name, sku, stock_quantity, min_stock_quantity, images")
+            .select("id, name, sku, stock_quantity, stock_available, min_stock_quantity, images")
             .eq("partner_id", ctx.partnerId)
             .in("id", productIds)
         return (data || []).map((p: any) => ({
             id: p.id,
             name: p.name,
             sku: p.sku || 'N/A',
-            stock: p.stock_quantity || 0,
+            stock: p.stock_available ?? p.stock_quantity ?? 0,
             minStock: p.min_stock_quantity || 0,
             image: p.images?.[0] || null,
         }))
@@ -381,7 +381,7 @@ export async function searchProductsForAppointmentItems(query: string) {
 
         const { data, error } = await supabase
             .from("products")
-            .select("id, name, sku, stock_quantity, images, has_variants")
+            .select("id, name, sku, stock_quantity, stock_available, images, has_variants")
             .eq("partner_id", ctx.partnerId)
             .eq("is_active", true)
             .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
@@ -396,7 +396,7 @@ export async function searchProductsForAppointmentItems(query: string) {
             id: p.id,
             name: p.name,
             sku: p.sku || 'N/A',
-            stock: p.stock_quantity || 0,
+            stock: p.stock_available ?? p.stock_quantity ?? 0,
             image: p.images && p.images.length > 0 ? p.images[0] : null,
             hasVariants: p.has_variants || false,
         }))

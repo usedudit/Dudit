@@ -55,36 +55,24 @@ export const Numpad = ({ onInput, onDelete, disabled }: { onInput: (key: string)
 export const PaymentMethodCard = ({ icon, label, selected, onClick, disabled }: any) => (
     <button disabled={disabled}
         onClick={onClick}
-        className={cn(
-            "flex flex-col items-center justify-center p-4 rounded-[22px] border-2 text-center transition-all w-full h-[100px] md:h-[110px] active:scale-95 transform duration-100 select-none",
-            selected
-                ? "border-brand-primary bg-brand-primary-light/10 text-brand-primary dark:border-brand-primary dark:bg-brand-primary/10 dark:text-brand-primary font-bold"
-                : "border-brand-border bg-white text-brand-dark hover:bg-brand-gray hover:border-[#cbd5e1] dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border/40",
-            disabled && "opacity-40 cursor-not-allowed pointer-events-none"
-        )}
+        className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
     >
-        <span className={cn("text-2xl mb-2", selected ? "text-brand-primary" : "text-brand-inactive-text dark:text-dark-body")}>
+        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors overflow-hidden">
             {icon}
-        </span>
-        <span className="text-[13px] md:text-sm font-semibold tracking-tight leading-tight">{label}</span>
+        </div>
+        <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">{label}</span>
     </button>
 );
 
 export const SplitPaymentCard = ({ icon, label, selected, onClick, disabled }: any) => (
     <button disabled={disabled}
         onClick={onClick}
-        className={cn(
-            "flex flex-col items-center justify-center p-4 rounded-[22px] border-2 text-center transition-all w-full h-[100px] md:h-[110px] active:scale-95 transform duration-100 select-none",
-            selected
-                ? "border-brand-primary bg-brand-primary-light/10 text-brand-primary dark:border-brand-primary dark:bg-brand-primary/10 dark:text-brand-primary font-bold"
-                : "border-brand-border bg-white text-brand-dark hover:bg-brand-gray hover:border-[#cbd5e1] dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border/40",
-            disabled && "opacity-40 cursor-not-allowed pointer-events-none"
-        )}
+        className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
     >
-        <span className={cn("text-2xl mb-2", selected ? "text-brand-primary" : "text-brand-inactive-text dark:text-dark-body")}>
+        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors overflow-hidden">
             {icon}
-        </span>
-        <span className="text-[13px] md:text-sm font-semibold tracking-tight leading-tight">{label}</span>
+        </div>
+        <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">{label}</span>
     </button>
 );
 

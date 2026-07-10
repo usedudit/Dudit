@@ -160,6 +160,8 @@ export default function TransactionsPage({
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
+    const [isScrolled, setIsScrolled] = useState(false)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
     const setActiveTab = forcedTab ? () => { } : setActiveTabState
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const effectiveViewMode = isTablet ? "grid" : viewMode
@@ -168,8 +170,6 @@ export default function TransactionsPage({
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
-    const [editingRecurringTemplateId, setEditingRecurringTemplateId] = useState<string | null>(null)
-    const [openInstallmentGroupId, setOpenInstallmentGroupId] = useState<string | null>(null)
     const [installmentDetailLoading, setInstallmentDetailLoading] = useState(false)
     const [installmentDetail, setInstallmentDetail] = useState<any | null>(null)
     const [payingInstallment, setPayingInstallment] = useState(false)
@@ -302,6 +302,11 @@ export default function TransactionsPage({
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
+
+    // --- Handlers ---
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+    }, [])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -815,7 +820,7 @@ export default function TransactionsPage({
     const handleEditTransaction = useCallback((transaction: ERPTransaction) => {
         if (transaction.isInstallmentGroup) return
         if (transaction.isRecurringOccurrence && transaction.recurringTemplateId) {
-            setEditingRecurringTemplateId(transaction.recurringTemplateId)
+            openEntity("edit", transaction.recurringTemplateId, "recurring")
         } else {
             openEntity("edit", transaction.id)
         }
@@ -942,8 +947,8 @@ export default function TransactionsPage({
             }
             notifySuccess("Parcelado quitado com sucesso.")
             setConfirmSettleGroup(null)
-            setOpenInstallmentGroupId(null)
             setInstallmentDetail(null)
+            closeEntity()
             void refreshTransactionsNow()
         } finally {
             setSettlingGroup(false)
@@ -954,7 +959,7 @@ export default function TransactionsPage({
         (transaction: ERPTransaction) => {
             // Installment group with pending → open installment detail view
             if (transaction.isInstallmentGroup && transaction.installmentGroupId && Number(transaction.installmentPendingCount || 0) > 0) {
-                setOpenInstallmentGroupId(transaction.installmentGroupId)
+                openEntity("view", transaction.installmentGroupId, "installment")
                 setInstallmentDetail(null)
                 setInstallmentDetailLoading(true)
                 void (async () => {
@@ -972,19 +977,17 @@ export default function TransactionsPage({
             if (transaction.isInstallmentGroup && Number(transaction.installmentPendingCount || 0) === 0) {
                 const representativeId = transaction.groupRepresentativeTransactionId || transaction.id
                 openEntity("view", representativeId)
-                setEditingRecurringTemplateId(null)
                 return
             }
             // Recurring occurrence → edit recurring template
             if (transaction.isRecurringOccurrence) {
                 if (transaction.recurringTemplateId) {
-                    setEditingRecurringTemplateId(transaction.recurringTemplateId)
+                    openEntity("edit", transaction.recurringTemplateId, "recurring")
                 }
                 return
             }
             // Standard transaction → INSTANT open (Products pattern: NO validation before openEntity)
             openEntity("view", transaction.id)
-            setEditingRecurringTemplateId(null)
         },
         [partnerId, notifyError, openEntity],
     )
@@ -999,10 +1002,10 @@ export default function TransactionsPage({
             notifyError("Apenas parcelas pendentes podem ser editadas.")
             return
         }
-        setOpenInstallmentGroupId(null)
         setInstallmentDetail(null)
+        closeEntity()
         openEntity("edit", tx.id)
-    }, [loadedTransactions, notifyError, openEntity])
+    }, [loadedTransactions, notifyError, openEntity, closeEntity])
 
     const handlePayInstallment = useCallback(async (installmentId: string) => {
         const row = (installmentDetail?.installments || []).find((item: any) => item.id === installmentId)
@@ -1364,7 +1367,7 @@ export default function TransactionsPage({
         )
     }
 
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
         if (isLoadingDetail) {
             return (
                 <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
@@ -1411,367 +1414,356 @@ export default function TransactionsPage({
         )
 
         return (
-            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background transition-colors duration-500 ease-in-out">
-                <div className="flex flex-col h-full overflow-hidden">
-                    {/* Header */}
-                    <div className="flex-none bg-white dark:bg-dark-surface border-b dark:border-dark-border">
-                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 md:pt-4">
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                            {/* Back button - desktop only */}
-                            <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
-                                <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                            </div>
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                            {/* Title row - desktop */}
-                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 text-xl md:text-3xl">
-                                        <span className="truncate">Quitar todas as parcelas</span>
-                                    </h1>
-                                    <div className="hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium overflow-hidden">
-                                        Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                {/* Back button - desktop only */}
+                                <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
+                                    <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="hidden md:inline truncate">Quitar todas as parcelas</span>
+                                        </h1>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                        </div>
                                     </div>
-                                </div>
-                                {/* Desktop action buttons */}
-                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
-                                        Cancelar
-                                    </Button>
-                                    <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />}>
-                                        Confirmar quitação
-                                    </Button>
-                                </div>
-                            </div>
 
-                            {/* Mobile Title row */}
-                            <div className="flex md:hidden items-center gap-3 py-3">
-                                <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                                <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
-                                    <h1 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
-                                        Quitar todas as parcelas
-                                    </h1>
-                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                        {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
-                                    </span>
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />}>
+                                            Confirmar quitação
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Scrollable body */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
-                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6 space-y-4">
-                            {/* Summary Cards */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shrink-0">
-                                            <FileIcon className="w-5 h-5" />
+                        {/* Scrollable body */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6 space-y-4">
+                                {/* Summary Cards */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shrink-0">
+                                                <FileIcon className="w-5 h-5" />
+                                            </div>
+                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                Total
+                                            </span>
                                         </div>
-                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                            Total
+                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                            {formatCurrency(total)}
                                         </span>
                                     </div>
-                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                        {formatCurrency(total)}
-                                    </span>
-                                </div>
 
-                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 shrink-0">
-                                            <CheckCircleIcon className="w-5 h-5" />
+                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+                                                <CheckCircleIcon className="w-5 h-5" />
+                                            </div>
+                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                Pago
+                                            </span>
                                         </div>
-                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                            Pago
+                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                            {formatCurrency(paid)}
                                         </span>
                                     </div>
-                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                        {formatCurrency(paid)}
-                                    </span>
-                                </div>
 
-                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 shrink-0">
-                                            <ClockIcon className="w-5 h-5" />
+                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 shrink-0">
+                                                <ClockIcon className="w-5 h-5" />
+                                            </div>
+                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                Restante
+                                            </span>
                                         </div>
-                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                            Restante
+                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                            {formatCurrency(pending)}
                                         </span>
                                     </div>
-                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                        {formatCurrency(pending)}
-                                    </span>
-                                </div>
 
-                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 shrink-0">
-                                            <InstallmentIcon className="w-5 h-5" />
+                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 shrink-0">
+                                                <InstallmentIcon className="w-5 h-5" />
+                                            </div>
+                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                Parcelas a quitar
+                                            </span>
                                         </div>
-                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                            Parcelas a quitar
+                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                            {pendingCount}
                                         </span>
                                     </div>
-                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                        {pendingCount}
-                                    </span>
-                                </div>
 
-                                <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 shrink-0">
-                                            <CashierIcon className="w-5 h-5" />
+                                    <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 shrink-0">
+                                                <CashierIcon className="w-5 h-5" />
+                                            </div>
+                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                Valor total da quitação
+                                            </span>
                                         </div>
-                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                            Valor total da quitação
+                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none text-brand-green">
+                                            {formatCurrency(settleModalTotalToPay)}
                                         </span>
                                     </div>
-                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none text-brand-green">
-                                        {formatCurrency(settleModalTotalToPay)}
-                                    </span>
                                 </div>
-                            </div>
 
-                            {/* Table / List Container */}
-                            <FormSection hasSeparator title="Parcelas pendentes">
-                                {pendingInstallments.length === 0 ? (
-                                    <IconPlaceholder
-                                        icon={InstallmentIcon}
-                                        title="Nenhuma parcela pendente encontrada neste grupo."
-                                        subtitle="Nenhuma parcela pendente encontrada neste grupo. Verifique se as parcelas não foram pagas ou canceladas." />
-                                ) : (
-                                    <>
-                                        {/* Desktop Table */}
-                                        <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
-                                            <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
-                                                    <thead>
-                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                            <th className="py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg" style={{ width: "150px" }}>Parcela</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Vencimento</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Restante</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "160px" }}>Valor Pagamento</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "176px" }}>Meio de Pagamento</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Juros</th>
-                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Desconto</th>
-                                                            <th className="py-3 px-2 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg text-right">Total a Pagar</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {paginatedPendingInstallments.map((row: any) => {
-                                                            const values = settlePaymentsByInstallment[row.id] || {
-                                                                paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
-                                                                interestAmount: "0",
-                                                                discountAmount: "0",
-                                                                paymentMethodId: paymentMethods?.[0]?.id || "",
-                                                            }
-                                                            const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
-                                                            return (
-                                                                <motion.tr
-                                                                    key={row.id}
-                                                                    initial={{ opacity: 0 }}
-                                                                    animate={{ opacity: 1 }}
-                                                                    className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background"
-                                                                >
-                                                                    <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
-                                                                        <div className="flex flex-col text-left min-w-0">
-                                                                            <div className="flex items-center">
-                                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
-                                                                                    Parcela {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                                {/* Table / List Container */}
+                                <FormSection hasSeparator title="Parcelas pendentes">
+                                    {pendingInstallments.length === 0 ? (
+                                        <IconPlaceholder
+                                            icon={InstallmentIcon}
+                                            title="Nenhuma parcela pendente encontrada neste grupo."
+                                            subtitle="Nenhuma parcela pendente encontrada neste grupo. Verifique se as parcelas não foram pagas ou canceladas." />
+                                    ) : (
+                                        <>
+                                            {/* Desktop Table */}
+                                            <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                                <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
+                                                        <thead>
+                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                <th className="py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg" style={{ width: "150px" }}>Parcela</th>
+                                                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Vencimento</th>
+                                                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "110px" }}>Restante</th>
+                                                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "160px" }}>Valor Pagamento</th>
+                                                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "176px" }}>Meio de Pagamento</th>
+                                                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Juros</th>
+                                                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Desconto</th>
+                                                                <th className="py-3 px-2 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg text-right">Total a Pagar</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {paginatedPendingInstallments.map((row: any) => {
+                                                                const values = settlePaymentsByInstallment[row.id] || {
+                                                                    paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                                                    interestAmount: "0",
+                                                                    discountAmount: "0",
+                                                                    paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                                }
+                                                                const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                                                return (
+                                                                    <motion.tr
+                                                                        key={row.id}
+                                                                        initial={{ opacity: 0 }}
+                                                                        animate={{ opacity: 1 }}
+                                                                        className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background"
+                                                                    >
+                                                                        <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                                                                            <div className="flex flex-col text-left min-w-0">
+                                                                                <div className="flex items-center">
+                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                                                                        Parcela {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                                            <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                {row.dueDate || "-"}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                                {formatCurrency(Number(row.remainingAmount || 0))}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "160px" }}>
+                                                                            <MoneyInput
+                                                                                value={Number(values.paymentAmount || 0)}
+                                                                                onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                    ...prev,
+                                                                                    [row.id]: { ...values, paymentAmount: String(value) }
+                                                                                }))}
+                                                                                min={0}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "176px" }}>
+                                                                            <FormDropdown
+                                                                                value={values.paymentMethodId}
+                                                                                setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                    ...prev,
+                                                                                    [row.id]: { ...values, paymentMethodId: val }
+                                                                                }))}
+                                                                                options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                                                                    value: pm.id,
+                                                                                    label: pm.name,
+                                                                                }))}
+                                                                                placeholder="Selecione"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
+                                                                            <MoneyInput
+                                                                                value={Number(values.interestAmount || 0)}
+                                                                                onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                    ...prev,
+                                                                                    [row.id]: { ...values, interestAmount: String(value) }
+                                                                                }))}
+                                                                                min={0}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
+                                                                            <MoneyInput
+                                                                                value={Number(values.discountAmount || 0)}
+                                                                                onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                                    ...prev,
+                                                                                    [row.id]: { ...values, discountAmount: String(value) }
+                                                                                }))}
+                                                                                min={0}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-right">
+                                                                            <div className="flex items-center justify-end">
+                                                                                <span className="text-[13px] font-bold whitespace-nowrap text-brand-green">
+                                                                                    {formatCurrency(finalPaid)}
                                                                                 </span>
                                                                             </div>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                                                        <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            {row.dueDate || "-"}
+                                                                        </td>
+                                                                    </motion.tr>
+                                                                )
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            {/* Mobile Stacked View */}
+                                            <div className="md:hidden space-y-3 pb-24">
+                                                {paginatedPendingInstallments.map((row: any) => {
+                                                    const values = settlePaymentsByInstallment[row.id] || {
+                                                        paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                                        interestAmount: "0",
+                                                        discountAmount: "0",
+                                                        paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                    }
+                                                    const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                                    return (
+                                                        <motion.div
+                                                            key={row.id}
+                                                            initial={{ opacity: 0 }}
+                                                            animate={{ opacity: 1 }}
+                                                            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col"
+                                                        >
+                                                            {/* Card Header */}
+                                                            <div className="flex gap-3 mb-3">
+                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                    <InstallmentIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2 min-w-0">
+                                                                        <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
+                                                                            {row.description}
+                                                                        </h3>
+                                                                        <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
+                                                                            {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                            Venc: {row.dueDate || "-"}
                                                                         </span>
-                                                                    </td>
-                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Value section */}
+                                                            <div className="border-t border-brand-border dark:border-dark-border pt-3 flex flex-col gap-3">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Restante</span>
+                                                                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
                                                                             {formatCurrency(Number(row.remainingAmount || 0))}
                                                                         </span>
-                                                                    </td>
-                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "160px" }}>
-                                                                        <MoneyInput
-                                                                            value={Number(values.paymentAmount || 0)}
-                                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                                ...prev,
-                                                                                [row.id]: { ...values, paymentAmount: String(value) }
-                                                                            }))}
-                                                                            min={0}
-                                                                        />
-                                                                    </td>
-                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "176px" }}>
-                                                                        <FormDropdown
-                                                                            value={values.paymentMethodId}
-                                                                            setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
-                                                                                ...prev,
-                                                                                [row.id]: { ...values, paymentMethodId: val }
-                                                                            }))}
-                                                                            options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                                                                value: pm.id,
-                                                                                label: pm.name,
-                                                                            }))}
-                                                                            placeholder="Selecione"
-                                                                        />
-                                                                    </td>
-                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
-                                                                        <MoneyInput
-                                                                            value={Number(values.interestAmount || 0)}
-                                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                                ...prev,
-                                                                                [row.id]: { ...values, interestAmount: String(value) }
-                                                                            }))}
-                                                                            min={0}
-                                                                        />
-                                                                    </td>
-                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
-                                                                        <MoneyInput
-                                                                            value={Number(values.discountAmount || 0)}
-                                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                                ...prev,
-                                                                                [row.id]: { ...values, discountAmount: String(value) }
-                                                                            }))}
-                                                                            min={0}
-                                                                        />
-                                                                    </td>
-                                                                    <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-right">
-                                                                        <div className="flex items-center justify-end">
-                                                                            <span className="text-[13px] font-bold whitespace-nowrap text-brand-green">
-                                                                                {formatCurrency(finalPaid)}
-                                                                            </span>
-                                                                        </div>
-                                                                    </td>
-                                                                </motion.tr>
-                                                            )
-                                                        })}
-                                                    </tbody>
-                                                </table>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <MoneyInput
+                                                                        label="Valor Pagamento"
+                                                                        value={Number(values.paymentAmount || 0)}
+                                                                        onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                            ...prev,
+                                                                            [row.id]: { ...values, paymentAmount: String(value) }
+                                                                        }))}
+                                                                        min={0}
+                                                                    />
+                                                                    <FormDropdown
+                                                                        label="Meio de Pagamento"
+                                                                        value={values.paymentMethodId}
+                                                                        setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
+                                                                            ...prev,
+                                                                            [row.id]: { ...values, paymentMethodId: val }
+                                                                        }))}
+                                                                        options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                                                            value: pm.id,
+                                                                            label: pm.name,
+                                                                        }))}
+                                                                        placeholder="Selecione"
+                                                                    />
+                                                                    <MoneyInput
+                                                                        label="Juros"
+                                                                        value={Number(values.interestAmount || 0)}
+                                                                        onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                            ...prev,
+                                                                            [row.id]: { ...values, interestAmount: String(value) }
+                                                                        }))}
+                                                                        min={0}
+                                                                    />
+                                                                    <MoneyInput
+                                                                        label="Desconto"
+                                                                        value={Number(values.discountAmount || 0)}
+                                                                        onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                            ...prev,
+                                                                            [row.id]: { ...values, discountAmount: String(value) }
+                                                                        }))}
+                                                                        min={0}
+                                                                    />
+                                                                </div>
+
+                                                                <div className="flex justify-between items-center bg-brand-green/5 px-4 py-3 rounded-xl border border-brand-green/10">
+                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total a Pagar</span>
+                                                                    <span className="text-[15px] font-bold text-brand-green">{formatCurrency(finalPaid)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    )
+                                                })}
                                             </div>
-                                        </div>
 
-                                        {/* Mobile Stacked View */}
-                                        <div className="md:hidden space-y-3 pb-24">
-                                            {paginatedPendingInstallments.map((row: any) => {
-                                                const values = settlePaymentsByInstallment[row.id] || {
-                                                    paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
-                                                    interestAmount: "0",
-                                                    discountAmount: "0",
-                                                    paymentMethodId: paymentMethods?.[0]?.id || "",
-                                                }
-                                                const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
-                                                return (
-                                                    <motion.div
-                                                        key={row.id}
-                                                        initial={{ opacity: 0 }}
-                                                        animate={{ opacity: 1 }}
-                                                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col"
-                                                    >
-                                                        {/* Card Header */}
-                                                        <div className="flex gap-3 mb-3">
-                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                <InstallmentIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 min-w-0">
-                                                                    <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
-                                                                        {row.description}
-                                                                    </h3>
-                                                                    <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
-                                                                        {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
-                                                                    </Badge>
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5 mt-0.5">
-                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        Venc: {row.dueDate || "-"}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Value section */}
-                                                        <div className="border-t border-brand-border dark:border-dark-border pt-3 flex flex-col gap-3">
-                                                            <div className="flex justify-between items-start">
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Restante</span>
-                                                                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                                                        {formatCurrency(Number(row.remainingAmount || 0))}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="grid grid-cols-2 gap-3">
-                                                                <MoneyInput
-                                                                    label="Valor Pagamento"
-                                                                    value={Number(values.paymentAmount || 0)}
-                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                        ...prev,
-                                                                        [row.id]: { ...values, paymentAmount: String(value) }
-                                                                    }))}
-                                                                    min={0}
-                                                                />
-                                                                <FormDropdown
-                                                                    label="Meio de Pagamento"
-                                                                    value={values.paymentMethodId}
-                                                                    setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
-                                                                        ...prev,
-                                                                        [row.id]: { ...values, paymentMethodId: val }
-                                                                    }))}
-                                                                    options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                                                        value: pm.id,
-                                                                        label: pm.name,
-                                                                    }))}
-                                                                    placeholder="Selecione"
-                                                                />
-                                                                <MoneyInput
-                                                                    label="Juros"
-                                                                    value={Number(values.interestAmount || 0)}
-                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                        ...prev,
-                                                                        [row.id]: { ...values, interestAmount: String(value) }
-                                                                    }))}
-                                                                    min={0}
-                                                                />
-                                                                <MoneyInput
-                                                                    label="Desconto"
-                                                                    value={Number(values.discountAmount || 0)}
-                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
-                                                                        ...prev,
-                                                                        [row.id]: { ...values, discountAmount: String(value) }
-                                                                    }))}
-                                                                    min={0}
-                                                                />
-                                                            </div>
-
-                                                            <div className="flex justify-between items-center bg-brand-green/5 px-4 py-3 rounded-xl border border-brand-green/10">
-                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total a Pagar</span>
-                                                                <span className="text-[15px] font-bold text-brand-green">{formatCurrency(finalPaid)}</span>
-                                                            </div>
-                                                        </div>
-                                                    </motion.div>
-                                                )
-                                            })}
-                                        </div>
-
-                                        {/* Pagination */}
-                                        {pendingCount > SETTLE_PAGE_SIZE && (
-                                            <Pagination
-                                                currentPage={settlePageClamped}
-                                                totalPages={settleTotalPages}
-                                                onPageChange={setSettleInstallmentPage}
-                                                inline
-                                            />
-                                        )}
-                                    </>
-                                )}
-                            </FormSection>
+                                            {/* Pagination */}
+                                            {pendingCount > SETTLE_PAGE_SIZE && (
+                                                <Pagination
+                                                    currentPage={settlePageClamped}
+                                                    totalPages={settleTotalPages}
+                                                    onPageChange={setSettleInstallmentPage}
+                                                    inline
+                                                />
+                                            )}
+                                        </>
+                                    )}
+                                </FormSection>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1791,7 +1783,7 @@ export default function TransactionsPage({
         )
     }
 
-    if (openInstallmentGroupId) {
+    if (isViewing && entityState.entityType === "installment") {
         return (
             <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background transition-colors duration-500 ease-in-out">
                 <div className="flex flex-col h-full overflow-hidden">
@@ -1801,14 +1793,15 @@ export default function TransactionsPage({
                             <div className="flex items-center gap-3">
 
                                 {/* Back button - desktop only */}
-                                <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={() => {
-                                        setOpenInstallmentGroupId(null)
+                                        closeEntity()
                                         setInstallmentDetail(null)
                                     }} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
+
                                 {/* Title row */}
                                 <div className="hidden md:flex items-start justify-between">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
@@ -1938,14 +1931,18 @@ export default function TransactionsPage({
         )
     }
 
-    const isFormOpen = (entityState.isOpen && (entityState.action === "create" || entityState.action === "edit" || entityState.action === "duplicate")) || !!editingRecurringTemplateId
+    const isFormOpen = entityState.isOpen && (
+        entityState.action === "create" ||
+        entityState.action === "duplicate" ||
+        entityState.action === "edit"
+    )
     // Plain expression (NOT useMemo - can't use hooks after early returns)
     const editingTx = (entityState.isOpen && entityState.action === "edit" && entityState.entityId)
         ? loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId) || null
         : null
 
     if (isFormOpen) {
-        if (entityState.action === "edit" && isLoadingDetail) {
+        if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring") {
             return (
                 <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
                     <ThreeDotsLoader />
@@ -1954,7 +1951,7 @@ export default function TransactionsPage({
         }
         return (
             <motion.div
-                key={editingRecurringTemplateId ? `edit-rec-${editingRecurringTemplateId}` : editingTx ? `edit-${editingTx.id}` : "create-transaction"}
+                key={entityState.entityType === "recurring" ? `edit-rec-${entityState.entityId}` : editingTx ? `edit-${editingTx.id}` : "create-transaction"}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -1967,19 +1964,17 @@ export default function TransactionsPage({
                     accounts={accounts}
                     paymentMethods={paymentMethods}
                     editTransaction={editingTx || undefined}
-                    editRecurringTemplateId={editingRecurringTemplateId || undefined}
-                    editRecurringTemplate={editingRecurringTemplateId ? recurringTemplates?.find((t: any) => t.id === editingRecurringTemplateId) : undefined}
+                    editRecurringTemplateId={entityState.entityType === "recurring" ? (entityState.entityId || undefined) : undefined}
+                    editRecurringTemplate={entityState.entityType === "recurring" ? recurringTemplates?.find((t: any) => t.id === entityState.entityId) : undefined}
                     forcedTab={forcedTab}
                     onBack={() => {
                         closeEntity()
-                        setEditingRecurringTemplateId(null)
                     }}
                     onSuccess={() => {
                         // Invalidate caches + close (same pattern as Products)
                         if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
                         afterMutation(entityState.entityId || undefined)
                         closeEntity()
-                        setEditingRecurringTemplateId(null)
                     }}
                 />
             </motion.div>

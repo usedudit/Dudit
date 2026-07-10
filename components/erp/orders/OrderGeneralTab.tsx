@@ -664,7 +664,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         {isPaidOrder ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
-                                <PaymentRow label="Canal de Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
+                                <PaymentRow label="Origem da Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
                                 <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
                                 {!isQuickMode && (
                                     <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
@@ -685,7 +685,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 />
 
                                 <FormDropdown
-                                    label="Canal de Venda"
+                                    label="Origem da Venda"
                                     disabled={isMarketplaceLocked}
                                     value={salesChannel}
                                     setValue={(val: any) => setSalesChannel(val)}
@@ -881,13 +881,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
                                                 />
                                             )}
-                                            <ListItem
-                                                icon={TruckIcon}
-                                                title="Adicionar entrega"
-                                                description="Define o valor da entrega do pedido"
-                                                onClick={isMarketplaceLocked ? undefined : onOpenShipping}
-                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                            />
+                                            {deliveryMethod === "delivery" && (
+                                                <ListItem
+                                                    icon={TruckIcon}
+                                                    title="Adicionar entrega"
+                                                    description="Define o valor da entrega do pedido"
+                                                    onClick={isMarketplaceLocked ? undefined : onOpenShipping}
+                                                    className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                />
+                                            )}
                                         </>
                                     )}
                                     <MoneyInput
@@ -1289,7 +1291,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     {isPaidOrder ? (
                         <div className="space-y-4 text-left">
                             <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
-                            <PaymentRow label="Canal de Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
+                            <PaymentRow label="Origem da Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
                             <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
                             {!isQuickMode && (
                                 <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
@@ -1310,7 +1312,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             />
 
                             <FormDropdown
-                                label="Canal de Venda"
+                                label="Origem da Venda"
                                 disabled={isMarketplaceLocked}
                                 value={salesChannel}
                                 setValue={(val: any) => setSalesChannel(val)}

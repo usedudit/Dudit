@@ -687,7 +687,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
 
                 {/* Content Body */}
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-8">
-                    <div className="pmax-w-[1300px] mx-auto min-h-[400px]">
+                    <div className="max-w-[1300px] mx-auto min-h-[400px]">
                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
 
                             {/* Left Column */}

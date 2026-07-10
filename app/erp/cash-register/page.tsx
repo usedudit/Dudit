@@ -9,7 +9,10 @@ import CashRegisterPage from "@/components/erp/cash-register/CashRegisterPage"
 
 export const dynamic = "force-dynamic"
 
-export default async function CashRegisterPageServer() {
+export default async function CashRegisterPageServer(props: { searchParams?: Promise<{ view?: string }> }) {
+  const searchParams = await props.searchParams
+  const viewId = searchParams?.view || null
+
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
@@ -42,6 +45,7 @@ export default async function CashRegisterPageServer() {
           initialNextCursor={historyResult.nextCursor}
           initialHasMore={historyResult.hasMore}
           initialActiveSession={activeSessionResult.data || null}
+          initialViewId={viewId}
         />
       </FadeIn>
     </>

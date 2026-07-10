@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { XIcon } from "@/lib/icons"
-import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox } from "@/components/reusable"
+import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -72,6 +72,7 @@ export default function POSShippingSheet({
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [breakdown, setBreakdown] = useState<Record<string, unknown> | null>(null)
   const [isQuoteLoading, setIsQuoteLoading] = useState(false)
+  const [deliveryError, setDeliveryError] = useState<string | null>(null)
 
   const [zipCode, setZipCode] = useState("")
   const [street, setStreet] = useState("")
@@ -85,10 +86,10 @@ export default function POSShippingSheet({
   useEffect(() => {
     if (!isOpen) return
     setShippingInput(Number(currentShippingFee || 0))
-    // Keep auto-quote enabled on open; "Sem custo" should be an explicit user choice.
     setShippingFree(false)
     setIsCustomShipping(false)
     setCalculatedFee(0)
+    setDeliveryError(null)
   }, [isOpen, currentShippingFee])
 
   useEffect(() => {
@@ -140,7 +141,8 @@ export default function POSShippingSheet({
     if (!isOpen || !hasSelectedCustomer || !hasStreet) return
     const destinationAddress = `${customerDetails?.address?.street || ""}, ${customerDetails?.address?.number || ""} - ${customerDetails?.address?.neighborhood || ""}, ${customerDetails?.address?.city || ""} - ${customerDetails?.address?.state || ""}, ${customerDetails?.address?.zipCode || ""}`
     setIsQuoteLoading(true)
-    const timer = setTimeout(async () => {
+    setDeliveryError(null)
+    ;(async () => {
       const quote = await quoteDeliveryFeeAction({
         partnerId,
         destinationAddress,
@@ -152,13 +154,13 @@ export default function POSShippingSheet({
         const fee = Number(quote.fee || 0)
         setCalculatedFee(fee)
         if (!shippingFree) setShippingInput(fee)
+        setDeliveryError(null)
+      } else {
+        setDeliveryError(quote.error || "Não foi possível calcular o frete.")
       }
       setIsQuoteLoading(false)
-    }, 250)
-    return () => {
-      active = false
-      clearTimeout(timer)
-    }
+    })()
+    return () => { active = false }
   }, [isOpen, hasSelectedCustomer, hasStreet, customerDetails?.id, customerDetails?.address?.street, customerDetails?.address?.number, customerDetails?.address?.city, customerDetails?.address?.state, customerDetails?.address?.zipCode, customerDetails?.address?.neighborhood, partnerId, shippingFree])
 
   const content = (
@@ -200,16 +202,24 @@ export default function POSShippingSheet({
             )}
           </TabsContent>
           <TabsContent value="valores" className="mt-4 space-y-4">
-            <div className="rounded-xl border border-brand-border p-4 text-sm dark:border-dark-border">
-              <div className="flex justify-between"><span>Distância</span><span>{distanceKm == null ? "-" : `${distanceKm.toFixed(2)} km`}</span></div>
-              <div className="flex justify-between"><span>Taxa base</span><span>R$ {Number((breakdown as any)?.baseFee || 0).toFixed(2)}</span></div>
-              <div className="flex justify-between"><span>Taxa por distância</span><span>R$ {Number((breakdown as any)?.distanceFee || 0).toFixed(2)}</span></div>
-              <div className="flex justify-between"><span>Ajuste por horário</span><span>R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span></div>
-              <div className="mt-2 border-t border-brand-border pt-2 font-bold dark:border-dark-border flex justify-between">
-                <span>Taxa final</span><span>R$ {Number(shippingFeeValue || 0).toFixed(2)}</span>
+            {deliveryError ? (
+              <InfoCard
+                color="red"
+                title="Entrega indisponível"
+                message={deliveryError}
+              />
+            ) : (
+              <div className="rounded-xl border border-brand-border p-4 text-sm dark:border-dark-border">
+                <div className="flex justify-between"><span>Distância</span><span>{distanceKm == null ? "-" : `${distanceKm.toFixed(2)} km`}</span></div>
+                <div className="flex justify-between"><span>Taxa base</span><span>R$ {Number((breakdown as any)?.baseFee || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Taxa por distância</span><span>R$ {Number((breakdown as any)?.distanceFee || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Ajuste por horário</span><span>R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span></div>
+                <div className="mt-2 border-t border-brand-border pt-2 font-bold dark:border-dark-border flex justify-between">
+                  <span>Taxa final</span><span>R$ {Number(shippingFeeValue || 0).toFixed(2)}</span>
+                </div>
+                {isQuoteLoading && <p className="mt-2 text-xs text-brand-inactive-text">Recalculando valores...</p>}
               </div>
-              {isQuoteLoading && <p className="mt-2 text-xs text-brand-inactive-text">Recalculando valores...</p>}
-            </div>
+            )}
 
             {hasSelectedCustomer && hasStreet && (
               <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border space-y-4">

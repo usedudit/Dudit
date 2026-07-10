@@ -91,7 +91,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
             )}
             {filters.channel.length > 0 && (
                 <FilterChip
-                    label="Canal"
+                    label="Origem"
                     value={filters.channel.join(", ")}
                     icon={<StoreIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, channel: [] }))}

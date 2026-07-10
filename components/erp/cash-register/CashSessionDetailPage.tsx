@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ActionsDropdown, Badge, Button, DefaultModal, DropdownItem, IconPlaceholder, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { ActionsDropdown, Badge, Button, DefaultModal, DropdownItem, FormSection, IconPlaceholder, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
@@ -250,6 +250,33 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     }
 
     const movementModalTitle = movModal === "withdrawal" ? "Registrar sangria" : movModal === "deposit" ? "Registrar reforço" : "Movimentação de caixa"
+
+    const groupedRows = closeSummary?.groupedByMethod || []
+    const closePreview = useMemo(() => {
+        if (!closeSummary) return null
+        const opening = Number(closeSummary.drawer?.initial || 0)
+        const deposits = Number(closeSummary.drawer?.deposits || 0)
+        const withdrawals = Number(closeSummary.drawer?.withdrawals || 0)
+        const refunds = Number(closeSummary.drawer?.refunds || 0)
+        const expectedDrawerTotal = Number(closeSummary.expectedDrawerTotal || 0)
+        const expectedCashSales = Number(closeSummary.drawer?.cashSales || 0)
+        const informedCashSales = groupedRows.reduce((acc: number, row: any) => {
+            const key = row.paymentMethodId || "__none__"
+            const raw = Number(String(countedByPm[key] ?? row.calculated ?? 0).replace(",", "."))
+            const value = Number.isFinite(raw) ? raw : 0
+            const type = String(row.paymentMethodType || "").toLowerCase()
+            const isCash = type === "cash" || (!row.paymentMethodId && type !== "pix")
+            return isCash ? acc + value : acc
+        }, 0)
+        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals - refunds
+        return {
+            opening,
+            expectedCashSales,
+            expectedDrawerTotal,
+            informedDrawerTotal,
+            difference: informedDrawerTotal - expectedDrawerTotal,
+        }
+    }, [closeSummary, groupedRows, countedByPm])
 
     return (
         <FadeIn>
@@ -593,15 +620,115 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
 
                 <DefaultModal isOpen={closeOpen} onClose={closeCloseModal} title="Fechar caixa">
                     <div className="space-y-4">
-                        {closeSummary && <InfoCard title="Saldo total registrado" message={formatCurrency(Number(closeSummary.expectedDrawerTotal || 0))} color="gray" />}
-                        {(closeSummary?.groupedByMethod || []).length === 0 ? <MoneyInput label="Valor registrado" value={Number(countedByPm.__total__ ?? closeSummary?.expectedDrawerTotal ?? 0)} onChange={(v) => setCountedByPm((prev) => ({ ...prev, __total__: String(v) }))} /> : (closeSummary?.groupedByMethod || []).map((row: any) => {
-                            const key = row.paymentMethodId || "__none__"
-                            return <MoneyInput key={key} label={`Valor informado - ${row.label}`} value={Number(countedByPm[key] ?? row.calculated ?? 0)} onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))} />
-                        })}
-                        <Input label="Observações" value={closingNotes} onChange={(e: any) => setClosingNotes(e.target.value)} />
+                        {isPreparingClose && !closeSummary ? (
+                            <ThreeDotsLoader />
+                        ) : closeSummary ? (
+                            <>
+                                {closePreview ? (
+                                    <FormSection title="Saldo na gaveta">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo de abertura</p>
+                                                <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(closePreview.opening)}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Vendas em dinheiro</p>
+                                                <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(closePreview.expectedCashSales)}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo esperado na gaveta</p>
+                                                <p className="mt-1 text-sm font-semibold text-brand-primary">
+                                                    {formatCurrency(closePreview.expectedDrawerTotal)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo informado com a contagem</p>
+                                            <div className="mt-1 flex items-center justify-between gap-3">
+                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(closePreview.informedDrawerTotal)}
+                                                </p>
+                                                <p className={`text-sm font-bold ${closePreview.difference === 0 ? "text-brand-green" : "text-brand-orange"}`}>
+                                                    Diferença: {formatCurrency(closePreview.difference)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </FormSection>
+                                ) : null}
+
+                                <FormSection title="Resumo calculado" hasSeparator className="mb-8">
+                                    {groupedRows.length > 0 ? (
+                                        groupedRows.map((row: any) => {
+                                            const lowerLabel = row.label?.toLowerCase() || ""
+                                            let Icon = MoneyIcon
+                                            if (lowerLabel.includes("dinheiro")) Icon = MoneyIcon
+                                            if (lowerLabel.includes("cartão") || lowerLabel.includes("cartao")) Icon = CreditCardIcon
+                                            if (lowerLabel.includes("pix")) Icon = QRCodeIcon
+                                            return (
+                                                <div key={row.paymentMethodId || row.label} className="w-full rounded-2xl bg-brand-gray/80 dark:bg-dark-border/20 p-3 flex items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-9 h-9 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                            <Icon className="w-5 h-5" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{row.label}</p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculado no período</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">
+                                                        {formatCurrency(Number(row.calculated ?? row.total ?? 0))}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })
+                                    ) : (
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                            Nenhuma venda no período desta sessão.
+                                        </p>
+                                    )}
+                                </FormSection>
+
+                                {groupedRows.length === 0 ? (
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                        Sem formas de pagamento para conferência nesta sessão.
+                                    </p>
+                                ) : (
+                                    <FormSection title="Contagem de dinheiro no caixa" hasSeparator>
+                                        {groupedRows.filter((row: any) => {
+                                            const type = String(row.paymentMethodType || "").toLowerCase()
+                                            const label = String(row.label || "").toLowerCase()
+                                            return type === "cash" || label.includes("dinheiro")
+                                        }).map((row: any) => {
+                                            const key = row.paymentMethodId || "__none__"
+                                            return (
+                                                <MoneyInput
+                                                    key={key}
+                                                    label={`Contado - ${row.label}`}
+                                                    value={Number(countedByPm[key] ?? row.calculated ?? 0)}
+                                                    onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))}
+                                                />
+                                            )
+                                        })}
+                                    </FormSection>
+                                )}
+                            </>
+                        ) : null}
+
+                        <Input
+                            label="Observações de fechamento"
+                            value={closingNotes}
+                            onChange={(e: any) => setClosingNotes(e.target.value)}
+                            maxLength={200}
+                        />
                         <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>
-                            <Button id="cash-close-submit" onClick={handleClose} isLoading={isClosing}>Confirmar fechamento</Button>
+                            <Button id="cash-close-submit" onClick={handleClose} isLoading={isClosing}>
+                                Confirmar fechamento
+                            </Button>
                         </div>
                     </div>
                 </DefaultModal>

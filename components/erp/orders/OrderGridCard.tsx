@@ -176,7 +176,7 @@ const OrderGridCard = React.memo(
                     {/* Row 2: Canal & Actions */}
                     <div className="flex justify-between items-end gap-2">
                         <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Canal</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Origem</span>
                             <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
                                     {order.order_source || "Manual"}

@@ -11,6 +11,12 @@ export default function ERPErrorBoundary({
     useEffect(() => {
         console.error("ERP Error Boundary caught:", error)
 
+        fetch("/api/log-error", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: error.message, stack: error.stack, name: error.name, digest: (error as any).digest }),
+        }).catch(() => {})
+
         const isChunkError =
             error.name === "ChunkLoadError" ||
             error.message?.includes("ChunkLoadError") ||

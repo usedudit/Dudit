@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -11,6 +12,8 @@ import {
     MoneyInput,
     IconPlaceholder,
     SkeletonLoader,
+    FormSection,
+    ThreeDotsLoader,
 } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -97,12 +100,12 @@ function resolvePaymentMethodVisual(row: any) {
     const type = String(row?.paymentMethodType || "").toLowerCase()
     const label = String(row?.label || "").toLowerCase()
     if (type === "cash" || label.includes("dinheiro")) {
-        return { Icon: MoneyIcon, bg: "bg-emerald-50 dark:bg-emerald-500/15", fg: "text-emerald-600 dark:text-emerald-300" }
+        return { Icon: MoneyIcon }
     }
     if (type === "pix" || label.includes("pix")) {
-        return { Icon: QRCodeIcon, bg: "bg-cyan-50 dark:bg-cyan-500/15", fg: "text-cyan-600 dark:text-cyan-300" }
+        return { Icon: QRCodeIcon }
     }
-    return { Icon: CreditCardIcon, bg: "bg-violet-50 dark:bg-violet-500/15", fg: "text-violet-600 dark:text-violet-300" }
+    return { Icon: CreditCardIcon }
 }
 
 export default function CashRegisterPage({
@@ -111,17 +114,21 @@ export default function CashRegisterPage({
     initialNextCursor,
     initialHasMore,
     initialActiveSession,
+    initialViewId,
 }: {
     partnerId: string
     initialHistory: SessionItem[]
     initialNextCursor: ERPCashSessionListCursor | null
     initialHasMore: boolean
     initialActiveSession: any | null
+    initialViewId?: string | null
 }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { exportData, isExporting } = useErpExport()
     const isMobile = useMediaQuery("(max-width: 768px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
+    const router = useRouter()
+    const pathname = usePathname()
 
     const [activeSession, setActiveSession] = useState<any | null>(initialActiveSession || null)
     const [search, setSearch] = useState("")
@@ -198,6 +205,13 @@ export default function CashRegisterPage({
         window.addEventListener('erp-sidebar-reset', handleReset)
         return () => window.removeEventListener('erp-sidebar-reset', handleReset)
     }, [])
+
+    // Auto-load session detail from URL ?view=id on initial mount
+    useEffect(() => {
+        if (initialViewId && !selectedSessionId) {
+            handleViewDetails(initialViewId)
+        }
+    }, [initialViewId, selectedSessionId])
 
     const operatorOptions = useMemo(() => {
         const names = new Set<string>()
@@ -289,10 +303,11 @@ export default function CashRegisterPage({
         await refetch()
     }
 
-    const handleViewDetails = async (id: string) => {
+    const handleViewDetails = useCallback(async (id: string) => {
         setSelectedSessionId(id)
         setDetailedSession(null)
         setIsDetailLoading(true)
+        router.replace(`${pathname}?view=${id}`, { scroll: false })
         try {
             const res = await getCashSessionDetailsAction(partnerId, id)
             if (res.success) {
@@ -300,14 +315,22 @@ export default function CashRegisterPage({
             } else {
                 notifyError(res.error || "Erro ao carregar detalhes")
                 setSelectedSessionId(null)
+                router.replace(pathname, { scroll: false })
             }
         } catch {
             notifyError("Erro de conexão ao carregar detalhes")
             setSelectedSessionId(null)
+            router.replace(pathname, { scroll: false })
         } finally {
             setIsDetailLoading(false)
         }
-    }
+    }, [partnerId, pathname, router])
+
+    useEffect(() => {
+        if (initialViewId && !selectedSessionId) {
+            handleViewDetails(initialViewId)
+        }
+    }, [initialViewId, handleViewDetails])
 
     const resetOpenForm = () => {
         setOpeningBalance(0)
@@ -485,7 +508,7 @@ export default function CashRegisterPage({
 
     return (
         <AnimatePresence mode="wait">
-            {selectedSessionId ? (
+{selectedSessionId ? (
                 <CashSessionDetailPage
                     key="detail"
                     partnerId={partnerId}
@@ -494,6 +517,7 @@ export default function CashRegisterPage({
                     onBack={() => {
                         setSelectedSessionId(null)
                         setDetailedSession(null)
+                        router.replace(pathname, { scroll: false })
                     }}
                 />
             ) : (
@@ -703,21 +727,11 @@ export default function CashRegisterPage({
                     <DefaultModal isOpen={closeModal} onClose={closeCloseModal} title="Fechar caixa">
                         <div className="space-y-4">
                             {isPreparingClose && !closeSummary ? (
-                                <>
-                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-3">
-                                        <SkeletonLoader className="h-4 w-36 rounded-full" />
-                                        <SkeletonLoader className="h-8 w-48 rounded-xl" />
-                                    </div>
-                                    <div className="space-y-3">
-                                        <SkeletonLoader className="h-12 w-full rounded-xl" />
-                                        <SkeletonLoader className="h-12 w-full rounded-xl" />
-                                        <SkeletonLoader className="h-12 w-full rounded-xl" />
-                                    </div>
-                                </>
+                                <ThreeDotsLoader />
                             ) : closeSummary ? (
                                 <>
                                     {closePreview ? (
-                                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-3">
+                                        <FormSection title="Saldo na gaveta">
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                                 <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
                                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo de abertura</p>
@@ -744,26 +758,23 @@ export default function CashRegisterPage({
                                                     <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                         {formatCurrency(closePreview.informedDrawerTotal)}
                                                     </p>
-                                                    <p className={`text-sm font-bold ${closePreview.difference === 0 ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"}`}>
+                                                    <p className={`text-sm font-bold ${closePreview.difference === 0 ? "text-brand-green" : "text-brand-orange"}`}>
                                                         Diferença: {formatCurrency(closePreview.difference)}
                                                     </p>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </FormSection>
                                     ) : null}
 
-                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-2">
-                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            Resumo calculado
-                                        </p>
+                                    <FormSection title="Resumo calculado" hasSeparator className="mb-8">
                                         {groupedRows.length > 0 ? (
                                             groupedRows.map((row: any) => {
                                                 const visual = resolvePaymentMethodVisual(row)
                                                 return (
                                                     <div key={row.paymentMethodId || row.label} className="w-full rounded-2xl bg-brand-gray/80 dark:bg-dark-border/20 p-3 flex items-center justify-between gap-3">
                                                         <div className="flex items-center gap-3 min-w-0">
-                                                            <div className={`w-9 h-9 rounded-full ${visual.bg} flex items-center justify-center`}>
-                                                                <visual.Icon className={`w-5 h-5 ${visual.fg}`} />
+                                                            <div className="w-9 h-9 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                <visual.Icon className="w-5 h-5" />
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{row.label}</p>
@@ -781,18 +792,19 @@ export default function CashRegisterPage({
                                                 Nenhuma venda no período desta sessão.
                                             </p>
                                         )}
-                                    </div>
+                                    </FormSection>
 
                                     {groupedRows.length === 0 ? (
                                         <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                             Sem formas de pagamento para conferência nesta sessão.
                                         </p>
                                     ) : (
-                                        <div className="space-y-3">
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                Contagem informada por forma de pagamento
-                                            </p>
-                                            {groupedRows.map((row: any) => {
+                                        <FormSection title="Contagem de dinheiro no caixa" hasSeparator>
+                                            {groupedRows.filter((row: any) => {
+                                                const type = String(row.paymentMethodType || "").toLowerCase()
+                                                const label = String(row.label || "").toLowerCase()
+                                                return type === "cash" || label.includes("dinheiro")
+                                            }).map((row: any) => {
                                                 const key = row.paymentMethodId || "__none__"
                                                 return (
                                                     <MoneyInput
@@ -803,7 +815,7 @@ export default function CashRegisterPage({
                                                     />
                                                 )
                                             })}
-                                        </div>
+                                        </FormSection>
                                     )}
                                 </>
                             ) : null}
@@ -812,6 +824,7 @@ export default function CashRegisterPage({
                                 label="Observações de fechamento"
                                 value={closingNotes}
                                 onChange={(e: any) => setClosingNotes(e.target.value)}
+                                maxLength={200}
                             />
                             <div className="flex justify-end gap-2">
                                 <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>
@@ -822,7 +835,8 @@ export default function CashRegisterPage({
                         </div>
                     </DefaultModal>
                 </FadeIn>
-            )}
-        </AnimatePresence>
+            )
+            }
+        </AnimatePresence >
     )
 }

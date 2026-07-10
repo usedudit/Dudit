@@ -1590,3 +1590,163 @@ export async function getAppointmentOrderDataAction(orderId: string, partnerId: 
     return null
   }
 }
+
+export async function getAppointmentDetailsDataAction(params: {
+  appointmentId?: string
+  partnerId: string
+  linkedOrderId?: string | null
+}) {
+  try {
+    const user = await requireUser()
+    if (!user) return { success: false, error: "Não autenticado" }
+
+    const { appointmentId, partnerId, linkedOrderId } = params
+
+    // Verify view permissions once
+    await requirePermission(partnerId, "appointments", "view")
+
+    const supabase = createAdminClient()
+
+    // Run all database fetches in parallel on the server
+    const [financeAccountsRes, partnerPlanRes, appointmentItemsRes, orderDataRes] = await Promise.all([
+      // 1. Finance accounts
+      supabase
+        .from("finance_accounts")
+        .select("id, is_active, account_type")
+        .eq("partner_id", partnerId),
+        
+      // 2. Partner plan
+      supabase
+        .from("subscriptions")
+        .select("plan_id, status")
+        .eq("partner_id", partnerId)
+        .in("status", ["active", "trialing", "past_due"])
+        .maybeSingle(),
+
+      // 3. Appointment items (if appointmentId provided)
+      appointmentId ? supabase
+        .from("appointment_items")
+        .select(`
+            id, 
+            appointment_id, 
+            product_id, 
+            variant_id, 
+            service_id, 
+            name, 
+            quantity, 
+            usage_type, 
+            created_at, 
+            updated_at,
+            products(name, sku, stock_quantity, stock_available, images),
+            services(name)
+        `)
+        .eq("appointment_id", appointmentId)
+        .order("created_at", { ascending: true })
+        .limit(500) : Promise.resolve({ data: null, error: null }),
+
+      // 4. Order and Order items (if linkedOrderId provided)
+      linkedOrderId ? Promise.all([
+        supabase
+          .from("orders")
+          .select("order_number, situation, total_amount, paid_amount, payment_method, order_source")
+          .eq("id", linkedOrderId)
+          .eq("partner_id", partnerId)
+          .maybeSingle(),
+        supabase
+          .from("order_items")
+          .select("id, line_type, product_name, product_price, quantity, subtotal, service_id, is_gift, original_price")
+          .eq("order_id", linkedOrderId)
+          .order("created_at", { ascending: true })
+      ]) : Promise.resolve([null, null])
+    ])
+
+    // Process Finance Account
+    let defaultFinanceAccountId = null
+    if (financeAccountsRes.data) {
+      const active = financeAccountsRes.data.filter((a: any) => a.is_active !== false)
+      const bankAcct = active.find((a: any) => a.account_type === 'bank')
+      const cashAcct = active.find((a: any) => a.account_type === 'cash')
+      defaultFinanceAccountId = bankAcct?.id || cashAcct?.id || active[0]?.id || null
+    }
+
+    // Process Partner Plan
+    let planSlug = 'free'
+    if (partnerPlanRes.data?.plan_id) {
+      const { data: plan } = await supabase
+        .from("plans")
+        .select("slug")
+        .eq("id", partnerPlanRes.data.plan_id)
+        .maybeSingle()
+      planSlug = plan?.slug || 'free'
+    }
+
+    // Process Appointment Items
+    let appointmentItems = []
+    if (appointmentItemsRes.data) {
+      appointmentItems = appointmentItemsRes.data.map((item: any) => {
+        const p = item.products
+        const s = item.services
+        return {
+          id: item.id,
+          appointmentId: item.appointment_id,
+          productId: item.product_id,
+          variantId: item.variant_id,
+          serviceId: item.service_id,
+          name: item.name,
+          quantity: item.quantity,
+          usageType: item.usage_type,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          product: p ? {
+              name: p.name,
+              sku: p.sku || 'N/A',
+              image: p.images?.[0] || null,
+              stock: p.stock_available ?? p.stock_quantity ?? 0,
+          } : null,
+          serviceName: s?.name || null,
+        }
+      })
+    }
+
+    // Process Order Data
+    let orderData = null
+    if (linkedOrderId && orderDataRes) {
+      const [orderRes, itemsRes] = orderDataRes as any
+      if (orderRes?.data) {
+        orderData = {
+          orderNumber: orderRes.data.order_number || null,
+          situation: orderRes.data.situation || "pending",
+          totalAmount: Number(orderRes.data.total_amount || 0),
+          paidAmount: Number(orderRes.data.paid_amount || 0),
+          paymentMethod: orderRes.data.payment_method || "",
+          orderSource: orderRes.data.order_source || "",
+          items: (itemsRes?.data || []).map((item: any) => ({
+            id: item.id,
+            lineType: item.line_type || "product",
+            productName: item.product_name,
+            productPrice: Number(item.product_price || 0),
+            quantity: Number(item.quantity || 0),
+            subtotal: Number(item.subtotal || 0),
+            serviceId: item.service_id || null,
+            isGift: Boolean(item.is_gift),
+            originalPrice: item.original_price ? Number(item.original_price) : null,
+          })),
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        defaultFinanceAccountId,
+        planSlug,
+        appointmentItems,
+        orderData,
+      }
+    }
+  } catch (err: any) {
+    console.error("getAppointmentDetailsDataAction error:", err)
+    return { success: false, error: err.message || "Erro ao buscar dados do agendamento" }
+  }
+}
+

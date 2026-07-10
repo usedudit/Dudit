@@ -117,7 +117,7 @@ const INITIAL_FILTERS: FilterState = {
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "order_id", label: "Pedido", align: "left", width: "200px" },
     { id: "customer", label: "Cliente", align: "left", width: "250px" },
-    { id: "channel", label: "Canal", align: "left", width: "150px" },
+    { id: "channel", label: "Origem", align: "left", width: "150px" },
     { id: "date", label: "Data", align: "left", width: "150px" },
     { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "status", label: "Status", align: "left", width: "80px" },
@@ -304,7 +304,7 @@ export default function OrdersPage({
             { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
             {
                 id: "channel",
-                title: "Canal",
+                title: "Origem",
                 type: "checkbox-list",
                 options: Array.from(
                     new Set(effectiveOrders?.map((o: any) => o.order_source || "Manual") || []),

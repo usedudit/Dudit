@@ -638,24 +638,33 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setGlobalDiscountCouponCode(couponCode)
     }, [isDiscountModalOpen, discountValue, discountType, couponCode])
 
-    const openShippingSheetWithCustomer = useCallback(async (customerId: string) => {
-        const details = await getPOSCustomerDetailsAction({ partnerId, customerId })
-        if (details.success && details.data) {
-            setShippingCustomerDetails(details.data)
-        } else {
-            setShippingCustomerDetails(null)
-        }
-        setIsShippingSheetOpen(true)
-    }, [partnerId])
-
     const handleOpenShippingSheet = useCallback(async () => {
         if (selectedCustomer?.id) {
-            await openShippingSheetWithCustomer(selectedCustomer.id)
+            const addr = selectedCustomer.addresses?.[0]
+            setShippingCustomerDetails({
+                id: selectedCustomer.id,
+                name: selectedCustomer.name,
+                email: selectedCustomer.email || null,
+                phone: selectedCustomer.phone || null,
+                address: addr ? {
+                    zipCode: addr.zipCode || addr.zip_code || "",
+                    street: addr.street || "",
+                    number: addr.number || "",
+                    complement: addr.complement || "",
+                    neighborhood: addr.neighborhood || "",
+                    city: addr.city || "",
+                    state: addr.state || addr.uf || "",
+                } : null,
+            })
+            setIsShippingSheetOpen(true)
+            getPOSCustomerDetailsAction({ partnerId, customerId: selectedCustomer.id }).then(res => {
+                if (res.success && res.data) setShippingCustomerDetails(res.data)
+            })
             return
         }
         setCustomerSelectIntent("shipping-preflight")
         setIsCustomerSheetOpen(true)
-    }, [openShippingSheetWithCustomer, selectedCustomer?.id])
+    }, [selectedCustomer, partnerId])
 
     useEffect(() => {
         let active = true
@@ -1645,13 +1654,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                                         className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
                                                                     />
                                                                 )}
-                                                                <ListItem
-                                                                    icon={TruckIcon}
-                                                                    title="Adicionar entrega"
-                                                                    description="Define o valor da entrega do pedido"
-                                                                    onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
-                                                                    className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                                                />
+                                                                {deliveryMethod === "delivery" && (
+                                                                    <ListItem
+                                                                        icon={TruckIcon}
+                                                                        title="Adicionar entrega"
+                                                                        description="Define o valor da entrega do pedido"
+                                                                        onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
+                                                                        className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                                    />
+                                                                )}
                                                             </>
                                                         )}
                                                         <MoneyInput
@@ -1793,30 +1804,46 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         setCustomerSelectIntent("default")
                     }}
                     onSelect={(customer) => {
-                        setSelectedCustomer(normalizeCustomerForCard(customer))
+                        const normalized = normalizeCustomerForCard(customer)
+                        setSelectedCustomer(normalized)
                         setIsCustomerSheetOpen(false)
-                        void (async () => {
-                            const details = await getPOSCustomerDetailsAction({ partnerId, customerId: customer.id })
-                            if (details.success && details.data) {
-                                setShippingCustomerDetails(details.data)
-                                setSelectedCustomer(normalizeCustomerForCard(details.data))
-                                if (deliveryMethod === "delivery" && details.data?.address) {
-                                    const addr = details.data.address
-                                    setCep(String(addr.zipCode || ""))
-                                    setStreet(String(addr.street || ""))
-                                    setNumber(String(addr.number || ""))
-                                    setComplement(String(addr.complement || ""))
-                                    setNeighborhood(String(addr.neighborhood || ""))
-                                    setCity(String(addr.city || ""))
-                                    setUf(String(addr.state || "SP"))
-                                    setNoNumber(!String(addr.number || "").trim())
-                                }
-                            }
-                        })()
-                        if (customerSelectIntent === "shipping-preflight") {
+                        const isPreflight = customerSelectIntent === "shipping-preflight"
+                        if (isPreflight) {
                             setCustomerSelectIntent("default")
-                            void openShippingSheetWithCustomer(customer.id)
+                            const addr = normalized?.addresses?.[0]
+                            setShippingCustomerDetails({
+                                id: customer.id,
+                                name: customer.name,
+                                email: customer.email || null,
+                                phone: customer.phone || null,
+                                address: addr ? {
+                                    zipCode: addr.zipCode || "",
+                                    street: addr.street || "",
+                                    number: addr.number || "",
+                                    complement: addr.complement || "",
+                                    neighborhood: addr.neighborhood || "",
+                                    city: addr.city || "",
+                                    state: addr.state || "",
+                                } : null,
+                            })
+                            setIsShippingSheetOpen(true)
                         }
+                        getPOSCustomerDetailsAction({ partnerId, customerId: customer.id }).then(res => {
+                            if (!res.success || !res.data) return
+                            setShippingCustomerDetails(res.data)
+                            setSelectedCustomer(normalizeCustomerForCard(res.data))
+                            if (deliveryMethod === "delivery" && res.data?.address) {
+                                const addr = res.data.address
+                                setCep(String(addr.zipCode || ""))
+                                setStreet(String(addr.street || ""))
+                                setNumber(String(addr.number || ""))
+                                setComplement(String(addr.complement || ""))
+                                setNeighborhood(String(addr.neighborhood || ""))
+                                setCity(String(addr.city || ""))
+                                setUf(String(addr.state || "SP"))
+                                setNoNumber(!String(addr.number || "").trim())
+                            }
+                        })
                     }}
                     partnerId={partnerId}
                 />

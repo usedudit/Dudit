@@ -11,6 +11,7 @@ export interface EntityState {
     action: EntityAction | null
     entityId: string | null
     isOpen: boolean
+    entityType?: string
 }
 
 const CLOSED_STATE: EntityState = { action: null, entityId: null, isOpen: false }
@@ -26,6 +27,7 @@ function stateFromParams(searchParams: URLSearchParams): EntityState {
                 action,
                 entityId: value === "true" ? null : value,
                 isOpen: true,
+                entityType: searchParams.get("type") || undefined,
             }
         }
     }
@@ -110,7 +112,8 @@ export function useEntityState() {
         if (
             urlState.action === localStateRef.current.action &&
             urlState.entityId === localStateRef.current.entityId &&
-            urlState.isOpen === localStateRef.current.isOpen
+            urlState.isOpen === localStateRef.current.isOpen &&
+            urlState.entityType === localStateRef.current.entityType
         ) {
             return
         }
@@ -136,18 +139,20 @@ export function useEntityState() {
     // ── Open: instant local state + instant URL sync ─────────────────────
 
     const open = useCallback(
-        (action: EntityAction, id?: string) => {
+        (action: EntityAction, id?: string, entityType?: string) => {
             const value = action === "create" ? "true" : id || ""
             if (!value) return
             if (typeof window !== "undefined" && window.location.pathname !== pathname) return
 
             const entityId = value === "true" ? null : value
 
-            const url = `${pathname}?${new URLSearchParams({ [action]: value }).toString()}`
+            const params = new URLSearchParams({ [action]: value })
+            if (entityType) params.set("type", entityType)
+            const url = `${pathname}?${params.toString()}`
 
             // 1. INSTANT: Update local state synchronously
             const wasOpen = localStateRef.current.isOpen
-            setLocalState({ action, entityId, isOpen: true })
+            setLocalState({ action, entityId, isOpen: true, entityType })
             lastUserActionRef.current = Date.now()
             expectedHrefRef.current = url
 

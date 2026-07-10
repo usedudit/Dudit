@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal } from '@/components/reusable';
-import { getAvailableTimeSlotsAction, getAppointmentOrderDataAction } from '@/app/actions/erp/appointments';
+import { getAvailableTimeSlotsAction, getAppointmentOrderDataAction, getAppointmentDetailsDataAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getAppointmentItemsAction, fetchProductsByIdsAction, getPartnerPlanAction } from '@/app/actions/erp/appointment-items';
@@ -111,6 +111,7 @@ export const AppointmentSheet = ({
     const [stockCheckItems, setStockCheckItems] = useState<any[]>([]);
     const [pendingNextStep, setPendingNextStep] = useState<{ fn: () => void } | null>(null);
     const [isEnrichingItems, setIsEnrichingItems] = useState(false);
+    const enrichedProductIdsRef = useRef<Set<string>>(new Set());
 
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
@@ -776,9 +777,9 @@ export const AppointmentSheet = ({
                 toast.warning("Aguarde", "Carregando informações de estoque...")
                 return
             }
-            
+
             // Stock verification for Crescer/Escalar plans before proceeding
-            const itemsToCheck = selectedItems.filter((item: any) => 
+            const itemsToCheck = selectedItems.filter((item: any) =>
                 item.usageType === 'consumed' && item.productId
             )
             const hasStockIssues = itemsToCheck.some((item: any) => {
@@ -787,7 +788,7 @@ export const AppointmentSheet = ({
                 const minStock = item.minStock || 0
                 return projectedStock <= 0 || (minStock > 0 && projectedStock <= minStock)
             })
-            
+
             if (hasStockIssues && (partnerPlan === 'crescer' || partnerPlan === 'escalar')) {
                 const stockIssues = itemsToCheck.map((item: any) => {
                     const stock = item.stock ?? 0
@@ -800,7 +801,7 @@ export const AppointmentSheet = ({
                         issue: projectedStock <= 0 ? 'negativo' : 'abaixo do mínimo'
                     }
                 }).filter(i => i.projectedStock <= 0 || (i.minStock > 0 && i.projectedStock <= i.minStock))
-                
+
                 setStockCheckItems(stockIssues)
                 setPendingNextStep({
                     fn: () => {
@@ -810,7 +811,7 @@ export const AppointmentSheet = ({
                 setIsStockCheckOpen(true)
                 return
             }
-            
+
             // Flow: Items -> Summary
             setCurrentView('summary');
         }
@@ -1122,91 +1123,85 @@ export const AppointmentSheet = ({
         if (s === 'pago' || s === 'paid' || s === 'parcialmente pago') return 'bg-green-600';
         if (s === 'finalizado' || s === 'finished') return 'bg-gray-700';
         return 'bg-blue-600';
-    }
+    };
+
     const [financeAccountId, setFinanceAccountId] = useState<string>('');
     const [orderNumber, setOrderNumber] = useState<string | null>(null);
+    const [orderItems, setOrderItems] = useState<any[] | null>(null);
+    const [orderPaymentInfo, setOrderPaymentInfo] = useState<{ situation: string; paidAmount: number; totalAmount: number } | null>(null);
 
     const linkedOrderId = appointment?.marketplaceOrderId
         || appointment?.saleId
         || null;
 
-    // Fetch default finance account for order creation
     useEffect(() => {
         if (!partnerId) return;
-        getFinanceAccountsAction(partnerId).then(res => {
-            if (res.success && res.data?.accounts) {
-                const active = res.data.accounts.filter((a: any) => a.is_active !== false);
-                const defaultId = pickBankThenCashDefaultFinanceAccountId(active);
-                if (defaultId) setFinanceAccountId(defaultId);
+
+        let cancelled = false;
+
+        if (mode !== 'view') {
+            setSavedAppointmentItems([]);
+            setOrderNumber(null);
+            setOrderItems(null);
+            setMarketplaceOrderData(null);
+            setOrderPaymentInfo(null);
+        }
+
+        setIsLoadingItems(true);
+
+        getAppointmentDetailsDataAction({
+            appointmentId: mode === 'view' ? appointment?.id : undefined,
+            partnerId,
+            linkedOrderId: mode === 'view' ? linkedOrderId : null
+        }).then(res => {
+            if (cancelled) return;
+            if (res && res.success && res.data) {
+                const { defaultFinanceAccountId, planSlug, appointmentItems, orderData } = res.data;
+
+                if (defaultFinanceAccountId) {
+                    setFinanceAccountId(defaultFinanceAccountId);
+                }
+
+                setPartnerPlan(planSlug || 'free');
+
+                if (mode === 'view') {
+                    setSavedAppointmentItems(appointmentItems || []);
+                    if (appointment) {
+                        (appointment as any)._originalItems = appointmentItems || [];
+                    }
+                    if (orderData) {
+                        setOrderNumber(orderData.orderNumber);
+                        setOrderItems(orderData.items);
+                        setMarketplaceOrderData({
+                            totalAmount: orderData.totalAmount,
+                            paymentMethod: orderData.paymentMethod || "",
+                            paidAmount: orderData.paidAmount,
+                            situation: orderData.situation,
+                            orderSource: orderData.orderSource || "",
+                        });
+                        setOrderPaymentInfo({
+                            situation: orderData.situation,
+                            paidAmount: orderData.paidAmount,
+                            totalAmount: orderData.totalAmount
+                        });
+                    } else {
+                        setOrderNumber(null);
+                        setOrderItems(null);
+                        setMarketplaceOrderData(null);
+                        setOrderPaymentInfo(null);
+                    }
+                }
+            }
+        }).catch(err => {
+            console.error("Error loading appointment details data:", err);
+        }).finally(() => {
+            if (!cancelled) {
+                setIsLoadingItems(false);
             }
         });
-    }, [partnerId]);
 
-    const [orderItems, setOrderItems] = useState<any[] | null>(null)
-    const [orderPaymentInfo, setOrderPaymentInfo] = useState<{ situation: string; paidAmount: number; totalAmount: number } | null>(null)
-
-    useEffect(() => {
-        if (!partnerId || !linkedOrderId || mode !== 'view') {
-            setOrderNumber(null)
-            setOrderItems(null)
-            setMarketplaceOrderData(null)
-            setOrderPaymentInfo(null)
-            return
-        }
-        let cancelled = false
-        getAppointmentOrderDataAction(linkedOrderId, partnerId).then(data => {
-            if (!cancelled && data) {
-                setOrderNumber(data.orderNumber)
-                setOrderItems(data.items)
-                setMarketplaceOrderData({
-                    totalAmount: data.totalAmount,
-                    paymentMethod: data.paymentMethod || "",
-                    paidAmount: data.paidAmount,
-                    situation: data.situation,
-                    orderSource: data.orderSource || "",
-                })
-                setOrderPaymentInfo({ situation: data.situation, paidAmount: data.paidAmount, totalAmount: data.totalAmount })
-            }
-        }).catch(() => {
-            if (!cancelled) { setOrderNumber(null); setOrderItems(null); setMarketplaceOrderData(null); setOrderPaymentInfo(null) }
-        })
-        return () => { cancelled = true }
-    }, [linkedOrderId, partnerId, mode])
-
-    // Load appointment items when in view mode
-    useEffect(() => {
-        if (!appointment?.id || mode !== 'view') {
-            setSavedAppointmentItems([])
-            return
-        }
-        let cancelled = false
-        setIsLoadingItems(true)
-        getAppointmentItemsAction(appointment.id).then(res => {
-            if (!cancelled && res.success) {
-                const items = res.data || [];
-                setSavedAppointmentItems(items);
-                // Store original items for change detection
-                (appointment as any)._originalItems = items;
-            }
-        }).catch(() => {
-            if (!cancelled) setSavedAppointmentItems([])
-        }).finally(() => {
-            if (!cancelled) setIsLoadingItems(false)
-        })
-        return () => { cancelled = true }
-    }, [appointment?.id, mode])
-
-    // Fetch partner plan for stock verification feature
-    useEffect(() => {
-        if (!partnerId) return
-        let cancelled = false
-        getPartnerPlanAction().then(res => {
-            if (!cancelled) setPartnerPlan(res.slug || 'free')
-        }).catch(() => {
-            if (!cancelled) setPartnerPlan('free')
-        })
-        return () => { cancelled = true }
-    }, [partnerId])
+        return () => { cancelled = true; };
+    }, [partnerId, appointment?.id, linkedOrderId, mode]);
 
     // Enrich selectedItems with product data (images, stock) when they change
     useEffect(() => {
@@ -1214,21 +1209,24 @@ export const AppointmentSheet = ({
             setIsEnrichingItems(false)
             return
         }
-        
+
         const itemsNeedingEnrichment = selectedItems.filter(
-            (item: any) => item.usageType === 'consumed' && item.productId && item.stock === undefined
+            (item: any) => item.usageType === 'consumed' && item.productId && item.stock === undefined && !enrichedProductIdsRef.current.has(item.productId)
         )
-        
+
         if (itemsNeedingEnrichment.length === 0) {
             setIsEnrichingItems(false)
             return
         }
-        
+
         setIsEnrichingItems(true)
-        
+
         let cancelled = false
         const productIds = itemsNeedingEnrichment.map((item: any) => item.productId)
-        
+
+        // Cache these immediately in Set before hitting database
+        productIds.forEach((id: string) => enrichedProductIdsRef.current.add(id));
+
         fetchProductsByIdsAction(productIds).then((products: any[]) => {
             if (!cancelled && products.length > 0) {
                 const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
@@ -1250,7 +1248,7 @@ export const AppointmentSheet = ({
         }).catch(() => {
             if (!cancelled) setIsEnrichingItems(false)
         })
-        
+
         return () => { cancelled = true }
     }, [selectedItems, partnerId])
 
@@ -1950,7 +1948,6 @@ export const AppointmentSheet = ({
                                             {!isLocked && (
                                                 <Button
                                                     variant="link"
-                                                    className="font-bold"
                                                     onClick={() => {
                                                         if (mode === 'view') {
                                                             setIsClientOverlayOpen(true);
@@ -2302,6 +2299,7 @@ export const AppointmentSheet = ({
                                             <Dropdown
                                                 width="w-56"
                                                 align="left"
+                                                fullWidth={false}
                                                 showChevron={false}
                                                 trigger={
                                                     <Button variant="outline" className="h-12 w-12 shrink-0 rounded-full border-brand-border bg-white p-0" type="button">

@@ -123,7 +123,6 @@ export function PixQrDisplayModal({
 
                 {onConfirmPayment && (
                     <Button
-                        variant="filled"
                         onClick={onConfirmPayment}
                         isLoading={isConfirming}
                         className="w-full h-12 flex"

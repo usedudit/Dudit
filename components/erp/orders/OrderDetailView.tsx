@@ -704,7 +704,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             <div className="flex justify-between items-center">
                                                                 <div className="flex items-center gap-1">
                                                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                        {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsável pela venda:"}
+                                                                        {order.order_source === "Marketplace" ? "Origem da venda:" : "Responsável pela venda:"}
                                                                     </span>
                                                                     <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
                                                                         {order.order_source === "Marketplace"
@@ -714,7 +714,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 </div>
                                                                 {order.order_source !== "Marketplace" && (
                                                                     <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                        Canal de venda: <strong className="text-brand-dark dark:text-dark-heading">{order.order_source || "Manual"}</strong>
+                                                                        Origem da venda: <strong className="text-brand-dark dark:text-dark-heading">{order.order_source || "Manual"}</strong>
                                                                     </div>
                                                                 )}
                                                             </div>
