@@ -41,6 +41,8 @@ export type PermissionTemplate = {
   productivity: { view: boolean; goals_view: boolean; goals_manage: boolean; commissions_view: boolean; commissions_manage: boolean }
   community_videos: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   colecoes: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  payment_methods: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  commissions: { view: boolean; edit: boolean }
   settings: {
     view: boolean
     settings_negocio: boolean
@@ -54,6 +56,8 @@ export type PermissionTemplate = {
     settings_messages: boolean
     settings_delivery: boolean
     settings_integrations: boolean
+    settings_system: boolean
+    settings_resources: boolean
   }
 }
 

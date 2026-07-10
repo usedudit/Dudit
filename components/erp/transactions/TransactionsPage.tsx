@@ -1785,144 +1785,145 @@ export default function TransactionsPage({
 
     if (isViewing && entityState.entityType === "installment") {
         return (
-            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background transition-colors duration-500 ease-in-out">
-                <div className="flex flex-col h-full overflow-hidden">
-                    {/* Header */}
-                    <div className="flex-none bg-white dark:bg-dark-surface border-b dark:border-dark-border">
-                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 md:pt-4">
-                            <div className="flex items-center gap-3">
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={() => {
                                         closeEntity()
                                         setInstallmentDetail(null)
-                                    }} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    }}
+                                        className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
 
                                 {/* Title row */}
-                                <div className="hidden md:flex items-start justify-between">
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 text-xl md:text-3xl">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="truncate">Detalhes do parcelamento</span>
                                         </h1>
 
-                                        <div className="hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium overflow-hidden">
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             Resumo completo e lista de parcelas
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Scrollable Content */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
-                        <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6">
-                            {/* Cells grid */}
-                            {installmentDetailLoading ? (
-                                <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
-                            ) : installmentDetail ? (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        {(() => {
-                                            const total = Number(installmentDetail.group?.total_amount || 0)
-                                            const rows = installmentDetail.installments || []
-                                            const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
-                                            const overdue = rows
-                                                .filter((row: any) => row.status === "overdue")
-                                                .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
-                                            const pending = Math.max(0, total - paid)
-                                            const cards = [
-                                                {
-                                                    label: "Total",
-                                                    value: total,
-                                                    icon: FileIcon,
-                                                    bg: "bg-indigo-50 dark:bg-indigo-950/20",
-                                                    text: "text-indigo-600 dark:text-indigo-400",
-                                                },
-                                                {
-                                                    label: "Pago",
-                                                    value: paid,
-                                                    icon: CheckCircleIcon,
-                                                    bg: "bg-emerald-50 dark:bg-emerald-950/20",
-                                                    text: "text-emerald-600 dark:text-emerald-400",
-                                                },
-                                                {
-                                                    label: "Restante",
-                                                    value: pending,
-                                                    icon: ClockIcon,
-                                                    bg: "bg-amber-50 dark:bg-amber-950/20",
-                                                    text: "text-amber-600 dark:text-amber-400",
-                                                },
-                                                {
-                                                    label: "Vencido",
-                                                    value: overdue,
-                                                    icon: AlertTriangleIcon,
-                                                    bg: "bg-rose-50 dark:bg-rose-950/20",
-                                                    text: "text-rose-600 dark:text-rose-400",
-                                                },
-                                            ]
-                                            return cards.map((card) => {
-                                                const Icon = card.icon
-                                                return (
-                                                    <div key={card.label} className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                                        <div className="flex items-center gap-3 mb-6">
-                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${card.bg} ${card.text} shrink-0`}>
-                                                                <Icon className="w-5 h-5" />
+                        {/* Scrollable Content */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6">
+                                {/* Cells grid */}
+                                {installmentDetailLoading ? (
+                                    <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
+                                ) : installmentDetail ? (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            {(() => {
+                                                const total = Number(installmentDetail.group?.total_amount || 0)
+                                                const rows = installmentDetail.installments || []
+                                                const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
+                                                const overdue = rows
+                                                    .filter((row: any) => row.status === "overdue")
+                                                    .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
+                                                const pending = Math.max(0, total - paid)
+                                                const cards = [
+                                                    {
+                                                        label: "Total",
+                                                        value: total,
+                                                        icon: FileIcon,
+                                                        bg: "bg-indigo-50 dark:bg-indigo-950/20",
+                                                        text: "text-indigo-600 dark:text-indigo-400",
+                                                    },
+                                                    {
+                                                        label: "Pago",
+                                                        value: paid,
+                                                        icon: CheckCircleIcon,
+                                                        bg: "bg-emerald-50 dark:bg-emerald-950/20",
+                                                        text: "text-emerald-600 dark:text-emerald-400",
+                                                    },
+                                                    {
+                                                        label: "Restante",
+                                                        value: pending,
+                                                        icon: ClockIcon,
+                                                        bg: "bg-amber-50 dark:bg-amber-950/20",
+                                                        text: "text-amber-600 dark:text-amber-400",
+                                                    },
+                                                    {
+                                                        label: "Vencido",
+                                                        value: overdue,
+                                                        icon: AlertTriangleIcon,
+                                                        bg: "bg-rose-50 dark:bg-rose-950/20",
+                                                        text: "text-rose-600 dark:text-rose-400",
+                                                    },
+                                                ]
+                                                return cards.map((card) => {
+                                                    const Icon = card.icon
+                                                    return (
+                                                        <div key={card.label} className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                                            <div className="flex items-center gap-3 mb-6">
+                                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${card.bg} ${card.text} shrink-0`}>
+                                                                    <Icon className="w-5 h-5" />
+                                                                </div>
+                                                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                    {card.label}
+                                                                </span>
                                                             </div>
-                                                            <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                {card.label}
+                                                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                                                {formatCurrency(card.value)}
                                                             </span>
                                                         </div>
-                                                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                                                            {formatCurrency(card.value)}
-                                                        </span>
-                                                    </div>
-                                                )
-                                            })
-                                        })()}
+                                                    )
+                                                })
+                                            })()}
+                                        </div>
+                                        {/* Table / List Container */}
+                                        <FormSection hasSeparator title="Parcelas">
+                                            <InstallmentParcelsTable
+                                                rows={
+                                                    (installmentDetail.installments || []).map(
+                                                        (row: any): InstallmentParcelRow => ({
+                                                            id: row.id,
+                                                            installmentNumber: row.installmentNumber,
+                                                            totalCount: Number(installmentDetail.group?.installments_count) || 0,
+                                                            status: row.status,
+                                                            originalAmount: Number(row.originalAmount || 0),
+                                                            paidAmount: Number(row.paidAmount || 0),
+                                                            interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
+                                                            discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
+                                                            dueDate: row.dueDate ? String(row.dueDate) : null,
+                                                            finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
+                                                            paymentType: row.paymentType ? String(row.paymentType) : null,
+                                                            reason: String(installmentDetail.group?.description || "Parcela"),
+                                                            reference: String(row.description || "-"),
+                                                            remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
+                                                        }),
+                                                    )
+                                                }
+                                                getActionsSlot={(row) =>
+                                                    row.status === "paid" ? null : (
+                                                        <ActionsDropdown>
+                                                            <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
+                                                                <MoneyIcon className="w-4 h-4" /> Registrar pagamento
+                                                            </DropdownItem>
+                                                        </ActionsDropdown>
+                                                    )
+                                                }
+                                            />
+                                        </FormSection>
                                     </div>
-                                    {/* Table / List Container */}
-                                    <FormSection hasSeparator title="Parcelas">
-                                        <InstallmentParcelsTable
-                                            rows={
-                                                (installmentDetail.installments || []).map(
-                                                    (row: any): InstallmentParcelRow => ({
-                                                        id: row.id,
-                                                        installmentNumber: row.installmentNumber,
-                                                        totalCount: Number(installmentDetail.group?.installments_count) || 0,
-                                                        status: row.status,
-                                                        originalAmount: Number(row.originalAmount || 0),
-                                                        paidAmount: Number(row.paidAmount || 0),
-                                                        interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
-                                                        discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
-                                                        dueDate: row.dueDate ? String(row.dueDate) : null,
-                                                        finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
-                                                        paymentType: row.paymentType ? String(row.paymentType) : null,
-                                                        reason: String(installmentDetail.group?.description || "Parcela"),
-                                                        reference: String(row.description || "-"),
-                                                        remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
-                                                    }),
-                                                )
-                                            }
-                                            getActionsSlot={(row) =>
-                                                row.status === "paid" ? null : (
-                                                    <ActionsDropdown>
-                                                        <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
-                                                            <MoneyIcon className="w-4 h-4" /> Registrar pagamento
-                                                        </DropdownItem>
-                                                    </ActionsDropdown>
-                                                )
-                                            }
-                                        />
-                                    </FormSection>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
-                            )}
+                                ) : (
+                                    <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

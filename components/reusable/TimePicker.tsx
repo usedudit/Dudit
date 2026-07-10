@@ -81,10 +81,10 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                             key={h}
                             onClick={() => handleSelect("hour", h)}
                             className={cn(
-                                "w-full py-2 px-3 text-sm font-medium rounded-lg transition-colors mb-0.5",
+                                "w-full py-2 px-3 text-sm rounded-lg transition-colors mb-0.5",
                                 hour === h
-                                    ? "bg-brand-primary text-brand-green"
-                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
+                                    ? "font-bold bg-brand-primary text-brand-green"
+                                    : "font-medium text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
                             )}
                         >
                             {h}
@@ -101,10 +101,10 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                                 setOpen(false)
                             }}
                             className={cn(
-                                "w-full py-2 px-3 text-sm font-medium rounded-lg transition-colors mb-0.5",
+                                "w-full py-2 px-3 text-sm rounded-lg transition-colors mb-0.5",
                                 minute === m
-                                    ? "bg-brand-primary text-brand-green"
-                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
+                                    ? "font-bold bg-brand-primary text-brand-green"
+                                    : "font-medium text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
                             )}
                         >
                             {m}
@@ -112,7 +112,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                     ))}
                 </div>
             </div>
-        </div>
+        </div >
     )
 
     const Trigger = (

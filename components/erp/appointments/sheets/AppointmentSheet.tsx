@@ -2299,6 +2299,7 @@ export const AppointmentSheet = ({
                                             <Dropdown
                                                 width="w-56"
                                                 align="left"
+                                                className='w-fit'
                                                 fullWidth={false}
                                                 showChevron={false}
                                                 trigger={

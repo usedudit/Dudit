@@ -67,6 +67,13 @@ VALUES (
     "reports": { "view_basic": false, "view_advanced": false },
     "dashboard": { "view": false },
     "delivery": { "view": false, "create": false, "edit": false, "update_status": false },
+    "recurring_plans": { "view": false, "manage": false },
+    "recurring_subscriptions": { "view": false, "manage": false },
+    "productivity": { "view": false, "goals_view": false, "goals_manage": false, "commissions_view": false, "commissions_manage": false },
+    "community_videos": { "view": false, "create": false, "edit": false, "delete": false },
+    "colecoes": { "view": false, "create": false, "edit": false, "delete": false },
+    "payment_methods": { "view": false, "create": false, "edit": false, "delete": false },
+    "commissions": { "view": false, "edit": false },
     "settings": {
       "view": false,
       "settings_negocio": false,
@@ -79,7 +86,9 @@ VALUES (
       "settings_os": false,
       "settings_messages": false,
       "settings_delivery": false,
-      "settings_integrations": false
+      "settings_integrations": false,
+      "settings_system": false,
+      "settings_resources": false
     }
   }'::jsonb
 )
@@ -113,6 +122,13 @@ INSERT INTO public.roles (id, name, permissions) VALUES
     "reports": { "view_basic": false, "view_advanced": false },
     "dashboard": { "view": true },
     "delivery": { "view": true, "create": false, "edit": false, "update_status": true },
+    "recurring_plans": { "view": false, "manage": false },
+    "recurring_subscriptions": { "view": false, "manage": false },
+    "productivity": { "view": false, "goals_view": false, "goals_manage": false, "commissions_view": false, "commissions_manage": false },
+    "community_videos": { "view": false, "create": false, "edit": false, "delete": false },
+    "colecoes": { "view": false, "create": false, "edit": false, "delete": false },
+    "payment_methods": { "view": true, "create": false, "edit": false, "delete": false },
+    "commissions": { "view": false, "edit": false },
     "settings": {
       "view": false,
       "settings_negocio": false,
@@ -125,7 +141,9 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_os": false,
       "settings_messages": false,
       "settings_delivery": false,
-      "settings_integrations": false
+      "settings_integrations": false,
+      "settings_system": false,
+      "settings_resources": false
     }
   }'::jsonb
 ),
@@ -148,6 +166,13 @@ INSERT INTO public.roles (id, name, permissions) VALUES
     "reports": { "view_basic": false, "view_advanced": false },
     "dashboard": { "view": false },
     "delivery": { "view": true, "create": false, "edit": false, "update_status": true },
+    "recurring_plans": { "view": false, "manage": false },
+    "recurring_subscriptions": { "view": false, "manage": false },
+    "productivity": { "view": false, "goals_view": false, "goals_manage": false, "commissions_view": false, "commissions_manage": false },
+    "community_videos": { "view": false, "create": false, "edit": false, "delete": false },
+    "colecoes": { "view": false, "create": false, "edit": false, "delete": false },
+    "payment_methods": { "view": true, "create": false, "edit": false, "delete": false },
+    "commissions": { "view": false, "edit": false },
     "settings": {
       "view": false,
       "settings_negocio": false,
@@ -160,7 +185,9 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_os": false,
       "settings_messages": false,
       "settings_delivery": false,
-      "settings_integrations": false
+      "settings_integrations": false,
+      "settings_system": false,
+      "settings_resources": false
     }
   }'::jsonb
 ),
@@ -183,6 +210,13 @@ INSERT INTO public.roles (id, name, permissions) VALUES
     "reports": { "view_basic": true, "view_advanced": false },
     "dashboard": { "view": true },
     "delivery": { "view": true, "create": true, "edit": true, "update_status": true },
+    "recurring_plans": { "view": true, "manage": true },
+    "recurring_subscriptions": { "view": true, "manage": true },
+    "productivity": { "view": true, "goals_view": true, "goals_manage": true, "commissions_view": true, "commissions_manage": true },
+    "community_videos": { "view": true, "create": true, "edit": true, "delete": true },
+    "colecoes": { "view": true, "create": true, "edit": true, "delete": true },
+    "payment_methods": { "view": true, "create": true, "edit": true, "delete": true },
+    "commissions": { "view": true, "edit": true },
     "settings": {
       "view": true,
       "settings_negocio": true,
@@ -195,7 +229,9 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_os": true,
       "settings_messages": true,
       "settings_delivery": true,
-      "settings_integrations": false
+      "settings_integrations": false,
+      "settings_system": false,
+      "settings_resources": false
     }
   }'::jsonb
 ),
@@ -218,6 +254,13 @@ INSERT INTO public.roles (id, name, permissions) VALUES
     "reports": { "view_basic": true, "view_advanced": true },
     "dashboard": { "view": true },
     "delivery": { "view": true, "create": true, "edit": true, "update_status": true },
+    "recurring_plans": { "view": true, "manage": true },
+    "recurring_subscriptions": { "view": true, "manage": true },
+    "productivity": { "view": true, "goals_view": true, "goals_manage": true, "commissions_view": true, "commissions_manage": true },
+    "community_videos": { "view": true, "create": true, "edit": true, "delete": true },
+    "colecoes": { "view": true, "create": true, "edit": true, "delete": true },
+    "payment_methods": { "view": true, "create": true, "edit": true, "delete": true },
+    "commissions": { "view": true, "edit": true },
     "settings": {
       "view": true,
       "settings_negocio": true,
@@ -230,7 +273,9 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_os": true,
       "settings_messages": true,
       "settings_delivery": true,
-      "settings_integrations": false
+      "settings_integrations": false,
+      "settings_system": true,
+      "settings_resources": true
     }
   }'::jsonb
 ),
@@ -315,4 +360,3 @@ BEGIN
 END $$;
 
 COMMIT;
-
