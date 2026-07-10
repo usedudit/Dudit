@@ -2,12 +2,13 @@
 
 import { useState, useCallback } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { Dropdown, DropdownItem } from "@/components/reusable/Dropdown"
+import { Button, Dropdown, DropdownItem } from "@/components/reusable"
 import type { Period, CompareMode } from "@/lib/period-types"
 import { PERIOD_LABELS, COMPARE_PRESET_LABELS, PERIOD_OPTIONS, COMPARE_PRESETS, getPeriodDateRange, getCustomMaxDate } from "@/lib/period-types"
-import { FilterIcon, SparklesIcon } from "@/lib/icons"
+import { FilterIcon, SparklesIcon, DownloadIcon } from "@/lib/icons"
 import { useDashboard } from "./dashboard/DashboardContext"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import Portal from "@/components/Portal"
+import { XIcon } from "@/lib/icons"
 
 function DashboardInsight({ message, color }: { message: string; color: string }) {
   const colors: Record<string, { bg: string; text: string; bar: string; border: string }> = {
@@ -31,7 +32,8 @@ export function GlobalPeriodFilter() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { insights } = useDashboard()
+  const { insights, exportHandler } = useDashboard()
+  const [insightSheetOpen, setInsightSheetOpen] = useState(false)
 
   const period = (searchParams.get("period") as Period) || "monthly"
   const compare = (searchParams.get("compare") as CompareMode) || "none"
@@ -69,37 +71,51 @@ export function GlobalPeriodFilter() {
   return (
     <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
       {insights && insights.length > 0 && (
-        <Sheet>
-          <SheetTrigger asChild>
-            <button className="flex items-center gap-2 text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer">
-              <div className="w-5 h-5 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                <SparklesIcon size={12} className="text-brand-green dark:text-emerald-400" />
-              </div>
-              <span>Insights</span>
-              <span className="bg-brand-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
-                {insights.length}
-              </span>
-            </button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-full sm:max-w-md p-6 border-l border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-            <SheetHeader className="pb-6 border-b border-brand-border/40 dark:border-dark-border/40">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                  <SparklesIcon size={18} className="text-brand-green dark:text-emerald-400" />
+        <>
+          <Button variant="outline" size="icon" onClick={() => setInsightSheetOpen(true)}>
+            <SparklesIcon size={14} />
+          </Button>
+
+          {insightSheetOpen && (
+            <Portal>
+              <div
+                className="fixed inset-0 bg-black/50 z-50 transition-opacity duration-300"
+                onClick={() => setInsightSheetOpen(false)}
+              >
+                <div
+                  className="fixed right-4 top-4 bottom-4 w-96 bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center shrink-0">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                        <SparklesIcon size={18} className="text-brand-green dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</h2>
+                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">Análises automáticas sobre os seus resultados.</p>
+                      </div>
+                    </div>
+                    <Button variant="filled" size="icon" onClick={() => setInsightSheetOpen(false)}>
+                      <XIcon className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-4">
+                    {insights.map((insight, i) => (
+                      <DashboardInsight key={i} message={insight.message} color={insight.color} />
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <SheetTitle className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</SheetTitle>
-                  <SheetDescription className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">Análises automáticas sobre os seus resultados.</SheetDescription>
-                </div>
               </div>
-            </SheetHeader>
-            <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)] pr-1">
-              {insights.map((insight, i) => (
-                <DashboardInsight key={i} message={insight.message} color={insight.color} />
-              ))}
-            </div>
-          </SheetContent>
-        </Sheet>
+            </Portal>
+          )}
+        </>
+      )}
+
+      {exportHandler && (
+        <Button variant="outline" size="icon" onClick={() => exportHandler("csv")}>
+          <DownloadIcon size={14} />
+        </Button>
       )}
 
       <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full overflow-hidden">

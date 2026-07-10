@@ -60,18 +60,21 @@ export default function SaleReceiptThermalPreview({
                 <DashedLine className="my-1" />
 
                 {/* Consumidor + pedido/data */}
-                <p className="text-[10px] mb-1">
-                    <span className="font-bold">Consumidor:</span> {data.customerName}
+                <p className="text-[10px]">
+                    <span className="font-bold">Cliente:</span> {data.customerName}
                 </p>
                 <div className="flex justify-between text-[10px] font-bold mb-1">
                     <span>Nº DO PEDIDO: {data.orderNumber}</span>
                     <span>{data.saleDateTime}</span>
                 </div>
+                <p className="text-[10px]">
+                    <span className="font-bold">Vendedor:</span> {data.sellerName}
+                </p>
 
                 <DashedLine className="my-1" />
 
                 {/* Cabeçalho itens */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[8px] font-bold uppercase mb-1">
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[10px] font-bold uppercase">
                     <span># COD DESC</span>
                     <span className="text-right">QTD</span>
                     <span className="text-right">VL UN</span>
@@ -137,12 +140,8 @@ export default function SaleReceiptThermalPreview({
                     {data.change > 0.009 && <Row left="Troco" right={formatReceiptAmount(data.change)} />}
                 </div>
 
-                <DashedLine className="my-2" />
-                <p className="text-[10px] font-bold text-center">Vendedor: {data.sellerName}</p>
-
                 {showAcknowledgment && (
                     <>
-                        <DashedLine className="my-2" />
                         <p className="text-[9px] text-center leading-relaxed px-1">{DEFAULT_RECEIPT_ACKNOWLEDGMENT}</p>
                         <DashedLine className="mt-4 mb-1" />
                         <p className="text-[9px] font-bold text-center uppercase tracking-wide">Assinatura do cliente</p>

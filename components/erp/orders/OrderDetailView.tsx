@@ -419,6 +419,18 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
     const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))
     const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
+
+    const hasDetailedAmounts = paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined)
+    
+    const detailedInterestAmount = hasDetailedAmounts
+        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0)
+        : paymentMethodExtraAmount
+    const detailedFeeAmount = hasDetailedAmounts
+        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.feeAmount || 0), 0)
+        : 0
+    const detailedFixedFeeAmount = hasDetailedAmounts
+        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.fixedFeeAmount || 0), 0)
+        : 0
     const subtotalValue = Number(order.subtotal_value || 0) > 0
         ? Number(order.subtotal_value || 0)
         : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - paymentMethodExtraAmount
@@ -990,10 +1002,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     }
                                                                     value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                             )}
-                                                            {paymentMethodExtraAmount > 0 && (
+                                                            {!hasDetailedAmounts && paymentMethodExtraAmount > 0 && (
                                                                 <PaymentRow
                                                                     label="Taxa do Método"
                                                                     value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
+                                                            )}
+                                                            {hasDetailedAmounts && detailedInterestAmount > 0 && (
+                                                                <PaymentRow
+                                                                    label="Juros do Método"
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedInterestAmount)}</span>} />
+                                                            )}
+                                                            {hasDetailedAmounts && detailedFeeAmount > 0 && (
+                                                                <PaymentRow
+                                                                    label="Taxa do Método"
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFeeAmount)}</span>} />
+                                                            )}
+                                                            {hasDetailedAmounts && detailedFixedFeeAmount > 0 && (
+                                                                <PaymentRow
+                                                                    label="Custo do Método"
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFixedFeeAmount)}</span>} />
                                                             )}
                                                             {changeAmount > 0.009 && (
                                                                 <PaymentRow
@@ -1442,11 +1469,26 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 label="Desconto do Método"
                                                                 value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                         )}
-                                                        {paymentMethodExtraAmount > 0 && (
-                                                            <PaymentRow
-                                                                label="Taxa do Método"
-                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
-                                                        )}
+                                                        {!hasDetailedAmounts && paymentMethodExtraAmount > 0 && (
+                                                             <PaymentRow
+                                                                 label="Taxa do Método"
+                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
+                                                         )}
+                                                         {hasDetailedAmounts && detailedInterestAmount > 0 && (
+                                                             <PaymentRow
+                                                                 label="Juros do Método"
+                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedInterestAmount)}</span>} />
+                                                         )}
+                                                         {hasDetailedAmounts && detailedFeeAmount > 0 && (
+                                                             <PaymentRow
+                                                                 label="Taxa do Método"
+                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFeeAmount)}</span>} />
+                                                         )}
+                                                         {hasDetailedAmounts && detailedFixedFeeAmount > 0 && (
+                                                             <PaymentRow
+                                                                 label="Custo do Método"
+                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFixedFeeAmount)}</span>} />
+                                                         )}
                                                         {changeAmount > 0.009 && (
                                                             <PaymentRow
                                                                 label="Troco"

@@ -31,6 +31,7 @@ type MarketplacePreviewResult = {
   finalAmount: number
   interestAmount: number
   feeAmount: number
+  fixedFeeAmount: number
   paymentMethodDiscountAmount: number
   amountBeforeInterest: number
   amountBeforeFee: number
@@ -87,15 +88,18 @@ function marketplaceCalculateAmounts(input: {
   const amountBeforeFee = currentTotal
 
   // Step 3: administrative/fixed fee over the running total after interest.
-  const feeAmount = round2(((currentTotal * feePercent) / 100) + feeFixed)
+  const percentageFeeAmount = round2((currentTotal * feePercent) / 100)
+  const fixedFeeAmount = feeFixed
+  const totalFeeAmount = round2(percentageFeeAmount + fixedFeeAmount)
   const finalAmount = pm.feeBearer === "customer"
-    ? toSafeMoney(currentTotal + feeAmount)
+    ? toSafeMoney(currentTotal + totalFeeAmount)
     : currentTotal
 
   return {
     finalAmount,
     interestAmount,
-    feeAmount,
+    feeAmount: percentageFeeAmount,
+    fixedFeeAmount,
     paymentMethodDiscountAmount,
     amountBeforeInterest,
     amountBeforeFee,
@@ -169,6 +173,7 @@ export async function previewMarketplacePaymentAction(input: {
         hasInterest: calc.interestAmount > 0 && feeConfig.feeBearer === "customer",
         totalInterest: calc.interestAmount,
         totalFee: calc.feeAmount,
+        fixedFee: calc.fixedFeeAmount,
         feeBearer: feeConfig.feeBearer,
         finalAmount: calc.finalAmount,
       })

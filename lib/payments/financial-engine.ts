@@ -25,6 +25,9 @@ export type PaymentLineDetails = {
   feeBearer: "merchant" | "customer" | null
   effectiveAmount: number
   netAmount: number
+  interestAmount?: number
+  feeAmount?: number
+  fixedFeeAmount?: number
 }
 
 export type PaymentBreakdownLine = {
@@ -40,6 +43,9 @@ export type PaymentBreakdownLine = {
   netAmount: number
   paymentMethodId: string | null
   installmentNumber: number
+  interestAmount?: number
+  feeAmount?: number
+  fixedFeeAmount?: number
 }
 
 export type PaymentBreakdownEntry = {
@@ -55,6 +61,9 @@ export type PaymentBreakdownEntry = {
   feeBearer?: string | null
   paymentMethodId?: string | null
   installmentNumber?: number
+  interestAmount?: number
+  feeAmount?: number
+  fixedFeeAmount?: number
 }
 
 export type PaymentBreakdownResult = {
@@ -68,7 +77,7 @@ export type PaymentBreakdownResult = {
 /**
  * Determines the adjustment type from a payment method config.
  * - discountPercent > 0 → discount
- * - feePercent > 0 → fee
+ * - feePercent > 0 || feeFixed > 0 → fee
  * - otherwise → none
  */
 export function deriveAdjustmentType(pm: PaymentMethodFeeConfig): AdjustmentType {
@@ -98,60 +107,94 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
   const feeFixed = Math.max(0, Number(pm.feeFixed || 0))
   const feeBearer = (pm.feeBearer || "merchant") as "merchant" | "customer"
 
-  let adjustmentPercent = 0
-  let adjustmentAmount = 0
-  let effectiveAmount = amountReceived
-  let netAmount = amountReceived
+  const clampedInstallments = Math.min(Math.max(1, input.installmentNumber || 1), Math.max(1, pm.maxInstallments || 24))
+  const installmentFeePercent = (pm.installmentFees || []).find(
+    (entry) => Number(entry.installmentNumber) === clampedInstallments,
+  )?.feePercent || 0
+  const fixedInterestPercent = Math.max(0, Number(pm.fixedInterestPercent || 0))
+  const interestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
 
-  switch (adjustmentType) {
-    case "discount": {
-      adjustmentPercent = discountPercent
-      adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100))
-      effectiveAmount = round2(amountReceived + adjustmentAmount)
-      netAmount = effectiveAmount
-      break
+  if (adjustmentType === "discount") {
+    const adjustmentPercent = discountPercent
+    const adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100))
+    const effectiveAmount = round2(amountReceived + adjustmentAmount)
+    const netAmount = effectiveAmount
+    return {
+      amountReceived,
+      adjustmentType: "discount",
+      adjustmentPercent,
+      adjustmentAmount,
+      feeBearer: null,
+      effectiveAmount,
+      netAmount,
+      interestAmount: 0,
+      feeAmount: 0,
+      fixedFeeAmount: 0,
     }
-    case "fee": {
-      adjustmentPercent = feePercent
-      adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100) + feeFixed)
-      if (feeBearer === "customer") {
-        effectiveAmount = round2(amountReceived - adjustmentAmount)
-        netAmount = effectiveAmount
-      } else {
-        effectiveAmount = amountReceived
-        netAmount = round2(amountReceived - adjustmentAmount)
+  }
+
+  if (feePercent > 0 || feeFixed > 0 || interestPercent > 0) {
+    const passesCostToCustomer = feeBearer === "customer"
+
+    if (passesCostToCustomer) {
+      const effectiveAmount = round2((amountReceived - feeFixed) / ((1 + interestPercent / 100) * (1 + feePercent / 100)))
+      const interestAmount = round2(effectiveAmount * (interestPercent / 100))
+      const fixedFeeAmount = feeFixed
+      const feeAmount = Math.max(0, round2(amountReceived - effectiveAmount - interestAmount - fixedFeeAmount))
+      const adjustmentAmount = Math.max(0, round2(amountReceived - effectiveAmount))
+      
+      const adjustmentPercent = feePercent + interestPercent
+      const derivedAdjType: AdjustmentType = interestAmount > 0.009 ? "interest" : "fee"
+
+      return {
+        amountReceived,
+        adjustmentType: derivedAdjType,
+        adjustmentPercent,
+        adjustmentAmount,
+        feeBearer,
+        effectiveAmount,
+        netAmount: effectiveAmount,
+        interestAmount,
+        feeAmount,
+        fixedFeeAmount,
       }
-      break
-    }
-    case "interest": {
-      adjustmentPercent = feePercent
-      adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100) + feeFixed)
-      if (feeBearer === "customer") {
-        effectiveAmount = round2(amountReceived - adjustmentAmount)
-        netAmount = effectiveAmount
-      } else {
-        effectiveAmount = amountReceived
-        netAmount = round2(amountReceived - adjustmentAmount)
+    } else {
+      const effectiveAmount = amountReceived
+      const interestAmount = round2(effectiveAmount * (interestPercent / 100))
+      const percentageFeeAmount = round2((effectiveAmount + interestAmount) * (feePercent / 100))
+      const fixedFeeAmount = feeFixed
+      const adjustmentAmount = round2(interestAmount + percentageFeeAmount + fixedFeeAmount)
+      const netAmount = round2(amountReceived - adjustmentAmount)
+      
+      const adjustmentPercent = feePercent + interestPercent
+      const derivedAdjType: AdjustmentType = interestAmount > 0.009 ? "interest" : "fee"
+
+      return {
+        amountReceived,
+        adjustmentType: derivedAdjType,
+        adjustmentPercent,
+        adjustmentAmount,
+        feeBearer,
+        effectiveAmount,
+        netAmount,
+        interestAmount,
+        feeAmount: percentageFeeAmount,
+        fixedFeeAmount,
       }
-      break
-    }
-    case "none":
-    default: {
-      adjustmentAmount = 0
-      effectiveAmount = amountReceived
-      netAmount = amountReceived
-      break
     }
   }
 
   return {
     amountReceived,
-    adjustmentType,
-    adjustmentPercent,
-    adjustmentAmount,
-    feeBearer: adjustmentType === "fee" || adjustmentType === "interest" ? feeBearer : null,
-    effectiveAmount,
-    netAmount,
+    adjustmentType: "none",
+    adjustmentPercent: 0,
+    adjustmentAmount: 0,
+    feeBearer: null,
+    effectiveAmount: amountReceived,
+    netAmount: amountReceived,
+    interestAmount: 0,
+    feeAmount: 0,
+    fixedFeeAmount: 0,
   }
 }
 

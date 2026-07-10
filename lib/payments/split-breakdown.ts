@@ -71,7 +71,9 @@ export type RecalculatedSplitRow = SplitInputRow & {
     finalAmount: number
     interestAmount: number
     feeAmount: number
+    fixedFeeAmount: number
     paymentMethodDiscountAmount: number
+    feeBearer?: "merchant" | "customer" | null
     /** New financial engine fields */
     amountReceived?: number
     adjustmentType?: AdjustmentType
@@ -96,6 +98,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
         ok: true
         finalTotal: number
         feeAmount: number
+        fixedFeeAmount: number
         interestAmount: number
         paymentMethodDiscountAmount: number
         adjustedRows: RecalculatedSplitRow[]
@@ -107,6 +110,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             ok: true,
             finalTotal: safeBase,
             feeAmount: 0,
+            fixedFeeAmount: 0,
             interestAmount: 0,
             paymentMethodDiscountAmount: 0,
             adjustedRows: [],
@@ -143,6 +147,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                 ok: true,
                 finalTotal: amountReceived,
                 feeAmount: 0,
+                fixedFeeAmount: 0,
                 interestAmount: 0,
                 paymentMethodDiscountAmount: 0,
                 adjustedRows: [
@@ -152,6 +157,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                         finalAmount: amountReceived,
                         interestAmount: 0,
                         feeAmount: 0,
+                        fixedFeeAmount: 0,
                         paymentMethodDiscountAmount: 0,
                         amountReceived,
                         adjustmentType: "none",
@@ -174,16 +180,18 @@ export function recalculateSplitPaymentFromBaseAmounts(
         return {
             ok: true,
             finalTotal: engine.effectiveAmount,
-            feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
-            interestAmount: engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0,
+            feeAmount: engine.feeAmount || 0,
+            fixedFeeAmount: engine.fixedFeeAmount || 0,
+            interestAmount: engine.interestAmount || 0,
             paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
             adjustedRows: [
                 {
                     ...row,
                     amount: engine.effectiveAmount,
                     finalAmount: engine.effectiveAmount,
-                    interestAmount: engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0,
-                    feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
+                    interestAmount: engine.interestAmount || 0,
+                    feeAmount: engine.feeAmount || 0,
+                    fixedFeeAmount: engine.fixedFeeAmount || 0,
                     paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
                     amountReceived: engine.amountReceived,
                     adjustmentType: engine.adjustmentType,
@@ -191,6 +199,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                     adjustmentAmount: engine.adjustmentAmount,
                     effectiveAmount: engine.effectiveAmount,
                     netAmount: engine.netAmount,
+                    feeBearer: engine.feeBearer,
                 },
             ],
         }
@@ -201,6 +210,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
     const adjustedRows: RecalculatedSplitRow[] = []
     let finalTotal = 0
     let totalFee = 0
+    let totalFixedFee = 0
     let totalInterest = 0
     let totalPmDiscount = 0
 
@@ -220,6 +230,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                 finalAmount: amountReceived,
                 interestAmount: 0,
                 feeAmount: 0,
+                fixedFeeAmount: 0,
                 paymentMethodDiscountAmount: 0,
                 amountReceived,
                 adjustmentType: "none",
@@ -239,16 +250,18 @@ export function recalculateSplitPaymentFromBaseAmounts(
         })
 
         const finalAmt = engine.effectiveAmount
-        totalFee = round2(totalFee + (engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0))
-        totalInterest = round2(totalInterest + (engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0))
+        totalFee = round2(totalFee + (engine.feeAmount || 0))
+        totalFixedFee = round2(totalFixedFee + (engine.fixedFeeAmount || 0))
+        totalInterest = round2(totalInterest + (engine.interestAmount || 0))
         totalPmDiscount = round2(totalPmDiscount + (engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0))
 
         adjustedRows.push({
             ...row,
             amount: finalAmt,
             finalAmount: finalAmt,
-            interestAmount: engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0,
-            feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
+            interestAmount: engine.interestAmount || 0,
+            feeAmount: engine.feeAmount || 0,
+            fixedFeeAmount: engine.fixedFeeAmount || 0,
             paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
             amountReceived: engine.amountReceived,
             adjustmentType: engine.adjustmentType,
@@ -256,6 +269,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             adjustmentAmount: engine.adjustmentAmount,
             effectiveAmount: engine.effectiveAmount,
             netAmount: engine.netAmount,
+            feeBearer: engine.feeBearer,
         })
         finalTotal = round2(finalTotal + finalAmt)
     }
@@ -264,6 +278,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
         ok: true,
         finalTotal: round2(finalTotal),
         feeAmount: totalFee,
+        fixedFeeAmount: totalFixedFee,
         interestAmount: totalInterest,
         paymentMethodDiscountAmount: totalPmDiscount,
         adjustedRows,
@@ -283,7 +298,10 @@ export function toStoredBreakdownAmounts(rows: RecalculatedSplitRow[]): PaymentB
         adjustmentType: r.adjustmentType ?? "none",
         adjustmentPercent: r.adjustmentPercent ?? 0,
         adjustmentAmount: r.adjustmentAmount ?? 0,
-        feeBearer: null,
+        feeBearer: r.feeBearer ?? null,
+        interestAmount: r.interestAmount ?? 0,
+        feeAmount: r.feeAmount ?? 0,
+        fixedFeeAmount: r.fixedFeeAmount ?? 0,
         effectiveAmount: r.effectiveAmount ?? r.finalAmount,
         netAmount: r.netAmount ?? r.finalAmount,
         paymentMethodId: r.paymentMethodId,

@@ -110,6 +110,7 @@ export const AppointmentSheet = ({
     const [isStockCheckOpen, setIsStockCheckOpen] = useState(false);
     const [stockCheckItems, setStockCheckItems] = useState<any[]>([]);
     const [pendingNextStep, setPendingNextStep] = useState<{ fn: () => void } | null>(null);
+    const [isEnrichingItems, setIsEnrichingItems] = useState(false);
 
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
@@ -731,7 +732,11 @@ export const AppointmentSheet = ({
                 setSelectedServices(updatedServices);
                 const resolvedItems = resolveResourcesFromServices(updatedServices);
                 setSelectedItems(resolvedItems);
-                setCurrentView('items');
+                if (resolvedItems.length > 0) {
+                    setCurrentView('items');
+                } else {
+                    setCurrentView('summary');
+                }
             } else {
                 setCurrentView('datetime');
             }
@@ -759,23 +764,34 @@ export const AppointmentSheet = ({
             const resolvedItems = resolveResourcesFromServices(updatedServices);
             setSelectedItems(resolvedItems);
 
-            // Flow: Datetime -> Items -> Summary
-            setCurrentView('items');
+            if (resolvedItems.length > 0) {
+                setCurrentView('items');
+            } else {
+                setCurrentView('summary');
+            }
         }
         else if (currentView === 'items') {
+            // Security: if enrichment is still loading, block navigation
+            if (isEnrichingItems) {
+                toast.warning("Aguarde", "Carregando informações de estoque...")
+                return
+            }
+            
             // Stock verification for Crescer/Escalar plans before proceeding
             const itemsToCheck = selectedItems.filter((item: any) => 
-                item.usageType === 'consumed' && item.productId && item.stock !== undefined
+                item.usageType === 'consumed' && item.productId
             )
             const hasStockIssues = itemsToCheck.some((item: any) => {
-                const projectedStock = (item.stock || 0) - (item.quantity || 0)
+                const stock = item.stock ?? 0
+                const projectedStock = stock - (item.quantity || 0)
                 const minStock = item.minStock || 0
                 return projectedStock <= 0 || (minStock > 0 && projectedStock <= minStock)
             })
             
             if (hasStockIssues && (partnerPlan === 'crescer' || partnerPlan === 'escalar')) {
                 const stockIssues = itemsToCheck.map((item: any) => {
-                    const projectedStock = (item.stock || 0) - (item.quantity || 0)
+                    const stock = item.stock ?? 0
+                    const projectedStock = stock - (item.quantity || 0)
                     const minStock = item.minStock || 0
                     return {
                         ...item,
@@ -988,12 +1004,12 @@ export const AppointmentSheet = ({
         }
         else if (currentView === 'summary') {
             if (mode === 'create') {
-                if (initialTimeSlot) {
-                    const resolvedItems = resolveResourcesFromServices(selectedServices);
-                    setSelectedItems(resolvedItems);
+                const resolvedItems = resolveResourcesFromServices(selectedServices);
+                setSelectedItems(resolvedItems);
+                if (resolvedItems.length > 0) {
                     setCurrentView('items');
                 } else {
-                    setCurrentView('items');
+                    setCurrentView(initialTimeSlot ? 'client' : 'datetime');
                 }
             } else {
                 onClose();
@@ -1194,13 +1210,21 @@ export const AppointmentSheet = ({
 
     // Enrich selectedItems with product data (images, stock) when they change
     useEffect(() => {
-        if (!selectedItems.length || !partnerId) return
+        if (!selectedItems.length || !partnerId) {
+            setIsEnrichingItems(false)
+            return
+        }
         
         const itemsNeedingEnrichment = selectedItems.filter(
-            (item: any) => item.productId && (!item.image || item.stock === undefined)
+            (item: any) => item.usageType === 'consumed' && item.productId && item.stock === undefined
         )
         
-        if (itemsNeedingEnrichment.length === 0) return
+        if (itemsNeedingEnrichment.length === 0) {
+            setIsEnrichingItems(false)
+            return
+        }
+        
+        setIsEnrichingItems(true)
         
         let cancelled = false
         const productIds = itemsNeedingEnrichment.map((item: any) => item.productId)
@@ -1222,7 +1246,10 @@ export const AppointmentSheet = ({
                     return item
                 }))
             }
-        }).catch(() => {})
+            if (!cancelled) setIsEnrichingItems(false)
+        }).catch(() => {
+            if (!cancelled) setIsEnrichingItems(false)
+        })
         
         return () => { cancelled = true }
     }, [selectedItems, partnerId])
@@ -1714,8 +1741,23 @@ export const AppointmentSheet = ({
                                                     if (cameFromSummary) {
                                                         setCurrentView('summary');
                                                         setCameFromSummary(false);
-                                                    } else if (initialStaffId && initialTimeSlot && mode === 'create') {
-                                                        setCurrentView('summary');
+                                                    } else if (initialTimeSlot && mode === 'create') {
+                                                        const updatedServices = selectedServices.map(s => {
+                                                            const staff = staffSource.find(sm => sm.id === selectedStaffId);
+                                                            return {
+                                                                ...s,
+                                                                staffId: selectedStaffId,
+                                                                staff: staff ? staff.name : 'Desconhecido'
+                                                            }
+                                                        });
+                                                        setSelectedServices(updatedServices);
+                                                        const resolvedItems = resolveResourcesFromServices(updatedServices);
+                                                        setSelectedItems(resolvedItems);
+                                                        if (resolvedItems.length > 0) {
+                                                            setCurrentView('items');
+                                                        } else {
+                                                            setCurrentView('summary');
+                                                        }
                                                     } else {
                                                         setCurrentView('datetime');
                                                     }
@@ -2229,6 +2271,7 @@ export const AppointmentSheet = ({
                                     disabled={
                                         (currentView === 'services' && selectedServices.length === 0) ||
                                         (currentView === 'datetime' && !needsRangePicker && !selectedTimeSlot) ||
+                                        (currentView === 'items' && isEnrichingItems) ||
                                         isSaving
                                     }
                                 >

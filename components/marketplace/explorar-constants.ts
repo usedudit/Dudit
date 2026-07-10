@@ -12,30 +12,6 @@ export const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "outros": "Outros"
 }
 
-export const SECTIONS_BANNERS = [
-    {
-        id: "promos",
-        title: "Em promoção",
-        subtitle: "Ofertas imperdíveis",
-        emoji: "🎯",
-        gradient: "from-[#FF6B35] to-[#FF8C42]"
-    },
-    {
-        id: "best-rated",
-        title: "Melhor avaliados",
-        subtitle: "Nota acima de 4.8",
-        emoji: "🏆",
-        gradient: "from-[#11998e] to-[#38ef7d]"
-    },
-    {
-        id: "best-sellers",
-        title: "Mais vendidos",
-        subtitle: "Os queridinhos da cidade",
-        emoji: "🔥",
-        gradient: "from-[#4facfe] to-[#00f2fe]"
-    }
-]
-
 export const CATEGORY_GRADIENTS = [
     "from-[#FF8008] to-[#FFC837]",
     "from-[#11998e] to-[#38ef7d]",

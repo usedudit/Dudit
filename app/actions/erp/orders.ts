@@ -197,6 +197,9 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
                 effectiveAmount: effectiveAmt,
                 netAmount: entry?.netAmount != null ? Math.max(0, Number(entry.netAmount)) : effectiveAmt,
                 feeBearer: entry?.feeBearer || null,
+                interestAmount: Math.max(0, Number(entry?.interestAmount || 0)),
+                feeAmount: Math.max(0, Number(entry?.feeAmount || 0)),
+                fixedFeeAmount: Math.max(0, Number(entry?.fixedFeeAmount || 0)),
                 paymentMethodId: entry?.paymentMethodId || null,
                 installmentNumber: Math.max(1, Math.floor(Number(entry?.installmentNumber || 1))),
             }
@@ -284,6 +287,16 @@ async function applyPaymentMethodPricingToTotal(
     const adjustedBreakdown: PaymentBreakdownEntry[] = stored.map((s, i) => ({
         method: s.method,
         amount: s.amount,
+        amountReceived: s.amountReceived,
+        adjustmentType: s.adjustmentType,
+        adjustmentPercent: s.adjustmentPercent,
+        adjustmentAmount: s.adjustmentAmount,
+        effectiveAmount: s.effectiveAmount,
+        netAmount: s.netAmount,
+        feeBearer: s.feeBearer,
+        interestAmount: s.interestAmount,
+        feeAmount: s.feeAmount,
+        fixedFeeAmount: s.fixedFeeAmount,
         paymentMethodId: s.paymentMethodId,
         installmentNumber: splitRows[i]?.installmentNumber || 1,
     }))

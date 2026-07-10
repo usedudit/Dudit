@@ -189,6 +189,7 @@ const getCheckoutPricingSnapshot = (order: any) => {
         paymentMethodDiscount: Number(snapshot.paymentMethodDiscount || 0),
         paymentMethodInterest: Number(snapshot.paymentMethodInterest || 0),
         paymentMethodFee: Number(snapshot.paymentMethodFee || 0),
+        paymentMethodFixedFee: Number(snapshot.paymentMethodFixedFee || 0),
         deliveryFee: Number(snapshot.deliveryFee || 0),
         finalTotal: Number(snapshot.finalTotal || 0),
     };
@@ -764,7 +765,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const couponDiscountVal = Math.max(0, Number(pricingSnapshot?.couponDiscount ?? order.discount_amount ?? order.discount_total ?? 0));
     const paymentMethodDiscountVal = Math.max(0, Number(pricingSnapshot?.paymentMethodDiscount ?? order.payment_method_discount_amount ?? 0));
     const paymentMethodInterestVal = Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
-    const paymentMethodFeeVal = Math.max(0, Number(pricingSnapshot?.paymentMethodFee ?? order.payment_method_extra_amount ?? 0));
+    const paymentMethodFeeVal = Math.max(0, Number(pricingSnapshot?.paymentMethodFee ?? (pricingSnapshot ? 0 : order.payment_method_extra_amount) ?? 0));
+    const paymentMethodFixedFeeVal = Math.max(0, Number(pricingSnapshot?.paymentMethodFixedFee || 0));
     const shippingVal = Math.max(0, Number(pricingSnapshot?.deliveryFee ?? order.delivery_fee ?? order.shipping_total ?? 0));
     const subtotalVal = Number(pricingSnapshot?.subtotal ?? order.subtotal_original ?? itemsSubtotal);
     const totalVal = Number(order.total_amount || 0);
@@ -819,10 +821,22 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <span className="font-medium">-{formatCurrency(paymentMethodDiscountVal)}</span>
                     </div>
                 )}
-                {(paymentMethodInterestVal + paymentMethodFeeVal) > 0 && (
+                {paymentMethodInterestVal > 0 && (
                     <div className="flex justify-between text-sm text-brand-inactive-text">
-                        <span>Juros e taxas do pagamento</span>
-                        <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodInterestVal + paymentMethodFeeVal)}</span>
+                        <span>Juros do pagamento</span>
+                        <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodInterestVal)}</span>
+                    </div>
+                )}
+                {paymentMethodFeeVal > 0 && (
+                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                        <span>Taxa do pagamento</span>
+                        <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodFeeVal)}</span>
+                    </div>
+                )}
+                {paymentMethodFixedFeeVal > 0 && (
+                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                        <span>Custo do método</span>
+                        <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodFixedFeeVal)}</span>
                     </div>
                 )}
                 {wantsChange && payWithAmount > 0 && (

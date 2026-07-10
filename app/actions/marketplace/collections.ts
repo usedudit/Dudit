@@ -226,7 +226,6 @@ export async function getCollection(id: string) {
     .from("collections")
     .select(`
       *,
-      author:author_id(id, full_name, avatar_url),
       items:collection_items(
         id,
         item_type,
@@ -240,6 +239,18 @@ export async function getCollection(id: string) {
   if (error) {
     console.error("getCollection error:", error)
     return null
+  }
+
+  if (collection?.author_id) {
+    const { data: author } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name")
+      .eq("user_id", collection.author_id)
+      .maybeSingle()
+
+    collection.author = author
+      ? { id: author.user_id, full_name: author.full_name, avatar_url: null }
+      : null
   }
 
   return collection
@@ -272,10 +283,7 @@ export async function getCommunityCollections(cursor?: string, limit = 20) {
 
   let query = supabase
     .from("collections")
-    .select(`
-      *,
-      author:author_id(id, full_name, avatar_url)
-    `)
+    .select("*")
     .order("views_count", { ascending: false })
     .limit(limit + 1)
 
@@ -287,6 +295,24 @@ export async function getCommunityCollections(cursor?: string, limit = 20) {
   const hasMore = data ? data.length > limit : false
   const items = data ? data.slice(0, limit) : []
   const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].created_at : null
+
+  if (items.length > 0) {
+    const authorIds = [...new Set(items.map((c: any) => c.author_id).filter(Boolean))]
+    if (authorIds.length > 0) {
+      const { data: authors } = await supabase
+        .from("user_profiles")
+        .select("user_id, full_name")
+        .in("user_id", authorIds)
+
+      const authorMap = new Map((authors || []).map((a: any) => [a.user_id, a]))
+      for (const item of items) {
+        const profile: any = authorMap.get(item.author_id)
+        item.author = profile
+          ? { id: profile.user_id, full_name: profile.full_name, avatar_url: null }
+          : null
+      }
+    }
+  }
 
   return { items, nextCursor, hasMore }
 }

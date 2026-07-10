@@ -18,6 +18,7 @@ export type PaymentCalculationResult = {
   finalAmount: number
   interestAmount: number
   feeAmount: number
+  fixedFeeAmount: number
   paymentMethodDiscountAmount: number
   amountBeforeInterest: number
   amountBeforeFee: number
@@ -88,16 +89,19 @@ export function calculatePaymentAmounts(input: PaymentCalculationInput): Payment
   const amountBeforeFee = currentTotal
 
   // Step 3: payment method fee over the running total after interest
-  const feeAmount = round2(((currentTotal * feePercent) / 100) + feeFixed)
+  const percentageFeeAmount = round2((currentTotal * feePercent) / 100)
+  const fixedFeeAmount = feeFixed
+  const totalFeeAmount = round2(percentageFeeAmount + fixedFeeAmount)
   const finalAmount =
     input.paymentMethod.feeBearer === "customer"
-      ? toSafeMoney(currentTotal + feeAmount)
+      ? toSafeMoney(currentTotal + totalFeeAmount)
       : currentTotal
 
   return {
     finalAmount,
     interestAmount,
-    feeAmount,
+    feeAmount: percentageFeeAmount,
+    fixedFeeAmount,
     paymentMethodDiscountAmount,
     amountBeforeInterest,
     amountBeforeFee,

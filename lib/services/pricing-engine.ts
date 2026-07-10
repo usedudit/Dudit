@@ -241,6 +241,8 @@ export type PricingResult = {
   paymentMethodInterestAmount: number
   /** Payment method fee amount */
   paymentMethodFeeAmount: number
+  /** Payment method fixed fee amount */
+  paymentMethodFixedFeeAmount: number
   /** Payment method applied discount percent */
   appliedPaymentDiscountPercent: number
   /** Final amount after ALL adjustments including payment method (the real charge) */
@@ -921,6 +923,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   let paymentMethodDiscountAmount = 0
   let paymentMethodInterestAmount = 0
   let paymentMethodFeeAmount = 0
+  let paymentMethodFixedFeeAmount = 0
   let appliedPaymentDiscountPercent = 0
   let finalAmountWithPayment = currentTotal
 
@@ -943,6 +946,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     paymentMethodDiscountAmount = round2(clampMin0(paymentCalc.paymentMethodDiscountAmount))
     paymentMethodInterestAmount = round2(clampMin0(paymentCalc.interestAmount))
     paymentMethodFeeAmount = round2(clampMin0(paymentCalc.feeAmount))
+    paymentMethodFixedFeeAmount = round2(clampMin0(paymentCalc.fixedFeeAmount))
     appliedPaymentDiscountPercent = paymentCalc.appliedDiscountPercent
     finalAmountWithPayment = round2(clampMin0(paymentCalc.finalAmount))
   }
@@ -979,6 +983,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     paymentMethodDiscountAmount,
     paymentMethodInterestAmount,
     paymentMethodFeeAmount,
+    paymentMethodFixedFeeAmount,
     appliedPaymentDiscountPercent,
     finalAmountWithPayment,
     eligibleSubtotal,

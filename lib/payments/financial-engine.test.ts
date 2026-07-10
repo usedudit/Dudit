@@ -101,13 +101,13 @@ describe("computePaymentLine - single payment", () => {
     expect(r.netAmount).toBe(102)
   })
 
-  it("fee customer: received 10, effective 9.70, net 9.70, adjustment 0.30 (3%)", () => {
+  it("fee customer: received 10, effective 9.71, net 9.71, adjustment 0.29 (3%)", () => {
     const r = computePaymentLine({ amountReceived: 10, paymentMethod: feeCardCustomer })
     expect(r.adjustmentType).toBe("fee")
     expect(r.adjustmentPercent).toBe(3)
-    expect(r.adjustmentAmount).toBe(0.3)
-    expect(r.effectiveAmount).toBe(9.7)
-    expect(r.netAmount).toBe(9.7)
+    expect(r.adjustmentAmount).toBe(0.29)
+    expect(r.effectiveAmount).toBe(9.71)
+    expect(r.netAmount).toBe(9.71)
     expect(r.feeBearer).toBe("customer")
   })
 
@@ -200,17 +200,17 @@ describe("computePaymentBreakdown - split payments", () => {
       orderTotal: 200,
       lines: [
         { amountReceived: 50, paymentMethod: discountPix },      // effective 51
-        { amountReceived: 80, paymentMethod: feeCardCustomer },  // effective 77.6
+        { amountReceived: 80, paymentMethod: feeCardCustomer },  // effective 77.67
         { amountReceived: 70, paymentMethod: noAdjustment },     // effective 70
       ],
     })
     expect(r.lines).toHaveLength(3)
     expect(r.lines[0].effectiveAmount).toBe(51)
-    expect(r.lines[1].effectiveAmount).toBe(77.6)
+    expect(r.lines[1].effectiveAmount).toBe(77.67)
     expect(r.lines[2].effectiveAmount).toBe(70)
-    expect(r.totalEffectiveAmount).toBe(198.6)
-    expect(r.totalNetAmount).toBe(198.6)
-    expect(r.remainingBalance).toBe(1.4) // 200 - 198.6
+    expect(r.totalEffectiveAmount).toBe(198.67)
+    expect(r.totalNetAmount).toBe(198.67)
+    expect(r.remainingBalance).toBe(1.33) // 200 - 198.67
   })
 
   it("split: pix discount + card fee merchant", () => {

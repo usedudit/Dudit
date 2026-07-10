@@ -119,68 +119,93 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const paymentBreakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
 
   // Compute fees per payment method
-  let totalFees = 0
+  let totalPercentageFees = 0
+  let totalFixedFees = 0
+  let totalInterest = 0
   const feeLines: { method: string; fee: number }[] = []
+  const fixedFeeLines: { method: string; fee: number }[] = []
 
   for (const entry of paymentBreakdown) {
     const method = String(entry.method || "").toLowerCase().trim()
     const amount = Number(entry.amount || 0)
     const installments = Math.max(1, Number(entry.installmentNumber || 1))
 
-    // MP fees: use actual feeAmount from payment_breakdown
-    if (String(entry.provider || "").toLowerCase().includes("mercado pago") || method.includes("mercado pago")) {
-      const feeAmount = Math.max(0, Number(entry.feeAmount || 0))
-      if (feeAmount > 0) {
-        totalFees += feeAmount
-        feeLines.push({ method: "Mercado Pago", fee: feeAmount })
-      }
-      continue
-    }
-
-    // For other methods, check fee configuration
+    // Find matched payment method config
     const matchedPM = (paymentMethods || []).find((pm: any) => {
       const pmName = String(pm.name || "").toLowerCase().trim()
       const pmType = String(pm.payment_type || "").toLowerCase().trim()
       return pmName === method || pmType === method || method.includes(pmName) || method.includes(pmType)
     })
 
-    if (matchedPM?.payment_method_fees?.length > 0) {
-      // Find the fee config for this installment number, or use the first available
-      const feeConfig = matchedPM.payment_method_fees.find((f: any) => Number(f.installment_number) === installments)
-        || matchedPM.payment_method_fees[0]
+    // Determine bearer
+    const bearer = entry.feeBearer !== undefined ? entry.feeBearer : (matchedPM?.fee_bearer || "merchant")
+    
+    // If bearer is customer, merchant did not pay this fee/interest
+    if (bearer === "customer") {
+      continue
+    }
 
-      if (feeConfig) {
-        let fee = 0
-        if (feeConfig.fee_type === "percentage" || feeConfig.fee_type === "both") {
-          fee += amount * Number(feeConfig.percentage_rate || 0)
-        }
-        if (feeConfig.fee_type === "fixed" || feeConfig.fee_type === "both") {
-          fee += Number(feeConfig.fixed_amount || 0)
-        }
-        if (fee > 0) {
-          totalFees += fee
-          feeLines.push({ method: matchedPM.name || method, fee: round2(fee) })
-        }
+    // Mercado Pago fees: use actual feeAmount from payment_breakdown if present
+    if (String(entry.provider || "").toLowerCase().includes("mercado pago") || method.includes("mercado pago")) {
+      const feeAmount = Math.max(0, Number(entry.feeAmount || 0))
+      if (feeAmount > 0) {
+        totalPercentageFees += feeAmount
+        feeLines.push({ method: "Mercado Pago", fee: feeAmount })
+      }
+      continue
+    }
+
+    // Read detailed fields if present
+    if (entry.feeAmount !== undefined || entry.fixedFeeAmount !== undefined || entry.interestAmount !== undefined) {
+      const percentageFee = Number(entry.feeAmount || 0)
+      const fixedFee = Number(entry.fixedFeeAmount || 0)
+      const interest = Number(entry.interestAmount || 0)
+
+      if (percentageFee > 0) {
+        totalPercentageFees += percentageFee
+        feeLines.push({ method: matchedPM?.name || entry.method || "Método", fee: percentageFee })
+      }
+      if (fixedFee > 0) {
+        totalFixedFees += fixedFee
+        fixedFeeLines.push({ method: matchedPM?.name || entry.method || "Método", fee: fixedFee })
+      }
+      if (interest > 0) {
+        totalInterest += interest
       }
     } else {
-      // Default fees for known methods
-      if (method.includes("boleto")) {
-        const boletoFee = 3.50
-        totalFees += boletoFee
-        feeLines.push({ method: "Boleto", fee: boletoFee })
-      } else if (method.includes("pix")) {
-        // Pix usually has very low or no fee
-        const pixFee = 0
-        if (pixFee > 0) {
-          totalFees += pixFee
-          feeLines.push({ method: "Pix", fee: pixFee })
+      // Legacy fallback recalculation
+      if (matchedPM?.payment_method_fees?.length > 0) {
+        const feeConfig = matchedPM.payment_method_fees.find((f: any) => Number(f.installment_number) === installments)
+          || matchedPM.payment_method_fees[0]
+
+        if (feeConfig) {
+          let fee = 0
+          if (feeConfig.fee_type === "percentage" || feeConfig.fee_type === "both") {
+            fee += amount * Number(feeConfig.percentage_rate || 0)
+          }
+          let fixed = 0
+          if (feeConfig.fee_type === "fixed" || feeConfig.fee_type === "both") {
+            fixed += Number(feeConfig.fixed_amount || 0)
+          }
+          if (fee > 0) {
+            totalPercentageFees += fee
+            feeLines.push({ method: matchedPM.name || entry.method || method, fee: round2(fee) })
+          }
+          if (fixed > 0) {
+            totalFixedFees += fixed
+            fixedFeeLines.push({ method: matchedPM.name || entry.method || method, fee: round2(fixed) })
+          }
+        }
+      } else {
+        // Default fees for known methods
+        if (method.includes("boleto")) {
+          const boletoFee = 3.50
+          totalFixedFees += boletoFee
+          fixedFeeLines.push({ method: "Boleto", fee: boletoFee })
         }
       }
     }
   }
-
-  // 7. Interest (payment_method_extra_amount)
-  const interestAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
 
   // 8. Delivery subsidy
   const deliverySubsidy = deliveryPayer === "seller" ? deliveryFee : 0
@@ -226,16 +251,21 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   if (productCosts > 0) costLines.push({ label: "Custo dos produtos", value: -productCosts })
   if (serviceCosts > 0) costLines.push({ label: "Custo dos serviços", value: -serviceCosts })
 
-  // Fee breakdown per method
+  // Fee breakdown per method (percentage fees)
   for (const f of feeLines) {
     costLines.push({ label: `Taxa (${f.method})`, value: -f.fee })
   }
 
-  if (interestAmount > 0) costLines.push({ label: "Juros", value: -interestAmount })
+  // Fixed method costs
+  for (const f of fixedFeeLines) {
+    costLines.push({ label: `Custo do método (${f.method})`, value: -f.fee })
+  }
+
+  if (totalInterest > 0) costLines.push({ label: "Juros", value: -totalInterest })
   if (deliverySubsidy > 0) costLines.push({ label: "Subsídio da entrega", value: -deliverySubsidy })
   if (sellerCommission > 0) costLines.push({ label: "Comissão do vendedor", value: -sellerCommission })
 
-  const totalCosts = round2(-(productCosts + serviceCosts + totalFees + interestAmount + deliverySubsidy + sellerCommission))
+  const totalCosts = round2(-(productCosts + serviceCosts + totalPercentageFees + totalFixedFees + totalInterest + deliverySubsidy + sellerCommission))
 
   const totalDeductions = round2(totalDiscounts + totalCosts)
   const netProfit = round2(totalRevenue + totalDeductions)

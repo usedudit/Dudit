@@ -1,6 +1,6 @@
-import React from 'react';
-import { TrashIcon, ChevronRightIcon } from '@/lib/icons';
-import { formatCurrency } from '@/lib/utils';
+import { TrashIcon, InfoIcon } from '@/lib/icons';
+import { formatCurrency, cn } from '@/lib/utils';
+import { Tooltip } from '@/components/reusable';
 
 // Scalloped edge specifically for the receipt bottom
 export const ReceiptScallopEdge = () => (
@@ -43,76 +43,49 @@ export const Numpad = ({ onInput, onDelete, disabled }: { onInput: (key: string)
                 </button>
                 <button disabled={disabled}
                     onClick={onDelete}
-                    className="h-16 md:h-[74px] rounded-[22px] flex items-center justify-center text-brand-red bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-transparent active:scale-95 transform duration-100"
+                    className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border flex items-center justify-center active:scale-95 transform duration-100"
                 >
-                    <TrashIcon size={24} />
+                    <TrashIcon className="w-6 h-6 md:w-7 md:h-7" />
                 </button>
             </div>
         </div>
     );
 };
 
-export const PaymentMethodCard = ({ icon: Icon, label, onClick, disabled }: { icon: any, label: string, onClick: () => void, disabled?: boolean }) => (
+export const PaymentMethodCard = ({ icon, label, selected, onClick, disabled }: any) => (
     <button disabled={disabled}
         onClick={onClick}
-        className={`flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group ${disabled ? 'opacity-50 pointer-events-none bg-gray-50 dark:bg-dark-border/10' : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
+        className={cn(
+            "flex flex-col items-center justify-center p-4 rounded-[22px] border-2 text-center transition-all w-full h-[100px] md:h-[110px] active:scale-95 transform duration-100 select-none",
+            selected
+                ? "border-brand-primary bg-brand-primary-light/10 text-brand-primary dark:border-brand-primary dark:bg-brand-primary/10 dark:text-brand-primary font-bold"
+                : "border-brand-border bg-white text-brand-dark hover:bg-brand-gray hover:border-[#cbd5e1] dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border/40",
+            disabled && "opacity-40 cursor-not-allowed pointer-events-none"
+        )}
     >
-        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${disabled ? 'bg-gray-200 dark:bg-dark-border/50' : 'bg-gray-100 dark:bg-dark-border/50 group-hover:bg-white dark:group-hover:bg-dark-surface'}`}>
-            <Icon size={20} className="text-brand-dark dark:text-dark-heading md:w-6 md:h-6" />
-        </div>
-        <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">{label}</span>
+        <span className={cn("text-2xl mb-2", selected ? "text-brand-primary" : "text-brand-inactive-text dark:text-dark-body")}>
+            {icon}
+        </span>
+        <span className="text-[13px] md:text-sm font-semibold tracking-tight leading-tight">{label}</span>
     </button>
 );
 
-export interface SplitPaymentCardProps {
-    icon: any;
-    label: string;
-    /** Valor base (antes de taxa/juros/desconto do meio) */
-    amount: string;
-    onClick: () => void;
-    /** Valor final após cálculo, quando disponível */
-    recalculatedAmount?: string;
-    /** Ex.: "Desc. 3% · + juros" */
-    subLabel?: string;
-}
-
-export const SplitPaymentCard: React.FC<SplitPaymentCardProps> = ({
-    icon: Icon,
-    label,
-    amount,
-    onClick,
-    recalculatedAmount,
-    subLabel,
-}) => (
-    <div
-        className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
+export const SplitPaymentCard = ({ icon, label, selected, onClick, disabled }: any) => (
+    <button disabled={disabled}
         onClick={onClick}
+        className={cn(
+            "flex flex-col items-center justify-center p-4 rounded-[22px] border-2 text-center transition-all w-full h-[100px] md:h-[110px] active:scale-95 transform duration-100 select-none",
+            selected
+                ? "border-brand-primary bg-brand-primary-light/10 text-brand-primary dark:border-brand-primary dark:bg-brand-primary/10 dark:text-brand-primary font-bold"
+                : "border-brand-border bg-white text-brand-dark hover:bg-brand-gray hover:border-[#cbd5e1] dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border/40",
+            disabled && "opacity-40 cursor-not-allowed pointer-events-none"
+        )}
     >
-        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-white dark:group-hover:bg-dark-surface">
-            <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
-        </div>
-        <div className="flex-1 min-w-0">
-            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block mb-0.5">{label}</span>
-            {subLabel ? (
-                <span className="text-xs text-brand-inactive-text line-clamp-2">{subLabel}</span>
-            ) : (
-                <span className="text-xs text-brand-inactive-text">Toque para editar valor e método</span>
-            )}
-        </div>
-        <div className="text-right shrink-0 max-w-[50%]">
-            {recalculatedAmount ? (
-                <>
-                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">Base</div>
-                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{amount}</span>
-                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">A cobrar</div>
-                    <span className="font-bold text-sm text-brand-green block">{recalculatedAmount}</span>
-                </>
-            ) : (
-                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{amount}</span>
-            )}
-        </div>
-        <ChevronRightIcon size={16} className="text-brand-inactive-text shrink-0" />
-    </div>
+        <span className={cn("text-2xl mb-2", selected ? "text-brand-primary" : "text-brand-inactive-text dark:text-dark-body")}>
+            {icon}
+        </span>
+        <span className="text-[13px] md:text-sm font-semibold tracking-tight leading-tight">{label}</span>
+    </button>
 );
 
 export const ReceiptContent = ({
@@ -198,8 +171,43 @@ export const ReceiptContent = ({
 
                 {pricingDetails.map((detail: any, index: number) => (
                     <div key={`${detail.label}-${index}`} className="flex justify-between items-center text-[14px]">
-                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{detail.label}</span>
-                        <span className={`font-bold ${detail.tone === "positive" ? "text-brand-green" : detail.tone === "negative" ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={cn("font-medium truncate", detail.isAbsorbed ? "text-brand-inactive-text/70 dark:text-dark-body/50" : "text-brand-inactive-text dark:text-dark-body")}>
+                                {detail.label}
+                            </span>
+                            {detail.tooltipRows && detail.tooltipRows.length > 0 && (
+                                <Tooltip
+                                    text={
+                                        <div className="w-[200px] text-left">
+                                            <div className="mb-2 font-bold">{detail.tooltipTitle || "Custos absorvidos"}</div>
+                                            <div className="space-y-1.5">
+                                                {detail.tooltipRows.map((row: any, rIdx: number) => (
+                                                    <div key={rIdx} className="flex justify-between items-center gap-3 w-full">
+                                                        <span className="text-white/70 dark:text-black/60 truncate text-xs" title={row.label}>
+                                                            {row.label}
+                                                        </span>
+                                                        <span className="font-semibold shrink-0 text-xs">{row.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    }
+                                >
+                                    <span className="inline-flex shrink-0 cursor-help">
+                                        <InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text/60 dark:text-dark-body/40" />
+                                    </span>
+                                </Tooltip>
+                            )}
+                        </div>
+                        <span className={cn("font-bold shrink-0",
+                            detail.isAbsorbed
+                                ? "text-brand-inactive-text/70 dark:text-dark-body/50"
+                                : detail.tone === "positive"
+                                    ? "text-brand-green"
+                                    : detail.tone === "negative"
+                                        ? "text-brand-red"
+                                        : "text-brand-dark dark:text-dark-heading"
+                        )}>
                             {detail.prefix || ""}{formatCurrency(detail.amount)}
                         </span>
                     </div>

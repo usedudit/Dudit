@@ -248,6 +248,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
                 hasInterest: calc.interestAmount > 0.009 && pmConfig.feeBearer === "customer",
                 totalInterest: calc.interestAmount,
                 totalFee: calc.feeAmount,
+                fixedFee: calc.fixedFeeAmount,
                 feeBearer: pmConfig.feeBearer,
                 finalAmount: calc.finalAmount
             })
@@ -259,15 +260,15 @@ export async function calculatePaymentMethodAmountsAction(input: {
         paymentMethod: pmConfig,
         installmentNumber: input.installmentNumber,
     })
-    const adjustmentAmount = round2(Number(calc.paymentMethodDiscountAmount || 0) + Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0))
+    const adjustmentAmount = round2(Number(calc.paymentMethodDiscountAmount || 0) + Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0) + Number(calc.fixedFeeAmount || 0))
     const adjustmentType = calc.paymentMethodDiscountAmount > 0.009
         ? "discount"
-        : (calc.interestAmount > 0.009 ? "interest" : (calc.feeAmount > 0.009 ? "fee" : "none"))
+        : (calc.interestAmount > 0.009 ? "interest" : (calc.feeAmount > 0.009 || calc.fixedFeeAmount > 0.009 ? "fee" : "none"))
     const adjustmentPercent = adjustmentType === "discount"
         ? calc.appliedDiscountPercent
         : (adjustmentType === "interest" ? calc.appliedInterestPercent : calc.appliedFeePercent)
     const absorbedAmount = pmConfig.feeBearer === "merchant"
-        ? round2(Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0))
+        ? round2(Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0) + Number(calc.fixedFeeAmount || 0))
         : 0
 
     return {
@@ -276,6 +277,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
         finalAmount: calc.finalAmount,
         paymentMethodDiscountAmount: calc.paymentMethodDiscountAmount,
         feeAmount: calc.feeAmount,
+        fixedFeeAmount: calc.fixedFeeAmount,
         interestAmount: calc.interestAmount,
         amountBeforeInterest: calc.amountBeforeInterest,
         amountBeforeFee: calc.amountBeforeFee,

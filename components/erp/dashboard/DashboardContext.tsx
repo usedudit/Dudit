@@ -10,15 +10,18 @@ interface Insight {
 interface DashboardContextType {
   insights: Insight[] | null;
   setInsights: (insights: Insight[] | null) => void;
+  exportHandler: ((format: "csv" | "xlsx") => Promise<void>) | null;
+  setExportHandler: (handler: ((format: "csv" | "xlsx") => Promise<void>) | null) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [insights, setInsights] = useState<Insight[] | null>(null);
+  const [exportHandler, setExportHandler] = useState<((format: "csv" | "xlsx") => Promise<void>) | null>(null);
 
   return (
-    <DashboardContext.Provider value={{ insights, setInsights }}>
+    <DashboardContext.Provider value={{ insights, setInsights, exportHandler, setExportHandler }}>
       {children}
     </DashboardContext.Provider>
   );

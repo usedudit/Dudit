@@ -150,34 +150,42 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                                         {typeInfo.label}
                                     </span>
                                 </div>
-                                {isConsumed && item.stock !== undefined && (
+                                {isConsumed && (
                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
-                                            willGoNegative ? 'text-red-600 bg-red-50 border-red-100' :
-                                            willGoBelowMin ? 'text-amber-600 bg-amber-50 border-amber-100' :
-                                            projectedStock <= minStock && minStock > 0 ? 'text-amber-600 bg-amber-50 border-amber-100' :
-                                            'text-emerald-600 bg-emerald-50 border-emerald-100'
-                                        }`}>
-                                            {willGoNegative ? (
-                                                <>
-                                                    <AlertTriangleIcon size={10} className="mr-0.5" />
-                                                    Estoque ficará {projectedStock} (negativo)
-                                                </>
-                                            ) : willGoBelowMin ? (
-                                                <>
-                                                    <InfoIcon size={10} className="mr-0.5" />
-                                                    Abaixo do mínimo ({projectedStock}/{minStock})
-                                                </>
-                                            ) : (
-                                                `Estoque após: ${projectedStock} ${minStock > 0 ? `(mín: ${minStock})` : ''}`
-                                            )}
-                                        </span>
-                                    </div>
-                                )}
-                                {item.stock !== undefined && item.stock <= 0 && item.usageType !== 'reference' && (
-                                    <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-600 font-medium">
-                                        <AlertTriangleIcon size={10} />
-                                        Sem estoque disponível
+                                        {item.stock === undefined ? (
+                                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200">
+                                                Carregando estoque...
+                                            </span>
+                                        ) : (
+                                            <>
+                                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                                                    willGoNegative ? 'text-red-600 bg-red-50 border-red-100' :
+                                                    willGoBelowMin ? 'text-amber-600 bg-amber-50 border-amber-100' :
+                                                    projectedStock <= minStock && minStock > 0 ? 'text-amber-600 bg-amber-50 border-amber-100' :
+                                                    'text-emerald-600 bg-emerald-50 border-emerald-100'
+                                                }`}>
+                                                    {willGoNegative ? (
+                                                        <>
+                                                            <AlertTriangleIcon size={10} className="mr-0.5" />
+                                                            Estoque ficará {projectedStock} (negativo)
+                                                        </>
+                                                    ) : willGoBelowMin ? (
+                                                        <>
+                                                            <InfoIcon size={10} className="mr-0.5" />
+                                                            Abaixo do mínimo ({projectedStock}/{minStock})
+                                                        </>
+                                                    ) : (
+                                                        `Estoque após: ${projectedStock} ${minStock > 0 ? `(mín: ${minStock})` : ''}`
+                                                    )}
+                                                </span>
+                                                {item.stock <= 0 && (
+                                                    <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                                                        <AlertTriangleIcon size={10} />
+                                                        Sem estoque disponível
+                                                    </span>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>

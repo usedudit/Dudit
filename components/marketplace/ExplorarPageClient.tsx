@@ -38,10 +38,8 @@ import { ExplorarViewControls } from "./ExplorarViewControls"
 import { ExplorarFilterSidebar } from "./ExplorarFilterSidebar"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
-import type { HomeSection } from "@/app/actions/marketplace/discover"
-import { CategoryCarousel } from "./explorar-category-carousel"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
-import { CATEGORY_SLUG_MAP, SECTIONS_BANNERS, FALLBACK_CATEGORIES, COMMON_CITY_ACCENTS } from "./explorar-constants"
+import { CATEGORY_SLUG_MAP, FALLBACK_CATEGORIES, COMMON_CITY_ACCENTS } from "./explorar-constants"
 import type { SortOption, ViewMode } from "./explorar-constants"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
 
@@ -62,7 +60,6 @@ interface ExplorarPageClientProps {
     searchAds?: SponsoredAd[]
     isStateRoute?: boolean
     communityVideos?: any[]
-    homeSections?: HomeSection[]
 }
 
 ;
@@ -87,7 +84,6 @@ export function ExplorarPageClient({
     searchAds = [],
     isStateRoute = false,
     communityVideos = [],
-    homeSections = [],
 }: ExplorarPageClientProps & { hideHeaderAndFooter?: boolean }) {
     const router = useRouter()
     const pathname = usePathname()
@@ -951,87 +947,71 @@ export function ExplorarPageClient({
         )
     }
 
-    // Renders discover home sections
-    const renderHomeSections = () => {
-        if (!homeSections || homeSections.length === 0) return null
-        const sectionsToShow = homeSections.filter(s => s.items && s.items.length > 0)
-        if (sectionsToShow.length === 0) return null
-        return (
-            <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
-                {sectionsToShow.map((section) => {
-                    if (section.id === "topVitrines" || section.id === "topVitrines") {
-                        return (
-                            <HorizontalCarousel
-                                key={section.id}
-                                title={section.title}
-                                subtitle={section.subtitle}
-                                items={section.items}
-                                renderItem={(item: any) => <VitrineCard vitrine={item} className="w-full" />}
-                                itemWidthClass="w-[270px] sm:w-[320px]"
-                                onSeeAll={() => {
-                                    setCurrentType("vitrines")
-                                    updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
-                                }}
-                            />
-                        )
-                    }
-                    return (
-                        <HorizontalCarousel
-                            key={section.id}
-                            title={section.title}
-                            subtitle={section.subtitle}
-                            items={section.items}
-                            renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
-                            itemWidthClass="w-[190px] sm:w-[210px]"
-                            onSeeAll={() => {
-                                setSelectedSection(section.id)
-                                updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, section.id)
-                            }}
-                        />
-                    )
-                })}
-            </div>
-        )
-    }
+    const showExploreSections = pageMode === "sections" && !selectedSection
 
-    // Renders the banners row
-    const renderBanners = () => {
-        if (pageMode !== "sections" && pageMode !== "category") return null
-        return (
-            <div className="w-full mb-6">
-                <h2 className="text-lg lg:text-2xl font-bold text-brand-dark mb-4 animate-fade-in">
-                    {selectedCitySlug
-                        ? `Descubra o que tem em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}`
-                        : "Descubra o que tem por perto"}
-                </h2>
-                <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    {SECTIONS_BANNERS.map((banner) => {
-                        const isActive = selectedSection === banner.id
-                        return (
-                            <button
-                                key={banner.id}
-                                onClick={() => {
-                                    const nextSection = isActive ? null : banner.id
-                                    setSelectedSection(nextSection)
-                                    updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, nextSection)
-                                }}
-                                className={`shrink-0 w-[220px] sm:w-[260px] h-[110px] rounded-[16px] bg-gradient-to-r ${banner.gradient} p-4 flex flex-col justify-between text-left text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none border-2 ${isActive ? 'border-brand-green ring-2 ring-brand-green/30' : 'border-transparent'
-                                    }`}
-                            >
-                                <div className="flex justify-between items-start">
-                                    <span className="text-xs font-semibold uppercase tracking-wider opacity-90">{banner.subtitle}</span>
-                                    <span className="text-2xl">{banner.emoji}</span>
-                                </div>
-                                <span className="text-lg font-bold leading-tight">{banner.title}</span>
-                            </button>
-                        )
-                    })}
-                </div>
-            </div>
-        )
-    }
+    // ─── Themed rotating sections ───────────────────────────────────────
+    const CATEGORY_THEMES = [
+        { id: "auto", title: "Hora de cuidar do veículo", slug: "auto-e-moto", category: "Auto & Moto", emoji: "🚗" },
+        { id: "casa", title: "Dando um trato na casa", slug: "casa-e-utilidades", category: "Casa & Utilidades", emoji: "🏠" },
+        { id: "moda", title: "Renove o visual", slug: "moda-e-beleza", category: "Moda & Beleza", emoji: "👗" },
+        { id: "tecnologia", title: "Tecnologia pra facilitar", slug: "tecnologia-e-eletronicos", category: "Tecnologia & Eletrônicos", emoji: "💻" },
+        { id: "pet", title: "Mimos pro seu pet", slug: "pets", category: "Pets", emoji: "🐾" },
+        { id: "saude", title: "Cuide de você", slug: "saude-e-bem-estar", category: "Saúde & Bem-estar", emoji: "💚" },
+        { id: "construcao", title: "Reformando a casa", slug: "construcao-e-ferramentas", category: "Construção & Ferramentas", emoji: "🔧" },
+        { id: "agro", title: "Pro campo e jardim", slug: "agro-e-jardim", category: "Agro & Jardim", emoji: "🌱" },
+        { id: "infantil", title: "Diversão para os pequenos", slug: "infantil-e-brinquedos", category: "Infantil & Brinquedos", emoji: "🧸" },
+        { id: "alimentacao", title: "Sabores da região", slug: "alimentacao", category: "Alimentação", emoji: "🍽️" },
+    ]
+
+    const themedSections = useMemo(() => {
+        if (!showExploreSections) return []
+        const available: typeof CATEGORY_THEMES = []
+
+        for (const theme of CATEGORY_THEMES) {
+            const catName = theme.category
+            const items = dataToFilter.filter(item => itemMatchesCategory(item, catName))
+            if (items.length > 0) {
+                available.push(theme)
+            }
+        }
+
+        if (available.length === 0) return []
+
+        // Daily seeded pick for rotation
+        const today = new Date().toDateString()
+        const seed = (today + (selectedCitySlug || "br")).split("").reduce((a, c) => a + c.charCodeAt(0), 0)
+        const pickCount = Math.min(2, available.length)
+        const picked: typeof CATEGORY_THEMES = []
+        const used = new Set<number>()
+
+        for (let i = 0; i < pickCount; i++) {
+            let idx = (seed + i * 7) % available.length
+            let attempts = 0
+            while (used.has(idx) && attempts < available.length) {
+                idx = (idx + 1) % available.length
+                attempts++
+            }
+            if (!used.has(idx)) {
+                used.add(idx)
+                picked.push(available[idx])
+            }
+        }
+
+        return picked.map(theme => {
+            const items = dataToFilter
+                .filter(item => itemMatchesCategory(item, theme.category))
+                .slice(0, 20)
+            return { ...theme, items }
+        })
+    }, [showExploreSections, dataToFilter, selectedCitySlug])
 
     const showCommunityVideos = communityVideos.length > 0
+
+    const goToCategory = (catName: string) => {
+        const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === catName) || catName.toLowerCase().replace(/ & /g, "-e-").replace(/\s+/g, "-")
+        const path = `/explorar/${selectedCitySlug || "brasil"}/${catSlug}`
+        router.push(path)
+    }
 
     return (
         <>
@@ -1057,22 +1037,81 @@ export function ExplorarPageClient({
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto px-4 max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
-                    {/* BANNERS - Show in sections and category mode */}
-                    {renderBanners()}
+                    {/* ─── SECTIONS MODE: Discover sections on top ─── */}
+                    {showExploreSections && (
+                        <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
+                            {/* 1. CATEGORIAS EM CÍRCULOS */}
+                            <div className="w-full">
+                                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-4">Categorias</h2>
+                                <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                    {(categoriesList || []).map((cat) => {
+                                        const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === cat.name)
+                                        return (
+                                            <button
+                                                key={cat.name}
+                                                onClick={() => goToCategory(cat.name)}
+                                                className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
+                                            >
+                                                <div className="w-[68px] h-[68px] rounded-full bg-brand-gray border border-gray-100 flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
+                                                    {cat.icon_url ? (
+                                                        <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
+                                                    ) : (
+                                                        <span className="text-2xl">📦</span>
+                                                    )}
+                                                </div>
+                                                <span className="text-[11px] font-bold text-center leading-tight text-brand-dark line-clamp-2">{cat.name}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
 
-                    {/* COMMUNITY VIDEOS - Show anytime there are videos */}
-                    {showCommunityVideos && (
-                        <CommunityVideosCarousel
-                            videos={communityVideos}
-                            title="Vídeos da comunidade"
-                        />
+                            {/* 2. BANNER PADRÃO (HOMEPAGE) */}
+                            <HeroBanner />
+
+                            {/* 3. VÍDEOS DA COMUNIDADE */}
+                            {showCommunityVideos && (
+                                <CommunityVideosCarousel
+                                    videos={communityVideos}
+                                    title="Vídeos da comunidade"
+                                />
+                            )}
+
+                            {/* 4. VENDEDORES EM DESTAQUE */}
+                            {vitrinesDestaque.length > 0 && (
+                                <HorizontalCarousel
+                                    title="Vendedores em destaque"
+                                    items={vitrinesDestaque}
+                                    renderItem={(vitrine) => (
+                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
+                                    )}
+                                    onSeeAll={() => {
+                                        setCurrentType("vitrines")
+                                        updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
+                                    }}
+                                    itemWidthClass="w-[270px] sm:w-[320px]"
+                                />
+                            )}
+
+                            {/* 5. SEÇÕES TEMÁTICAS ROTATÓRIAS */}
+                            {themedSections.map((theme) => (
+                                <HorizontalCarousel
+                                    key={theme.id}
+                                    title={`${theme.emoji} ${theme.title}`}
+                                    items={theme.items}
+                                    renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} className="w-full" />}
+                                    itemWidthClass="w-[190px] sm:w-[210px]"
+                                    onSeeAll={() => {
+                                        const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === theme.category) || theme.slug
+                                        router.push(`/explorar/${selectedCitySlug || "brasil"}/${catSlug}`)
+                                    }}
+                                />
+                            ))}
+                        </div>
                     )}
 
-                    {/* CATEGORY DISCOVERY SECTIONS */}
+                    {/* ─── CATEGORY DISCOVERY SECTIONS ─── */}
                     {renderCategoryDiscoverSections()}
-
-                    {/* HOME DISCOVER SECTIONS */}
-                    {pageMode === "sections" && renderHomeSections()}
 
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                         {/* SIDEBAR (Desktop only) - contextualizado */}
@@ -1206,24 +1245,6 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : (
                                         <>
-                                            {/* Vendedores em destaque (Sections Mode) */}
-                                            {pageMode === "sections" && !selectedSection && vitrinesDestaque.length > 0 && (
-                                                <div className="mb-6 animate-fade-in">
-                                                    <HorizontalCarousel
-                                                        title="Vendedores em destaque"
-                                                        items={vitrinesDestaque}
-                                                        renderItem={(vitrine) => (
-                                                            <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
-                                                        )}
-                                                        onSeeAll={() => {
-                                                            setCurrentType("vitrines")
-                                                            updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
-                                                        }}
-                                                        itemWidthClass="w-[270px] sm:w-[320px]"
-                                                    />
-                                                </div>
-                                            )}
-
                                             {/* Carrossel de Lojas Locais na Busca */}
                                             {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
                                                 <div className="mb-6">

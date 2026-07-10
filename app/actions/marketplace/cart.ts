@@ -31,6 +31,7 @@ export type MarketplaceCheckoutPricingSnapshot = {
   paymentMethodDiscount: number
   paymentMethodInterest: number
   paymentMethodFee: number
+  paymentMethodFixedFee?: number
   deliveryFee: number
   finalTotal: number
 }
@@ -50,6 +51,7 @@ function normalizeCheckoutPricingSnapshot(input?: Partial<MarketplaceCheckoutPri
     paymentMethodDiscount: moneyOrZero(input.paymentMethodDiscount),
     paymentMethodInterest: moneyOrZero(input.paymentMethodInterest),
     paymentMethodFee: moneyOrZero(input.paymentMethodFee),
+    paymentMethodFixedFee: moneyOrZero(input.paymentMethodFixedFee),
     deliveryFee: moneyOrZero(input.deliveryFee),
     finalTotal: moneyOrZero(input.finalTotal),
   }
@@ -59,7 +61,8 @@ function normalizeCheckoutPricingSnapshot(input?: Partial<MarketplaceCheckoutPri
     - snapshot.couponDiscount
     - snapshot.paymentMethodDiscount
     + snapshot.paymentMethodInterest
-    + snapshot.paymentMethodFee,
+    + snapshot.paymentMethodFee
+    + (snapshot.paymentMethodFixedFee || 0),
   )
   if (Math.abs(expected - snapshot.finalTotal) > 0.01) return null
   return snapshot
@@ -927,8 +930,9 @@ export async function checkoutCartAction(
     subtotal: persistedSubtotal,
     couponDiscount: persistedCouponDiscount,
     paymentMethodDiscount: persistedPaymentMethodDiscount,
-    paymentMethodInterest: 0,
-    paymentMethodFee: persistedPaymentMethodExtra,
+    paymentMethodInterest: pricingResult.paymentMethodInterestAmount || 0,
+    paymentMethodFee: pricingResult.paymentMethodFeeAmount || 0,
+    paymentMethodFixedFee: pricingResult.paymentMethodFixedFeeAmount || 0,
     deliveryFee: persistedDeliveryFee,
     finalTotal: persistedTotal,
   }
@@ -1041,6 +1045,14 @@ export async function checkoutCartAction(
           paymentMethodId: bestMethod.id,
           installmentNumber: Math.max(1, Number(installments || 1)),
           checkoutPricing: persistedCheckoutPricing,
+          feeBearer: pmtConfig?.feeBearer || "merchant",
+          interestAmount: pricingResult.paymentMethodInterestAmount || 0,
+          feeAmount: pricingResult.paymentMethodFeeAmount || 0,
+          fixedFeeAmount: pricingResult.paymentMethodFixedFeeAmount || 0,
+          effectiveAmount: persistedTotal,
+          netAmount: pmtConfig?.feeBearer === "merchant"
+            ? Math.max(0, persistedTotal - (pricingResult.paymentMethodInterestAmount || 0) - (pricingResult.paymentMethodFeeAmount || 0) - (pricingResult.paymentMethodFixedFeeAmount || 0))
+            : persistedTotal,
           ...(payDepositOnly ? (() => {
             const serviceDepositTotal = resolvedLines
               .filter((l) => l.itemType === "service_booking" && l.payDepositOnly && l.depositAmount != null)

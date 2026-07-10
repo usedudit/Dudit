@@ -68,7 +68,7 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
         const methods = createMethodMap([
             { id: "credit", fee_percent: 5, fee_bearer: "customer" }
         ])
-        // amountReceived = 100, 5% fee customer → effective = 95 (settles less), fee = 5
+        // amountReceived = 100, 5% fee customer (inverse) → effective = 95.24, fee = 4.76
         const rows = [
             { method: "credit", amount: 100.00, amountReceived: 100.00, paymentMethodId: "credit", installmentNumber: 1 }
         ]
@@ -76,12 +76,12 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
 
         expect(res.ok).toBe(true)
         if (res.ok) {
-            expect(res.finalTotal).toBe(95.00) // 100 - 5 fee = 95 effective
-            expect(res.feeAmount).toBe(5.00)
-            expect(res.adjustedRows[0].finalAmount).toBe(95.00)
+            expect(res.finalTotal).toBe(95.24)
+            expect(res.feeAmount).toBe(4.76)
+            expect(res.adjustedRows[0].finalAmount).toBe(95.24)
             expect(res.adjustedRows[0].adjustmentType).toBe("fee")
-            expect(res.adjustedRows[0].effectiveAmount).toBe(95.00)
-            expect(res.adjustedRows[0].netAmount).toBe(95.00)
+            expect(res.adjustedRows[0].effectiveAmount).toBe(95.24)
+            expect(res.adjustedRows[0].netAmount).toBe(95.24)
         }
     })
 
@@ -89,7 +89,7 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
         const methods = createMethodMap([
             { id: "credit", fee_percent: 5, fee_bearer: "customer" }
         ])
-        // amountReceived = 60, 5% fee customer → effective = 57, fee = 3
+        // amountReceived = 60, 5% fee customer (inverse) → effective = 57.14, fee = 2.86
         const rows = [
             { method: "credit", amount: 60.00, amountReceived: 60.00, paymentMethodId: "credit", installmentNumber: 1 }
         ]
@@ -97,9 +97,9 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
 
         expect(res.ok).toBe(true)
         if (res.ok) {
-            expect(res.finalTotal).toBe(57.00) // 60 - 3 = 57
-            expect(res.feeAmount).toBe(3.00) // fee on 60 = 3
-            expect(res.adjustedRows[0].finalAmount).toBe(57.00)
+            expect(res.finalTotal).toBe(57.14)
+            expect(res.feeAmount).toBe(2.86)
+            expect(res.adjustedRows[0].finalAmount).toBe(57.14)
         }
     })
 })
@@ -122,17 +122,17 @@ describe("recalculateSplitPaymentFromBaseAmounts - Multiple Split Payment Mode",
         expect(res.ok).toBe(true)
         if (res.ok) {
             // Pix leg: received 40 -> 2% discount (0.80) -> effective 40.80
-            // Credit leg: received 60 -> 5% fee customer (3.00) -> effective 57.00
-            // Final total = 40.80 + 57.00 = 97.80
-            expect(res.finalTotal).toBe(97.80)
+            // Credit leg: received 60 -> 5% fee customer (inverse) -> effective 57.14, fee 2.86
+            // Final total = 40.80 + 57.14 = 97.94
+            expect(res.finalTotal).toBe(97.94)
             expect(res.paymentMethodDiscountAmount).toBe(0.80)
-            expect(res.feeAmount).toBe(3.00)
+            expect(res.feeAmount).toBe(2.86)
             expect(res.adjustedRows[0].finalAmount).toBe(40.80)
             expect(res.adjustedRows[0].adjustmentType).toBe("discount")
             expect(res.adjustedRows[0].effectiveAmount).toBe(40.80)
-            expect(res.adjustedRows[1].finalAmount).toBe(57.00)
+            expect(res.adjustedRows[1].finalAmount).toBe(57.14)
             expect(res.adjustedRows[1].adjustmentType).toBe("fee")
-            expect(res.adjustedRows[1].effectiveAmount).toBe(57.00)
+            expect(res.adjustedRows[1].effectiveAmount).toBe(57.14)
         }
     })
 })

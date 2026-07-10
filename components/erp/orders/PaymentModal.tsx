@@ -88,7 +88,10 @@ const PaymentPricingDetailBadge = React.memo(({ calculation, baseAllocated }: { 
     const disc = Number(calculation.paymentMethodDiscountAmount || 0);
     const juros = Number(calculation.interestAmount || 0);
     const taxa = Number(calculation.feeAmount || 0);
+    const custoMetodo = Number(calculation.fixedFeeAmount || 0);
     const final = Number(calculation.finalAmount || 0);
+    const isMerchant = calculation.feeBearer === "merchant";
+    const totalAbsorbed = juros + taxa + custoMetodo;
     return (
         <div className="relative group/payinfo inline-flex shrink-0">
             <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help" />
@@ -96,9 +99,13 @@ const PaymentPricingDetailBadge = React.memo(({ calculation, baseAllocated }: { 
                 <div className="mb-2 font-bold text-brand-dark dark:text-dark-heading">Detalhes do meio de pagamento</div>
                 <div className="space-y-1.5 text-brand-dark dark:text-dark-heading">
                     <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Subtotal</span><span className="font-semibold">{formatCurrency(base)}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">− {formatCurrency(disc)}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(juros)}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">{formatCurrency(taxa)}</span></div>
+                    {disc > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">− {formatCurrency(disc)}</span></div>}
+                    {!isMerchant && juros > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(juros)}</span></div>}
+                    {!isMerchant && taxa > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">+ {formatCurrency(taxa)}</span></div>}
+                    {!isMerchant && custoMetodo > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Custo do método</span><span className="font-semibold">+ {formatCurrency(custoMetodo)}</span></div>}
+                    {isMerchant && totalAbsorbed > 0.009 && (
+                        <div className="flex justify-between gap-3"><span className="text-brand-inactive-text/70">Taxas/juros absorvidos</span><span className="font-semibold text-brand-inactive-text/70">{formatCurrency(totalAbsorbed)}</span></div>
+                    )}
                     <div className="mt-2 flex justify-between gap-3 border-t border-brand-border pt-2 font-bold dark:border-dark-border"><span>Total a cobrar</span><span>{formatCurrency(final)}</span></div>
                 </div>
             </div>
@@ -112,6 +119,7 @@ const PaymentPricingTooltipBadge = React.memo(({ calculation, baseAllocated }: {
     const disc = Number(calculation.paymentMethodDiscountAmount || 0);
     const juros = Number(calculation.interestAmount || 0);
     const taxa = Number(calculation.feeAmount || 0);
+    const custoMetodo = Number(calculation.fixedFeeAmount || 0);
     const final = Number(calculation.finalAmount || 0);
 
     const rows = [
@@ -119,6 +127,7 @@ const PaymentPricingTooltipBadge = React.memo(({ calculation, baseAllocated }: {
         disc > 0 ? { label: 'Desconto', value: `- ${formatCurrency(disc)}` } : null,
         juros > 0 ? { label: 'Juros', value: `+ ${formatCurrency(juros)}` } : null,
         taxa > 0 ? { label: 'Taxa', value: `+ ${formatCurrency(taxa)}` } : null,
+        custoMetodo > 0 ? { label: 'Custo do método', value: `+ ${formatCurrency(custoMetodo)}` } : null,
         { label: 'Total a cobrar', value: formatCurrency(final), isTotal: true },
     ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>;
 
@@ -191,13 +200,17 @@ const formatInstallmentOptionLabel = (opt: any) => {
     const finalAmount = Number(opt?.finalAmount || (installmentValue * installmentsCount));
     const interestAmount = Number(opt?.totalInterest || 0);
     const feeAmount = Number(opt?.totalFee || 0);
-    const pricingAmount = interestAmount + feeAmount;
+    const fixedFeeAmount = Number(opt?.fixedFee || 0);
+    const pricingAmount = interestAmount + feeAmount + fixedFeeAmount;
     const passesCostToCustomer = opt?.feeBearer !== "merchant";
-    const pricingName = interestAmount > 0.009 && feeAmount > 0.009
-        ? "juros/taxa"
-        : interestAmount > 0.009
-            ? "juros"
-            : "taxa";
+
+    const parts = [];
+    if (interestAmount > 0.009) parts.push("juros");
+    if (feeAmount > 0.009) parts.push("taxa");
+    if (fixedFeeAmount > 0.009) parts.push("custo fixo");
+
+    const pricingName = parts.length > 0 ? parts.join("/") : "taxa";
+
     const pricingLabel = pricingAmount > 0.009
         ? ` · ${formatCurrency(pricingAmount)} ${passesCostToCustomer ? `de ${pricingName}` : `${pricingName} absorvida`}`
         : "";
@@ -452,6 +465,8 @@ const PaymentModal = ({
         paymentMethodDiscountAmount: number
         interestAmount: number
         feeAmount: number
+        fixedFeeAmount: number
+        feeBearer: "merchant" | "customer" | null
         appliedDiscountPercent?: number
         appliedFeePercent?: number
         appliedInterestPercent?: number
@@ -1185,10 +1200,13 @@ const PaymentModal = ({
     const currentPricingTotals = useMemo(() => {
         if (view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success) {
             const rows = splitPreview.rows || [];
+            const hasMerchantBearer = rows.some((row: any) => row?.feeBearer === "merchant");
             return {
                 paymentMethodDiscountAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.paymentMethodDiscountAmount || 0), 0),
                 interestAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.interestAmount || 0), 0),
                 feeAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.feeAmount || 0), 0),
+                fixedFeeAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.fixedFeeAmount || 0), 0),
+                feeBearer: hasMerchantBearer ? "merchant" as const : "customer" as const,
             };
         }
         if (paymentCalculation?.success) {
@@ -1196,6 +1214,8 @@ const PaymentModal = ({
                 paymentMethodDiscountAmount: Number(paymentCalculation.paymentMethodDiscountAmount || 0),
                 interestAmount: Number(paymentCalculation.interestAmount || 0),
                 feeAmount: Number(paymentCalculation.feeAmount || 0),
+                fixedFeeAmount: Number(paymentCalculation.fixedFeeAmount || 0),
+                feeBearer: paymentCalculation.feeBearer,
                 appliedDiscountPercent: Number(paymentCalculation.appliedDiscountPercent || 0),
                 appliedFeePercent: Number(paymentCalculation.appliedFeePercent || 0),
                 appliedInterestPercent: Number(paymentCalculation.appliedInterestPercent || 0),
@@ -1205,6 +1225,8 @@ const PaymentModal = ({
             paymentMethodDiscountAmount: 0,
             interestAmount: 0,
             feeAmount: 0,
+            fixedFeeAmount: 0,
+            feeBearer: "merchant" as const,
             appliedDiscountPercent: 0,
             appliedFeePercent: 0,
             appliedInterestPercent: 0,
@@ -1225,16 +1247,45 @@ const PaymentModal = ({
                 paymentMethodDiscountAmount: successSnapshot.paymentMethodDiscountAmount,
                 interestAmount: successSnapshot.interestAmount,
                 feeAmount: successSnapshot.feeAmount,
+                fixedFeeAmount: successSnapshot.fixedFeeAmount,
+                feeBearer: successSnapshot.feeBearer,
                 appliedDiscountPercent: successSnapshot.appliedDiscountPercent,
                 appliedFeePercent: successSnapshot.appliedFeePercent,
                 appliedInterestPercent: successSnapshot.appliedInterestPercent,
             }
             : currentPricingTotals;
 
+        const isMerchant = source.feeBearer === "merchant";
+
+        if (isMerchant) {
+            const juros = Number(source.interestAmount || 0);
+            const taxa = Number(source.feeAmount || 0);
+            const custo = Number(source.fixedFeeAmount || 0);
+            const totalAbsorbed = juros + taxa + custo;
+
+            const tooltipRows = [
+                juros > 0 ? { label: "Juros", value: formatCurrency(juros) } : null,
+                taxa > 0 ? { label: "Taxa", value: formatCurrency(taxa) } : null,
+                custo > 0 ? { label: "Custo do método", value: formatCurrency(custo) } : null,
+            ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+            return [
+                source.paymentMethodDiscountAmount > 0 ? { label: `Desc. meio pagamento${source.appliedDiscountPercent ? ` (${source.appliedDiscountPercent}%)` : ''}`, amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
+                totalAbsorbed > 0.009 ? {
+                    label: "Taxas/juros absorvidos",
+                    amount: totalAbsorbed,
+                    isAbsorbed: true,
+                    tooltipTitle: "Custos absorvidos pela empresa",
+                    tooltipRows,
+                } : null,
+            ].filter(Boolean);
+        }
+
         return [
             source.paymentMethodDiscountAmount > 0 ? { label: `Desc. meio pagamento${source.appliedDiscountPercent ? ` (${source.appliedDiscountPercent}%)` : ''}`, amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
             source.interestAmount > 0 ? { label: `Juros${source.appliedInterestPercent ? ` (${source.appliedInterestPercent}%)` : ''}`, amount: source.interestAmount, prefix: '+', tone: 'neutral' } : null,
             source.feeAmount > 0 ? { label: `Taxas${source.appliedFeePercent ? ` (${source.appliedFeePercent}%)` : ''}`, amount: source.feeAmount, tone: 'neutral' } : null,
+            source.fixedFeeAmount > 0 ? { label: "Custo do método", amount: source.fixedFeeAmount, prefix: '+', tone: 'neutral' } : null,
         ].filter(Boolean);
     }, [paymentStatus, successSnapshot, currentPricingTotals]);
 
@@ -1325,6 +1376,8 @@ const PaymentModal = ({
                             paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
                             interestAmount: Number(currentPricingTotals.interestAmount || 0),
                             feeAmount: Number(currentPricingTotals.feeAmount || 0),
+                            fixedFeeAmount: Number(currentPricingTotals.fixedFeeAmount || 0),
+                            feeBearer: currentPricingTotals.feeBearer,
                             appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
                             appliedFeePercent: currentPricingTotals.appliedFeePercent,
                             appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
@@ -1714,6 +1767,8 @@ const PaymentModal = ({
             paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
             interestAmount: Number(currentPricingTotals.interestAmount || 0),
             feeAmount: Number(currentPricingTotals.feeAmount || 0),
+            fixedFeeAmount: Number(currentPricingTotals.fixedFeeAmount || 0),
+            feeBearer: currentPricingTotals.feeBearer,
             appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
             appliedFeePercent: currentPricingTotals.appliedFeePercent,
             appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
@@ -1721,7 +1776,6 @@ const PaymentModal = ({
             paymentBreakdown: snapshotBreakdown,
         })
         setPaymentStatus('processing');
-
 
         try {
             const result = await onConfirm(payload);
@@ -1949,18 +2003,18 @@ const PaymentModal = ({
                                             ) : (
                                                 <div className="grid grid-cols-1 gap-4">
                                                     {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && (
-                                                         <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-border/20">
-                                                             <div className="flex items-center justify-between gap-3">
-                                                                 <div>
-                                                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal</p>
-                                                                     <p className="text-xs text-brand-inactive-text">Pix Mercado Pago - {formatCurrency(depositChargeAmount)}</p>
-                                                                 </div>
-                                                                 <Button variant="filled" onClick={handleGenerateDepositCharge} isLoading={generatingDepositPix}>
-                                                                     {depositMpPixData ? "Visualizar Pix" : "Gerar Pix"}
-                                                                 </Button>
-                                                             </div>
-                                                         </div>
-                                                     )}
+                                                        <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-border/20">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal</p>
+                                                                    <p className="text-xs text-brand-inactive-text">Pix Mercado Pago - {formatCurrency(depositChargeAmount)}</p>
+                                                                </div>
+                                                                <Button variant="filled" onClick={handleGenerateDepositCharge} isLoading={generatingDepositPix}>
+                                                                    {depositMpPixData ? "Visualizar Pix" : "Gerar Pix"}
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     <div className="grid grid-cols-2 gap-4">
                                                         {availableMethodTypes.has("cash") && (
                                                             <PaymentMethodCard

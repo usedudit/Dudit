@@ -1,12 +1,13 @@
 "use client"
 
-import React, { useState, useMemo, useCallback } from "react"
+import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, ListItem, Button, DefaultModal } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, Button } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
+import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
 import {
-  DashboardPieChart, DashboardLineChart, DashboardBarChart, CHART_COLORS
+  DashboardPieChart, DashboardLineChart, DashboardBarChart, CHART_COLORS, CHART_COLORS_VIVID, CHART_COLORS_CATEGORY
 } from "@/components/erp/dashboard/charts/DashboardCharts"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
 
@@ -15,10 +16,8 @@ import {
   AnalyticsIcon, PackageIcon, WrenchIcon, TruckIcon, FileTextIcon,
   MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
   ChartIcon, ShoppingBagIcon, TagIcon, TrendingUpIcon, CreditCardIcon,
-  ListIcon, AlertCircleIcon, CalendarIcon, ClockIcon, ArrowUpIcon, ArrowDownIcon,
-  SparklesIcon, ShoppingCartIcon, StarIcon, TargetIcon, DownloadIcon,
+  ListIcon, ClockIcon, CalendarIcon, TargetIcon, BoxIcon,
 } from "@/lib/icons"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ReportTableCard, ReportRankingCard } from "./widgets"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData } from "@/lib/data/dashboard"
 import type {
@@ -108,124 +107,8 @@ function CardHeader({ icon: Icon, title }: { icon: React.ElementType; title: str
 
 // ─────────────────────────── Header ───────────────────────────
 
-function SectionHeader({ title, onExport, insights: sectionInsights }: { title: string; onExport: (f: "csv" | "xlsx") => Promise<void>; insights?: { message: string; color: string }[] }) {
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [exportOpen, setExportOpen] = useState(false)
-  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx" | null>(null)
-  const [exportLoading, setExportLoading] = useState(false)
-
-  const handleExport = async () => {
-    if (!exportFormat) return
-    setExportLoading(true)
-    try {
-      await onExport(exportFormat)
-      setExportOpen(false)
-      setExportFormat(null)
-    } finally {
-      setExportLoading(false)
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-between">
-      <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
-      <div className="flex items-center gap-2">
-        {sectionInsights && sectionInsights.length > 0 && (
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <button className="flex items-center gap-2 text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer">
-                <div className="w-5 h-5 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                  <SparklesIcon size={12} className="text-brand-green dark:text-emerald-400" />
-                </div>
-                <span>Insights</span>
-                <span className="bg-brand-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
-                  {sectionInsights.length}
-                </span>
-              </button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-full sm:max-w-md p-6 border-l border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-              <SheetHeader className="pb-6 border-b border-brand-border/40 dark:border-dark-border/40">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                    <SparklesIcon size={18} className="text-brand-green dark:text-emerald-400" />
-                  </div>
-                  <div>
-                    <SheetTitle className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</SheetTitle>
-                    <SheetDescription className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">Análises automáticas sobre os seus resultados.</SheetDescription>
-                  </div>
-                </div>
-              </SheetHeader>
-              <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)] pr-1">
-                {sectionInsights.map((insight, i) => (
-                  <DashboardInsightInline key={i} message={insight.message} color={insight.color} />
-                ))}
-              </div>
-            </SheetContent>
-          </Sheet>
-        )}
-
-        <button
-          onClick={() => setExportOpen(true)}
-          className="flex items-center gap-2 text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer"
-        >
-          <DownloadIcon size={14} />
-          <span>Exportar</span>
-        </button>
-
-        <DefaultModal
-          isOpen={exportOpen}
-          onClose={() => { setExportOpen(false); setExportFormat(null) }}
-          title="Exportar Relatório"
-          maxWidth="sm"
-          footer={
-            <div className="flex items-center justify-end gap-3 w-full pt-2">
-              <Button variant="outline" onClick={() => { setExportOpen(false); setExportFormat(null) }}>
-                Cancelar
-              </Button>
-              <Button variant="default" onClick={handleExport} disabled={!exportFormat || exportLoading} isLoading={exportLoading}>
-                Exportar
-              </Button>
-            </div>
-          }
-        >
-          <div className="flex flex-col gap-2">
-            <ListItem
-              icon={<div className="w-5 h-5 flex items-center justify-center text-brand-dark dark:text-dark-heading"><DownloadIcon size={16} /></div>}
-              title="CSV"
-              description="Arquivo de texto separado por vírgulas"
-              onClick={() => setExportFormat("csv")}
-              className={exportFormat === "csv" ? "ring-2 ring-brand-green" : ""}
-            />
-            <ListItem
-              icon={<div className="w-5 h-5 flex items-center justify-center text-brand-dark dark:text-dark-heading"><DownloadIcon size={16} /></div>}
-              title="Excel (XLSX)"
-              description="Planilha no formato do Excel"
-              onClick={() => setExportFormat("xlsx")}
-              className={exportFormat === "xlsx" ? "ring-2 ring-brand-green" : ""}
-            />
-          </div>
-        </DefaultModal>
-      </div>
-    </div>
-  )
-}
-
-function DashboardInsightInline({ message, color }: { message: string; color: string }) {
-  const colors: Record<string, { bg: string; text: string; bar: string; border: string }> = {
-    green: { bg: "bg-[#ecfdf5] dark:bg-emerald-900/20", text: "text-emerald-900 dark:text-emerald-100", bar: "bg-emerald-500", border: "border-emerald-100 dark:border-emerald-900/30" },
-    red: { bg: "bg-red-50 dark:bg-red-900/10", text: "text-red-700 dark:text-red-300/80", bar: "bg-red-400", border: "border-red-100 dark:border-red-900/30" },
-    orange: { bg: "bg-[#fff7ed] dark:bg-orange-900/20", text: "text-orange-700 dark:text-orange-300/80", bar: "bg-orange-500", border: "border-orange-100 dark:border-orange-900/30" },
-    blue: { bg: "bg-blue-50 dark:bg-blue-900/20", text: "text-blue-700 dark:text-blue-300/80", bar: "bg-blue-500", border: "border-blue-100 dark:border-blue-900/30" },
-  }
-  const c = colors[color] || colors.blue
-  return (
-    <div className={`${c.bg} ${c.border} rounded-xl px-4 py-4 border transition-all duration-200 hover:scale-[1.01] hover:shadow-xs`}>
-      <div className="flex gap-3 items-start">
-        <div className={`${c.bar} w-1.5 rounded-full self-stretch shrink-0 min-h-6`} />
-        <p className={`text-[14px] font-semibold leading-relaxed ${c.text}`}>{message}</p>
-      </div>
-    </div>
-  )
+function SectionHeader({ title, onExport }: { title: string; onExport: (f: "csv" | "xlsx") => Promise<void> }) {
+  return null
 }
 
 export function ReportsPage(props: ReportsPageProps) {
@@ -249,7 +132,7 @@ export function ReportsPage(props: ReportsPageProps) {
         ))}
       </TabsList>
       <TabsContent value="vendas"><SalesSection {...props} /></TabsContent>
-      {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} /></TabsContent>}
+      {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} returnsData={props.returnsData} /></TabsContent>}
       {props.servicesData && <TabsContent value="servicos"><ServicesSection servicesData={props.servicesData} /></TabsContent>}
       {props.deliveryData && <TabsContent value="entregas"><DeliveriesSection {...props} /></TabsContent>}
       {props.serviceOrdersData && <TabsContent value="ordens-servico"><ServiceOrdersSection {...props} /></TabsContent>}
@@ -266,6 +149,7 @@ export function ReportsPage(props: ReportsPageProps) {
 
 function SalesSection({ salesData, period }: { salesData: SalesReportData | null; period: Period }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   if (!salesData) return <SectionPlaceholder title="Vendas" description="Ative o módulo de produtos para visualizar relatórios de vendas." />
 
   const insights = generateSalesInsights({
@@ -283,15 +167,9 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
 
   const kpis = [
     { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend },
-    { title: "Receita Líquida", value: salesData.metrics.netRevenueFormatted, trend: "" },
+    { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend },
     { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: salesData.metrics.orderTrend },
     { title: "Itens Vendidos", value: String(salesData.metrics.itemsSold), trend: "" },
-    { title: "Cancelamento", value: salesData.metrics.cancellationRateFormatted, trend: "" },
-    { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend },
-    ...(salesData.metrics.costCoveragePct >= 50 ? [
-      { title: "Lucro Bruto", value: salesData.metrics.estimatedGrossProfitFormatted, trend: "" },
-      { title: "Margem", value: salesData.metrics.grossMarginFormatted, trend: "" },
-    ] : []),
   ]
 
   const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
@@ -301,18 +179,22 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
     else await exportXLSX("relatorio-vendas", [{ name: "Vendas", headers, rows }])
   }, [salesData])
 
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   const evoData = salesData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
   const paymentLabels: Record<string, string> = { credit: "Crédito", debit: "Débito", cash: "Dinheiro", pix: "Pix", credit_card: "Cartão Crédito", debit_card: "Cartão Débito", money: "Dinheiro", transfer: "Transferência", boleto: "Boleto" }
   const paymentData = salesData.byPaymentMethod.map(p => ({ label: paymentLabels[p.label.toLowerCase()] || p.label, value: p.value }))
   const sourceData = salesData.bySource.map(s => ({ label: s.label, value: s.value }))
 
+  const combinedItems = [
+    ...salesData.topProducts.map(p => ({ label: p.label, value: p.value })),
+    ...(salesData.topServices || []).map(s => ({ label: s.label, value: s.value })),
+  ].sort((a, b) => Number(b.value) - Number(a.value)).slice(0, 10)
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Vendas" onExport={onExport} insights={mappedInsights} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={kpis} variant="horizontal" />
@@ -323,50 +205,28 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução de Vendas" />
-            <DashboardLineChart data={evoData} />
+            <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Este Período", secondary: "Anterior" }} />
           </div>
         </div>
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <ReportRankingCard
-            title="Produtos Mais Vendidos"
-            items={salesData.topProducts.slice(0, 5).map(p => ({ id: p.id, label: p.label, value: p.value, subtitle: p.subtitle }))}
-            variant="compact"
-            icon={ShoppingCartIcon}
-          />
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[13px] font-bold text-brand-inactive-text">Ticket</h3>
-              <h3 className="text-[13px] font-bold text-brand-inactive-text">Itens</h3>
-              <h3 className="text-[13px] font-bold text-brand-inactive-text">Cancel.</h3>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{salesData.metrics.ticketFormatted}</span>
-              <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{salesData.metrics.itemsSold}</span>
-              <span className="text-xl font-bold text-[#cc4745]">{salesData.metrics.cancellationRateFormatted}</span>
-            </div>
+        <div className="lg:col-span-4">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+            <CardHeader icon={ShoppingBagIcon} title="Itens Mais Vendidos" />
+            <DashboardBarChart data={combinedItems.slice(0, 8)} colors={CHART_COLORS_VIVID} layout="horizontal" showLegend />
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-            <CardHeader icon={TagIcon} title="Canal" />
-            <div className="flex justify-center">
-              <DashboardPieChart data={sourceData} totalValue={salesData.metrics.revenueFormatted} totalLabel="Faturamento" innerRadius={60} outerRadius={80} className="h-[190px]" />
-            </div>
-          </div>
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-            <CardHeader icon={CreditCardIcon} title="Pagamento" />
-            <div className="flex justify-center">
-              <DashboardPieChart data={paymentData} totalValue={salesData.metrics.revenueFormatted} totalLabel="Faturamento" innerRadius={60} outerRadius={80} className="h-[190px]" />
-            </div>
-          </div>
-        </div>
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={ClockIcon} title="Pedidos por Hora" />
-            <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} />
+            <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={CHART_COLORS_VIVID} showLegend />
+          </div>
+        </div>
+        <div className="lg:col-span-4">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+            <CardHeader icon={TagIcon} title="Canal" />
+            <DashboardPieChart data={sourceData} totalValue={salesData.metrics.revenueFormatted} totalLabel="Faturamento" innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY} />
           </div>
         </div>
       </div>
@@ -374,53 +234,35 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-            <CardHeader icon={CalendarIcon} title="Dia da Semana" />
-            <DashboardBarChart data={salesData.ordersByDayOfWeek.map(d => ({ label: d.label, value: d.value }))} />
+            <CardHeader icon={CreditCardIcon} title="Pagamento" />
+            <DashboardPieChart data={paymentData} totalValue={salesData.metrics.revenueFormatted} totalLabel="Faturamento" innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY} />
           </div>
         </div>
         <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TargetIcon} title="Curva ABC" />
-            <DashboardBarChart data={salesData.abcCurve.map(a => ({ label: a.label, value: a.value })).slice(0, 8)} />
+            <DashboardBarChart data={salesData.abcCurve.map(a => ({ label: a.label, value: a.value })).slice(0, 8)} colors={CHART_COLORS_VIVID} showLegend />
           </div>
         </div>
         <div className="lg:col-span-4">
           <ReportRankingCard
-            title="Menos Vendidos"
-            items={salesData.leastSoldProducts.map(p => ({ id: p.id, label: p.label, value: `${p.value} un.` }))}
+            title="Maior Margem"
+            items={salesData.topMarginProducts.slice(0, 6).map(p => ({ id: p.id, label: p.label, value: `${p.margin}%` }))}
             variant="compact"
-            icon={ArrowDownIcon}
+            icon={AwardIcon}
           />
         </div>
       </div>
-
-      {salesData.topServices.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-          <div className="lg:col-span-8">
-            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-              <CardHeader icon={WrenchIcon} title="Serviços Mais Vendidos" />
-              <DashboardBarChart data={salesData.topServices.map(s => ({ label: s.label, value: s.value }))} />
-            </div>
-          </div>
-          <div className="lg:col-span-4">
-            <ReportRankingCard
-              title="Maior Margem"
-              items={salesData.topMarginProducts.map(p => ({ id: p.id, label: p.label, value: `${p.margin}%` }))}
-              variant="compact"
-              icon={AwardIcon}
-            />
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
 // ─────────────────── 3. Produtos ───────────────────
 
-function ProductsSection({ productsData, stockValue }: { productsData: ProductsDashboardData | null; stockValue: number }) {
+function ProductsSection({ productsData, stockValue, returnsData }: { productsData: ProductsDashboardData | null; stockValue: number; returnsData: ReturnsReportData | null }) {
   if (!productsData) return <SectionPlaceholder title="Produtos" description="Ative o módulo de produtos." />
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   const insights = generateProductsInsights({
     totalProducts: Number(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0),
     outOfStock: Number(productsData.metrics.find((m: any) => m.title.includes("sem estoque"))?.value || 0),
@@ -439,26 +281,42 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
   }, [insights])
 
   const kpis = [
-    ...productsData.metrics.slice(0, 4).map((m: any) => ({ title: m.title, value: m.value, trend: m.detail || "" })),
     ...(stockValue > 0 ? [{ title: "Valor em Estoque", value: brl(stockValue), trend: "" }] : []),
+    ...productsData.metrics.slice(3, 6).map((m: any) => ({ title: m.title, value: m.value, trend: m.detail || "" })),
   ]
+
   const catData = (productsData.categorySales || []).map(c => ({ label: c.label, value: Number(c.value) }))
   const evoData = (productsData.salesEvolution || []).map(e => ({ label: e.label, value: Number(e.value), secondary: Number(e.secondary || 0) }))
-  const bestSellerData = (productsData.bestSellers || []).map(b => ({ label: b.label, value: Number(b.value) }))
+  const returnEvoData = (returnsData?.returnEvolution || []).map(r => ({ label: r.label, value: r.value }))
+  const idleData = (productsData.idleProducts || []).map(p => ({ id: p.id, label: p.title, value: p.value || "0" }))
+
+  const allLabels = [...new Set([...evoData.map(e => e.label), ...returnEvoData.map(r => r.label)])]
+  const mergedEvolution = allLabels.map(label => {
+    const sold = evoData.find(e => e.label === label)
+    const ret = returnEvoData.find(r => r.label === label)
+    return { label, vendidos: sold?.value || 0, devolvidos: ret?.value || 0 }
+  })
+
+  const vendidoTotal = evoData.reduce((s, e) => s + e.value, 0)
+  const devolvidoTotal = returnEvoData.reduce((s, e) => s + e.value, 0)
+  const faturamentoData = [
+    { label: "Valor Vendido", value: vendidoTotal },
+    { label: "Valor Devolvido", value: devolvidoTotal },
+    { label: "Valor Faturado", value: Math.max(vendidoTotal - devolvidoTotal, 0) },
+  ]
 
   const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-    const rows = productsData.metrics.slice(0, 4).map((m: any) => [m.title, m.value])
+    const rows = kpis.map((m: any) => [m.title, m.value])
     if (fmt === "csv") exportCSV("relatorio-produtos", ["Indicador", "Valor"], rows)
     else await exportXLSX("relatorio-produtos", [{ name: "Produtos", headers: ["Indicador", "Valor"], rows }])
-  }, [productsData])
+  }, [kpis])
+
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Produtos" onExport={onExport} insights={mappedInsights} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={kpis} variant="horizontal" />
@@ -466,25 +324,55 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-7">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+            <CardHeader icon={TrendingUpIcon} title="Evolução de Vendas" />
+            <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} showLegend legendLabels={{ vendidos: "Produtos Vendidos", devolvidos: "Produtos Devolvidos" }} />
+          </div>
+        </div>
+        <div className="lg:col-span-5">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+            <CardHeader icon={CreditCardIcon} title="Faturamento por Produtos" />
+            <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#2563eb"]} showLegend />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TagIcon} title="Categorias mais Vendidas" />
             <div className="flex justify-center">
-              <DashboardPieChart data={catData} innerRadius={60} outerRadius={80} className="h-[200px]" />
+              <DashboardPieChart data={catData} innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY} />
             </div>
           </div>
-          {stockValue > 0 && (
-            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-              <CardHeader icon={MoneyIcon} title="Valor em Estoque" />
-              <p className="text-[32px] font-bold text-brand-orange dark:text-dark-heading">{brl(stockValue)}</p>
-              <p className="text-[13px] font-medium text-brand-inactive-text">custo total do inventário</p>
-            </div>
-          )}
         </div>
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-4">
+          <ReportRankingCard
+            title="Produtos mais Vendidos"
+            items={(productsData.topProducts || []).slice(0, 6).map((p: any) => ({ id: p.id, label: p.title, value: p.value }))}
+            variant="compact"
+            icon={AwardIcon}
+          />
+        </div>
+        <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-            <CardHeader icon={TrendingUpIcon} title="Evolução de Vendas" />
-            <DashboardLineChart data={evoData} />
+            <CardHeader icon={BoxIcon} title="Produtos sem Movimento" />
+            {idleData.length > 0 ? (
+              <div className="space-y-3">
+                {idleData.slice(0, 6).map((item, i) => (
+                  <div key={item.id} className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0 text-xs font-bold text-brand-inactive-text">{i + 1}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading truncate">{item.label}</p>
+                    </div>
+                    <span className="text-[13px] font-bold text-brand-inactive-text shrink-0">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-brand-inactive-text text-center py-8">Todos os produtos tiveram movimento.</p>
+            )}
           </div>
         </div>
       </div>
@@ -500,12 +388,13 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
           />
         </div>
         <div className="lg:col-span-4">
-          <ReportRankingCard
-            title="Mais Vendidos"
-            items={(productsData.topProducts || []).slice(0, 6).map((p: any) => ({ id: p.id, label: p.title, value: p.value }))}
-            variant="compact"
-            icon={AwardIcon}
-          />
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+            <CardHeader icon={PackageIcon} title="Produtos sem Estoque" />
+            <p className="text-[32px] font-bold text-brand-red dark:text-dark-heading">
+              {productsData.metrics.find((m: any) => m.title.includes("sem estoque"))?.value || "0"}
+            </p>
+            <p className="text-[13px] font-medium text-brand-inactive-text">precisam de reposição</p>
+          </div>
         </div>
       </div>
     </div>
@@ -516,6 +405,7 @@ function ProductsSection({ productsData, stockValue }: { productsData: ProductsD
 
 function CustomersSection({ customerData, period }: { customerData: CustomerReportData | null; period: Period }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   if (!customerData) return <SectionPlaceholder title="Clientes" description="Relatórios de clientes disponíveis com o plano Crescer." />
 
   const insights = generateCustomerInsights({
@@ -549,13 +439,12 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
     else await exportXLSX("relatorio-clientes", [{ name: "Clientes", headers: ["Indicador", "Valor"], rows }])
   }, [customerData])
 
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Clientes" onExport={onExport} insights={mappedInsights} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={kpis} variant="horizontal" />
@@ -566,7 +455,7 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Ativos vs Novos" />
-            <DashboardLineChart data={evoData} />
+            <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Ativos", secondary: "Novos" }} />
           </div>
         </div>
         <div className="lg:col-span-4 flex flex-col gap-6">
@@ -617,6 +506,7 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
 
 function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData | null }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   if (!deliveryData) return <SectionPlaceholder title="Entregas" description="Sem dados de entregas." />
   const insights = generateDeliveryInsights({
     totalDeliveries: deliveryData.metrics.total, lateCount: deliveryData.metrics.late,
@@ -647,13 +537,12 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
     else await exportXLSX("relatorio-entregas", [{ name: "Entregas", headers: ["Indicador", "Valor"], rows }])
   }, [deliveryData])
 
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Entregas" onExport={onExport} insights={mappedInsights} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={kpis} variant="horizontal" />
@@ -664,14 +553,14 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Entregas por Período" />
-            <DashboardLineChart data={evoData} />
+            <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Este Período", secondary: "Anterior" }} />
           </div>
         </div>
         <div className="lg:col-span-4 flex flex-col gap-6">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TruckIcon} title="Situação" />
             <div className="flex justify-center">
-              <DashboardPieChart data={statusData} totalValue={String(deliveryData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[180px]" />
+              <DashboardPieChart data={statusData} totalValue={String(deliveryData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[180px]" showLegend colors={CHART_COLORS_CATEGORY} />
             </div>
           </div>
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
@@ -722,6 +611,7 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
 
 function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: ServiceOrderReportData | null }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   if (!serviceOrdersData) return <SectionPlaceholder title="Ordens de Serviço" description="Sem dados de ordens de serviço." />
 
   const kpis = [
@@ -742,10 +632,10 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
     else await exportXLSX("ordens-servico", [{ name: "Ordens de Serviço", headers: ["Indicador", "Valor"], rows }])
   }, [serviceOrdersData])
 
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      <SectionHeader title="Ordens de Serviço" onExport={onExport} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={kpis} variant="horizontal" />
@@ -756,7 +646,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução" />
-            <DashboardLineChart data={evoData} />
+            <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Ordens", secondary: "Período Anterior" }} />
           </div>
         </div>
         <div className="lg:col-span-4">
@@ -783,7 +673,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
             <CardHeader icon={ListIcon} title="Por Status" />
             <div className="flex justify-center flex-1 items-center">
-              <DashboardPieChart data={statusData} totalValue={String(serviceOrdersData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" />
+              <DashboardPieChart data={statusData} totalValue={String(serviceOrdersData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY} />
             </div>
           </div>
         </div>
@@ -796,6 +686,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
 
 function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   if (!returnsData) return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
 
   const insights = generateReturnsInsights({
@@ -826,11 +717,12 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
     else await exportXLSX("relatorio-trocas", [{ name: "Trocas", headers: ["Indicador", "Valor"], rows }])
   }, [returnsData])
 
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Trocas e Devoluções" onExport={onExport} insights={mappedInsights} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12"><SummaryCards metrics={kpis} /></div>
       </div>
@@ -838,20 +730,20 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
         <div className="lg:col-span-7">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução das Devoluções" />
-            <DashboardBarChart data={returnsData.returnEvolution.map(e => ({ label: e.label, value: e.value }))} />
+            <DashboardBarChart data={returnsData.returnEvolution.map(e => ({ label: e.label, value: e.value }))} colors={CHART_COLORS_VIVID} showLegend />
           </div>
         </div>
         <div className="lg:col-span-5 flex flex-col gap-6">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TagIcon} title="Por Motivo" />
             <div className="flex justify-center">
-              <DashboardPieChart data={reasonData} totalValue={String(returnsData.returnCount)} totalLabel="Devoluções" innerRadius={60} outerRadius={80} className="h-[190px]" />
+              <DashboardPieChart data={reasonData} totalValue={String(returnsData.returnCount)} totalLabel="Devoluções" innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY} />
             </div>
           </div>
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={ListIcon} title="Por Status" />
             <div className="flex justify-center">
-              <DashboardPieChart data={statusData} totalValue={String(returnsData.byStatus.reduce((a: any, s: any) => a + s.value, 0))} totalLabel="Total" innerRadius={55} outerRadius={72} className="h-[170px]" />
+              <DashboardPieChart data={statusData} totalValue={String(returnsData.byStatus.reduce((a: any, s: any) => a + s.value, 0))} totalLabel="Total" innerRadius={55} outerRadius={72} className="h-[170px]" showLegend colors={CHART_COLORS_CATEGORY} />
             </div>
           </div>
         </div>
@@ -887,6 +779,7 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
 
 function MarketingSection({ marketingData }: { marketingData: MarketingReportData | null }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   if (!marketingData) return <SectionPlaceholder title="Marketing" description="Ative o módulo de vendas para visualizar relatórios de marketing." />
 
   const insights = generateMarketingInsights({
@@ -919,13 +812,12 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
     else await exportXLSX("relatorio-marketing", [{ name: "Marketing", headers: ["Indicador", "Valor"], rows }])
   }, [marketingData])
 
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Marketing" onExport={onExport} insights={mappedInsights} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={kpis} variant="horizontal" />
@@ -936,14 +828,14 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Evolução" />
-            <DashboardLineChart data={evoData} />
+            <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Faturamento" }} />
           </div>
         </div>
         <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
             <CardHeader icon={TagIcon} title="Faturamento por Canal" />
             <div className="flex justify-center flex-1 items-center">
-              <DashboardPieChart data={sourceData} totalValue={marketingData.totalRevenueFormatted} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" />
+              <DashboardPieChart data={sourceData} totalValue={marketingData.totalRevenueFormatted} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY} />
             </div>
           </div>
         </div>
@@ -988,6 +880,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
 
 function ProductivitySection({ productivityData, goalData }: { productivityData: ProductivityReportData | null; goalData: GoalReportData | null }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
   if (!productivityData) return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços." />
 
   const insights = generateProductivityInsights({
@@ -1019,13 +912,12 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
     else await exportXLSX("relatorio-produtividade", [{ name: "Produtividade", headers: ["Indicador", "Valor"], rows }])
   }, [productivityData])
 
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório de Produtividade" onExport={onExport} insights={mappedInsights} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={kpis} variant="horizontal" />
@@ -1036,7 +928,7 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TrendingUpIcon} title="Atendimentos por Dia" />
-            <DashboardLineChart data={evoData} />
+            <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Atendimentos", secondary: "Receita" }} />
           </div>
         </div>
         <div className="lg:col-span-4">
@@ -1090,6 +982,7 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
 
 function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
 
   const parseBrl = (val?: string) => {
     if (!val) return 0
@@ -1121,13 +1014,17 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
     }))
   }, [insights])
 
+  const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+    const rows = [["Atendimentos", String(servicesData.metrics[0]?.value || "0")]]
+    if (fmt === "csv") exportCSV("servicos", ["Indicador", "Valor"], rows)
+    else await exportXLSX("servicos", [{ name: "Serviços", headers: ["Indicador", "Valor"], rows }])
+  }, [servicesData])
+
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      <SectionHeader title="Relatório de Serviços" onExport={async (fmt) => {
-        const rows = [["Atendimentos", String(servicesData.metrics[0]?.value || "0")]]
-        if (fmt === "csv") exportCSV("servicos", ["Indicador", "Valor"], rows)
-        else await exportXLSX("servicos", [{ name: "Serviços", headers: ["Indicador", "Valor"], rows }])
-      }} insights={mappedInsights} />
+      <InsightsRegister insights={mappedInsights} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12"><SummaryCards metrics={servicesData.metrics} /></div>
       </div>
@@ -1139,7 +1036,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
               <DashboardPieChart
                 data={(servicesData.categoryRows || []).map(c => ({ label: c.title, value: Number(c.value || 0) }))}
                 totalValue={String(totalCategoryServices)} totalLabel="Serviços"
-                innerRadius={60} outerRadius={80} className="h-[200px]"
+                innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY}
               />
             </div>
           </div>
@@ -1147,7 +1044,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
         <div className="lg:col-span-7">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={WrenchIcon} title="Faturamento por Serviço" />
-            <DashboardLineChart data={serviceChartData} />
+            <DashboardLineChart data={serviceChartData} showLegend />
           </div>
         </div>
       </div>
@@ -1188,6 +1085,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
 
 function FinancialSection({ financialData }: { financialData: FinancialDashboardData }) {
   const router = useRouter()
+  const { setExportHandler } = useDashboard()
 
   const totalDistribution = (financialData.distribution || []).reduce((acc, d) => acc + Number(d.value), 0)
   const cashflowData = (financialData.cashflow || []).map(p => ({ label: p.label, value: Number(p.value), secondary: Number(p.secondary || 0) }))
@@ -1207,17 +1105,18 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
     }))
   }, [insights])
 
+  const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+    const rows = [["Saldo", financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value || "R$ 0,00"]]
+    if (fmt === "csv") exportCSV("financeiro", ["Indicador", "Valor"], rows)
+    else await exportXLSX("financeiro", [{ name: "Financeiro", headers: ["Indicador", "Valor"], rows }])
+  }, [financialData])
+
+  useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={mappedInsights} />
 
-      <SectionHeader title="Relatório Financeiro" onExport={async (fmt) => {
-        const rows = [["Saldo", financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value || "R$ 0,00"]]
-        if (fmt === "csv") exportCSV("financeiro", ["Indicador", "Valor"], rows)
-        else await exportXLSX("financeiro", [{ name: "Financeiro", headers: ["Indicador", "Valor"], rows }])
-      }} insights={mappedInsights} />
-      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
           <SummaryCards metrics={financialData.metrics} variant="horizontal" />
@@ -1228,7 +1127,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={MoneyIcon} title="Fluxo de Caixa" />
-            <DashboardLineChart data={cashflowData} />
+            <DashboardLineChart data={cashflowData} showLegend legendLabels={{ value: "Entradas", secondary: "Saídas" }} />
           </div>
         </div>
         <div className="lg:col-span-4 flex flex-col gap-6">
@@ -1238,13 +1137,13 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
               <DashboardPieChart
                 data={(financialData.distribution || []).map(d => ({ label: d.label, value: Number(d.value) }))}
                 totalValue={brl(totalDistribution)} totalLabel="Movimentação"
-                innerRadius={60} outerRadius={80} className="h-[190px]"
+                innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY}
               />
             </div>
           </div>
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TagIcon} title="Despesas por Categoria" />
-            <DashboardBarChart data={(financialData.expensesByCategory || []).map(e => ({ label: e.label, value: Number(e.value) }))} />
+            <DashboardBarChart data={(financialData.expensesByCategory || []).map(e => ({ label: e.label, value: Number(e.value) }))} colors={CHART_COLORS_VIVID} showLegend />
           </div>
         </div>
       </div>

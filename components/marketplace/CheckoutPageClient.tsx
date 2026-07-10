@@ -135,6 +135,7 @@ interface MarketplacePaymentPreview {
     finalAmount: number
     interestAmount: number
     feeAmount: number
+    fixedFeeAmount: number
     paymentMethodDiscountAmount: number
     installmentNumber: number
     installmentAmounts: number[]
@@ -144,6 +145,7 @@ interface MarketplacePaymentPreview {
         hasInterest: boolean
         totalInterest: number
         totalFee?: number
+        fixedFee?: number
         feeBearer?: "merchant" | "customer"
         finalAmount: number
     }[]
@@ -1080,9 +1082,12 @@ export function CheckoutPageClient() {
         const methodInterest = passesPaymentCostToCustomer
             ? Number(paymentPreview.interestAmount || 0)
             : 0
-        const chargedFee = Math.max(0, Number((
-            checkoutTotalToCharge - (chargedBase - methodDiscount + methodInterest)
-        ).toFixed(2)))
+        const methodFee = passesPaymentCostToCustomer
+            ? Number(paymentPreview.feeAmount || 0)
+            : 0
+        const methodFixedFee = passesPaymentCostToCustomer
+            ? Number(paymentPreview.fixedFeeAmount || 0)
+            : 0
 
         const snapshotSubtotal = checkoutAmounts
             ? (payDepositOnly && depositAvailable
@@ -1095,7 +1100,8 @@ export function CheckoutPageClient() {
             couponDiscount: checkoutAmounts?.couponDiscountAmount ?? couponDiscount,
             paymentMethodDiscount: methodDiscount,
             paymentMethodInterest: methodInterest,
-            paymentMethodFee: chargedFee,
+            paymentMethodFee: methodFee,
+            paymentMethodFixedFee: methodFixedFee,
             deliveryFee: checkoutDeliveryFee,
             finalTotal: checkoutTotalToCharge,
         }
@@ -1142,6 +1148,9 @@ export function CheckoutPageClient() {
                 : null,
             paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0
                 ? { label: "Taxa", value: `+ ${formatCurrency(paymentPreview.feeAmount)}` }
+                : null,
+            paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) > 0
+                ? { label: "Custo do método", value: `+ ${formatCurrency(paymentPreview.fixedFeeAmount)}` }
                 : null,
             { label: "Total a cobrar", value: formatCurrency(checkoutTotalToCharge), isTotal: true },
         ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>
@@ -2847,6 +2856,12 @@ export function CheckoutPageClient() {
                                             <div className="flex justify-between">
                                                 <span>Taxas</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.feeAmount)}</span>
+                                            </div>
+                                        )}
+                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) > 0 && (
+                                            <div className="flex justify-between">
+                                                <span>Custos do método</span>
+                                                <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.fixedFeeAmount)}</span>
                                             </div>
                                         )}
                                         <div className="flex justify-between text-base font-bold text-brand-dark dark:text-dark-heading pt-2 border-t border-brand-border/20">
