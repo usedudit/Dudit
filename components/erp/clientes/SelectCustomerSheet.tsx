@@ -17,6 +17,7 @@ export type PinnedCustomerSummary = {
     id: string
     name: string
     email?: string | null
+    phone?: string | null
     avatar_url?: string | null
 }
 
