@@ -570,8 +570,7 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                                     return (
                                         <div
                                             key={dIdx}
-                                            className={`flex-1 border-r border-brand-border dark:border-dark-border relative min-w-[140px] p-2 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group ${isClosed ? 'bg-[repeating-linear-gradient(-45deg,rgba(239,68,68,0.03),rgba(239,68,68,0.03)_10px,transparent_10px,transparent_20px)] bg-red-50/5 dark:bg-red-950/5' : ''
-                                                }`}
+                                            className={`flex-1 relative min-w-[140px] p-2 transition-colors cursor-pointer group ${isClosed ? 'border border-red-200 dark:border-red-900 bg-[#fef2f2]/60 dark:bg-red-950/5 rounded-xl m-1 hover:bg-[#fee2e2]/40 dark:hover:bg-red-950/10' : 'border-r border-brand-border dark:border-dark-border hover:bg-gray-50 dark:hover:bg-zinc-900/50'}`}
                                             onClick={(e) => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 const x = e.clientX;
@@ -591,7 +590,9 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                                         >
                                             {isClosed && (
                                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                                                    <span className="text-sm font-bold text-brand-red uppercase tracking-widest">Fechado</span>
+                                                    <span className="px-4 py-1 text-xs font-semibold text-[#991b1b] bg-[#fee2e2] dark:text-red-200 dark:bg-red-950/80 border border-red-200/50 rounded-full">
+                                                        Fechado
+                                                    </span>
                                                 </div>
                                             )}
                                             <div className="flex flex-col gap-1.5 h-full overflow-hidden relative z-10">
@@ -662,7 +663,7 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
 };
 
 // ... MonthView ...
-export const MonthView = ({ appointments, currentDate, handleGenericCellClick, activePopover, handleOpenCreate, handleOpenUnavailable, setActivePopover, handleOpenView, handleOpenMore }: any) => {
+export const MonthView = ({ appointments, currentDate, handleGenericCellClick, activePopover, handleOpenCreate, handleOpenUnavailable, setActivePopover, handleOpenView, handleOpenMore, openingHours }: any) => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -685,9 +686,20 @@ export const MonthView = ({ appointments, currentDate, handleGenericCellClick, a
             return a.date === dateStr;
         });
 
+        const dName = DAYS_OF_WEEK[dateObj.getDay()];
+        const dConfig = openingHours ? openingHours[dName] : null;
+        const isClosed = openingHours && (!dConfig || !dConfig.enabled);
+
         days.push(
-            <div key={d} className="min-h-[120px] p-2 border-b border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface relative group hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer" onClick={(e) => handleGenericCellClick(e, dateObj)}>
-                <span className={`text-sm font-bold ${cellApps.length > 0 ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-inactive-text'}`}>{d}</span>
+            <div key={d} className={`min-h-[120px] p-2 relative group transition-colors cursor-pointer ${isClosed ? 'border border-red-200 dark:border-red-900 bg-[#fef2f2]/60 dark:bg-red-950/5 rounded-xl m-1 hover:bg-[#fee2e2]/40 dark:hover:bg-red-950/10' : 'border-b border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-zinc-900/50'}`} onClick={(e) => handleGenericCellClick(e, dateObj)}>
+                <span className={`text-sm font-bold ${isClosed ? 'text-red-700 dark:text-red-400' : (cellApps.length > 0 ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-inactive-text')}`}>{d}</span>
+                {isClosed && (
+                    <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none z-10">
+                        <span className="px-4 py-1 text-xs font-semibold text-[#991b1b] bg-[#fee2e2] dark:text-red-200 dark:bg-red-950/80 border border-red-200/50 rounded-full">
+                            Fechado
+                        </span>
+                    </div>
+                )}
                 <div className="mt-2 flex flex-col gap-1">
                     <AnimatePresence>
                         {cellApps.slice(0, 4).map((apt: Appointment, i: number) => {

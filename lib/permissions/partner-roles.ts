@@ -42,6 +42,7 @@ const settingsNone = {
     settings_payments: false, settings_comissions: false, settings_returns: false,
     settings_vitrine: false, settings_os: false, settings_messages: false,
     settings_delivery: false, settings_integrations: false,
+    settings_system: false, settings_resources: false, settings_logs: false,
 }
 
 const fullPdv = {
@@ -74,6 +75,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         settings: {
             view: true, settings_negocio: true, settings_team: true, settings_plan: true, settings_payments: true, settings_comissions: true,
             settings_returns: true, settings_vitrine: true, settings_os: true, settings_messages: true, settings_delivery: true, settings_integrations: true,
+            settings_system: true, settings_resources: true, settings_logs: true,
         },
         settings_negocio: { edit: true },
         settings_team: { invite: true, edit: true, remove: true, revoke_invite: true },
@@ -103,6 +105,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         settings: {
             view: true, settings_negocio: true, settings_team: true, settings_plan: false, settings_payments: true, settings_comissions: true,
             settings_returns: true, settings_vitrine: true, settings_os: true, settings_messages: true, settings_delivery: true, settings_integrations: false,
+            settings_system: true, settings_resources: true, settings_logs: true,
         },
         settings_negocio: { edit: true },
         settings_team: { invite: true, edit: true, remove: true, revoke_invite: true },
@@ -132,6 +135,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         settings: {
             view: true, settings_negocio: true, settings_team: false, settings_plan: false, settings_payments: false, settings_comissions: false,
             settings_returns: true, settings_vitrine: false, settings_os: true, settings_messages: true, settings_delivery: false, settings_integrations: false,
+            settings_system: false, settings_resources: false, settings_logs: false,
         },
         settings_negocio: { edit: false },
         settings_team: { invite: false, edit: true, remove: false, revoke_invite: false },

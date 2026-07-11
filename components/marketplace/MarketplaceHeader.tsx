@@ -197,7 +197,7 @@ const Header: React.FC<HeaderProps> = ({
         const parts = slug.split("-")
         const state = parts.pop()?.toUpperCase() || ""
         const cityKey = parts.join("-")
-        
+
         let city = COMMON_CITY_ACCENTS[cityKey]
         if (!city) {
             city = parts
@@ -757,9 +757,10 @@ const Header: React.FC<HeaderProps> = ({
 
                     <div className="py-2">
                         {([
-                            { label: "Seu perfil", href: "/perfil" },
+                            { label: "Seu Perfil", href: "/perfil" },
                             { label: "Meus Favoritos", href: "/favoritos" },
-                            { label: "Minhas avaliações", href: "/perfil?tab=avaliacoes" },
+                            { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
+                            { label: "Minhas Coleções", href: "/colecoes" },
                             { label: "Central do Parceiro", href: "/erp/switch" },
                         ] as any[]).map((item, idx) => {
                             const ItemWrapper: any = item.href ? Link : "div";
@@ -942,9 +943,10 @@ const Header: React.FC<HeaderProps> = ({
 
                                     <div className="py-2">
                                         {([
-                                            { label: "Seu perfil", href: "/perfil" },
+                                            { label: "Seu Perfil", href: "/perfil" },
                                             { label: "Meus Favoritos", href: "/favoritos" },
-                                            { label: "Minhas avaliações", href: "/perfil?tab=avaliacoes" },
+                                            { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
+                                            { label: "Minhas Coleções", href: "/colecoes" },
                                             { label: "Central do Parceiro", href: "/erp/switch" },
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";

@@ -1211,7 +1211,7 @@ export const AppointmentSheet = ({
         }
 
         const itemsNeedingEnrichment = selectedItems.filter(
-            (item: any) => item.usageType === 'consumed' && item.productId && item.stock === undefined && !enrichedProductIdsRef.current.has(item.productId)
+            (item: any) => item.usageType === 'consumed' && item.productId && item.stock == null && !enrichedProductIdsRef.current.has(item.productId)
         )
 
         if (itemsNeedingEnrichment.length === 0) {
@@ -1224,29 +1224,43 @@ export const AppointmentSheet = ({
         let cancelled = false
         const productIds = itemsNeedingEnrichment.map((item: any) => item.productId)
 
-        // Cache these immediately in Set before hitting database
+        // Cache these immediately in Set before hitting database to prevent duplicate requests
         productIds.forEach((id: string) => enrichedProductIdsRef.current.add(id));
 
-        fetchProductsByIdsAction(productIds).then((products: any[]) => {
-            if (!cancelled && products.length > 0) {
-                const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
-                setSelectedItems(prevItems => prevItems.map((item: any) => {
-                    const product = item.productId ? productsMap[item.productId] : null
-                    if (product && (!item.image || item.stock === undefined)) {
-                        return {
-                            ...item,
-                            image: item.image || product.image,
-                            stock: item.stock !== undefined ? item.stock : product.stock,
-                            minStock: product.minStock,
-                            sku: item.sku || product.sku,
+        fetchProductsByIdsAction(productIds, partnerId).then((products: any[]) => {
+            if (!cancelled) {
+                if (products.length > 0) {
+                    const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
+                    setSelectedItems(prevItems => prevItems.map((item: any) => {
+                        const product = item.productId ? productsMap[item.productId] : null
+                        if (product && (item.stock == null || !item.image)) {
+                            return {
+                                ...item,
+                                image: item.image || product.image,
+                                stock: item.stock != null ? item.stock : product.stock,
+                                minStock: product.minStock,
+                                sku: item.sku || product.sku,
+                            }
                         }
+                        return item
+                    }))
+                }
+
+                // If any products were not returned, remove them from enriched cache so they can be retried
+                const foundIds = new Set(products.map((p: any) => p.id))
+                productIds.forEach((id: string) => {
+                    if (!foundIds.has(id)) {
+                        enrichedProductIdsRef.current.delete(id)
                     }
-                    return item
-                }))
+                })
             }
             if (!cancelled) setIsEnrichingItems(false)
         }).catch(() => {
-            if (!cancelled) setIsEnrichingItems(false)
+            if (!cancelled) {
+                // Remove all from cache on error
+                productIds.forEach((id: string) => enrichedProductIdsRef.current.delete(id))
+                setIsEnrichingItems(false)
+            }
         })
 
         return () => { cancelled = true }
@@ -2930,30 +2944,38 @@ export const AppointmentSheet = ({
                                 <span className="font-bold text-red-600">negativo ou abaixo do mínimo</span>
                                 {' '}após este agendamento:
                             </p>
-                            <div className="max-h-60 overflow-y-auto space-y-2">
-                                {stockCheckItems.map((item: any, idx: number) => (
-                                    <div key={idx} className="p-3 rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800/20">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{item.name}</p>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    Estoque atual: <span className="font-bold">{item.stock || 0}</span>
-                                                    {item.minStock > 0 && (
-                                                        <> | Mínimo: <span className="font-bold">{item.minStock}</span></>
-                                                    )}
-                                                </p>
+                            <div className="max-h-60 overflow-y-auto border border-brand-border dark:border-dark-border rounded-xl px-4 divide-y divide-brand-border/40 dark:divide-dark-border/40 bg-white dark:bg-dark-surface">
+                                {stockCheckItems.map((item: any, idx: number) => {
+                                    const itemStock = item.stock ?? 0;
+                                    const itemImage = item.image;
+                                    const itemName = item.name;
+                                    const itemSku = item.sku;
+                                    const newStock = item.projectedStock;
+
+                                    return (
+                                        <div key={idx} className="py-4 flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                    <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{itemName}</div>
+                                                    <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{itemSku || 'N/A'}</div>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="font-bold text-red-600 text-sm">
-                                                    Projetado: {item.projectedStock}
-                                                </p>
-                                                <p className="text-xs text-red-600">
-                                                    ({item.issue === 'negativo' ? 'Estoque negativo' : 'Abaixo do mínimo'})
-                                                </p>
+
+                                            <div className="h-8 w-px bg-brand-border dark:bg-dark-border shrink-0" />
+
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{itemStock} <span className="text-[10px] font-medium opacity-60">un</span></span>
+                                                <ArrowRightIcon size={14} className="text-brand-inactive-text" />
+                                                <span className="text-[15px] font-bold text-brand-red">
+                                                    {newStock} <span className="text-xs font-bold">un</span>
+                                                </span>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center">
                                 Deseja prosseguir mesmo assim?

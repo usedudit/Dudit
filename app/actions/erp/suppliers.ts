@@ -36,6 +36,7 @@ export async function createComprehensiveSupplierAction(data: {
   state?: string
   municipioCodigoIbge?: string
   notes?: string
+  image_url?: string | null
   csrf_token?: string
 }) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -81,6 +82,7 @@ export async function createComprehensiveSupplierAction(data: {
     contribuinte_icms: data.contribuinteIcms || null,
     notes: data.notes || null,
     supplier_code: supplierCode,
+    image_url: data.image_url || null,
   }).select().single()
 
   if (error) {
@@ -256,6 +258,7 @@ export async function updateComprehensiveSupplierAction(data: {
   state?: string
   municipioCodigoIbge?: string
   notes?: string
+  image_url?: string | null
   csrf_token?: string
 }) {
   // Validate CSRF token
@@ -299,6 +302,7 @@ export async function updateComprehensiveSupplierAction(data: {
       state: data.state || null,
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
       notes: data.notes || null,
+      image_url: data.image_url || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", data.supplierId)

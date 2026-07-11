@@ -315,16 +315,20 @@ export async function handleAppointmentItemsStockMovement(params: {
     revalidateStockMovements(partnerId)
 }
 
-export async function fetchProductsByIdsAction(productIds: string[]) {
+export async function fetchProductsByIdsAction(productIds: string[], partnerId?: string) {
     try {
         if (!productIds.length) return []
-        const ctx = await getCurrentPartnerContext()
-        if (!ctx?.partnerId) return []
+        let resolvedPartnerId = partnerId
+        if (!resolvedPartnerId) {
+            const ctx = await getCurrentPartnerContext()
+            resolvedPartnerId = ctx?.partnerId
+        }
+        if (!resolvedPartnerId) return []
         const supabase = createAdminClient()
         const { data } = await supabase
             .from("products")
             .select("id, name, sku, stock_quantity, stock_available, min_stock_quantity, images")
-            .eq("partner_id", ctx.partnerId)
+            .eq("partner_id", resolvedPartnerId)
             .in("id", productIds)
         return (data || []).map((p: any) => ({
             id: p.id,

@@ -58,6 +58,7 @@ export type PermissionTemplate = {
     settings_integrations: boolean
     settings_system: boolean
     settings_resources: boolean
+    settings_logs: boolean
   }
 }
 

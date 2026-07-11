@@ -972,16 +972,19 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             </FormSection>
 
                                             <FormSection title="Descrição">
-                                                <textarea
-                                                    className="w-full min-h-[120px] px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green resize-y disabled:opacity-50"
+                                                <FormTextarea
                                                     placeholder="Descreva o serviço a ser realizado..."
                                                     value={description}
                                                     onChange={(e) => setDescription(e.target.value)}
                                                     disabled={isLocked}
+                                                    error={fieldErrors.has("description")}
+                                                    errorMessage={fieldErrors.has("description") ? "A descrição é obrigatória" : undefined}
+                                                    label="Descrição"
+                                                    name="description"
                                                 />
                                             </FormSection>
 
-                                            <FormSection title="Agendamento e Responsabilidade">
+                                            <FormSection title="Agendamento e Responsabilidade" hasSeparator>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <DatePicker
                                                         label="Data de abertura"
@@ -1183,7 +1186,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                 )}
 
                                 {activeTab === "notes" && (
-                                    <FadeIn key="notes" className="space-y-6 w-full max-w-[800px]">
+                                    <FadeIn key="notes" className="max-w-[1300px] mx-auto min-h-[400px]">
                                         <FormTextarea
                                             label="Observações internas"
                                             placeholder="Anotações internas (não visíveis ao cliente)..."

@@ -152,11 +152,11 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
   const { setExportHandler } = useDashboard()
   if (!salesData) return <SectionPlaceholder title="Vendas" description="Ative o módulo de produtos para visualizar relatórios de vendas." />
 
-  const insights = generateSalesInsights({
+  const insights = useMemo(() => generateSalesInsights({
     revenue: salesData.metrics.revenue, previousRevenue: 0,
     orderCount: salesData.metrics.orderCount, previousOrderCount: 0,
     ticketMedio: salesData.metrics.ticketMedio, previousTicketMedio: 0,
-  })
+  }), [salesData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -263,7 +263,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
   if (!productsData) return <SectionPlaceholder title="Produtos" description="Ative o módulo de produtos." />
   const router = useRouter()
   const { setExportHandler } = useDashboard()
-  const insights = generateProductsInsights({
+  const insights = useMemo(() => generateProductsInsights({
     totalProducts: Number(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0),
     outOfStock: Number(productsData.metrics.find((m: any) => m.title.includes("sem estoque"))?.value || 0),
     lowStock: Number(productsData.metrics.find((m: any) => m.title.includes("baixo"))?.value || 0),
@@ -271,7 +271,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
     topProductName: productsData.topProducts[0]?.title,
     topProductSales: parseFloat(String(productsData.topProducts[0]?.value?.replace(" un.", "") || "0")),
     topProductPreviousSales: 0,
-  })
+  }), [productsData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -408,12 +408,12 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
   const { setExportHandler } = useDashboard()
   if (!customerData) return <SectionPlaceholder title="Clientes" description="Relatórios de clientes disponíveis com o plano Crescer." />
 
-  const insights = generateCustomerInsights({
+  const insights = useMemo(() => generateCustomerInsights({
     totalCustomers: customerData.totalCustomers, newCustomers: customerData.newCustomers, activeCustomers: customerData.activeCustomers,
     avgTicket: customerData.avgTicket, previousAvgTicket: customerData.previousAvgTicket,
     topCustomerName: customerData.topCustomers[0]?.label,
     topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
-  })
+  }), [customerData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -508,11 +508,11 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
   const router = useRouter()
   const { setExportHandler } = useDashboard()
   if (!deliveryData) return <SectionPlaceholder title="Entregas" description="Sem dados de entregas." />
-  const insights = generateDeliveryInsights({
+  const insights = useMemo(() => generateDeliveryInsights({
     totalDeliveries: deliveryData.metrics.total, lateCount: deliveryData.metrics.late,
     avgTimeMinutes: deliveryData.metrics.avgTimeMinutes, previousAvgTimeMinutes: deliveryData.metrics.previousAvgTimeMinutes,
     onTimeRate: deliveryData.metrics.onTimeRate,
-  })
+  }), [deliveryData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -689,11 +689,11 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
   const { setExportHandler } = useDashboard()
   if (!returnsData) return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
 
-  const insights = generateReturnsInsights({
+  const insights = useMemo(() => generateReturnsInsights({
     returnRate: returnsData.returnRate, previousReturnRate: returnsData.previousReturnRate,
     totalRefunded: returnsData.totalRefunded, topReason: returnsData.byReason[0]?.label,
     returnCount: returnsData.returnCount,
-  })
+  }), [returnsData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -782,11 +782,11 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
   const { setExportHandler } = useDashboard()
   if (!marketingData) return <SectionPlaceholder title="Marketing" description="Ative o módulo de vendas para visualizar relatórios de marketing." />
 
-  const insights = generateMarketingInsights({
+  const insights = useMemo(() => generateMarketingInsights({
     totalCoupons: marketingData.couponStats.total, couponUsageRate: marketingData.couponStats.usageRate,
     revenueBySource: Object.fromEntries(marketingData.revenueBySource.map(s => [s.label, s.value])),
     topSource: marketingData.topSource, topSourcePercent: marketingData.topSourcePercent,
-  })
+  }), [marketingData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -883,10 +883,10 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
   const { setExportHandler } = useDashboard()
   if (!productivityData) return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços." />
 
-  const insights = generateProductivityInsights({
+  const insights = useMemo(() => generateProductivityInsights({
     topStaffName: productivityData.staffRanking[0]?.label, topStaffRevenue: productivityData.staffRanking[0]?.revenue,
     staffCount: productivityData.staffRanking.length, totalRevenue: productivityData.metrics.totalRevenue,
-  })
+  }), [productivityData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -998,14 +998,14 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
   const topStaffName = servicesData.staffRows?.[0]?.title
   const topStaffRevenue = parseBrl(servicesData.staffRows?.[0]?.value)
 
-  const insights = generateServicesInsights({
+  const insights = useMemo(() => generateServicesInsights({
     todayAppointments: todayCount,
     cancelledCount: Number(servicesData.metrics.find((m: any) => m.title.includes("Cancelados"))?.value || 0),
     totalAppointments: Number(servicesData.metrics.find((m: any) => m.title.includes("Total"))?.value || 0),
     attendanceRate: Number(String(servicesData.metrics.find((m: any) => m.title.includes("Comparecimento"))?.value || "100").replace("%", "")),
     topStaffName,
     topStaffRevenue,
-  })
+  }), [servicesData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({
@@ -1090,13 +1090,13 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
   const totalDistribution = (financialData.distribution || []).reduce((acc, d) => acc + Number(d.value), 0)
   const cashflowData = (financialData.cashflow || []).map(p => ({ label: p.label, value: Number(p.value), secondary: Number(p.secondary || 0) }))
 
-  const insights = generateFinancialInsights({
+  const insights = useMemo(() => generateFinancialInsights({
     balance: Number(financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
     receivable: Number(financialData.metrics.find((m: any) => m.title.includes("Receber"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
     payable: Number(financialData.metrics.find((m: any) => m.title.includes("Pagar"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
     incomeTotal: totalDistribution,
     expenseTotal: Number(financialData.metrics.find((m: any) => m.title.includes("Despesas"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-  })
+  }), [financialData])
 
   const mappedInsights = useMemo(() => {
     return insights.map(ins => ({

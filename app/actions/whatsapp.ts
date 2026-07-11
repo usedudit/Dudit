@@ -127,14 +127,23 @@ export async function getWhatsappIntegrationAction(): Promise<
             .order("updated_at", { ascending: false })
 
         const rows = (connections || []) as PartnerWhatsappConnection[]
+
+        // Auto-reset stale pairing statuses on page load
+        for (const conn of rows) {
+            if (conn.provider === "evolution" && (conn.status === "connecting" || conn.status === "qr_pending")) {
+                conn.status = "disconnected"
+                conn.is_active = false
+                await admin
+                    .from("partner_whatsapp_connections")
+                    .update({ status: "disconnected", is_active: false, updated_at: new Date().toISOString() })
+                    .eq("id", conn.id)
+            }
+        }
+
         const active = rows.find((c: PartnerWhatsappConnection) => c.is_active) || rows[0]
 
-        const { data: messages } = await admin
-            .from("whatsapp_messages")
-            .select("id, phone_number, template_name, status, error_message, sent_at, created_at, message_type")
-            .eq("partner_id", context.partnerId)
-            .order("created_at", { ascending: false })
-            .limit(50)
+        // Do not query messages to avoid database load, since they are no longer shown in UI
+        const messages: any[] = []
 
         const { data: templateRows } = await admin
             .from("whatsapp_templates")
@@ -204,16 +213,7 @@ export async function getWhatsappIntegrationAction(): Promise<
                         isActive: t.is_active,
                     }
                 }),
-                messages: ((messages || []) as WhatsappMessageRow[]).map((m) => ({
-                    id: m.id,
-                    phoneNumber: m.phone_number,
-                    templateName: m.template_name,
-                    status: m.status,
-                    errorMessage: m.error_message,
-                    sentAt: m.sent_at,
-                    createdAt: m.created_at,
-                    messageType: m.message_type,
-                })),
+                messages: [],
             },
         }
     } catch (error: unknown) {
@@ -867,6 +867,33 @@ export async function testEvolutionConnectionAction(phone: string): Promise<Acti
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
         console.error("[WhatsApp] testEvolutionConnectionAction error:", msg, error)
+        return { success: false, error: msg }
+    }
+}
+
+export async function resetEvolutionPairingStatusAction(): Promise<ActionResponse<void>> {
+    try {
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        const admin = getAdminClient()
+        await admin
+            .from("partner_whatsapp_connections")
+            .update({
+                status: "disconnected",
+                is_active: false,
+                updated_at: new Date().toISOString()
+            })
+            .eq("partner_id", context.partnerId)
+            .eq("provider", "evolution")
+            .in("status", ["connecting", "qr_pending"])
+
+        revalidatePath("/erp/integrations/whatsapp")
+        return { success: true, data: undefined }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] resetEvolutionPairingStatusAction error:", msg, error)
         return { success: false, error: msg }
     }
 }

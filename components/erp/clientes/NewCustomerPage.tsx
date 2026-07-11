@@ -35,6 +35,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getCustomerByIdAction } from "@/app/actions/erp/customers"
+import { useR2Upload } from "@/hooks/use-r2-upload"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -63,6 +64,16 @@ const REQUIRED_FIELDS = [
 
 const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customerId, initialData, onSuccess, onError }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
+        prefix: "customers/",
+        onSuccess: (result) => {
+            setImageUrl(result.publicUrl)
+            notifySuccess("Imagem do cliente carregada com sucesso!")
+        },
+        onError: (err) => {
+            notifyError("Erro ao enviar imagem: " + err.message)
+        }
+    })
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -88,6 +99,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const [motherName, setMotherName] = useState("")
     const [fatherName, setFatherName] = useState("")
     const [observacoes, setObservacoes] = useState("")
+    const [imageUrl, setImageUrl] = useState("")
     const [status, setStatus] = useState("Ativo")
     const [contribuinte, setContribuinte] = useState("9")
 
@@ -121,8 +133,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const isDirty = useMemo(() => {
         return customerName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" || rg !== "" ||
             email !== "" || phone !== "" || mobile !== "" || website !== "" || birthDate !== "" || motherName !== "" || fatherName !== "" || observacoes !== "" ||
-            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== ""
-    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city])
+            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== ""
+    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city, imageUrl])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -149,6 +161,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         setBirthDate(c.birth_date || "")
         setMotherName(c.mother_name || "")
         setFatherName(c.father_name || "")
+        setImageUrl(c.image_url || "")
         if (c.phone_fixed) setPhone(c.phone_fixed)
     }, [])
 
@@ -338,6 +351,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 birthDate: birthDate || null,
                 motherName: motherName || null,
                 fatherName: fatherName || null,
+                image_url: imageUrl || null,
                 hasDifferentBillingAddress: hasDifferentBillingAddress,
                 billingZipCode: hasDifferentBillingAddress ? billingCep : undefined,
                 billingStreet: hasDifferentBillingAddress ? billingStreet : undefined,
@@ -788,13 +802,41 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                 <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
                                                     <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Imagem do Cliente</h3>
-                                                    <div className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
-                                                        <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
+                                                    <label className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
+                                                        <input
+                                                            type="file"
+                                                            accept="image/png, image/jpeg, image/webp"
+                                                            className="hidden"
+                                                            onChange={async (e) => {
+                                                                const file = e.target.files?.[0]
+                                                                if (file) {
+                                                                    try {
+                                                                        await uploadFile(file)
+                                                                    } catch (err) {
+                                                                        // error already handled by hook onError
+                                                                    }
+                                                                }
+                                                            }}
+                                                            disabled={isUploadingImage}
+                                                        />
+                                                        {isUploadingImage ? (
+                                                            <ThreeDotsLoader className="scale-75" />
+                                                        ) : imageUrl ? (
+                                                            <img
+                                                                src={imageUrl}
+                                                                alt="Imagem do cliente"
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
+                                                        )}
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <span className="text-white text-sm font-bold uppercase tracking-wider">Alterar</span>
+                                                            <span className="text-white text-sm font-bold uppercase tracking-wider">
+                                                                {imageUrl ? "Alterar" : "Enviar"}
+                                                            </span>
                                                         </div>
-                                                    </div>
-                                                    <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 2MB)</p>
+                                                    </label>
+                                                    <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
                                                 </div>
 
                                                 <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mt-8 relative overflow-hidden">

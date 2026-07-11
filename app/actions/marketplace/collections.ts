@@ -335,7 +335,7 @@ export async function getCollectionItems(collectionId: string) {
     productIds.length > 0
       ? supabase
           .from("products")
-          .select("id, name, price, promotional_price, images, rating, condition, created_at, partners!inner(store_name, store_avatar)")
+          .select("id, name, price, promotional_price, images, rating, condition, created_at, partners!inner(store_name, store_image_url)")
           .in("id", productIds)
           .eq("is_active", true)
           .then((r: any) => r.data || [])
@@ -343,7 +343,7 @@ export async function getCollectionItems(collectionId: string) {
     serviceIds.length > 0
       ? supabase
           .from("services")
-          .select("id, name, price, images, rating, created_at, partners!inner(store_name, store_avatar)")
+          .select("id, name, price, images, rating, created_at, partners!inner(store_name, store_image_url)")
           .in("id", serviceIds)
           .eq("is_active", true)
           .then((r: any) => r.data || [])

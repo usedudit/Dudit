@@ -94,6 +94,7 @@ export async function createComprehensiveCustomerAction(data: {
   birthDate?: string | null
   motherName?: string | null
   fatherName?: string | null
+  image_url?: string | null
   csrf_token?: string
   hasDifferentBillingAddress?: boolean
   billingZipCode?: string
@@ -200,6 +201,7 @@ export async function createComprehensiveCustomerAction(data: {
     birth_date: data.birthDate || null,
     mother_name: data.motherName || null,
     father_name: data.fatherName || null,
+    image_url: data.image_url || null,
   }).select().single()
 
   if (error) {
@@ -322,6 +324,7 @@ export async function updateComprehensiveCustomerAction(data: {
   birthDate?: string | null
   motherName?: string | null
   fatherName?: string | null
+  image_url?: string | null
   csrf_token?: string
   hasDifferentBillingAddress?: boolean
   billingZipCode?: string
@@ -410,6 +413,7 @@ export async function updateComprehensiveCustomerAction(data: {
       birth_date: data.birthDate || null,
       mother_name: data.motherName || null,
       father_name: data.fatherName || null,
+      image_url: data.image_url || null,
     })
     .eq("id", data.customerId)
     .eq("partner_id", data.partnerId) // Defense in depth
@@ -539,7 +543,7 @@ export async function getCustomerByIdAction(customerId: string) {
       cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
       store_credit, notes, birth_date, mother_name, father_name, website,
       created_at, zip_code, street, number, complement, neighborhood,
-      city, state, country, user_id, marketplace_user_id
+      city, state, country, user_id, marketplace_user_id, image_url
     `)
     .eq("id", customerId)
     .maybeSingle()

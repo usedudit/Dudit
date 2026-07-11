@@ -49,8 +49,8 @@ export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]
 
       <div className="flex items-center gap-3 px-1">
         <UserProfileImage
-          fullName={authorName}
-          imageUrl={collection.author?.avatar_url || null}
+          fullName={collection.name}
+          imageUrl={collection.cover_url || null}
           className="w-10 h-10 border border-brand-border shrink-0 bg-gray-50"
         />
         <div className="flex-1 min-w-0">
@@ -58,7 +58,7 @@ export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]
             {collection.name}
           </h3>
           <p className="text-[12px] text-brand-inactive-text truncate">
-            {authorName} • {collection.items_count} {collection.items_count === 1 ? "item" : "itens"}
+            {collection.items_count} {collection.items_count === 1 ? "item" : "itens"}
           </p>
         </div>
       </div>

@@ -151,21 +151,14 @@ export function useEntityState() {
             const url = `${pathname}?${params.toString()}`
 
             // 1. INSTANT: Update local state synchronously
-            const wasOpen = localStateRef.current.isOpen
             setLocalState({ action, entityId, isOpen: true, entityType })
             lastUserActionRef.current = Date.now()
             expectedHrefRef.current = url
 
-            // 2. INSTANT: Sync URL via pushState (so browser back button returns to the list page)
-            // If the entity modal was already open, we replace the state to avoid polluting history with multiple action steps
+            // 2. INSTANT: Sync URL via replaceState (no pushState to avoid history pollution)
+            // Always replaceState so that close() never sends the user to an unexpected URL via back()
             if (typeof window !== "undefined") {
-                const existingState = window.history.state
-                const stateObj = { ...existingState, isEntityOpen: true }
-                if (wasOpen) {
-                    window.history.replaceState(stateObj, "", url)
-                } else {
-                    window.history.pushState(stateObj, "", url)
-                }
+                window.history.replaceState(null, "", url)
             }
         },
         [pathname],
@@ -187,14 +180,10 @@ export function useEntityState() {
         lastUserActionRef.current = Date.now()
         expectedHrefRef.current = pathname
 
-        // 2. INSTANT: Sync URL
-        // If we pushed state to open this, use history.back() to clean up browser history
-        if (typeof window !== "undefined" && window.history.state?.isEntityOpen) {
-            window.history.back()
-        } else {
-            if (typeof window !== "undefined") {
-                window.history.replaceState(null, "", pathname)
-            }
+        // 2. INSTANT: Sync URL back to clean list page
+        // Always replaceState so we never send the user to an unexpected URL
+        if (typeof window !== "undefined") {
+            window.history.replaceState(null, "", pathname)
         }
     }, [pathname])
 

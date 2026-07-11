@@ -19,6 +19,7 @@ import {
   DANGEROUS_EXTENSIONS,
   MAX_FILE_SIZE,
   MAX_PRESIGNED_URL_EXPIRY,
+  R2_PREFIXES,
 } from "@/lib/r2/config"
 
 export async function GET(request: NextRequest) {
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const fileName = searchParams.get("fileName")
     const fileType = searchParams.get("fileType")
+    const requestedPrefix = searchParams.get("prefix")
 
     // 3. VALIDATE REQUIRED PARAMS
     if (!fileName || !fileType) {
@@ -37,6 +39,19 @@ export async function GET(request: NextRequest) {
         { error: "fileName e fileType são obrigatórios" },
         { status: 400 }
       )
+    }
+
+    // Validate custom prefix if provided
+    let prefix: string = "products/"
+    if (requestedPrefix) {
+      const allowedPrefixes = Object.values(R2_PREFIXES) as string[]
+      if (!allowedPrefixes.includes(requestedPrefix)) {
+        return NextResponse.json(
+          { error: "Prefixo de upload inválido ou não permitido" },
+          { status: 400 }
+        )
+      }
+      prefix = requestedPrefix
     }
 
     // 4. VALIDATE MIME TYPE - strict allowlist
@@ -63,12 +78,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 6. GENERATE SIGNED URL - user-scoped, short expiry
-    // Prefix is determined server-side, NOT from client input
     const result = await generateSignedUploadUrl({
       fileName,
       fileType,
       userId: user.id,
-      prefix: "products/",
+      prefix,
       expiresIn: MAX_PRESIGNED_URL_EXPIRY, // Capped at 120s
     })
 

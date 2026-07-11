@@ -197,6 +197,34 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
         return () => window.removeEventListener("keydown", onKey)
     }, [isOpen, closeOpen])
 
+    const groupedRows = closeSummary?.groupedByMethod || []
+
+    const closePreview = useMemo(() => {
+        if (!closeSummary) return null
+        const opening = Number(closeSummary.drawer?.initial || 0)
+        const deposits = Number(closeSummary.drawer?.deposits || 0)
+        const withdrawals = Number(closeSummary.drawer?.withdrawals || 0)
+        const refunds = Number(closeSummary.drawer?.refunds || 0)
+        const expectedDrawerTotal = Number(closeSummary.expectedDrawerTotal || 0)
+        const expectedCashSales = Number(closeSummary.drawer?.cashSales || 0)
+        const informedCashSales = groupedRows.reduce((acc: number, row: any) => {
+            const key = row.paymentMethodId || "__none__"
+            const raw = Number(String(countedByPm[key] ?? row.calculated ?? 0).replace(",", "."))
+            const value = Number.isFinite(raw) ? raw : 0
+            const type = String(row.paymentMethodType || "").toLowerCase()
+            const isCash = type === "cash" || (!row.paymentMethodId && type !== "pix")
+            return isCash ? acc + value : acc
+        }, 0)
+        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals - refunds
+        return {
+            opening,
+            expectedCashSales,
+            expectedDrawerTotal,
+            informedDrawerTotal,
+            difference: informedDrawerTotal - expectedDrawerTotal,
+        }
+    }, [closeSummary, groupedRows, countedByPm])
+
     if (isLoading || !details || !session) return <div className="h-full flex items-center justify-center bg-white dark:bg-dark-surface min-h-[400px]"><ThreeDotsLoader /></div>
 
     const openCloseModal = async () => {
@@ -250,33 +278,6 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     }
 
     const movementModalTitle = movModal === "withdrawal" ? "Registrar sangria" : movModal === "deposit" ? "Registrar reforço" : "Movimentação de caixa"
-
-    const groupedRows = closeSummary?.groupedByMethod || []
-    const closePreview = useMemo(() => {
-        if (!closeSummary) return null
-        const opening = Number(closeSummary.drawer?.initial || 0)
-        const deposits = Number(closeSummary.drawer?.deposits || 0)
-        const withdrawals = Number(closeSummary.drawer?.withdrawals || 0)
-        const refunds = Number(closeSummary.drawer?.refunds || 0)
-        const expectedDrawerTotal = Number(closeSummary.expectedDrawerTotal || 0)
-        const expectedCashSales = Number(closeSummary.drawer?.cashSales || 0)
-        const informedCashSales = groupedRows.reduce((acc: number, row: any) => {
-            const key = row.paymentMethodId || "__none__"
-            const raw = Number(String(countedByPm[key] ?? row.calculated ?? 0).replace(",", "."))
-            const value = Number.isFinite(raw) ? raw : 0
-            const type = String(row.paymentMethodType || "").toLowerCase()
-            const isCash = type === "cash" || (!row.paymentMethodId && type !== "pix")
-            return isCash ? acc + value : acc
-        }, 0)
-        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals - refunds
-        return {
-            opening,
-            expectedCashSales,
-            expectedDrawerTotal,
-            informedDrawerTotal,
-            difference: informedDrawerTotal - expectedDrawerTotal,
-        }
-    }, [closeSummary, groupedRows, countedByPm])
 
     return (
         <FadeIn>

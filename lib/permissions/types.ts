@@ -71,6 +71,9 @@ export interface SettingsPermissions {
     settings_messages: boolean
     settings_delivery: boolean
     settings_integrations: boolean
+    settings_system: boolean
+    settings_resources: boolean
+    settings_logs: boolean
 }
 
 export interface SettingsNegocioPermissions {

@@ -33,6 +33,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveSupplierAction, updateComprehensiveSupplierAction, getSupplierByIdAction } from "@/app/actions/erp/suppliers"
+import { useR2Upload } from "@/hooks/use-r2-upload"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
@@ -57,6 +58,16 @@ const REQUIRED_FIELDS = [
 
 const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplierId, onSuccess, onError }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
+        prefix: "partners/",
+        onSuccess: (result) => {
+            setImageUrl(result.publicUrl)
+            notifySuccess("Imagem do fornecedor carregada com sucesso!")
+        },
+        onError: (err) => {
+            notifyError("Erro ao enviar imagem: " + err.message)
+        }
+    })
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -79,6 +90,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const [observacoes, setObservacoes] = useState("")
     const [status, setStatus] = useState("Ativo")
     const [contribuinte, setContribuinte] = useState("9")
+    const [imageUrl, setImageUrl] = useState("")
     const [supplierCode, setSupplierCode] = useState("")
 
     // Address States
@@ -98,8 +110,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const isDirty = useMemo(() => {
         return supplierName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" ||
             email !== "" || phone !== "" || mobile !== "" || website !== "" || observacoes !== "" ||
-            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== ""
-    }, [supplierName, fantasia, cnpj, ie, cpf, email, phone, mobile, website, observacoes, cep, street, number, neighborhood, city])
+            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== ""
+    }, [supplierName, fantasia, cnpj, ie, cpf, email, phone, mobile, website, observacoes, cep, street, number, neighborhood, city, imageUrl])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -126,6 +138,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                         setContribuinte(s.contribuinte || "9")
                         setObservacoes(s.notes || "")
                         setSupplierCode(s.supplier_code || "")
+                        setImageUrl(s.image_url || "")
                         // Address fields (direct from suppliers table)
                         setCep(s.zip_code || "")
                         setStreet(s.street || "")
@@ -251,6 +264,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                 state: uf,
                 csrf_token: token,
                 notes: observacoes,
+                image_url: imageUrl || null,
             }
 
             const res = supplierId
@@ -624,13 +638,41 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                 <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
                                                     <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Imagem do Fornecedor</h3>
-                                                    <div className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
-                                                        <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
+                                                    <label className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
+                                                        <input
+                                                            type="file"
+                                                            accept="image/png, image/jpeg, image/webp"
+                                                            className="hidden"
+                                                            onChange={async (e) => {
+                                                                const file = e.target.files?.[0]
+                                                                if (file) {
+                                                                    try {
+                                                                        await uploadFile(file)
+                                                                    } catch (err) {
+                                                                        // error already handled by hook onError
+                                                                    }
+                                                                }
+                                                            }}
+                                                            disabled={isUploadingImage}
+                                                        />
+                                                        {isUploadingImage ? (
+                                                            <ThreeDotsLoader className="scale-75" />
+                                                        ) : imageUrl ? (
+                                                            <img
+                                                                src={imageUrl}
+                                                                alt="Imagem do fornecedor"
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
+                                                        )}
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <span className="text-white text-sm font-bold uppercase tracking-wider">Alterar</span>
+                                                            <span className="text-white text-sm font-bold uppercase tracking-wider">
+                                                                {imageUrl ? "Alterar" : "Enviar"}
+                                                            </span>
                                                         </div>
-                                                    </div>
-                                                    <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 2MB)</p>
+                                                    </label>
+                                                    <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
                                                 </div>
 
                                                 {supplierCode && (

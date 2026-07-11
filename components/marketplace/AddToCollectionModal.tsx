@@ -105,7 +105,7 @@ export function AddToCollectionModal({ isOpen, onClose, itemType, itemId }: AddT
               leftIcon={<PlusIcon size={16} />}
               onClick={() => {
                 onClose()
-                router.push("/minhas-colecoes")
+                router.push("/colecoes")
               }}
             >
               Criar coleção

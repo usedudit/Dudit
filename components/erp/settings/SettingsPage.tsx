@@ -15,6 +15,7 @@ import {
   WrenchIcon,
   MailIcon,
   CadastrosIcon,
+  ClockIcon,
 } from "@/lib/icons"
 
 import { BusinessDataSubPage } from "./BusinessDataSubPage"
@@ -30,6 +31,7 @@ import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { SystemSettingsSubPage } from "./SystemSettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
+import { AuditLogsSubPage } from "./AuditLogsSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
@@ -59,6 +61,7 @@ type ActivePage =
   | "delivery"
   | "system-settings"
   | "resources"
+  | "logs"
 
 export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProps) {
   const searchParams = useSearchParams()
@@ -82,6 +85,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "system-settings": "configuracoes-sistema",
     "integrations": "integracoes",
     "resources": "gerenciar-recursos",
+    "logs": "historico-atividades",
   }
 
   const SLUG_TO_PAGE: Record<string, ActivePage> = Object.entries(PAGE_TO_SLUG).reduce(
@@ -141,6 +145,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "recibo": "Recibo/Devolução",
         "vitrine": "Minha Vitrine",
         "delivery": "Logística e Entrega",
+        "logs": "Histórico de Atividades",
         "home": "Configurações"
       }
       setHeaderOverride({
@@ -179,6 +184,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessSystemSettings = isOwnerOrAdmin
   const canAccessBusinessData = isOwnerAdminOrManager
   const canAccessResources = isOwnerOrAdmin
+  const canAccessLogs = isOwnerOrAdmin
   const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const paymentsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const commissionsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
@@ -194,7 +200,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "recibo" && !canAccessReturns) setActivePage("home")
     if (activePage === "business-data" && !canAccessBusinessData) setActivePage("home")
     if (activePage === "resources" && !canAccessResources) setActivePage("home")
-  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, canAccessBusinessData, canAccessResources])
+    if (activePage === "logs" && !canAccessLogs) setActivePage("home")
+  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, canAccessBusinessData, canAccessResources, canAccessLogs])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -395,6 +402,16 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 className="px-4 py-3 gap-4"
                               />
                             )}
+                            {canAccessLogs && (
+                              <ListItem
+                                icon={ClockIcon}
+                                title="Histórico de Atividades"
+                                description="Visualize o registro de ações realizadas no sistema."
+                                onClick={() => setActivePage("logs")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
                           </FadeIn>
                         )}
                       </TabsContent>
@@ -444,6 +461,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
             <SystemSettingsSubPage key="system-settings" partnerId={partner.id} onBack={() => setActivePage("home")} />
           )}
           {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => setActivePage("home")} />}
+          {activePage === "logs" && canAccessLogs && <AuditLogsSubPage key="logs" onBack={() => setActivePage("home")} />}
         </AnimatePresence>
       </div>
     </FadeIn>

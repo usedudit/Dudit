@@ -60,10 +60,14 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
       let signedUrlResponse: Response
 
       if (endpoint.endsWith("get-signed-url")) {
-        const searchParams = new URLSearchParams({
+        const queryObj: Record<string, string> = {
           fileName: file.name,
           fileType: file.type,
-        })
+        }
+        if (options?.prefix) {
+          queryObj.prefix = options.prefix
+        }
+        const searchParams = new URLSearchParams(queryObj)
         signedUrlResponse = await fetch(`${endpoint}?${searchParams}`, { method: "GET" })
       } else {
         signedUrlResponse = await fetch(endpoint, {

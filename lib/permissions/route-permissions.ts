@@ -321,7 +321,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     financial_dashboard: viewOnly,
     financial_dre: withSpecific(viewOnly, { can_view_dre: true }),
     cadastros_financeiro: full,
-    reports: viewOnly,
+    reports: full,
     // Vitrine
     store_customize: withSpecific(crud, { can_customize_store: true }),
     store_reviews: withSpecific(viewOnly, { can_respond_reviews: true }),
@@ -331,7 +331,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_marketing: full,
     recurring_plans: full,
     recurring_subscriptions: full,
-    community_videos: full,
+    community_videos: noAccess,
     colecoes: full,
     // Configurações (limitado): pode visualizar; sem assinatura/integrações
     settings: viewOnly,
@@ -339,10 +339,10 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     settings_integrations: noAccess,
     settings_team: withSpecific(viewOnly, { can_invite: false, can_remove_member: false, can_revoke_invite: false, can_manage_team: true }),
     settings_subscription: noAccess,
-    // Produtividade - pode visualizar overview, gerenciar metas, visualizar comissões
-    productivity_overview: viewOnly,
-    productivity_goals: withSpecific(crud, { can_manage: true }),
-    productivity_commissions: withSpecific(viewOnly, { can_pay_commission: false }),
+    // Produtividade - full
+    productivity_overview: full,
+    productivity_goals: full,
+    productivity_commissions: withSpecific(full, { can_pay_commission: true }),
 }
 
 // ─── OPERATOR: Operador ─────────────────────────────────────────────────────
@@ -380,13 +380,13 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_services: viewOnly,
     // Clientes - CRUD sem exclusão
     customers: crud,
-    // Financeiro - no access
-    financial_transactions: noAccess,
-    cash_register: withSpecific(viewOnly, { can_open_cash: true, can_close_cash: true, can_manage_cash: false }),
-    financial_dashboard: noAccess,
-    financial_dre: noAccess,
-    cadastros_financeiro: noAccess,
-    reports: noAccess,
+    // Financeiro - full access
+    financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
+    cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
+    financial_dashboard: viewOnly,
+    financial_dre: viewOnly,
+    cadastros_financeiro: full,
+    reports: full,
     // Vitrine - no access
     store_customize: noAccess,
     store_reviews: noAccess,
@@ -641,6 +641,9 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             settings_messages: mapRoute("settings").view,
             settings_delivery: mapRoute("logistics").view,
             settings_integrations: mapRoute("settings_integrations").view,
+            settings_system: mapRoute("settings").view,
+            settings_resources: mapRoute("settings").view,
+            settings_logs: mapRoute("settings").view,
         },
         cadastros_categories: mapRoute("cadastros_produtos"),
         specific: {

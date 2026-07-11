@@ -88,7 +88,8 @@ VALUES (
       "settings_delivery": false,
       "settings_integrations": false,
       "settings_system": false,
-      "settings_resources": false
+      "settings_resources": false,
+      "settings_logs": false
     }
   }'::jsonb
 )
@@ -112,14 +113,14 @@ INSERT INTO public.roles (id, name, permissions) VALUES
     "customers": { "view": true, "create": true, "edit": true, "delete": false },
     "products": { "view": true, "create": false, "edit": false, "delete": false },
     "stock_movements": { "view": true, "create": false, "undo": false },
-    "pdv": { "view": true, "sell": true, "open_pdv": true, "close_pdv": true, "sangria": false, "reforco": false, "can_apply_discount": false, "can_add_delivery": true },
+    "pdv": { "view": true, "sell": true, "open_pdv": true, "close_pdv": true, "sangria": true, "reforco": true, "can_apply_discount": false, "can_add_delivery": true },
     "services": { "view": true, "create": false, "edit": false, "delete": false },
     "quotes": { "view": true, "create": true, "edit": true, "delete": false },
-    "financial": { "view": false, "create": false, "edit": false, "cancel": false },
+    "financial": { "view": true, "create": true, "edit": true, "cancel": false },
     "categories": { "view": true, "create": false, "edit": false, "delete": false },
     "coupons": { "view": false, "create": false, "edit": false, "delete": false },
     "goals": { "view": false, "create": false, "edit": false, "delete": false },
-    "reports": { "view_basic": false, "view_advanced": false },
+    "reports": { "view_basic": true, "view_advanced": true },
     "dashboard": { "view": true },
     "delivery": { "view": true, "create": false, "edit": false, "update_status": true },
     "recurring_plans": { "view": false, "manage": false },
@@ -143,7 +144,8 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_delivery": false,
       "settings_integrations": false,
       "settings_system": false,
-      "settings_resources": false
+      "settings_resources": false,
+      "settings_logs": false
     }
   }'::jsonb
 ),
@@ -187,7 +189,8 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_delivery": false,
       "settings_integrations": false,
       "settings_system": false,
-      "settings_resources": false
+      "settings_resources": false,
+      "settings_logs": false
     }
   }'::jsonb
 ),
@@ -231,7 +234,8 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_delivery": true,
       "settings_integrations": false,
       "settings_system": false,
-      "settings_resources": false
+      "settings_resources": false,
+      "settings_logs": false
     }
   }'::jsonb
 ),
@@ -275,7 +279,8 @@ INSERT INTO public.roles (id, name, permissions) VALUES
       "settings_delivery": true,
       "settings_integrations": false,
       "settings_system": true,
-      "settings_resources": true
+      "settings_resources": true,
+      "settings_logs": true
     }
   }'::jsonb
 ),
