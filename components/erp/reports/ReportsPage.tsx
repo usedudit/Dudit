@@ -165,12 +165,12 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
     }))
   }, [insights])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend },
     { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend },
     { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: salesData.metrics.orderTrend },
     { title: "Itens Vendidos", value: String(salesData.metrics.itemsSold), trend: "" },
-  ]
+  ], [salesData])
 
   const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
     const headers = ["Indicador", "Valor"]
@@ -211,7 +211,7 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
         <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={ShoppingBagIcon} title="Itens Mais Vendidos" />
-            <DashboardBarChart data={combinedItems.slice(0, 8)} colors={CHART_COLORS_VIVID} layout="horizontal" showLegend />
+            <DashboardBarChart data={combinedItems.slice(0, 5)} colors={CHART_COLORS_VIVID} layout="horizontal" />
           </div>
         </div>
       </div>
@@ -220,13 +220,13 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={ClockIcon} title="Pedidos por Hora" />
-            <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={CHART_COLORS_VIVID} showLegend />
+            <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={[CHART_COLORS_VIVID[0]]} />
           </div>
         </div>
         <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
             <CardHeader icon={TagIcon} title="Canal" />
-            <DashboardPieChart data={sourceData} totalValue={salesData.metrics.revenueFormatted} totalLabel="Faturamento" innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY} />
+            <DashboardPieChart data={sourceData} totalValue={String(salesData.metrics.orderCount)} totalLabel="Pedidos" half innerRadius={60} outerRadius={80} className="mt-4" showLegend colors={CHART_COLORS_CATEGORY} />
           </div>
         </div>
       </div>
@@ -241,7 +241,7 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
         <div className="lg:col-span-4">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
             <CardHeader icon={TargetIcon} title="Curva ABC" />
-            <DashboardBarChart data={salesData.abcCurve.map(a => ({ label: a.label, value: a.value })).slice(0, 8)} colors={CHART_COLORS_VIVID} showLegend />
+            <DashboardBarChart data={salesData.abcCurve.map(a => ({ label: a.label, value: a.value })).slice(0, 5)} colors={["#f97316"]} />
           </div>
         </div>
         <div className="lg:col-span-4">
@@ -280,10 +280,10 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
     }))
   }, [insights])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     ...(stockValue > 0 ? [{ title: "Valor em Estoque", value: brl(stockValue), trend: "" }] : []),
     ...productsData.metrics.slice(3, 6).map((m: any) => ({ title: m.title, value: m.value, trend: m.detail || "" })),
-  ]
+  ], [stockValue, productsData])
 
   const catData = (productsData.categorySales || []).map(c => ({ label: c.label, value: Number(c.value) }))
   const evoData = (productsData.salesEvolution || []).map(e => ({ label: e.label, value: Number(e.value), secondary: Number(e.secondary || 0) }))
@@ -422,14 +422,14 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
     }))
   }, [insights])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { title: "Total",       value: String(customerData.totalCustomers), trend: "" },
     { title: "Ativos",       value: String(customerData.activeCustomers), trend: "" },
     { title: "Recorrentes",  value: String(customerData.recurringCustomers), trend: "" },
     { title: "Novos",        value: String(customerData.newCustomers), trend: "" },
     { title: "Inativos 90d", value: String(customerData.inactiveCustomers), trend: "" },
     { title: "Ticket Médio", value: customerData.avgTicketFormatted, trend: "" },
-  ]
+  ], [customerData])
 
   const evoData = customerData.customerEvolution.map(d => ({ label: d.label, value: d.ativos, secondary: d.novos }))
 
@@ -521,12 +521,12 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
     }))
   }, [insights])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { title: "Total", value: String(deliveryData.metrics.total), trend: "" },
     { title: "Pendentes", value: String(deliveryData.metrics.pending), trend: "" },
     { title: "Atrasadas", value: String(deliveryData.metrics.late), trend: "" },
     { title: "No Prazo", value: `${deliveryData.metrics.onTimeRate}%`, trend: "" },
-  ]
+  ], [deliveryData])
 
   const evoData = deliveryData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
   const statusData = deliveryData.byStatus.map(s => ({ label: s.label, value: s.value }))
@@ -614,14 +614,14 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
   const { setExportHandler } = useDashboard()
   if (!serviceOrdersData) return <SectionPlaceholder title="Ordens de Serviço" description="Sem dados de ordens de serviço." />
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { title: "Total OS", value: String(serviceOrdersData.metrics.total), trend: "" },
     { title: "Abertas", value: String(serviceOrdersData.metrics.open), trend: "" },
     { title: "Em Andamento", value: String(serviceOrdersData.metrics.inProgress), trend: "" },
     { title: "Concluídas", value: String(serviceOrdersData.metrics.completed), trend: "" },
     { title: "Canceladas", value: String(serviceOrdersData.metrics.cancelled), trend: "" },
     { title: "Receita", value: serviceOrdersData.metrics.totalRevenueFormatted, trend: "" },
-  ]
+  ], [serviceOrdersData])
 
   const evoData = serviceOrdersData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
   const statusData = serviceOrdersData.byStatus.map(s => ({ label: s.label, value: s.value }))
@@ -702,11 +702,11 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
     }))
   }, [insights])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { title: "Total Devoluções", value: String(returnsData.returnCount), trend: "" },
     { title: "Taxa Devolução", value: `${returnsData.returnRate}%`, trend: "" },
     { title: "Reembolsado", value: returnsData.totalRefundedFormatted, trend: "" },
-  ]
+  ], [returnsData])
 
   const reasonData = returnsData.byReason.map(r => ({ label: r.label, value: r.value }))
   const statusData = returnsData.byStatus.map(s => ({ label: s.label, value: s.value }))
@@ -795,13 +795,13 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
     }))
   }, [insights])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "" },
     { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total` },
     { title: "Cupons", value: String(marketingData.couponStats.total), trend: "" },
     { title: "Uso Cupons", value: `${marketingData.couponStats.usageRate}%`, trend: "" },
     ...(marketingData.campaigns.length > 0 ? [{ title: "Campanhas", value: String(marketingData.campaigns.filter(c => c.isActive).length), trend: `de ${marketingData.campaigns.length}` }] : []),
-  ]
+  ], [marketingData])
 
   const sourceData = marketingData.revenueBySource.map(s => ({ label: s.label, value: s.value }))
   const evoData = marketingData.evolution.map(d => ({ label: d.label, value: d.online + d.presencial + d.outros }))
@@ -895,14 +895,14 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
     }))
   }, [insights])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "" },
     { title: "Receita", value: productivityData.metrics.totalRevenueFormatted, trend: "" },
     { title: "Ticket Médio", value: brl(productivityData.metrics.avgTicketPerStaff), trend: "" },
     { title: "Tempo Médio", value: `${productivityData.metrics.avgDuration}min`, trend: "" },
     { title: "Comparecimento", value: `${productivityData.metrics.attendanceRate}%`, trend: "" },
     ...(goalData && goalData.totalCount > 0 ? [{ title: "Metas", value: `${goalData.achievedCount}/${goalData.totalCount}`, trend: `${goalData.overallProgress}%` }] : []),
-  ]
+  ], [productivityData, goalData])
 
   const evoData = productivityData.dailyEvolution.map(d => ({ label: d.label, value: d.atendimentos, secondary: d.receita }))
 

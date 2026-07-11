@@ -691,7 +691,7 @@ export const MonthView = ({ appointments, currentDate, handleGenericCellClick, a
         const isClosed = openingHours && (!dConfig || !dConfig.enabled);
 
         days.push(
-            <div key={d} className={`min-h-[120px] p-2 relative group transition-colors cursor-pointer ${isClosed ? 'border border-red-200 dark:border-red-900 bg-[#fef2f2]/60 dark:bg-red-950/5 rounded-xl m-1 hover:bg-[#fee2e2]/40 dark:hover:bg-red-950/10' : 'border-b border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-zinc-900/50'}`} onClick={(e) => handleGenericCellClick(e, dateObj)}>
+            <div key={d} className={`min-h-[120px] p-2 relative group transition-colors cursor-pointer ${isClosed ? 'border border-red-200 dark:border-red-900 bg-[#fef2f2]/60 dark:bg-red-950/5 hover:bg-[#fee2e2]/40 dark:hover:bg-red-950/10' : 'border-b border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-zinc-900/50'}`} onClick={(e) => handleGenericCellClick(e, dateObj)}>
                 <span className={`text-sm font-bold ${isClosed ? 'text-red-700 dark:text-red-400' : (cellApps.length > 0 ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-inactive-text')}`}>{d}</span>
                 {isClosed && (
                     <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none z-10">

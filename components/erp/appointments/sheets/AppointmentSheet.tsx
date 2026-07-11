@@ -111,7 +111,7 @@ export const AppointmentSheet = ({
     const [stockCheckItems, setStockCheckItems] = useState<any[]>([]);
     const [pendingNextStep, setPendingNextStep] = useState<{ fn: () => void } | null>(null);
     const [isEnrichingItems, setIsEnrichingItems] = useState(false);
-    const enrichedProductIdsRef = useRef<Set<string>>(new Set());
+    const fetchingProductIdsRef = useRef<Set<string>>(new Set());
 
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
@@ -1211,7 +1211,7 @@ export const AppointmentSheet = ({
         }
 
         const itemsNeedingEnrichment = selectedItems.filter(
-            (item: any) => item.usageType === 'consumed' && item.productId && item.stock == null && !enrichedProductIdsRef.current.has(item.productId)
+            (item: any) => item.usageType === 'consumed' && item.productId && item.stock == null && !fetchingProductIdsRef.current.has(item.productId)
         )
 
         if (itemsNeedingEnrichment.length === 0) {
@@ -1225,19 +1225,29 @@ export const AppointmentSheet = ({
         const productIds = itemsNeedingEnrichment.map((item: any) => item.productId)
 
         // Cache these immediately in Set before hitting database to prevent duplicate requests
-        productIds.forEach((id: string) => enrichedProductIdsRef.current.add(id));
+        productIds.forEach((id: string) => fetchingProductIdsRef.current.add(id));
 
         fetchProductsByIdsAction(productIds, partnerId).then((products: any[]) => {
             if (!cancelled) {
+                // Remove from in-flight Set upon completion
+                productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
+
                 if (products.length > 0) {
                     const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
                     setSelectedItems(prevItems => prevItems.map((item: any) => {
                         const product = item.productId ? productsMap[item.productId] : null
                         if (product && (item.stock == null || !item.image)) {
+                            let stock = product.stock
+                            if (item.variantId && product.variants) {
+                                const variant = product.variants.find((v: any) => v.id === item.variantId)
+                                if (variant) {
+                                    stock = variant.stock
+                                }
+                            }
                             return {
                                 ...item,
                                 image: item.image || product.image,
-                                stock: item.stock != null ? item.stock : product.stock,
+                                stock: item.stock != null ? item.stock : stock,
                                 minStock: product.minStock,
                                 sku: item.sku || product.sku,
                             }
@@ -1245,20 +1255,12 @@ export const AppointmentSheet = ({
                         return item
                     }))
                 }
-
-                // If any products were not returned, remove them from enriched cache so they can be retried
-                const foundIds = new Set(products.map((p: any) => p.id))
-                productIds.forEach((id: string) => {
-                    if (!foundIds.has(id)) {
-                        enrichedProductIdsRef.current.delete(id)
-                    }
-                })
             }
             if (!cancelled) setIsEnrichingItems(false)
         }).catch(() => {
             if (!cancelled) {
-                // Remove all from cache on error
-                productIds.forEach((id: string) => enrichedProductIdsRef.current.delete(id))
+                // Remove all from in-flight Set on error
+                productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
                 setIsEnrichingItems(false)
             }
         })
@@ -2693,17 +2695,15 @@ export const AppointmentSheet = ({
                         />
                     </div>
                     <Button
-                        variant="outline"
                         onClick={() => {
                             setNewCustomerName("");
                             setNewCustomerEmail("");
                             setNewCustomerPhone("");
                             setIsNewClientOpen(true);
                         }}
-                        className="h-11 px-3 shrink-0 rounded-xl"
-                        type="button"
+                        className="h-11"
+                        leftIcon={<PlusIcon size={18} />}
                     >
-                        <PlusIcon size={16} /> Novo
                     </Button>
                 </div>
 
@@ -3253,6 +3253,7 @@ export const AppointmentSheet = ({
             <AddItemSheet
                 isOpen={isAddItemSheetOpen}
                 onClose={() => setIsAddItemSheetOpen(false)}
+                partnerId={partnerId}
                 onConfirm={(newItem) => {
                     const item = {
                         ...newItem,

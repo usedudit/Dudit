@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { usePermissions } from "@/lib/permission-context"
@@ -40,34 +41,31 @@ export default function VideosManagement() {
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
+    const queryClient = useQueryClient()
     const entityState = useEntityState()
     const { state: es, open: openEntity, close: closeEntity, isViewing, isEditing, isCreating } = entityState
 
-    const [videos, setVideos] = useState<CommunityVideoItem[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<ActiveTab>("Todos")
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [viewMode, setViewMode] = useState<ViewMode>(isMobile ? "grid" : "list")
     const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
+    const [activeTab, setActiveTab] = useState<"Todos" | "Pendentes" | "Aprovados" | "Rejeitados">("Todos")
     const [videoToDelete, setVideoToDelete] = useState<CommunityVideoItem | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
 
-    const loadVideos = useCallback(async () => {
-        if (!partnerId) return
-        setIsLoading(true)
-        try {
+    const { data: videosData, isLoading: isVideosLoading } = useQuery({
+        queryKey: ['erp', 'videos', partnerId],
+        queryFn: async () => {
             const { items } = await getPartnerCommunityVideos(partnerId)
-            setVideos(items)
-        } catch {
-            // silent
-        } finally {
-            setIsLoading(false)
-        }
-    }, [partnerId])
+            return items ?? []
+        },
+        staleTime: 30000,
+        refetchOnWindowFocus: false,
+        placeholderData: [],
+    })
 
-    useEffect(() => { loadVideos() }, [loadVideos])
+    const videos = videosData ?? []
 
     useEffect(() => {
         const timeout = setTimeout(() => setDebouncedSearch(search), 350)
@@ -100,7 +98,7 @@ export default function VideosManagement() {
             if (result.success) {
                 toast({ title: "Vídeo excluído" })
                 setVideoToDelete(null)
-                await loadVideos()
+                await queryClient.invalidateQueries({ queryKey: ['erp', 'videos', partnerId] })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
             }
@@ -149,7 +147,7 @@ export default function VideosManagement() {
             toast({ title: "Vídeo criado" })
         }
         closeEntity()
-        await loadVideos()
+        await queryClient.invalidateQueries({ queryKey: ['erp', 'videos', partnerId] })
     }
 
     const hasActiveFilters = debouncedSearch.length > 0
@@ -239,7 +237,7 @@ export default function VideosManagement() {
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                                 <AnimatePresence mode="wait">
-                                    {isLoading ? (
+                                    {isVideosLoading ? (
                                         <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
                                             <ThreeDotsLoader />
                                         </FadeIn>

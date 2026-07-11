@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
@@ -97,22 +98,21 @@ export default function ServiceOrdersPage({
   const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
   const itemsPerPage = 50
 
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
-
-  useEffect(() => {
-    async function loadTeam() {
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['erp', 'team-members', partnerId],
+    queryFn: async () => {
       try {
         const { getTeamMembers } = await import("@/app/actions/erp/team")
         const res = await getTeamMembers()
-        if (res.members) {
-          setTeamMembers(res.members)
-        }
+        return res.members ?? []
       } catch (err) {
         console.error("Erro ao carregar equipe:", err)
+        return []
       }
-    }
-    loadTeam()
-  }, [])
+    },
+    staleTime: 120000,
+    refetchOnWindowFocus: false,
+  })
 
   const entityPage = useEntityPage<any, any, any>({
     entityType: "service_orders",

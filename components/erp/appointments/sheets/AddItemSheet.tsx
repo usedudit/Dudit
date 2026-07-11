@@ -3,14 +3,18 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Package, SearchIcon, XIcon, PlusIcon } from "@/lib/icons"
-import { Button, Input, FormDropdown, ThreeDotsLoader, IconPlaceholder } from "@/components/reusable"
+import { Button, Input, FormDropdown, ThreeDotsLoader, IconPlaceholder, Badge } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { searchProductsForAppointmentItems } from "@/app/actions/erp/appointment-items"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
+import { formatCurrency } from "@/lib/utils/formatters"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 interface AddItemSheetProps {
     isOpen: boolean
     onClose: () => void
+    partnerId?: string
     onConfirm: (item: {
         product_id?: string | null
         variant_id?: string | null
@@ -21,30 +25,42 @@ interface AddItemSheetProps {
     }) => void
 }
 
-export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemSheetProps) {
+export default function AddItemSheet({ isOpen, onClose, partnerId, onConfirm }: AddItemSheetProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [searchResults, setSearchResults] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
+    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
     const [quantity, setQuantity] = useState(1)
     const [usageType, setUsageType] = useState<string>('consumed')
     const [isManualMode, setIsManualMode] = useState(false)
     const [manualName, setManualName] = useState("")
     const [showResults, setShowResults] = useState(false)
+    const [activePromotions, setActivePromotions] = useState<any[]>([])
     const searchRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        if (!isOpen) {
+        if (isOpen && partnerId) {
+            listActivePromotionsForMarketplaceAction(partnerId).then(res => {
+                if (Array.isArray(res)) {
+                    setActivePromotions(res)
+                }
+            }).catch(err => {
+                console.error("Error loading active promotions for search:", err)
+            })
+        } else if (!isOpen) {
             setSearchQuery("")
             setSearchResults([])
             setSelectedProduct(null)
+            setSelectedVariantId(null)
             setQuantity(1)
             setUsageType('consumed')
             setIsManualMode(false)
             setManualName("")
             setShowResults(false)
+            setActivePromotions([])
         }
-    }, [isOpen])
+    }, [isOpen, partnerId])
 
     useEffect(() => {
         if (!searchQuery || searchQuery.trim().length < 2) {
@@ -84,7 +100,23 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
         setShowResults(false)
         setManualName("")
         setIsManualMode(false)
+        if (product.variants && product.variants.length > 0) {
+            setSelectedVariantId(product.variants[0].id)
+        } else {
+            setSelectedVariantId(null)
+        }
     }, [])
+
+    const selectedVariant = useMemo(() => {
+        if (!selectedProduct || !selectedProduct.variants) return null
+        return selectedProduct.variants.find((v: any) => v.id === selectedVariantId) || null
+    }, [selectedProduct, selectedVariantId])
+
+    const displayStock = useMemo(() => {
+        if (selectedVariant) return selectedVariant.stock
+        if (selectedProduct) return selectedProduct.stock
+        return 0
+    }, [selectedProduct, selectedVariant])
 
     const handleConfirm = useCallback(() => {
         if (isManualMode) {
@@ -97,14 +129,15 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
         } else if (selectedProduct) {
             onConfirm({
                 product_id: selectedProduct.id,
-                name: selectedProduct.name,
+                variant_id: selectedVariantId || null,
+                name: selectedVariant ? `${selectedProduct.name} - ${selectedVariant.name}` : selectedProduct.name,
                 quantity,
                 usage_type: usageType as any,
                 image: selectedProduct.image || null,
             })
         }
         onClose()
-    }, [isManualMode, manualName, selectedProduct, quantity, usageType, onConfirm, onClose])
+    }, [isManualMode, manualName, selectedProduct, selectedVariantId, selectedVariant, quantity, usageType, onConfirm, onClose])
 
     const handleManualClick = useCallback(() => {
         setIsManualMode(true)
@@ -181,37 +214,58 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                                 >
                                                     {isLoading ? (
                                                         <div className="p-4"><ThreeDotsLoader /></div>
-                                                    ) : searchResults.length > 0 ? (
-                                                        searchResults.map((product) => (
-                                                            <button
-                                                                key={product.id}
-                                                                onClick={() => handleProductSelect(product)}
-                                                                className="w-full flex items-center gap-3 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors text-left"
-                                                            >
-                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/50 shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                                    {product.image ? (
-                                                                        <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
-                                                                    ) : (
-                                                                        <Package size={18} className="text-brand-inactive-text" />
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">{product.name}</p>
-                                                                    <p className="text-[11px] text-brand-inactive-text">SKU: {product.sku}</p>
-                                                                </div>
-                                                                <div className="text-right shrink-0">
-                                                                    <p className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${product.stock > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
-                                                                        {product.stock} em estoque
-                                                                    </p>
-                                                                </div>
-                                                            </button>
-                                                        ))
-                                                    ) : (
-                                                        <div className="p-4 text-center text-sm text-brand-inactive-text">
-                                                            Nenhum produto encontrado
-                                                        </div>
-                                                    )}
-                                                </motion.div>
+                                                     ) : searchResults.length > 0 ? (
+                                                         searchResults.map((product) => (
+                                                             <button
+                                                                 key={product.id}
+                                                                 onClick={() => handleProductSelect(product)}
+                                                                 className="w-full flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors text-left"
+                                                             >
+                                                                 <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 shrink-0 overflow-hidden border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                     {product.image ? (
+                                                                         <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-full h-full object-cover rounded-full" alt="" />
+                                                                     ) : (
+                                                                         <Package size={18} className="text-brand-inactive-text" />
+                                                                     )}
+                                                                 </div>
+                                                                 <div className="flex-1 min-w-0">
+                                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                                                     <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
+                                                                         {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                         {(() => {
+                                                                             if (product.variants && product.variants.length > 0) {
+                                                                                 const prices = product.variants.map((v: any) => Number(v.price || 0))
+                                                                                 const minP = Math.min(...prices)
+                                                                                 const maxP = Math.max(...prices)
+                                                                                 return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
+                                                                             }
+                                                                             const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, activePromotions, { productId: product.id, categoryId: product.category_id || undefined });
+                                                                             return (
+                                                                                 <div className="flex items-center gap-1.5">
+                                                                                     {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
+                                                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>
+                                                                                     {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                                     {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
+                                                                                 </div>
+                                                                             )
+                                                                         })()}
+                                                                     </div>
+                                                                     <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                                         {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
+                                                                     </div>
+                                                                 </div>
+                                                             </button>
+                                                         ))
+                                                     ) : (
+                                                         <div className="p-4 text-center text-sm text-brand-inactive-text">
+                                                             Nenhum produto encontrado
+                                                         </div>
+                                                     )}
+                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
                                     </div>
@@ -241,9 +295,9 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                             </div>
                                             <div>
                                                 <p className="font-bold text-brand-dark dark:text-dark-heading">{selectedProduct.name}</p>
-                                                <p className="text-xs text-brand-inactive-text">SKU: {selectedProduct.sku}</p>
-                                                <p className={`text-xs font-bold mt-1 ${selectedProduct.stock > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                                    {selectedProduct.stock} em estoque
+                                                <p className="text-xs text-brand-inactive-text">SKU: {selectedVariant ? selectedVariant.sku : selectedProduct.sku}</p>
+                                                <p className={`text-xs font-bold mt-1 ${displayStock > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    {displayStock} em estoque
                                                 </p>
                                             </div>
                                             <Button
@@ -277,6 +331,21 @@ export default function AddItemSheet({ isOpen, onClose, onConfirm }: AddItemShee
                                 {/* USAGE TYPE & QUANTITY */}
                                 {showSelectionForm && (
                                     <>
+                                        {selectedProduct && selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                                            <div>
+                                                <FormDropdown
+                                                    label="Selecione a Variação"
+                                                    options={selectedProduct.variants.map((v: any) => ({
+                                                        value: v.id,
+                                                        label: `${v.name || 'Variação'} - ${formatCurrency(v.price)} (${v.stock} em estoque)`
+                                                    }))}
+                                                    value={selectedVariantId || ""}
+                                                    setValue={(val) => setSelectedVariantId(val || null)}
+                                                    width="w-full"
+                                                />
+                                            </div>
+                                        )}
+
                                         <div>
                                             <FormDropdown
                                                 label="Tipo de Uso"

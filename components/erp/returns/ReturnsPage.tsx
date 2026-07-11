@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence } from "framer-motion"
 import { Badge, Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, DefaultModal, Checkbox } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -92,8 +93,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
     const canManage = roleId === "owner" || roleId === "admin" || roleId === "manager"
 
-    const [returns, setReturns] = useState<ReturnRequest[]>([])
-    const [isLoading, setIsLoading] = useState(true)
+    const queryClient = useQueryClient()
     const [isSaving, setIsSaving] = useState(false)
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -110,20 +110,16 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
     const [mpPaymentNotFoundChecked, setMpPaymentNotFoundChecked] = useState(false)
     const [pendingProcessData, setPendingProcessData] = useState<Record<string, any> | null>(null)
 
-    const loadReturns = useCallback(async () => {
-        setIsLoading(true)
-        const res = await getReturnRequestsPageAction(partnerId, { limit: 100 })
-        if (res.success) {
-            setReturns(res.items as ReturnRequest[])
-        } else {
-            toast({ title: "Erro", description: res.error, variant: "destructive" })
-        }
-        setIsLoading(false)
-    }, [partnerId, toast])
-
-    useEffect(() => {
-        void loadReturns()
-    }, [loadReturns])
+    const { data: returnsData, isLoading: isReturnsLoading } = useQuery({
+        queryKey: ['erp', 'returns', partnerId],
+        queryFn: async () => {
+            const res = await getReturnRequestsPageAction(partnerId, { limit: 100 })
+            if (res.success) return res.items as ReturnRequest[]
+            throw new Error(res.error || "Erro ao carregar devoluções")
+        },
+        staleTime: 30000,
+        refetchOnWindowFocus: false,
+    })
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search), 300)
@@ -136,8 +132,8 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
 
     const activeReturnRequest = useMemo(() => {
         if (!entityState.entityId) return null
-        return returns.find((r) => r.id === entityState.entityId) || null
-    }, [returns, entityState.entityId])
+        return (returnsData ?? []).find((r) => r.id === entityState.entityId) || null
+    }, [returnsData, entityState.entityId])
 
     const handleSaveReturn = async (data: Partial<ReturnRequest> & Record<string, any>) => {
         setIsSaving(true)
@@ -239,7 +235,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                 }
                 toast({ title: "Sucesso", description: "Solicitação atualizada com sucesso." })
             }
-            await loadReturns()
+            await queryClient.invalidateQueries({ queryKey: ['erp', 'returns', partnerId] })
             closeEntity()
         } catch (err: any) {
             toast({ title: "Erro", description: err?.message || "Erro ao salvar devolução.", variant: "destructive" })
@@ -250,7 +246,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
 
     const filteredReturns = useMemo(() => {
         const term = debouncedSearch.trim().toLowerCase()
-        let result = returns.filter((item) => {
+        let result = (returnsData ?? []).filter((item) => {
             const matchesSearch =
                 !term ||
                 item.orderNumber.toLowerCase().includes(term) ||
@@ -303,7 +299,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
         }
 
         return result
-    }, [returns, debouncedSearch, activeTab, sortConfig])
+    }, [returnsData, debouncedSearch, activeTab, sortConfig])
 
     const totalPages = Math.max(1, Math.ceil(filteredReturns.length / ITEMS_PER_PAGE))
     const paginatedReturns = filteredReturns.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
@@ -348,7 +344,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                 skipMpPaymentCheck: true,
             })
             if (!retryResponse.success) throw new Error(retryResponse.error)
-            await loadReturns()
+            await queryClient.invalidateQueries({ queryKey: ['erp', 'returns', partnerId] })
             closeEntity()
             toast({ title: "Sucesso", description: "Solicitação atualizada com sucesso." })
         } catch (err: any) {
@@ -357,13 +353,13 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
             setIsSaving(false)
             setPendingProcessData(null)
         }
-    }, [pendingProcessData, loadReturns, closeEntity, toast])
+    }, [pendingProcessData, queryClient, partnerId, closeEntity, toast])
 
     return (
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen ? (
-                    isLoading ? (
+                    isReturnsLoading ? (
                         <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
                             <ThreeDotsLoader />
                         </div>
@@ -426,7 +422,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                                 <AnimatePresence mode="wait">
-                                    {isLoading ? (
+                                    {isReturnsLoading ? (
                                         <div className="h-[400px] flex items-center justify-center">
                                             <ThreeDotsLoader />
                                         </div>
