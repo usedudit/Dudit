@@ -748,7 +748,7 @@ export async function getAdminCommunityVideos(
                     .from("partners")
                     .select("id, store_name")
                     .in("id", partnerIds)
-                partnerMap = new Map((partners || []).map((p) => [p.id, p]))
+                partnerMap = new Map((partners || []).map((p: any) => [p.id, p]))
             }
         }
 
