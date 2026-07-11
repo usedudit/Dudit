@@ -1949,14 +1949,21 @@ export function ProductDetailsPageClient({
                             Produtos
                         </Link>
                         <ChevronRightIcon size={10} />
-                        {product.category && (
+                        {product.marketplace_category?.parent?.name || product.marketplace_category?.name ? (
+                            <>
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.marketplace_category.parent?.name || product.marketplace_category.name)}?type=produtos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                    {product.marketplace_category.parent?.name || product.marketplace_category.name}
+                                </Link>
+                                <ChevronRightIcon size={10} />
+                            </>
+                        ) : product.category && !product.marketplace_category ? (
                             <>
                                 <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.category)}?type=produtos`} prefetch={true} className="hover:text-brand-dark transition-colors">
                                     {product.category}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
-                        )}
+                        ) : null}
                         <span className="text-brand-inactive-text truncate max-w-[300px]">{product.name}</span>
                     </div>
 

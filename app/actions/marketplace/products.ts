@@ -36,6 +36,7 @@ async function _getMarketplaceProductBase(id: string) {
       condition, show_in_marketplace, technical_specs, created_at,
       show_price_in_store,
       video_type, video_url, video_thumbnail, video_duration, video_provider_id,
+      marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
         id, store_name, store_description, rating, user_id, phone,
@@ -66,6 +67,7 @@ async function _getMarketplaceProductBase(id: string) {
     data.subcategory = (data.subcategory as any)?.name || null
     data.brand = (data.brand as any)?.name || null
     data.location = (data.location as any)?.name || null
+    data.marketplace_category = data.marketplace_category as any
 
     let p: any = data.partners
     if (Array.isArray(p)) p = p[0]

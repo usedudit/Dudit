@@ -11,6 +11,10 @@ export interface UsePrefetchOptions {
     enabled?: boolean
     /** Hover debounce delay in ms. Default: 150 */
     hoverDelay?: number
+    /** Enable hover prefetch. Default: false (prevents excessive Server Action calls) */
+    enableHover?: boolean
+    /** Enable touch prefetch. Default: false */
+    enableTouch?: boolean
 }
 
 export interface PrefetchProps {
@@ -36,7 +40,7 @@ export interface PrefetchProps {
  * ```
  */
 export function usePrefetch(options: UsePrefetchOptions): PrefetchProps {
-    const { prefetchFn, enabled = true, hoverDelay = 150 } = options
+    const { prefetchFn, enabled = true, hoverDelay = 150, enableHover = false, enableTouch = false } = options
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const hasPrefetchedRef = useRef(false)
 
@@ -52,10 +56,10 @@ export function usePrefetch(options: UsePrefetchOptions): PrefetchProps {
     }, [enabled, prefetchFn])
 
     const onMouseEnter = useCallback(() => {
-        if (!enabled || hasPrefetchedRef.current) return
+        if (!enabled || !enableHover || hasPrefetchedRef.current) return
         if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
         hoverTimerRef.current = setTimeout(doPrefetch, hoverDelay)
-    }, [enabled, doPrefetch, hoverDelay])
+    }, [enabled, enableHover, doPrefetch, hoverDelay])
 
     const onMouseLeave = useCallback(() => {
         if (hoverTimerRef.current) {
@@ -65,8 +69,9 @@ export function usePrefetch(options: UsePrefetchOptions): PrefetchProps {
     }, [])
 
     const onTouchStart = useCallback(() => {
+        if (!enableTouch) return
         doPrefetch()
-    }, [doPrefetch])
+    }, [enableTouch, doPrefetch])
 
     // Cleanup on unmount
     useEffect(() => {
@@ -92,12 +97,15 @@ export function usePrefetch(options: UsePrefetchOptions): PrefetchProps {
 export function createPrefetchPropsFactory(
     prefetchEntity: (id: string) => void,
     hoverDelay = 150,
+    enableHover = false,
+    enableTouch = false,
 ): (id: string) => PrefetchProps {
     const timers = new Map<string, ReturnType<typeof setTimeout>>()
     const prefetched = new Set<string>()
 
     return (id: string): PrefetchProps => ({
         onMouseEnter: () => {
+            if (!enableHover) return
             if (prefetched.has(id)) return
             const existing = timers.get(id)
             if (existing) clearTimeout(existing)
@@ -118,6 +126,7 @@ export function createPrefetchPropsFactory(
             }
         },
         onTouchStart: () => {
+            if (!enableTouch) return
             if (prefetched.has(id)) return
             prefetched.add(id)
             prefetchEntity(id)

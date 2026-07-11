@@ -45,6 +45,12 @@ export interface DashboardChecklistItem {
   completed: boolean;
   href?: string;
   tabTarget?: string;
+  importOptions?: {
+    sellsProducts: boolean;
+    sellsServices: boolean;
+    isQuickMode: boolean;
+    isErpMode: boolean;
+  };
 }
 
 export interface DashboardShortcut {

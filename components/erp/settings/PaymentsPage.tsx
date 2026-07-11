@@ -12,6 +12,7 @@ import { getPickupPaymentPolicyAction, updatePickupPaymentPolicyAction } from "@
 import { getServiceCheckoutSettingsAction, updateServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
 import { useNotification } from "@/hooks/use-notification"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import Link from "next/link"
 
 const DEPOSIT_OPTIONS = [
     { value: "10", label: "10%" },
@@ -320,12 +321,15 @@ export function PaymentsPage({
                                                     </div>
 
                                                     {!mpConnected && (
-                                                        <div className="p-3 bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 rounded-xl text-xs text-amber-600 dark:text-amber-400">
-                                                            Para cobrar sinal, é necessário ter o Mercado Pago conectado.{" "}
-                                                            <a href="/erp/settings?tab=integracoes" className="underline font-bold hover:text-amber-700 dark:hover:text-amber-300">
-                                                                Clique aqui para conectar o Mercado Pago
-                                                            </a>.
-                                                        </div>
+                                                        <InfoCard
+                                                            title="Mercado Pago não conectado"
+                                                            message="Para cobrar sinal, é necessário ter o Mercado Pago conectado."
+                                                            rightElement={
+                                                                <Link href="/erp/settings?tab=integracoes">
+                                                                    <Button variant="link">Conectar Mercado Pago</Button>
+                                                                </Link>
+                                                            }
+                                                        />
                                                     )}
 
                                                     {depositEnabled && (

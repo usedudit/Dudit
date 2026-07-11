@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from "react"
-import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
     PlusIcon,
     ShoppingCartIcon,
@@ -17,17 +17,28 @@ import {
     ShareIcon,
     RocketIcon,
     InfoIcon,
-    BriefcaseIcon
-} from "@/lib/icons"
-import { Button, Badge, ThreeDotsLoader } from "@/components/reusable"
-import { useToast } from "@/hooks/use-toast"
-import { formatCurrency } from "@/lib/utils"
-import QuickModeItemCard from "./QuickModeItemCard"
-import { deleteProductAction, duplicateProductAction } from "@/app/actions/erp/products"
-import { deleteServiceAction, duplicateServiceAction } from "@/app/actions/erp/servicos"
-import AlertModal from "@/components/reusable/AlertModal"
-import { ERPPageHeader } from "@/components/erp/page-header-state"
-import { DashboardLayout } from "@/lib/dashboard-engine/types"
+    BriefcaseIcon,
+    WhatsappIcon,
+    CreditCardIcon,
+    TruckIcon,
+    DownloadIcon,
+    UploadSheetIcon,
+    HelpCircleIcon,
+    LinkIcon,
+    CopyIcon,
+    PlayIcon,
+    MailIcon,
+} from "@/lib/icons";
+import { Button, Badge, ListItem, Accordion, DefaultModal } from "@/components/reusable";
+import { Tooltip } from "@/components/reusable/Tooltip"
+import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
+import QuickModeItemCard from "./QuickModeItemCard";
+import { deleteProductAction, duplicateProductAction } from "@/app/actions/erp/products";
+import { deleteServiceAction, duplicateServiceAction } from "@/app/actions/erp/servicos";
+import AlertModal from "@/components/reusable/AlertModal";
+import { ERPPageHeader } from "@/components/erp/page-header-state";
+import { DashboardLayout } from "@/lib/dashboard-engine/types";
 
 const IconMap: Record<string, React.ComponentType<any>> = {
     PlusIcon,
@@ -43,7 +54,17 @@ const IconMap: Record<string, React.ComponentType<any>> = {
     ShareIcon,
     RocketIcon,
     InfoIcon,
-    BriefcaseIcon
+    BriefcaseIcon,
+    WhatsappIcon,
+    CreditCardIcon,
+    TruckIcon,
+    DownloadIcon,
+    UploadSheetIcon,
+    HelpCircleIcon,
+    LinkIcon,
+    CopyIcon,
+    PlayIcon,
+    MailIcon,
 };
 
 function renderIcon(iconName: string, className?: string) {
@@ -56,61 +77,609 @@ interface QuickModeHomeProps {
     partnerId: string;
 }
 
+interface ImportOption {
+    label: string;
+    description: string;
+    icon: string;
+    href: string;
+    variant: "default" | "outline" | "filled";
+}
+
+interface DashboardChecklistItem {
+    id: string;
+    title: string;
+    description: string;
+    completed: boolean;
+    href?: string;
+    tabTarget?: string;
+    importOptions?: {
+        sellsProducts: boolean;
+        sellsServices: boolean;
+        isQuickMode: boolean;
+        isErpMode: boolean;
+    };
+}
+
+// ============================================
+// SUB-COMPONENTS
+// ============================================
+
+function QRCodeCard({ partnerId, storeName }: { partnerId: string; storeName: string }) {
+    const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+    const [copied, setCopied] = useState(false);
+    const { toast } = useToast();
+
+    const profileUrl = `${typeof window !== "undefined" ? window.location.origin : "https://dudit.com.br"}/perfil/${partnerId}`;
+
+    React.useEffect(() => {
+        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(profileUrl)}`);
+    }, [profileUrl]);
+
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(profileUrl);
+            setCopied(true);
+            toast({ title: "Link copiado!", description: "O link do seu perfil foi copiado para a área de transferência." });
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            toast({ title: "Erro ao copiar", variant: "destructive" });
+        }
+    };
+
+    const shareProfile = async () => {
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: storeName,
+                    text: `Confira meu perfil na Dudit: ${storeName}`,
+                    url: profileUrl,
+                });
+            } catch (e) {
+                if ((e as Error).name !== "AbortError") copyLink();
+            }
+        } else {
+            copyLink();
+        }
+    };
+
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <QRCodeIcon size={20} className="text-brand-green" />
+                </div>
+                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Seu Perfil de Vendedor</h3>
+            </div>
+
+            <div className="flex flex-col items-center gap-4 flex-1">
+                <div className="bg-white dark:bg-dark-surface p-4 rounded-2xl border border-brand-border dark:border-dark-border">
+                    <img
+                        src={qrCodeUrl}
+                        alt="QR Code do perfil"
+                        className="w-48 h-48 mx-auto"
+                    />
+                </div>
+                <p className="text-center text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                    Escaneie ou compartilhe seu perfil
+                </p>
+
+                <div className="flex gap-3 w-full">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={copyLink}
+                    >
+                        <CopyIcon className="w-4 h-4" />
+                        {copied ? "Copiado!" : "Copiar Link"}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={shareProfile}
+                    >
+                        <ShareIcon className="w-4 h-4" />
+                        Compartilhar
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function IntegrationsCard({ integrations, isWhatsAppConnected, isMercadoPagoConnected }: {
+    integrations: DashboardLayout["integrations"];
+    isWhatsAppConnected: boolean;
+    isMercadoPagoConnected: boolean;
+}) {
+    const router = useRouter();
+
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <LinkIcon size={20} className="text-brand-green" />
+                </div>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Integrações</h3>
+            </div>
+
+            <div className="space-y-3">
+                <ListItem
+                    icon={WhatsappIcon}
+                    title="WhatsApp Business"
+                    description={isWhatsAppConnected ? "Conectado e recebendo pedidos" : "Conecte para receber pedidos no WhatsApp"}
+                    right={
+                        <Badge variant={isWhatsAppConnected ? "green" : "gray"}>
+                            {isWhatsAppConnected ? "Conectado" : "Desconectado"}
+                        </Badge>
+                    }
+                    onClick={() => router.push("/erp/integrations/whatsapp")}
+                    className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
+                />
+                <ListItem
+                    icon={CreditCardIcon}
+                    title="Mercado Pago"
+                    description={isMercadoPagoConnected ? "Recebendo pagamentos online" : "Conecte para receber via Pix, cartão e boleto"}
+                    right={
+                        <Badge variant={isMercadoPagoConnected ? "green" : "gray"}>
+                            {isMercadoPagoConnected ? "Conectado" : "Desconectado"}
+                        </Badge>
+                    }
+                    onClick={() => router.push("/erp/settings?tab=formas-de-pagamento")}
+                    className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
+                />
+            </div>
+
+            <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-4 text-brand-green font-bold"
+                onClick={() => router.push("/erp/integrations")}
+            >
+                Ver todas as integrações <ChevronRightIcon size={16} />
+            </Button>
+        </div>
+    );
+}
+
+function ShortcutsCard({ shortcuts, sellsProducts, sellsServices }: {
+    shortcuts: DashboardLayout["shortcuts"];
+    sellsProducts: boolean;
+    sellsServices: boolean;
+}) {
+    const router = useRouter();
+
+    const allShortcuts = [
+        ...(sellsProducts ? [{
+            id: "add-product",
+            label: "Anunciar Produto",
+            description: "Crie um novo anúncio no marketplace",
+            icon: "PlusIcon",
+            href: "/erp/products?create=true"
+        }] : []),
+        ...(sellsServices ? [{
+            id: "add-service",
+            label: "Anunciar Serviço",
+            description: "Ofereça um novo serviço aos clientes",
+            icon: "WrenchIcon",
+            href: "/erp/servicos?create=true"
+        }] : []),
+        ...shortcuts,
+        {
+            id: "orders",
+            label: "Ver Pedidos",
+            description: "Acesse seus pedidos recebidos",
+            icon: "ShoppingCartIcon",
+            href: "/erp/orders"
+        },
+        {
+            id: "products",
+            label: "Meu Catálogo",
+            description: "Gerencie produtos e serviços",
+            icon: "Package",
+            href: "/erp/products"
+        },
+    ];
+
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <RocketIcon size={20} className="text-brand-green" />
+                </div>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Atalhos Rápidos</h3>
+            </div>
+
+            <div className="space-y-2">
+                {allShortcuts.slice(0, 5).map((shortcut) => (
+                    <ListItem
+                        key={shortcut.id}
+                        icon={shortcut.icon}
+                        title={shortcut.label}
+                        description={shortcut.description}
+                        onClick={() => router.push(shortcut.href)}
+                        className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-2"
+                    />
+                ))}
+            </div>
+
+            <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-2 text-brand-green font-bold"
+                onClick={() => router.push("/erp/dashboard")}
+            >
+                Ver dashboard completo <ChevronRightIcon size={16} />
+            </Button>
+        </div>
+    );
+}
+
+function HelpCard() {
+    const router = useRouter();
+
+    const helpItems = [
+        { label: "Central de Ajuda", description: "Artigos, tutoriais e perguntas frequentes", href: "/ajuda", icon: "HelpCircleIcon" },
+        { label: "Vídeos Tutoriais", description: "Aprenda a usar a Dudit com nossos vídeos", href: "/ajuda/videos", icon: "PlayIcon" },
+        { label: "Fale Conosco", description: "Suporte via chat, e-mail ou WhatsApp", href: "/ajuda/contato", icon: "MailIcon" },
+        { label: "Status do Sistema", description: "Verifique o status dos serviços da Dudit", href: "https://status.dudit.com.br", icon: "InfoIcon", external: true },
+    ];
+
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                    <HelpCircleIcon size={20} className="text-brand-green" />
+                </div>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Ajuda e Suporte</h3>
+            </div>
+
+            <div className="space-y-2 flex-1">
+                {helpItems.map((item) => (
+                    <ListItem
+                        key={item.label}
+                        icon={item.icon}
+                        title={item.label}
+                        description={item.description}
+                        right={item.external ? <LinkIcon className="w-4 h-4 text-brand-inactive-text" /> : <ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
+                        onClick={() => item.external ? window.open(item.href, "_blank") : router.push(item.href)}
+                        className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-2"
+                    />
+                ))}
+            </div>
+
+            <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-2 text-brand-green font-bold"
+                onClick={() => router.push("/ajuda")}
+            >
+                Ver todos os recursos <ChevronRightIcon size={16} />
+            </Button>
+        </div>
+    );
+}
+
+function ProgressCard({
+    checklist,
+    onItemClick,
+    onImportClick,
+}: {
+    checklist: DashboardLayout["checklist"];
+    onItemClick: (item: DashboardChecklistItem) => void;
+    onImportClick: () => void;
+}) {
+    if (!checklist) return null;
+
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+                <div>
+                    <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">
+                        Seu Progresso de Ativação
+                    </h3>
+                    <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
+                        Complete as tarefas abaixo para deixar sua vitrine pronta.
+                    </p>
+                </div>
+                <div className="text-right shrink-0">
+                    <span className="text-[28px] font-black text-brand-green tracking-tight">
+                        {checklist.percentComplete}%
+                    </span>
+                    <span className="text-xs font-bold text-brand-inactive-text block uppercase">
+                        {checklist.completedCount} de {checklist.totalCount} concluídos
+                    </span>
+                </div>
+            </div>
+
+            <div className="w-full h-3 bg-brand-gray dark:bg-dark-border rounded-full overflow-hidden mb-6">
+                <motion.div
+                    className="h-full bg-brand-green rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${checklist.percentComplete}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+            </div>
+
+            <div className="flex flex-col gap-4 flex-1 overflow-y-auto">
+                {checklist.items.map((item, idx) => (
+                    <div
+                        key={item.id}
+                        className={`bg-white dark:bg-dark-surface border rounded-[20px] p-5 flex items-start gap-4 transition-all shadow-sm ${
+                            item.completed
+                                ? 'border-brand-border/60 dark:border-dark-border/40 opacity-80'
+                                : 'border-brand-green/30 dark:border-brand-green/20'
+                        }`}
+                    >
+                        <div className="shrink-0 mt-0.5">
+                            {item.completed ? (
+                                <CheckCircleIcon size={22} className="text-brand-green" />
+                            ) : (
+                                <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-green/30 dark:border-brand-green/20 flex items-center justify-center text-xs font-black text-brand-green">
+                                    {idx + 1}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <h4 className={`text-[15px] font-bold ${item.completed ? 'text-brand-dark/70 dark:text-dark-heading/70 line-through' : 'text-brand-dark dark:text-dark-heading'}`}>
+                                    {item.title}
+                                </h4>
+                                {item.completed && (
+                                    <Badge variant="green" className="self-start sm:self-auto text-[10px] py-0.5 px-2">Concluído</Badge>
+                                )}
+                            </div>
+                            <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-1">
+                                {item.description}
+                            </p>
+                            {item.importOptions && !item.completed && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-3 text-brand-green border-brand-green hover:bg-brand-green/5 text-sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onImportClick();
+                                    }}
+                                >
+                                    <PlusIcon className="w-3.5 h-3.5" /> Ver opções de cadastro
+                                </Button>
+                            )}
+                        </div>
+                        <div className="shrink-0 ml-2">
+                            <Button
+                                variant={item.completed ? "outline" : "default"}
+                                size="sm"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onItemClick(item);
+                                }}
+                                className={item.completed ? "text-brand-inactive-text border-brand-border h-9" : "h-9"}
+                            >
+                                {item.completed ? "Configurar" : "Começar"}
+                            </Button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function ImportOptionsModal({
+    isOpen,
+    onClose,
+    sellsProducts,
+    sellsServices,
+    isQuickMode,
+    isErpMode,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    sellsProducts: boolean;
+    sellsServices: boolean;
+    isQuickMode: boolean;
+    isErpMode: boolean;
+}) {
+    const router = useRouter();
+
+    const productOptions: ImportOption[] = [
+        {
+            label: "Cadastrar manualmente",
+            description: "Crie um novo produto preenchendo os dados",
+            icon: "PlusIcon",
+            href: "/erp/products?create=true",
+            variant: "default",
+        },
+        {
+            label: "Importar via planilha",
+            description: "Faça upload de uma planilha Excel/CSV com seus produtos",
+            icon: "UploadSheetIcon",
+            href: "/erp/products/import",
+            variant: "outline",
+        },
+    ];
+
+    if (isErpMode && sellsProducts) {
+        productOptions.splice(1, 0, {
+            label: "Importar XML (NF-e)",
+            description: "Importe produtos direto da nota fiscal de entrada",
+            icon: "DownloadIcon",
+            href: "/erp/xml-import",
+            variant: "outline",
+        });
+    }
+
+    const serviceOptions: ImportOption[] = [
+        {
+            label: "Cadastrar manualmente",
+            description: "Crie um novo serviço preenchendo os dados",
+            icon: "PlusIcon",
+            href: "/erp/servicos?create=true",
+            variant: "default",
+        },
+        {
+            label: "Importar via planilha",
+            description: "Faça upload de uma planilha Excel/CSV com seus serviços",
+            icon: "UploadSheetIcon",
+            href: "/erp/servicos/import",
+            variant: "outline",
+        },
+    ];
+
+    const handleNavigate = (href: string) => {
+        onClose();
+        router.push(href);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <DefaultModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Adicionar ao Catálogo"
+            description={sellsProducts && sellsServices
+                ? "Escolha como deseja adicionar itens ao seu catálogo"
+                : sellsServices
+                    ? "Escolha como deseja adicionar serviços"
+                    : "Escolha como deseja adicionar produtos"}
+            maxWidth="lg"
+            hideHeader={false}
+        >
+            <div className="space-y-6">
+                {sellsProducts && (
+                    <div className="space-y-4">
+                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                            <Package className="w-5 h-5 text-brand-green" />
+                            Produtos
+                        </h4>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {productOptions.map((opt, idx) => (
+                                <Button
+                                    key={idx}
+                                    variant={opt.variant}
+                                    size="lg"
+                                    className="h-28 w-full justify-start gap-4 text-left rounded-2xl border-2 hover:border-brand-green/50 transition-colors"
+                                    onClick={() => handleNavigate(opt.href)}
+                                >
+                                    <div className="w-12 h-12 rounded-xl bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                                        {renderIcon(opt.icon, "w-6 h-6 text-brand-green")}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-bold text-brand-dark dark:text-dark-heading">{opt.label}</p>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{opt.description}</p>
+                                    </div>
+                                    <ChevronRightIcon className="text-brand-inactive-text w-5 h-5" />
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {sellsServices && (
+                    <div className="space-y-4 pt-6 border-t border-brand-border dark:border-dark-border">
+                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                            <WrenchIcon className="w-5 h-5 text-brand-green" />
+                            Serviços
+                        </h4>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {serviceOptions.map((opt, idx) => (
+                                <Button
+                                    key={idx}
+                                    variant={opt.variant}
+                                    size="lg"
+                                    className="h-28 w-full justify-start gap-4 text-left rounded-2xl border-2 hover:border-brand-green/50 transition-colors"
+                                    onClick={() => handleNavigate(opt.href)}
+                                >
+                                    <div className="w-12 h-12 rounded-xl bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                                        {renderIcon(opt.icon, "w-6 h-6 text-brand-green")}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-bold text-brand-dark dark:text-dark-heading">{opt.label}</p>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{opt.description}</p>
+                                    </div>
+                                    <ChevronRightIcon className="text-brand-inactive-text w-5 h-5" />
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </DefaultModal>
+    );
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
 export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
-    const router = useRouter()
-    const { toast } = useToast()
-    const [isDeleting, setIsDeleting] = useState<string | null>(null)
-    const [showDeleteModal, setShowDeleteModal] = useState<any>(null)
+    const router = useRouter();
+    const { toast } = useToast();
+    const [isDeleting, setIsDeleting] = useState<string | null>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState<any>(null);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [currentImportOptions, setCurrentImportOptions] = useState<DashboardChecklistItem["importOptions"] | null>(null);
 
     const handleDelete = async () => {
-        if (!showDeleteModal) return
-        const { id, itemType } = showDeleteModal
-        setIsDeleting(id)
+        if (!showDeleteModal) return;
+        const { id, itemType } = showDeleteModal;
+        setIsDeleting(id);
 
         const res = itemType === 'product'
             ? await deleteProductAction(id)
-            : await deleteServiceAction(id)
+            : await deleteServiceAction(id);
 
         if (res.success) {
-            toast({ title: "Item excluído com sucesso" })
-            router.refresh()
+            toast({ title: "Item excluído com sucesso" });
+            router.refresh();
         } else {
-            toast({ title: "Erro ao excluir", description: (res as any).error, variant: "destructive" })
+            toast({ title: "Erro ao excluir", description: (res as any).error, variant: "destructive" });
         }
-        setIsDeleting(null)
-        setShowDeleteModal(null)
+        setIsDeleting(null);
+        setShowDeleteModal(null);
     }
 
     const handleDuplicate = async (item: any) => {
-        toast({ title: "Duplicando item..." })
+        toast({ title: "Duplicando item..." });
         const res = item.itemType === 'product'
             ? await duplicateProductAction(item.id)
-            : await duplicateServiceAction(item.id)
+            : await duplicateServiceAction(item.id);
 
         if (res.success) {
-            toast({ title: "Item duplicado com sucesso" })
-            router.refresh()
+            toast({ title: "Item duplicado com sucesso" });
+            router.refresh();
         } else {
-            toast({ title: "Erro ao duplicar", description: (res as any).error, variant: "destructive" })
+            toast({ title: "Erro ao duplicar", description: (res as any).error, variant: "destructive" });
         }
     }
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'paid': return <Badge variant="green">Pago</Badge>
-            case 'pending': return <Badge variant="orange">Pendente</Badge>
-            case 'cancelled': return <Badge variant="red">Cancelado</Badge>
-            default: return <Badge variant="gray">{status}</Badge>
-        }
-    }
-
-    const getStepAction = (item: any) => {
+    const getStepAction = (item: DashboardChecklistItem) => {
         if (item.href) {
-            router.push(item.href)
+            router.push(item.href);
         } else if (item.tabTarget) {
-            router.push(`/erp/settings?tab=${item.tabTarget}`)
+            router.push(`/erp/settings?tab=${item.tabTarget}`);
         }
-    }
+    };
+
+    const handleChecklistItemClick = (item: DashboardChecklistItem) => {
+        if (item.importOptions && !item.completed) {
+            setCurrentImportOptions(item.importOptions);
+            setShowImportModal(true);
+        } else {
+            getStepAction(item);
+        }
+    };
+
+    const handleImportClick = () => {
+        if (currentImportOptions) {
+            setShowImportModal(true);
+        }
+    };
+
+    const isQuickMode = data.isQuickMode;
 
     return (
         <>
@@ -128,23 +697,30 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => router.push('/erp/settings')}
-                            className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors cursor-pointer"
-                        >
-                            Configurações
-                        </button>
+                        <Tooltip text="Configurações">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => router.push('/erp/settings')}
+                            >
+                                <SettingsIcon className="w-4 h-4" />
+                                Configurações
+                            </Button>
+                        </Tooltip>
                     </div>
                 </header>
 
-                {/* 1. Alertas Críticos */}
+                {/* Alertas Críticos */}
                 {data.alerts.length > 0 && (
                     <div className="flex flex-col gap-4">
                         {data.alerts.map((alert) => (
-                            <div 
-                                key={alert.id} 
+                            <motion.div
+                                key={alert.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
                                 className={`border rounded-2xl p-5 flex items-start gap-4 shadow-sm transition-all ${
-                                    alert.type === "danger" 
+                                    alert.type === "danger"
                                         ? "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/20 dark:border-red-900/40 dark:text-red-300"
                                         : alert.type === "warning"
                                             ? "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300"
@@ -155,319 +731,63 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                     <AlertTriangleIcon size={20} className={alert.type === "danger" ? "text-brand-red" : alert.type === "warning" ? "text-amber-500" : "text-blue-500"} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="text-[15px] font-bold">
-                                        {alert.title}
-                                    </h4>
-                                    <p className="text-[13px] font-medium mt-1 opacity-90">
-                                        {alert.description}
-                                    </p>
+                                    <h4 className="text-[15px] font-bold">{alert.title}</h4>
+                                    <p className="text-[13px] font-medium mt-1 opacity-90">{alert.description}</p>
                                 </div>
                                 {alert.actionLabel && alert.actionHref && (
-                                    <Button 
+                                    <Button
                                         variant={alert.type === "danger" ? "default" : "outline"}
                                         size="sm"
                                         onClick={() => router.push(alert.actionHref!)}
                                         className={`shrink-0 rounded-full font-bold ${
-                                            alert.type === "danger" 
-                                                ? "bg-brand-red hover:bg-brand-red/90 border-none text-white" 
-                                                : ""
+                                            alert.type === "danger" ? "bg-brand-red hover:bg-brand-red/90 border-none text-white" : ""
                                         }`}
                                     >
                                         {alert.actionLabel}
                                     </Button>
                                 )}
-                            </div>
+                            </motion.div>
                         ))}
                     </div>
                 )}
 
-                {/* 2. Checklist de Onboarding (Visível enquanto houver itens incompletos) */}
-                {data.checklist && (
-                    <section className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 shadow-sm">
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
-                            <div>
-                                <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">
-                                    Seu Progresso de Ativação
-                                </h3>
-                                <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                    Complete as tarefas abaixo para deixar sua vitrine pronta.
-                                </p>
-                            </div>
-                            <div className="text-right shrink-0">
-                                <span className="text-[28px] font-black text-brand-green tracking-tight">
-                                    {data.checklist.percentComplete}%
-                                </span>
-                                <span className="text-xs font-bold text-brand-inactive-text block uppercase">
-                                    {data.checklist.completedCount} de {data.checklist.totalCount} concluídos
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Barra de Progresso */}
-                        <div className="w-full h-3 bg-brand-gray dark:bg-dark-border rounded-full overflow-hidden mb-6">
-                            <motion.div 
-                                className="h-full bg-brand-green rounded-full"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${data.checklist.percentComplete}%` }}
-                                transition={{ duration: 0.5, ease: "easeOut" }}
+                {/* Main Grid - Progress Card (2/3) + QR Code Card (1/3) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Progress/Onboarding Card - 2/3 width */}
+                    <div className="lg:col-span-8">
+                        {data.checklist && (
+                            <ProgressCard
+                                checklist={data.checklist}
+                                onItemClick={handleChecklistItemClick}
+                                onImportClick={handleImportClick}
                             />
-                        </div>
-
-                        {/* Lista do Checklist */}
-                        <div className="flex flex-col gap-4">
-                            {data.checklist.items.map((item, idx) => (
-                                <div 
-                                    key={item.id}
-                                    className={`bg-white dark:bg-dark-surface border rounded-[20px] p-5 flex items-start gap-4 transition-all shadow-sm ${item.completed ? 'border-brand-border/60 dark:border-dark-border/40 opacity-80' : 'border-brand-green/30 dark:border-brand-green/20'}`}
-                                >
-                                    <div className="shrink-0 mt-0.5">
-                                        {item.completed ? (
-                                            <CheckCircleIcon size={22} className="text-brand-green" />
-                                        ) : (
-                                            <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-green/30 dark:border-brand-green/20 flex items-center justify-center text-xs font-black text-brand-green">
-                                                {idx + 1}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                            <h4 className={`text-[15px] font-bold ${item.completed ? 'text-brand-dark/70 dark:text-dark-heading/70 line-through' : 'text-brand-dark dark:text-dark-heading'}`}>
-                                                {item.title}
-                                            </h4>
-                                            {item.completed && (
-                                                <Badge variant="green" className="self-start sm:self-auto text-[10px] py-0.5 px-2">Concluído</Badge>
-                                            )}
-                                        </div>
-                                        <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-1">
-                                            {item.description}
-                                        </p>
-                                    </div>
-                                    <div className="shrink-0 ml-2">
-                                        <Button
-                                            variant={item.completed ? "outline" : "default"}
-                                            size="sm"
-                                            onClick={() => getStepAction(item)}
-                                            className={item.completed ? "text-brand-inactive-text border-brand-border h-9" : "h-9"}
-                                        >
-                                            {item.completed ? "Configurar" : "Começar"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {/* 3. Ações/Atalhos Rápidos */}
-                {data.shortcuts.length > 0 && (
-                    <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {data.shortcuts.map((shortcut) => (
-                            <div
-                                key={shortcut.id}
-                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 cursor-pointer flex items-center gap-6 group transition-all hover:bg-brand-green-light/20 dark:hover:bg-dark-border/20"
-                                onClick={() => router.push(shortcut.href)}
-                            >
-                                <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green shrink-0 transition-colors">
-                                    {renderIcon(shortcut.icon, "w-5 h-5")}
-                                </div>
-                                <div>
-                                    <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
-                                        {shortcut.label}
-                                    </h3>
-                                    <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        {shortcut.description}
-                                    </p>
-                                </div>
-                                <ChevronRightIcon className="ml-auto text-brand-inactive-text/50 dark:text-dark-body/50 group-hover:text-brand-green transition-colors w-5 h-5" />
-                            </div>
-                        ))}
-                    </section>
-                )}
-
-                {/* 4. Métrica/Stats Cards */}
-                {data.cards.length > 0 && (
-                    <section className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        {data.cards.map((card) => (
-                            <div 
-                                key={card.id} 
-                                className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between cursor-pointer hover:bg-brand-gray/10 transition-colors"
-                                onClick={() => card.href && router.push(card.href)}
-                            >
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading">
-                                            {renderIcon(card.icon, "text-brand-dark dark:text-dark-heading w-[18px] h-[18px]")}
-                                        </div>
-                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{card.title}</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-baseline space-x-2 mt-2">
-                                    <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                        {card.value}
-                                    </h2>
-                                    <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                                        {card.subtitle}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </section>
-                )}
-
-                {/* 5. Meus Anúncios e Pedidos */}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                    {/* Meus Anúncios */}
-                    <div className="xl:col-span-2 flex flex-col gap-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                Anúncios Recentes
-                            </h2>
-                            <Button
-                                variant="ghost"
-                                onClick={() => router.push('/erp/products')}
-                                className="text-brand-green font-bold text-sm hover:bg-brand-green-light dark:hover:bg-dark-border/40 flex items-center gap-1"
-                            >
-                                Ver todos <ChevronRightIcon size={16} />
-                            </Button>
-                        </div>
-
-                        {data.recentItems.length === 0 ? (
-                            <div className="bg-brand-gray/50 dark:bg-dark-surface/30 border-2 border-dashed border-brand-border dark:border-dark-border rounded-[24px] p-12 flex flex-col items-center text-center gap-4">
-                                <img src="https://img.dudit.com.br/static/mascots/Estoque.png" className="w-32 h-32 object-contain grayscale opacity-50" alt="" />
-                                <div>
-                                    <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Nenhum anúncio ainda</h4>
-                                    <p className="text-brand-inactive-text dark:text-dark-body font-medium mt-1">Crie seu primeiro anúncio para começar a vender.</p>
-                                </div>
-                                <Button onClick={() => router.push('/erp/products?create=true')} className="mt-2">
-                                    Criar Primeiro Anúncio
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {data.recentItems.map((item) => (
-                                    <QuickModeItemCard
-                                        key={item.id}
-                                        item={item}
-                                        onEdit={() => router.push(item.itemType === 'product' ? `/erp/products?edit=${item.id}` : `/erp/servicos?edit=${item.id}`)}
-                                        onDelete={() => setShowDeleteModal(item)}
-                                        onDuplicate={() => handleDuplicate(item)}
-                                    />
-                                ))}
-                            </div>
                         )}
                     </div>
 
-                    {/* Pedidos Recentes */}
-                    <div className="flex flex-col gap-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                Pedidos Recentes
-                            </h2>
-                            <Button
-                                variant="ghost"
-                                onClick={() => router.push('/erp/orders')}
-                                className="text-brand-green font-bold text-sm hover:bg-brand-green-light dark:hover:bg-dark-border/40 flex items-center gap-1"
-                            >
-                                Ver todos <ChevronRightIcon size={16} />
-                            </Button>
+                    {/* QR Code Card - 1/3 width (only in quick mode) */}
+                    {isQuickMode && (
+                        <div className="lg:col-span-4">
+                            <QRCodeCard partnerId={partnerId} storeName={data.storeName || "Sua Loja"} />
                         </div>
-
-                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] overflow-hidden flex flex-col h-full">
-                            {data.recentOrders.length === 0 ? (
-                                <div className="p-8 flex flex-col items-center text-center gap-4 my-auto">
-                                    <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center text-brand-inactive-text">
-                                        <ShoppingCartIcon size={32} />
-                                    </div>
-                                    <p className="text-brand-inactive-text dark:text-dark-body font-medium">Aguardando seu primeiro pedido...</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col divide-y divide-brand-border dark:divide-dark-border">
-                                    {data.recentOrders.map((order) => (
-                                        <div
-                                            key={order.id}
-                                            className="px-5 py-4 flex items-center justify-between hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 transition-colors cursor-pointer group"
-                                            onClick={() => router.push(`/erp/orders?id=${order.id}`)}
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                                                    <ShoppingCartIcon size={18} className="text-brand-dark dark:text-dark-heading" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                                        Pedido #{order.order_number}
-                                                    </div>
-                                                    <div className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[140px] sm:max-w-none">
-                                                        {order.customer_name || "Consumidor Final"}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-right">
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-1">
-                                                        {formatCurrency(order.total_amount)}
-                                                    </span>
-                                                    {getStatusBadge(order.situation)}
-                                                </div>
-                                                <ChevronRightIcon size={16} className="text-brand-inactive-text/50 dark:text-dark-body/50 group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {data.recentOrders.length > 0 && (
-                                <div className="mt-auto p-4 bg-brand-gray/20 dark:bg-dark-border/20 border-t border-brand-border dark:border-dark-border text-center">
-                                    <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-widest">
-                                        Total de {data.recentOrders.length} pedidos
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    )}
                 </div>
 
-                {/* 6. Integrações Ativas */}
-                {data.integrations.length > 0 && (
-                    <section className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
-                        <div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                Integrações Ativas
-                            </h3>
-                            <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                Conecte e gerencie seus canais de vendas e formas de pagamento.
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                            {data.integrations.map((integration) => (
-                                <div key={integration.id} className="border border-brand-border dark:border-dark-border rounded-xl p-4 flex items-center justify-between hover:bg-brand-gray/5 dark:hover:bg-dark-border/10 transition-all">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green shrink-0">
-                                            {integration.id === "whatsapp" ? <ShareIcon size={18} /> : <StoreIcon size={18} />}
-                                        </div>
-                                        <div>
-                                            <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                                {integration.name}
-                                            </h4>
-                                            <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5 max-w-[200px] sm:max-w-none">
-                                                {integration.description}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <Badge variant={integration.status === "connected" ? "green" : "gray"}>
-                                            {integration.status === "connected" ? "Conectado" : "Desconectado"}
-                                        </Badge>
-                                        <Button size="sm" variant="outline" onClick={() => router.push(integration.actionHref)}>
-                                            Configurar
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
+                {/* Bottom 3 Cards - Integrations, Shortcuts, Help */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <IntegrationsCard
+                        integrations={data.integrations}
+                        isWhatsAppConnected={data.integrations.find(i => i.id === "whatsapp")?.status === "connected"}
+                        isMercadoPagoConnected={data.integrations.find(i => i.id === "mercadopago")?.status === "connected"}
+                    />
+                    <ShortcutsCard
+                        shortcuts={data.shortcuts}
+                        sellsProducts={data.checklist?.items.some(i => i.importOptions?.sellsProducts) ?? true}
+                        sellsServices={data.checklist?.items.some(i => i.importOptions?.sellsServices) ?? false}
+                    />
+                    <HelpCard />
+                </div>
 
-                {/* 7. Recomendações e Dicas de Vendas */}
+                {/* Recomendações e Dicas */}
                 {data.recommendations.length > 0 && (
                     <div className="flex flex-col gap-6">
                         {data.recommendations.map((rec) => {
@@ -502,7 +822,12 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                 )
                             } else {
                                 return (
-                                    <div key={rec.id} className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <motion.div
+                                        key={rec.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                                    >
                                         <div className="flex items-start gap-4">
                                             <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green shrink-0 mt-0.5">
                                                 <InfoIcon size={22} />
@@ -519,24 +844,34 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                         <Button variant="outline" className="shrink-0 rounded-full font-bold" onClick={() => router.push(rec.actionHref)}>
                                             {rec.actionLabel}
                                         </Button>
-                                    </div>
+                                    </motion.div>
                                 )
                             }
                         })}
                     </div>
                 )}
-            </div>
 
-            <AlertModal
-                isOpen={!!showDeleteModal}
-                onClose={() => setShowDeleteModal(null)}
-                onConfirm={handleDelete}
-                title="Excluir item?"
-                description={`Tem certeza que deseja excluir "${showDeleteModal?.name}"? Esta ação removerá o item do marketplace permanentemente.`}
-                confirmText={isDeleting ? "Excluindo..." : "Sim, excluir"}
-                cancelText="Cancelar"
-                variant="danger"
-            />
+                {/* Import Modal */}
+                <ImportOptionsModal
+                    isOpen={showImportModal}
+                    onClose={() => { setShowImportModal(false); setCurrentImportOptions(null); }}
+                    sellsProducts={currentImportOptions?.sellsProducts ?? false}
+                    sellsServices={currentImportOptions?.sellsServices ?? false}
+                    isQuickMode={currentImportOptions?.isQuickMode ?? false}
+                    isErpMode={currentImportOptions?.isErpMode ?? false}
+                />
+
+                <AlertModal
+                    isOpen={!!showDeleteModal}
+                    onClose={() => setShowDeleteModal(null)}
+                    onConfirm={handleDelete}
+                    title="Excluir item?"
+                    description={`Tem certeza que deseja excluir "${showDeleteModal?.name}"? Esta ação removerá o item do marketplace permanentemente.`}
+                    confirmText={isDeleting ? "Excluindo..." : "Sim, excluir"}
+                    cancelText="Cancelar"
+                    variant="danger"
+                />
+            </div>
         </>
     )
 }

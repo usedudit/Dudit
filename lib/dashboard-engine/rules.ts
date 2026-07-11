@@ -9,59 +9,33 @@ import {
 } from "./types";
 
 /**
-@@ -10,3 +10,183 @@
+ * Retorna os itens do checklist de onboarding dinâmico
  */
 export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem[] {
   const items: DashboardChecklistItem[] = [];
 
-  // 1. Dados Gerais
+  // 1. Dados do Negócio (combina: Dados Gerais + Endereço + Horários)
+  const dadosNegocioCompleted = ctx.hasPhone && ctx.hasCategory && ctx.hasAddress && ctx.hasHours;
   items.push({
-    id: "profile",
-    title: "Dados Gerais e Segmento",
-    description: "Defina o nome da loja, categoria principal e número de WhatsApp.",
-    completed: ctx.hasPhone && ctx.hasCategory,
+    id: "business-data",
+    title: "Dados do Negócio",
+    description: "Complete o nome da loja, categoria, WhatsApp, endereço e horários de funcionamento.",
+    completed: dadosNegocioCompleted,
     tabTarget: "dados-do-negocio"
   });
 
-  // 2. Endereço
-  items.push({
-    id: "address",
-    title: "Endereço Comercial",
-    description: "Cadastre o endereço da sua loja para cálculo de rotas e entrega.",
-    completed: ctx.hasAddress,
-    tabTarget: "dados-do-negocio"
-  });
-
-  // 3. Horários
-  items.push({
-    id: "hours",
-    title: "Horários de Funcionamento",
-    description: "Defina os horários em que seu estabelecimento aceita pedidos.",
-    completed: ctx.hasHours,
-    tabTarget: "dados-do-negocio"
-  });
-
-  // 4. Chave Pix
-  items.push({
-    id: "payments",
-    title: "Forma de Recebimento (Pix)",
-    description: "Cadastre uma chave Pix ativa para receber pagamentos diretos.",
-    completed: ctx.hasPix,
-    tabTarget: "formas-de-pagamento"
-  });
-
-  // 5. Cadastrar Item (Produto ou Serviço)
+  // 2. Itens (Produtos/Serviços) - com accordion para importação
   const itemTitle = ctx.sellsProducts && ctx.sellsServices
-    ? "Cadastrar Produto ou Serviço"
+    ? "Cadastrar Produtos ou Serviços"
     : ctx.sellsServices
-      ? "Cadastrar Primeiro Serviço"
-      : "Cadastrar Primeiro Produto";
+      ? "Cadastrar Serviços"
+      : "Cadastrar Produtos";
 
   const itemDescription = ctx.sellsProducts && ctx.sellsServices
-    ? "Adicione pelo menos um produto ou serviço ativo ao seu catálogo."
+    ? "Adicione itens ao catálogo: cadastre manualmente, importe via planilha ou XML (NF-e)."
     : ctx.sellsServices
-      ? "Adicione pelo menos um serviço ativo ao seu catálogo."
-      : "Adicione pelo menos um produto ativo ao seu catálogo.";
+      ? "Adicione serviços: cadastre manualmente ou importe via planilha."
+      : "Adicione produtos: cadastre manualmente, importe via planilha ou XML (NF-e).";
 
   const itemHref = ctx.sellsProducts ? "/erp/products?create=true" : "/erp/servicos?create=true";
 
@@ -70,10 +44,39 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
     title: itemTitle,
     description: itemDescription,
     completed: ctx.hasItems,
-    href: ctx.hasItems ? undefined : itemHref
+    href: ctx.hasItems ? undefined : itemHref,
+    // Novos campos para o accordion de importação
+    importOptions: {
+      sellsProducts: ctx.sellsProducts,
+      sellsServices: ctx.sellsServices,
+      isQuickMode: ctx.isQuickMode,
+      isErpMode: !ctx.isQuickMode,
+    }
   });
 
-  // 6. Visual da Vitrine
+  // 3. Forma de Recebimento (apenas planos Crescer/Escalar)
+  if (ctx.planSlug === "crescer" || ctx.planSlug === "escalar") {
+    items.push({
+      id: "payments",
+      title: "Forma de Recebimento",
+      description: "Configure Pix, Mercado Pago e outras formas de pagamento para receber online.",
+      completed: ctx.hasPix || ctx.isMercadoPagoConnected,
+      tabTarget: "formas-de-pagamento"
+    });
+  }
+
+  // 4. Entregas/Logística (apenas se tem endereço e plano Crescer/Escalar)
+  if ((ctx.planSlug === "crescer" || ctx.planSlug === "escalar") && ctx.hasAddress) {
+    items.push({
+      id: "logistics",
+      title: "Entregas e Logística",
+      description: "Configure áreas de entrega, taxas, transportadoras e prazos para seus pedidos.",
+      completed: false, // TODO: verificar se já configurou logística
+      tabTarget: "entregas"
+    });
+  }
+
+  // 5. Visual da Vitrine
   items.push({
     id: "showcase",
     title: "Visual da sua Vitrine",

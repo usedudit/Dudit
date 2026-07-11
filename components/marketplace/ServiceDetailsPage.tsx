@@ -50,6 +50,7 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
@@ -1950,6 +1951,21 @@ export function ServiceDetailsPageClient({
                             Serviços
                         </Link>
                         <ChevronRightIcon size={10} />
+                        {service.marketplace_category?.parent?.name || service.marketplace_category?.name ? (
+                            <>
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.marketplace_category.parent?.name || service.marketplace_category.name)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                    {service.marketplace_category.parent?.name || service.marketplace_category.name}
+                                </Link>
+                                <ChevronRightIcon size={10} />
+                            </>
+                        ) : service.service_categories?.name && !service.marketplace_category ? (
+                            <>
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.service_categories.name)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                    {service.service_categories.name}
+                                </Link>
+                                <ChevronRightIcon size={10} />
+                            </>
+                        ) : null}
                         <span className="text-brand-inactive-text truncate max-w-[300px]">{service.name}</span>
                     </div>
 
