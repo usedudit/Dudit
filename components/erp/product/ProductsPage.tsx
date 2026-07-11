@@ -548,7 +548,7 @@ export default function ProductsPage({
             const result = await deleteProductAction(deleteId)
             setActionModal({ open: false, text: "" })
             if (result.success) {
-                afterMutation(deleteId)
+                afterMutation(deleteId, true)
                 setProducts((p) => p.filter((prod) => prod.id !== deleteId))
                 notifySuccess("Excluído")
             } else {

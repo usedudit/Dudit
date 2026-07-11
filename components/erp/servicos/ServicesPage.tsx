@@ -415,7 +415,7 @@ export default function ServicesPage({
             const result = await deleteServiceAction(deleteId)
             setActionModal({ open: false, text: "" })
             if (result.success) {
-                afterMutation(deleteId)
+                afterMutation(deleteId, true)
                 setServices((p) => p.filter((prod) => prod.id !== deleteId))
                 toast({ title: "Excluído" })
             } else {

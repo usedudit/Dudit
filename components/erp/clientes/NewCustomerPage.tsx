@@ -1,14 +1,12 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import {
     Tabs,
     TabsList,
     TabsTrigger,
     TabsContent,
     Button,
-    Badge,
-    AlertModal,
     FormDropdown,
     Input,
     Checkbox,

@@ -477,7 +477,7 @@ export default function QuotesPage({
             const res = await deleteQuoteAction(quoteToDelete.originalId)
             if (res.success) {
                 success("Orçamento excluído", "O orçamento foi removido com sucesso.")
-                afterMutation(quoteToDelete.originalId)
+                afterMutation(quoteToDelete.originalId, true)
             } else {
                 // Revert
                 setCurrentQuotes(previousQuotes)

@@ -6,6 +6,13 @@ import { useEntityState } from "./use-entity-state"
 import { useEntityCache } from "./use-entity-cache"
 import { createPrefetchPropsFactory } from "./use-prefetch"
 import { useInfiniteList } from "./use-infinite-list"
+import type { DataPriority } from "@/components/erp/hooks"
+
+const PRIORITY_STALE_TIME: Record<DataPriority, number> = {
+  live: 5000,
+  normal: 30000,
+  low: 120000,
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,8 +42,10 @@ export interface UseEntityPageOptions<
     getDetailFn: (id: string) => Promise<TDetail | null>
     /** Map list item to partial detail for cache seeding */
     listToDetail?: (item: TListItem) => Partial<TDetail>
-    /** Stale time for cache entries (ms). Default: 60000 */
+    /** Stale time for cache entries (ms). Default: derived from priority (30000 for normal) */
     staleTime?: number
+    /** Priority tier for cache freshness. Default: 'normal'. Overridden by explicit staleTime if provided. */
+    priority?: DataPriority
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -57,8 +66,11 @@ export function useEntityPage<
         dedupeKey,
         getDetailFn,
         listToDetail,
-        staleTime,
+        staleTime: staleTimeProp,
+        priority,
     } = options
+
+    const staleTime = staleTimeProp ?? (priority ? PRIORITY_STALE_TIME[priority] : 30000)
 
     const queryClient = useQueryClient()
 
@@ -139,9 +151,13 @@ export function useEntityPage<
     // ── Mutation helpers ─────────────────────────────────────────────────
 
     const afterMutation = useCallback(
-        (entityId?: string) => {
-            if (entityId) cache.invalidateEntity(entityId)
-            cache.invalidateList()
+        (entityId?: string, invalidateList = false) => {
+            if (entityId) {
+                cache.invalidateEntity(entityId)
+                if (invalidateList) cache.invalidateList()
+            } else {
+                cache.invalidateAll()
+            }
         },
         [cache],
     )

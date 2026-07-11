@@ -67,21 +67,29 @@ export function useDeliberatePrefetch(
   return { onMouseEnter, onMouseLeave }
 }
 
+export type DataPriority = 'live' | 'normal' | 'low'
+
+const PRIORITY_CONFIG: Record<DataPriority, { staleTime: number; refetchOnWindowFocus: boolean; refetchOnMount: boolean }> = {
+  live: { staleTime: 5000, refetchOnWindowFocus: true, refetchOnMount: true },
+  normal: { staleTime: 30000, refetchOnWindowFocus: false, refetchOnMount: true },
+  low: { staleTime: 120000, refetchOnWindowFocus: false, refetchOnMount: false },
+}
+
 export function useERPData<TData = any, TError = Error>(
   queryKey: any[], 
   queryFn: () => Promise<TData>, 
-  options?: Omit<UseQueryOptions<TData, TError, TData, any[]>, 'queryKey' | 'queryFn'> & { isCritical?: boolean }
+  options?: Omit<UseQueryOptions<TData, TError, TData, any[]>, 'queryKey' | 'queryFn'> & { priority?: DataPriority }
 ): UseQueryResult<TData, TError> {
-  const { isCritical = false, ...restOptions } = options || {}
+  const { priority = 'normal', ...restOptions } = options || {}
+  const config = PRIORITY_CONFIG[priority]
 
   return useQuery({
     queryKey,
     queryFn,
-    staleTime: isCritical ? 15000 : 30000,
-    refetchOnWindowFocus: false,
+    staleTime: config.staleTime,
+    refetchOnWindowFocus: config.refetchOnWindowFocus,
     refetchOnReconnect: true,
-    refetchOnMount: true,
-    // Keep showing previous data during background refetch to avoid loading flash
+    refetchOnMount: config.refetchOnMount,
     placeholderData: keepPreviousData,
     ...restOptions
   })

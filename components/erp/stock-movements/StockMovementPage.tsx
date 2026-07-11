@@ -178,7 +178,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         try {
             const res = await undoStockMovementAction(undoingId, undoReason);
             if (res.success) {
-                afterMutation(undoingId);
+                afterMutation(undoingId, true);
                 notifySuccess('Movimentação desfeita com sucesso.');
             } else {
                 notifyError(res.error || 'Erro ao desfazer.');
