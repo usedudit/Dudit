@@ -799,6 +799,17 @@ async function handler(request: NextRequest) {
             ? "cancelled"
             : "pending"
 
+    // Fetch delivery_payer setting for snapshot
+    const { data: deliverySettings } = await adminClient
+      .from("delivery_settings")
+      .select("delivery_payer")
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+
+    const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+    // For MP orders (customer-initiated), seller_commission_amount is 0
+    const sellerCommissionAmount = 0
+
     if (checkoutFulfillment && approvedPaidAmount > 0) {
       checkoutFulfillment = patchDepositCheckoutOnPayment(
         checkoutFulfillment,
@@ -827,6 +838,8 @@ async function handler(request: NextRequest) {
         payment_method_discount_amount: paymentMethodDiscountAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
         delivery_fee: deliveryFee,
+        delivery_payer: deliveryPayer,
+        seller_commission_amount: sellerCommissionAmount,
         payment_breakdown: [{
           method: paymentMethodDisplayName,
           amount: chargeAmount,

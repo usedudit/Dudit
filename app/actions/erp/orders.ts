@@ -1504,6 +1504,38 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         deliveryMethod: data.deliveryMethod,
     })
 
+    // Fetch delivery_payer setting for snapshot
+    const { data: deliverySettings } = await supabase
+        .from("delivery_settings")
+        .select("delivery_payer")
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+    const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+
+    // Calculate seller commission amount for snapshot (frozen at order creation)
+    let sellerCommissionAmount = 0
+    if (user.id) {
+        const { calculateCommission } = await import("@/lib/services/commission.service")
+        const { data: sellerCommissions } = await supabase
+            .from("employee_commissions")
+            .select("*")
+            .eq("partner_id", partnerId)
+            .eq("role", "seller")
+            .maybeSingle()
+
+        if (sellerCommissions && sellerCommissions.commission_type !== "none") {
+            const subtotalValue = Math.max(0, Number(data.subtotal || 0))
+            sellerCommissionAmount = calculateCommission({
+                userId: user.id,
+                role: "seller",
+                commissionType: sellerCommissions.commission_type,
+                value: Number(sellerCommissions.value || 0),
+                saleAmount: subtotalValue,
+            })
+        }
+    }
+
     const orderInsertPayload: Record<string, unknown> = {
         partner_id: partnerId,
         buyer_id: data.customerId || null,
@@ -1532,6 +1564,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         finance_account_id: data.financeAccountId,
         created_by: user.id,
         pricing_version: pricingResult.pricingVersion,
+        delivery_payer: deliveryPayer,
+        seller_commission_amount: sellerCommissionAmount,
         ...(preparationEstimate || {}),
     }
 
@@ -1556,6 +1590,27 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const orderError = orderInsertResult.error
     if (orderError) return { error: orderError.message }
 
+    // Fetch cost prices for products and services for unit_cost snapshot
+    const productIds = sanitizedItems.filter(item => item.productId).map(item => item.productId)
+    const serviceIds = sanitizedItems.filter(item => (item as any).serviceId).map(item => (item as any).serviceId)
+    const variantIds = sanitizedItems.filter(item => item.variantId).map(item => item.variantId)
+
+    const [{ data: products }, { data: variants }, { data: services }] = await Promise.all([
+        productIds.length > 0
+            ? supabase.from("products").select("id, cost_price").eq("partner_id", partnerId).in("id", productIds)
+            : Promise.resolve({ data: [] as any[] }),
+        variantIds.length > 0
+            ? supabase.from("product_variants").select("id, product_id, cost_price").in("id", variantIds)
+            : Promise.resolve({ data: [] as any[] }),
+        serviceIds.length > 0
+            ? supabase.from("services").select("id, cost_price").eq("partner_id", partnerId).in("id", serviceIds)
+            : Promise.resolve({ data: [] as any[] }),
+    ])
+
+    const productCostMap = new Map<string, number>((products || []).map((p: { id: string; cost_price: number | null }) => [p.id, Number(p.cost_price || 0)]))
+    const variantCostMap = new Map<string, number>((variants || []).map((v: { id: string; cost_price: number | null }) => [v.id, Number(v.cost_price || 0)]))
+    const serviceCostMap = new Map<string, number>((services || []).map((s: { id: string; cost_price: number | null }) => [s.id, Number(s.cost_price || 0)]))
+
     const giftItemsToInsert = giftItems.map((item, idx) => ({
         order_id: order.id,
         product_id: item.product_id,
@@ -1571,23 +1626,34 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         promotion_id: item.promotion_id,
     }))
     const itemsToInsert = [
-        ...sanitizedItems.map(item => ({
-            order_id: order.id,
-            product_id: item.productId,
-            variant_id: item.variantId || null,
-            product_name: item.customName || "Item manual",
-            product_price: item.unitPrice,
-            quantity: item.quantity,
-            subtotal: item.unitPrice * item.quantity,
-            sort_order: item.sortOrder,
-            is_gift: false,
-            original_price: null,
-            is_promotional: false,
-            promotion_id: null,
-            service_id: (item as any).serviceId || null,
-            line_type: (item as any).lineType || 'product',
-            fulfillment_mode: (item as any).fulfillmentMode || null,
-        })),
+        ...sanitizedItems.map(item => {
+            let unitCost = 0
+            if ((item as any).serviceId) {
+                unitCost = serviceCostMap.get((item as any).serviceId) || 0
+            } else if (item.variantId) {
+                unitCost = variantCostMap.get(item.variantId) || 0
+            } else if (item.productId) {
+                unitCost = productCostMap.get(item.productId) || 0
+            }
+            return {
+                order_id: order.id,
+                product_id: item.productId,
+                variant_id: item.variantId || null,
+                product_name: item.customName || "Item manual",
+                product_price: item.unitPrice,
+                quantity: item.quantity,
+                subtotal: item.unitPrice * item.quantity,
+                sort_order: item.sortOrder,
+                is_gift: false,
+                original_price: null,
+                is_promotional: false,
+                promotion_id: null,
+                service_id: (item as any).serviceId || null,
+                line_type: (item as any).lineType || 'product',
+                fulfillment_mode: (item as any).fulfillmentMode || null,
+                unit_cost: unitCost,
+            }
+        }),
         ...giftItemsToInsert
     ]
 

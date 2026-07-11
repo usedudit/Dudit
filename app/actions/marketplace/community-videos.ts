@@ -30,7 +30,7 @@ export interface CommunityVideoItem {
   orders_origin_count: number
   published_at: string | null
   created_at: string
-  partner?: { store_name: string; store_avatar: string | null }
+  partner?: { store_name: string; store_image_url: string | null }
 }
 
 export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
@@ -44,7 +44,7 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
     .from("community_videos")
     .select(`
       *,
-      partner:partner_id(store_name, store_avatar)
+      partner:partner_id(store_name, store_image_url)
     `)
     .eq("moderation_status", "approved")
     .order("published_at", { ascending: false })

@@ -88,9 +88,9 @@ export async function resolveCheckoutCartLines(
     .select(`
       id, user_id, partner_id, item_type, product_id, variant_id, service_id,
       recurring_plan_id, quantity, booking_metadata, pay_deposit_only, fulfillment_mode,
-      products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images),
+      products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images, cost_price),
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),
-      services(id, name, price, promotional_price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes, images, category_id),
+      services(id, name, price, promotional_price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes, images, category_id, cost_price),
       recurring_plans(
         id, name, status, show_in_marketplace,
         recurring_plan_items(
@@ -214,6 +214,7 @@ export async function resolveCheckoutCartLines(
           fulfillment_mode: fulfillmentMode,
           service_id: null,
           recurring_plan_id: null,
+          unit_cost: Number(product.cost_price || 0),
         },
         fulfillmentLine,
         requiresStock: true,
@@ -314,6 +315,7 @@ export async function resolveCheckoutCartLines(
           line_type: "service_booking",
           fulfillment_mode: fulfillmentMode,
           recurring_plan_id: null,
+          unit_cost: Number(service.cost_price || 0),
         },
         fulfillmentLine,
         requiresStock: false,
@@ -334,16 +336,20 @@ export async function resolveCheckoutCartLines(
       }
 
       const planItems = planRow.recurring_plan_items || []
+
+      // Calculate subscription unit cost from plan items
+      let subscriptionUnitCost = 0
       const productModeLists: FulfillmentMode[][] = []
       const serviceModeLists: FulfillmentMode[][] = []
-
       for (const pi of planItems as any[]) {
         if (pi.item_type === "product" && pi.products) {
+          subscriptionUnitCost += Number(pi.products.cost_price || 0) * Number(pi.quantity || 1)
           productModeLists.push(
             productCatalogCapabilities(pi.products).fulfillmentModes,
           )
         }
         if (pi.item_type === "service" && pi.services) {
+          subscriptionUnitCost += Number(pi.services.cost_price || 0) * Number(pi.quantity || 1)
           serviceModeLists.push(
             serviceCatalogCapabilities(pi.services).fulfillmentModes,
           )
@@ -409,6 +415,7 @@ export async function resolveCheckoutCartLines(
           line_type: "subscription",
           fulfillment_mode: fulfillmentMode,
           service_id: null,
+          unit_cost: subscriptionUnitCost,
         },
         fulfillmentLine,
         requiresStock: false,

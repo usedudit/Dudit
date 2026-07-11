@@ -19,7 +19,7 @@ interface VideoData {
   linked_item_id: string | null
   partner_id: string
   views_count: number
-  partner?: { store_name: string; store_avatar: string | null } | null
+  partner?: { store_name: string; store_image_url: string | null } | null
 }
 
 interface VideoModalProps {

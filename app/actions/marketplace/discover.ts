@@ -4,6 +4,18 @@ import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { calculateDistance } from "@/lib/services/location.service"
 
+const DISCOVER_DEBUG = false
+
+function dLog(...args: unknown[]) {
+    if (DISCOVER_DEBUG) console.log(...args)
+}
+function dWarn(...args: unknown[]) {
+    if (DISCOVER_DEBUG) console.warn(...args)
+}
+function dError(...args: unknown[]) {
+    if (DISCOVER_DEBUG) console.error(...args)
+}
+
 // ─── State name map (UF → full name) ───────────────────────────────────────
 
 const ESTADOS: Record<string, string> = {
@@ -234,12 +246,12 @@ const getPartnerIdsByTier = cache(async (
         .eq("is_active", true)
 
     if (error) {
-        console.error(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
+        dError(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
         return { cityIds: new Set(), stateIds: new Set(), allIds: new Set() }
     }
 
     if (!partners || partners.length === 0) {
-        console.warn("[DISCOVER][PARTNER_IDS] No active partners found in Brazil")
+        dWarn("[DISCOVER][PARTNER_IDS] No active partners found in Brazil")
         return { cityIds: new Set(), stateIds: new Set(), allIds: new Set() }
     }
 
@@ -275,9 +287,7 @@ const getPartnerIdsByTier = cache(async (
         }
     }
 
-    console.log(
-        `[DISCOVER][PARTNER_IDS] city=${cityPartnerCount} | state=${statePartnerCount} | country=${allIds.size}`,
-    )
+    dLog(`[DISCOVER][PARTNER_IDS] city=${cityPartnerCount} | state=${statePartnerCount} | country=${allIds.size}`)
 
     return { cityIds, stateIds, allIds }
 })
@@ -358,7 +368,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP trending reason=no_partners`)
+        dLog(`[Discover] SKIP trending reason=no_partners`)
         return null
     }
 
@@ -371,13 +381,13 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][TRENDING] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP trending reason=error`)
+        dError(`[DISCOVER][TRENDING] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP trending reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP trending reason=no_products`)
+        dLog(`[Discover] SKIP trending reason=no_products`)
         return null
     }
 
@@ -395,7 +405,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     })
 
     if (withSignals.length === 0) {
-        console.log(`[Discover] SKIP trending reason=no_signals`)
+        dLog(`[Discover] SKIP trending reason=no_signals`)
         return null
     }
 
@@ -404,7 +414,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const scoped = filterByScope(withSignals, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP trending reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP trending reason=no_items_in_scope`)
         return null
     }
 
@@ -434,7 +444,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP endingSoon reason=no_partners`)
+        dLog(`[Discover] SKIP endingSoon reason=no_partners`)
         return null
     }
 
@@ -459,8 +469,8 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
             .order("ends_at", { ascending: true })
 
         if (error) {
-            console.error(`[DISCOVER][ENDING_SOON] Error (${w.label}):`, error)
-            console.log(`[Discover] SKIP endingSoon reason=error`)
+            dError(`[DISCOVER][ENDING_SOON] Error (${w.label}):`, error)
+            dLog(`[Discover] SKIP endingSoon reason=error`)
             return null
         }
 
@@ -471,7 +481,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     }
 
     if (!campaigns || campaigns.length === 0) {
-        console.log(`[Discover] SKIP endingSoon reason=no_campaigns_in_24h_48h_7d`)
+        dLog(`[Discover] SKIP endingSoon reason=no_campaigns_in_24h_48h_7d`)
         return null
     }
 
@@ -486,13 +496,13 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         .in("partner_id", allIds)
 
     if (promoErr) {
-        console.error(`[DISCOVER][ENDING_SOON] Promotions error:`, promoErr)
-        console.log(`[Discover] SKIP endingSoon reason=promotions_error`)
+        dError(`[DISCOVER][ENDING_SOON] Promotions error:`, promoErr)
+        dLog(`[Discover] SKIP endingSoon reason=promotions_error`)
         return null
     }
 
     if (!promotions || promotions.length === 0) {
-        console.log(`[Discover] SKIP endingSoon reason=no_promotions`)
+        dLog(`[Discover] SKIP endingSoon reason=no_promotions`)
         return null
     }
 
@@ -502,7 +512,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         if (pp) for (const p of pp) if (p.product_id) productIds.add(p.product_id)
     }
     if (productIds.size === 0) {
-        console.log(`[Discover] SKIP endingSoon reason=no_products_in_promotions`)
+        dLog(`[Discover] SKIP endingSoon reason=no_products_in_promotions`)
         return null
     }
 
@@ -515,13 +525,13 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         .limit(30)
 
     if (prodErr) {
-        console.error(`[DISCOVER][ENDING_SOON] Products error:`, prodErr)
-        console.log(`[Discover] SKIP endingSoon reason=products_error`)
+        dError(`[DISCOVER][ENDING_SOON] Products error:`, prodErr)
+        dLog(`[Discover] SKIP endingSoon reason=products_error`)
         return null
     }
 
     if (!products || products.length === 0) {
-        console.log(`[Discover] SKIP endingSoon reason=no_products_found`)
+        dLog(`[Discover] SKIP endingSoon reason=no_products_found`)
         return null
     }
 
@@ -531,7 +541,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP endingSoon reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP endingSoon reason=no_items_in_scope`)
         return null
     }
 
@@ -565,14 +575,14 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
 async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     if (!ctx.coords) {
-        console.log(`[Discover] SKIP nearby reason=no_coords`)
+        dLog(`[Discover] SKIP nearby reason=no_coords`)
         return null
     }
 
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP nearby reason=no_partners`)
+        dLog(`[Discover] SKIP nearby reason=no_partners`)
         return null
     }
 
@@ -587,13 +597,13 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][NEARBY] Error:`, error)
-        console.log(`[Discover] SKIP nearby reason=error`)
+        dError(`[DISCOVER][NEARBY] Error:`, error)
+        dLog(`[Discover] SKIP nearby reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP nearby reason=no_products`)
+        dLog(`[Discover] SKIP nearby reason=no_products`)
         return null
     }
 
@@ -630,13 +640,13 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     for (const opt of options) {
         if (opt.pool.length >= minItems) {
             chosen = opt
-            console.log(`[DISCOVER][NEARBY] Band "${opt.id}" → ${opt.pool.length} items`)
+            dLog(`[DISCOVER][NEARBY] Band "${opt.id}" → ${opt.pool.length} items`)
             break
         }
     }
 
     if (!chosen) {
-        console.log(`[DISCOVER][NEARBY] No band with >=${minItems} items - skipping`)
+        dLog(`[DISCOVER][NEARBY] No band with >=${minItems} items - skipping`)
         return null
     }
 
@@ -674,7 +684,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP recent reason=no_partners`)
+        dLog(`[Discover] SKIP recent reason=no_partners`)
         return null
     }
 
@@ -698,17 +708,17 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     ])
 
     if (prodResult.error) {
-        console.error(`[DISCOVER][RECENT] Products Error:`, prodResult.error, `city=${ctx.city} state=${ctx.state}`)
+        dError(`[DISCOVER][RECENT] Products Error:`, prodResult.error, `city=${ctx.city} state=${ctx.state}`)
     }
     if (servResult.error) {
-        console.error(`[DISCOVER][RECENT] Services Error:`, servResult.error, `city=${ctx.city} state=${ctx.state}`)
+        dError(`[DISCOVER][RECENT] Services Error:`, servResult.error, `city=${ctx.city} state=${ctx.state}`)
     }
 
     const products = (prodResult.data || []) as RawProduct[]
     const services = (servResult.data || []) as any[]
 
     if (products.length === 0 && services.length === 0) {
-        console.log(`[Discover] SKIP recent reason=no_items`)
+        dLog(`[Discover] SKIP recent reason=no_items`)
         return null
     }
 
@@ -740,7 +750,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     const scoped = filterByScope(merged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP recent reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP recent reason=no_items_in_scope`)
         return null
     }
 
@@ -796,7 +806,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP gems reason=no_partners`)
+        dLog(`[Discover] SKIP gems reason=no_partners`)
         return null
     }
 
@@ -811,13 +821,13 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         .limit(80)
 
     if (error) {
-        console.error(`[DISCOVER][GEMS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP gems reason=error`)
+        dError(`[DISCOVER][GEMS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP gems reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP gems reason=no_products`)
+        dLog(`[Discover] SKIP gems reason=no_products`)
         return null
     }
 
@@ -852,7 +862,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
     const scoped = filterByScope(diverseItems, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP gems reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP gems reason=no_items_in_scope`)
         return null
     }
 
@@ -884,14 +894,14 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
 async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     if (!ctx.userId) {
-        console.log(`[Discover] SKIP personalized reason=not_logged_in`)
+        dLog(`[Discover] SKIP personalized reason=not_logged_in`)
         return null
     }
 
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP personalized reason=no_partners`)
+        dLog(`[Discover] SKIP personalized reason=no_partners`)
         return null
     }
 
@@ -905,7 +915,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
     const hasFavs = (favRes.count ?? 0) > 0
     const hasOrders = (orderRes.count ?? 0) > 0
     if (!hasFavs && !hasOrders) {
-        console.log(`[Discover] SKIP personalized reason=no_signals`)
+        dLog(`[Discover] SKIP personalized reason=no_signals`)
         return null
     }
 
@@ -918,8 +928,8 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         .limit(50)
 
     if (favErr) {
-        console.error(`[DISCOVER][PERSONALIZED] Favorites error:`, favErr)
-        console.log(`[Discover] SKIP personalized reason=favorites_error`)
+        dError(`[DISCOVER][PERSONALIZED] Favorites error:`, favErr)
+        dLog(`[Discover] SKIP personalized reason=favorites_error`)
         return null
     }
 
@@ -933,7 +943,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
             .in("id", favProductIds)
 
         if (catErr) {
-            console.error(`[DISCOVER][PERSONALIZED] Category error:`, catErr)
+            dError(`[DISCOVER][PERSONALIZED] Category error:`, catErr)
         } else if (favProducts) {
             const counts = new Map<string, number>()
             for (const p of favProducts) {
@@ -947,7 +957,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
     }
 
     if (preferredCatIds.length === 0) {
-        console.log(`[Discover] SKIP personalized reason=no_preferred_categories → fallback to popular`)
+        dLog(`[Discover] SKIP personalized reason=no_preferred_categories → fallback to popular`)
         return fetchPopular(tiers, ctx)
     }
 
@@ -962,13 +972,13 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][PERSONALIZED] Products error:`, error)
-        console.log(`[Discover] SKIP personalized reason=products_error`)
+        dError(`[DISCOVER][PERSONALIZED] Products error:`, error)
+        dLog(`[Discover] SKIP personalized reason=products_error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP personalized reason=no_products`)
+        dLog(`[Discover] SKIP personalized reason=no_products`)
         return null
     }
 
@@ -983,7 +993,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
 
     const scoped = filterByScope(filtered, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP personalized reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP personalized reason=no_items_in_scope`)
         return null
     }
 
@@ -1006,7 +1016,7 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP bestSellers reason=no_partners`)
+        dLog(`[Discover] SKIP bestSellers reason=no_partners`)
         return null
     }
 
@@ -1021,13 +1031,13 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][BEST_SELLERS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP bestSellers reason=error`)
+        dError(`[DISCOVER][BEST_SELLERS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP bestSellers reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP bestSellers reason=no_products`)
+        dLog(`[Discover] SKIP bestSellers reason=no_products`)
         return null
     }
 
@@ -1040,7 +1050,7 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP bestSellers reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP bestSellers reason=no_items_in_scope`)
         return null
     }
 
@@ -1070,7 +1080,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP topRated reason=no_partners`)
+        dLog(`[Discover] SKIP topRated reason=no_partners`)
         return null
     }
 
@@ -1085,13 +1095,13 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][TOP_RATED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP topRated reason=error`)
+        dError(`[DISCOVER][TOP_RATED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP topRated reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP topRated reason=no_products`)
+        dLog(`[Discover] SKIP topRated reason=no_products`)
         return null
     }
 
@@ -1104,7 +1114,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP topRated reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP topRated reason=no_items_in_scope`)
         return null
     }
 
@@ -1133,7 +1143,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP promos reason=no_partners`)
+        dLog(`[Discover] SKIP promos reason=no_partners`)
         return null
     }
 
@@ -1147,8 +1157,8 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         .limit(80)
 
     if (error) {
-        console.error(`[DISCOVER][PROMOS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP promos reason=error`)
+        dError(`[DISCOVER][PROMOS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP promos reason=error`)
         return null
     }
 
@@ -1157,7 +1167,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     )
 
     if (discounted.length === 0) {
-        console.log(`[Discover] SKIP promos reason=no_discounts`)
+        dLog(`[Discover] SKIP promos reason=no_discounts`)
         return null
     }
 
@@ -1172,7 +1182,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP promos reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP promos reason=no_items_in_scope`)
         return null
     }
 
@@ -1204,7 +1214,7 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP mostViewed reason=no_partners`)
+        dLog(`[Discover] SKIP mostViewed reason=no_partners`)
         return null
     }
 
@@ -1218,13 +1228,13 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][MOST_VIEWED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP mostViewed reason=error`)
+        dError(`[DISCOVER][MOST_VIEWED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP mostViewed reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP mostViewed reason=no_products`)
+        dLog(`[Discover] SKIP mostViewed reason=no_products`)
         return null
     }
 
@@ -1237,7 +1247,7 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP mostViewed reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP mostViewed reason=no_items_in_scope`)
         return null
     }
 
@@ -1267,7 +1277,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP services reason=no_partners`)
+        dLog(`[Discover] SKIP services reason=no_partners`)
         return null
     }
 
@@ -1281,13 +1291,13 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][SERVICES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP services reason=error`)
+        dError(`[DISCOVER][SERVICES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP services reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP services reason=no_products`)
+        dLog(`[Discover] SKIP services reason=no_products`)
         return null
     }
 
@@ -1307,7 +1317,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP services reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP services reason=no_items_in_scope`)
         return null
     }
 
@@ -1356,7 +1366,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP topVitrines reason=no_partners`)
+        dLog(`[Discover] SKIP topVitrines reason=no_partners`)
         return null
     }
 
@@ -1369,13 +1379,13 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .limit(30)
 
     if (error) {
-        console.error(`[DISCOVER][VITRINES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP topVitrines reason=error`)
+        dError(`[DISCOVER][VITRINES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP topVitrines reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP topVitrines reason=no_partners_data`)
+        dLog(`[Discover] SKIP topVitrines reason=no_partners_data`)
         return null
     }
 
@@ -1392,7 +1402,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP topVitrines reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP topVitrines reason=no_items_in_scope`)
         return null
     }
 
@@ -1441,7 +1451,7 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP popular reason=no_partners`)
+        dLog(`[Discover] SKIP popular reason=no_partners`)
         return null
     }
 
@@ -1455,13 +1465,13 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][POPULAR] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP popular reason=error`)
+        dError(`[DISCOVER][POPULAR] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP popular reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP popular reason=no_products`)
+        dLog(`[Discover] SKIP popular reason=no_products`)
         return null
     }
 
@@ -1474,7 +1484,7 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP popular reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP popular reason=no_items_in_scope`)
         return null
     }
 
@@ -1497,7 +1507,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
-        console.log(`[Discover] SKIP allProducts reason=no_partners`)
+        dLog(`[Discover] SKIP allProducts reason=no_partners`)
         return null
     }
 
@@ -1510,13 +1520,13 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][ALL_PRODUCTS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-        console.log(`[Discover] SKIP allProducts reason=error`)
+        dError(`[DISCOVER][ALL_PRODUCTS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        dLog(`[Discover] SKIP allProducts reason=error`)
         return null
     }
 
     if (!data || data.length === 0) {
-        console.log(`[Discover] SKIP allProducts reason=no_products`)
+        dLog(`[Discover] SKIP allProducts reason=no_products`)
         return null
     }
 
@@ -1532,7 +1542,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
-        console.log(`[Discover] SKIP allProducts reason=no_items_in_scope`)
+        dLog(`[Discover] SKIP allProducts reason=no_items_in_scope`)
         return null
     }
 
@@ -1588,12 +1598,12 @@ const PROXIMITY_SECTIONS: SectionDef[] = [
 
 export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> {
     const t0 = performance.now()
-    console.log(`[Discover] START | scope=${ctx.scope} city=${ctx.city} state=${ctx.state} user=${ctx.userId ? "logged" : "anon"}`)
+    dLog(`[Discover] START | scope=${ctx.scope} city=${ctx.city} state=${ctx.state} user=${ctx.userId ? "logged" : "anon"}`)
 
     const tiers = await getPartnerIdsByTier(ctx.city, ctx.state, ctx.stateOnly)
 
     if (tiers.allIds.size === 0) {
-        console.warn(`[Discover] No partners found anywhere in Brazil`)
+        dWarn(`[Discover] No partners found anywhere in Brazil`)
         return []
     }
 
@@ -1611,11 +1621,11 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             pool.push(result.value)
             usedGatilhos.add(result.value.gatilho)
         } else if (result.status === "rejected") {
-            console.warn(`[Discover] HIGH ${HIGH_SECTIONS[i].id} error:`, result.reason)
+            dWarn(`[Discover] HIGH ${HIGH_SECTIONS[i].id} error:`, result.reason)
         }
     }
 
-    console.log(`[Discover] Phase 1 (HIGH): ${pool.length}/4`)
+    dLog(`[Discover] Phase 1 (HIGH): ${pool.length}/4`)
 
     // 2. Fill gaps with MEDIUM (seeded shuffle for daily rotation)
     if (pool.length < 5) {
@@ -1631,17 +1641,17 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
 
             const result = await def.fetch(tiers, ctx).catch(() => null)
             if (result && result.items.length >= 1) {
-                console.log(`[Discover] Filler: ${def.id} → ${result.items.length} items`)
+                dLog(`[Discover] Filler: ${def.id} → ${result.items.length} items`)
                 pool.push(result)
                 usedGatilhos.add(result.gatilho)
                 usedIds.add(result.id)
             } else {
-                console.log(`[Discover] Filler: ${def.id} → empty`)
+                dLog(`[Discover] Filler: ${def.id} → empty`)
             }
         }
     }
 
-    console.log(`[Discover] Phase 2 (MEDIUM): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
+    dLog(`[Discover] Phase 2 (MEDIUM): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 3. FALLBACK if still < 5
     if (pool.length < 5) {
@@ -1649,26 +1659,26 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             if (pool.length >= 5) break
             const result = await def.fetch(tiers, ctx).catch(() => null)
             if (result && result.items.length >= 1) {
-                console.log(`[Discover] Fallback: ${def.id} → ${result.items.length} items`)
+                dLog(`[Discover] Fallback: ${def.id} → ${result.items.length} items`)
                 pool.push(result)
             }
         }
     }
 
-    console.log(`[Discover] Phase 3 (FALLBACK): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
+    dLog(`[Discover] Phase 3 (FALLBACK): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 4. ULTIMATE FALLBACK - any products at all (no ranking required)
     if (pool.length < 5) {
         const result = await fetchAllProducts(tiers, ctx).catch(() => null)
         if (result && result.items.length >= 1) {
-            console.log(`[Discover] Ultimate fallback: allProducts → ${result.items.length} items`)
+            dLog(`[Discover] Ultimate fallback: allProducts → ${result.items.length} items`)
             pool.push(result)
         } else {
-            console.warn(`[Discover] Ultimate fallback: allProducts empty - database may be empty`)
+            dWarn(`[Discover] Ultimate fallback: allProducts empty - database may be empty`)
         }
     }
 
-    console.log(`[Discover] Phase 4 (ULTIMATE): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
+    dLog(`[Discover] Phase 4 (ULTIMATE): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 5. Proximity (nearby) - only with coords, only if room
     //    Vitrines are NOT reserved - they participate in the seeded MEDIUM rotation
@@ -1677,13 +1687,13 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             if (pool.length >= 6) break
             const result = await def.fetch(tiers, ctx).catch(() => null)
             if (result && result.items.length >= 1) {
-                console.log(`[Discover] Proximity: ${result.id} → ${result.items.length} items`)
+                dLog(`[Discover] Proximity: ${result.id} → ${result.items.length} items`)
                 pool.push(result)
             }
         }
     }
 
-    console.log(`[Discover] Phase 5 (PROXIMITY): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
+    dLog(`[Discover] Phase 5 (PROXIMITY): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 6. Sixth dynamic section (only if room)
     if (pool.length < 6) {
@@ -1704,7 +1714,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
                 const result = await def.fetch(tiers, ctx).catch(() => null)
                 if (result && result.items.length >= 1) {
                     sixthSection = result
-                    console.log(`[Discover] Sixth: ${def.id} → ${result.items.length} items`)
+                    dLog(`[Discover] Sixth: ${def.id} → ${result.items.length} items`)
                     break
                 }
             }
@@ -1729,11 +1739,11 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
                 pool.push(sixthSection)
             }
         } else {
-            console.log(`[Discover] Sixth: none available`)
+            dLog(`[Discover] Sixth: none available`)
         }
     }
 
-    console.log(`[Discover] Phase 6 (SIXTH): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
+    dLog(`[Discover] Phase 6 (SIXTH): ${pool.length} | ids=[${pool.map(s => s.id).join(",")}]`)
 
     // 7. Global dedup with auto-refill - sections never drop below 1 item
     const globalSeen = new Set<string>()
@@ -1765,14 +1775,14 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
 
         if (removedCount > 0) {
-            console.log(`[Discover] DEDUP ${section.id}: before=${beforeCount} removed=${removedCount} refilled=${refilled} after=${deduped.length}`)
+            dLog(`[Discover] DEDUP ${section.id}: before=${beforeCount} removed=${removedCount} refilled=${refilled} after=${deduped.length}`)
         }
 
         // Never drop a section entirely - if dedup killed everything, keep original
         if (deduped.length >= 1) {
             finalSections.push({ ...section, items: deduped.slice(0, 20) })
         } else {
-            console.log(`[Discover] DEDUP would kill section "${section.id}" - keeping it anyway`)
+            dLog(`[Discover] DEDUP would kill section "${section.id}" - keeping it anyway`)
             finalSections.push(section)
         }
     }
@@ -1780,10 +1790,10 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
     const result = finalSections.slice(0, 6)
 
     const t1 = performance.now()
-    console.log(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
-    console.log(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
+    dLog(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
+    dLog(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
     if (result.length > 0) {
-        console.log(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
+        dLog(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
     }
 
     return result

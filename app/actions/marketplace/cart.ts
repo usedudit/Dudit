@@ -1023,6 +1023,18 @@ export async function checkoutCartAction(
     console.error("Error ensuring marketplace customer in checkoutCartAction:", e)
   }
 
+  // Fetch delivery_payer setting for snapshot
+  const { data: deliverySettings } = await getAdminClient()
+    .from("delivery_settings")
+    .select("delivery_payer")
+    .eq("partner_id", partnerId)
+    .maybeSingle()
+
+  const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+
+  // For marketplace orders (customer-initiated), seller_commission_amount is 0
+  const sellerCommissionAmount = 0
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -1037,6 +1049,8 @@ export async function checkoutCartAction(
       delivery_type: orderDelivery,
       delivery_address: hasDeliveryLines ? deliveryAddress : deliveryAddress || null,
       payment_method: useMercadoPago ? "Mercado Pago" : paymentMethodName,
+      delivery_payer: deliveryPayer,
+      seller_commission_amount: sellerCommissionAmount,
       payment_breakdown: useMercadoPago
         ? []
         : [{

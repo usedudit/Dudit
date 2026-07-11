@@ -116,26 +116,30 @@ async function createRecurringOrder(params: {
   const { supabase, claim, productItems, customer, financeAccountId } = params
 
   const productIds = productItems.map((i) => i.product_id).filter(Boolean) as string[]
+  const variantIds = productItems.map((i) => i.variant_id).filter(Boolean) as string[]
 
+  // Fetch products with cost_price for unit_cost snapshot
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, price")
+    .select("id, name, price, cost_price")
     .in("id", productIds)
     .eq("partner_id", claim.partnerId)
 
-  const variantIds = productItems.map((i) => i.variant_id).filter(Boolean) as string[]
   const variantsMap = new Map<string, { name: string; price: number }>()
+  const variantCostMap = new Map<string, number>()
   if (variantIds.length > 0) {
     const { data: variants } = await supabase
       .from("product_variants")
-      .select("id, variant_name, price")
+      .select("id, variant_name, price, cost_price")
       .in("id", variantIds)
     for (const v of variants || []) {
       variantsMap.set(v.id, { name: v.variant_name || "Variante", price: Number(v.price || 0) })
+      variantCostMap.set(v.id, Number(v.cost_price || 0))
     }
   }
 
   const productsMap = new Map((products || []).map((p) => [p.id, p]))
+  const productCostMap = new Map((products || []).map((p) => [p.id, Number(p.cost_price || 0)]))
 
   const orderItemsPayload: Array<Record<string, unknown>> = []
   const pricingItems: import("@/lib/services/pricing-engine").PricingItem[] = []
@@ -158,6 +162,10 @@ async function createRecurringOrder(params: {
       basePrice: unitPrice,
     })
 
+    const unitCost = item.variant_id
+      ? variantCostMap.get(item.variant_id) || 0
+      : productCostMap.get(item.product_id) || 0
+
     orderItemsPayload.push({
       product_id: item.product_id,
       variant_id: item.variant_id || null,
@@ -166,6 +174,7 @@ async function createRecurringOrder(params: {
       quantity: qty,
       subtotal: lineSubtotal,
       sort_order: item.sort_order ?? 0,
+      unit_cost: unitCost,
     })
   }
 
@@ -175,6 +184,18 @@ async function createRecurringOrder(params: {
   })
   const totalAmount = pricingResult.finalTotal
   const subtotal = pricingResult.subtotal
+
+  // Fetch delivery_payer for snapshot
+  const { data: deliverySettings } = await supabase
+    .from("delivery_settings")
+    .select("delivery_payer")
+    .eq("partner_id", claim.partnerId)
+    .maybeSingle()
+
+  const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+
+  // For recurring orders, no seller commission (system-generated)
+  const sellerCommissionAmount = 0
 
   const orderPayload: Record<string, unknown> = {
     partner_id: claim.partnerId,
@@ -199,6 +220,8 @@ async function createRecurringOrder(params: {
     recurring_subscription_id: claim.subscriptionId,
     recurring_execution_id: claim.executionId,
     pricing_version: pricingResult.pricingVersion,
+    delivery_payer: deliveryPayer,
+    seller_commission_amount: sellerCommissionAmount,
   }
 
   const { data: order, error: orderError } = await supabase

@@ -352,10 +352,10 @@ async function syncPosSaleToOrders(params: {
             ? "partially_paid"
             : "pending"
 
-    const productIds = Array.from(
+const productIds = Array.from(
         new Set((saleItems || []).map((item: any) => item.product_id).filter(Boolean))
     ) as string[]
-    const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.all([
+const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.all([
         productIds.length > 0
             ? admin
                 .from("products")
@@ -379,6 +379,58 @@ async function syncPosSaleToOrders(params: {
         pickupWindowMinutes: 30,
         deliveryTimeEstimateMinutes: 0,
     })
+
+    // Fetch delivery_payer for snapshot
+    const { data: deliverySettings } = await admin
+        .from("delivery_settings")
+        .select("delivery_payer")
+        .eq("partner_id", params.partnerId)
+        .maybeSingle()
+
+    const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+
+    // Calculate seller_commission_amount for snapshot
+    let sellerCommissionAmount = 0
+    if (params.sellerPartnerUserId) {
+        const { data: sellerCommissions } = await admin
+            .from("employee_commissions")
+            .select("*")
+            .eq("partner_id", params.partnerId)
+            .eq("role", "seller")
+            .maybeSingle()
+
+        if (sellerCommissions && sellerCommissions.commission_type !== "none") {
+            const subtotalValue = Math.max(0, Number(sale.subtotal || 0))
+            const { calculateCommission } = await import("@/lib/services/commission.service")
+            sellerCommissionAmount = calculateCommission({
+                userId: params.sellerPartnerUserId,
+                role: "seller",
+                commissionType: sellerCommissions.commission_type,
+                value: Number(sellerCommissions.value || 0),
+                saleAmount: subtotalValue,
+            })
+        }
+    }
+
+    // Fetch cost prices for unit_cost snapshot - reuse productIds
+    const variantIds = (saleItems || []).filter((i: any) => i.variant_id).map((i: any) => i.variant_id)
+    const serviceIds = (saleItems || []).filter((i: any) => i.service_id).map((i: any) => i.service_id)
+
+    const [{ data: products }, { data: variants }, { data: services }] = await Promise.all([
+        productIds.length > 0
+            ? admin.from("products").select("id, cost_price").eq("partner_id", params.partnerId).in("id", productIds)
+            : Promise.resolve({ data: [] as any[] }),
+        variantIds.length > 0
+            ? admin.from("product_variants").select("id, cost_price").in("id", variantIds)
+            : Promise.resolve({ data: [] as any[] }),
+        serviceIds.length > 0
+            ? admin.from("services").select("id, cost_price").eq("partner_id", params.partnerId).in("id", serviceIds)
+            : Promise.resolve({ data: [] as any[] }),
+    ])
+
+    const productCostMap = new Map<string, number>((products || []).map((p: { id: string; cost_price: number | null }) => [p.id, Number(p.cost_price || 0)]))
+    const variantCostMap = new Map<string, number>((variants || []).map((v: { id: string; cost_price: number | null }) => [v.id, Number(v.cost_price || 0)]))
+    const serviceCostMap = new Map<string, number>((services || []).map((s: { id: string; cost_price: number | null }) => [s.id, Number(s.cost_price || 0)]))
 
     const orderPayload: Record<string, unknown> = {
         partner_id: params.partnerId,
@@ -411,6 +463,8 @@ async function syncPosSaleToOrders(params: {
         inventory_deducted: true,
         order_number: finalOrderNumber,
         pricing_version: pricingResult.pricingVersion,
+        delivery_payer: deliveryPayer,
+        seller_commission_amount: sellerCommissionAmount,
         ...(preparationEstimate ? {
             preparation_time_minutes: preparationEstimate.preparationTimeMinutes,
             estimated_ready_at: preparationEstimate.readyAt.toISOString(),
@@ -460,20 +514,31 @@ async function syncPosSaleToOrders(params: {
 
     if (!createdOrderId) return null
 
-    const orderItems = (saleItems || []).map((item: any, index: number) => ({
-        order_id: createdOrderId,
-        product_id: item.product_id || null,
-        variant_id: item.variant_id || null,
-        product_name: item.product_name || "Item",
-        product_price: safeMoney(Number(item.unit_price || 0)),
-        quantity: Number(item.quantity || 0),
-        subtotal: safeMoney(Number(item.subtotal || 0)),
-        sort_order: index,
-        is_gift: Boolean(item.is_gift),
-        original_price: item.original_price != null ? Number(item.original_price) : null,
-        is_promotional: Boolean(item.is_promotional),
-        promotion_id: item.promotion_id || null,
-    }))
+    const orderItems = (saleItems || []).map((item: any, index: number) => {
+        let unitCost = 0
+        if (item.service_id) {
+            unitCost = serviceCostMap.get(item.service_id) || 0
+        } else if (item.variant_id) {
+            unitCost = variantCostMap.get(item.variant_id) || 0
+        } else if (item.product_id) {
+            unitCost = productCostMap.get(item.product_id) || 0
+        }
+        return {
+            order_id: createdOrderId,
+            product_id: item.product_id || null,
+            variant_id: item.variant_id || null,
+            product_name: item.product_name || "Item",
+            product_price: safeMoney(Number(item.unit_price || 0)),
+            quantity: Number(item.quantity || 0),
+            subtotal: safeMoney(Number(item.subtotal || 0)),
+            sort_order: index,
+            is_gift: Boolean(item.is_gift),
+            original_price: item.original_price != null ? Number(item.original_price) : null,
+            is_promotional: Boolean(item.is_promotional),
+            promotion_id: item.promotion_id || null,
+            unit_cost: unitCost,
+        }
+    })
 
     if (orderItems.length > 0) {
         const { error: itemsErr } = await admin.from("order_items").insert(orderItems)
