@@ -16,6 +16,7 @@ import { formatCurrency, formatDate, checkBirthday, formatDateToBR } from '@/lib
 import { FadeIn } from '@/components/animations/FadeIn';
 import { getBirthdayCouponCodeAction, sendBirthdayNotificationAction, canCustomerReceiveNotificationAction } from '@/app/actions/erp/birthday';
 import { usePlanUpgrade, planStarIconForTarget } from '@/components/erp/subscription/PlanUpgradeModal';
+import { fetchCSRFTokenSingleton } from '@/hooks/use-csrf-token';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { usePermissions } from '@/lib/permission-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
@@ -403,7 +404,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const handleDelete = async () => {
         try {
             setIsDeleting(true)
-            const token = await (await fetch("/api/csrf-token")).json().then((r: any) => r.token)
+            const token = await fetchCSRFTokenSingleton() || ""
             const res = await deleteCustomerAction(realCustomerId, token)
             if (res?.error) {
                 notifyError("Erro ao excluir: " + res.error)

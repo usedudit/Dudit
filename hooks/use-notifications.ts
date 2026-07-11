@@ -13,7 +13,7 @@ import { useNotificationsRealtime } from "./use-notifications-realtime"
 import { useSupabase } from "@/providers/supabase-provider"
 
 const READ_DELAY_MS = 2000
-const READ_INTERVAL_MS = 1000
+const READ_INTERVAL_MS = 10000
 
 function groupNotificationsByDate(items: NotificationRecord[]) {
   const groups: { label: string; items: NotificationRecord[] }[] = []

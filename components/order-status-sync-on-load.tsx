@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 interface OrderStatusSyncProps {
   orderId: string
@@ -47,6 +47,8 @@ interface BatchOrderStatusSyncProps {
 }
 
 export function BatchOrderStatusSyncOnLoad({ orders }: BatchOrderStatusSyncProps) {
+  const prevKeyRef = useRef("")
+
   useEffect(() => {
     if (!Array.isArray(orders) || orders.length === 0) return
 
@@ -58,6 +60,10 @@ export function BatchOrderStatusSyncOnLoad({ orders }: BatchOrderStatusSyncProps
     )
 
     if (pendingMpOrders.length === 0) return
+
+    const key = pendingMpOrders.map((o) => o.id).sort().join(",")
+    if (key === prevKeyRef.current) return
+    prevKeyRef.current = key
 
     const syncBatch = async () => {
       try {

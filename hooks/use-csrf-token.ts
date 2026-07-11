@@ -11,7 +11,7 @@ let cachedAt = 0
 let inflightPromise: Promise<string | null> | null = null
 const CSRF_TTL = 5 * 60 * 1000 // 5 minutes
 
-function fetchCSRFTokenSingleton(): Promise<string | null> {
+export function fetchCSRFTokenSingleton(): Promise<string | null> {
   // Return cached token if still valid
   if (cachedToken && Date.now() - cachedAt < CSRF_TTL) {
     return Promise.resolve(cachedToken)

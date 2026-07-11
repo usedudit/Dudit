@@ -14,6 +14,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
+import { fetchCSRFTokenSingleton } from '@/hooks/use-csrf-token';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "invoice_number", label: "Nota / Série", align: "left", width: "200px" },
@@ -151,7 +152,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
     const handleDelete = async () => {
         try {
             setIsDeleting(true)
-            const token = await (await fetch("/api/csrf-token")).json().then((r: any) => r.token)
+            const token = await fetchCSRFTokenSingleton() || ""
             const res = await deleteSupplierAction(realSupplierId, token)
             if (res?.error) {
                 notifyError("Erro ao excluir: " + res.error)

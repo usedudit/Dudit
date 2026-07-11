@@ -19,6 +19,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { addSubscriptionToCartAction } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 
 interface PlanDetailsPageClientProps {
     plan: any
@@ -248,7 +249,7 @@ export function PlanDetailsPageClient({
 
         setSubmitting(true)
         try {
-            const { token } = await (await fetch("/api/csrf-token")).json()
+            const token = await fetchCSRFTokenSingleton() || ""
             const result = await addSubscriptionToCartAction({
                 recurringPlanId: plan.id,
                 partnerId: partner.id,

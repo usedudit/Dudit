@@ -34,6 +34,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveSupplierAction, updateComprehensiveSupplierAction, getSupplierByIdAction } from "@/app/actions/erp/suppliers"
 import { useR2Upload } from "@/hooks/use-r2-upload"
+import ImageCropperModal from "@/components/ImageCropperModal"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
@@ -60,13 +61,6 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
         prefix: "partners/",
-        onSuccess: (result) => {
-            setImageUrl(result.publicUrl)
-            notifySuccess("Imagem do fornecedor carregada com sucesso!")
-        },
-        onError: (err) => {
-            notifyError("Erro ao enviar imagem: " + err.message)
-        }
     })
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -91,6 +85,10 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const [status, setStatus] = useState("Ativo")
     const [contribuinte, setContribuinte] = useState("9")
     const [imageUrl, setImageUrl] = useState("")
+    const [imagePreview, setImagePreview] = useState("")
+    const [showImageCropper, setShowImageCropper] = useState(false)
+    const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
+    const [imageFile, setImageFile] = useState<File | null>(null)
     const [supplierCode, setSupplierCode] = useState("")
 
     // Address States
@@ -110,8 +108,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const isDirty = useMemo(() => {
         return supplierName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" ||
             email !== "" || phone !== "" || mobile !== "" || website !== "" || observacoes !== "" ||
-            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== ""
-    }, [supplierName, fantasia, cnpj, ie, cpf, email, phone, mobile, website, observacoes, cep, street, number, neighborhood, city, imageUrl])
+            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== "" || imageFile !== null
+    }, [supplierName, fantasia, cnpj, ie, cpf, email, phone, mobile, website, observacoes, cep, street, number, neighborhood, city, imageUrl, imageFile])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -139,6 +137,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                         setObservacoes(s.notes || "")
                         setSupplierCode(s.supplier_code || "")
                         setImageUrl(s.image_url || "")
+                        setImagePreview(s.image_url || "")
                         // Address fields (direct from suppliers table)
                         setCep(s.zip_code || "")
                         setStreet(s.street || "")
@@ -159,6 +158,21 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
             fetchData()
         }
     }, [supplierId, partnerId])
+
+    const handleImageCropComplete = useCallback(async (croppedImageDataUrl: string) => {
+        try {
+            const response = await fetch(croppedImageDataUrl)
+            const blob = await response.blob()
+            const extension = blob.type === "image/png" ? "png" : "jpg"
+            const file = new File([blob], `supplier-image.${extension}`, { type: blob.type })
+            setImageFile(file)
+            setImagePreview(croppedImageDataUrl)
+            setShowImageCropper(false)
+            setSelectedImageForCrop(null)
+        } catch (error) {
+            console.error("Erro ao processar imagem recortada", error)
+        }
+    }, [])
 
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 
@@ -197,8 +211,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     }, [cnpj, notifySuccess, notifyError])
 
     const getCsrfToken = async (): Promise<string> => {
-        const { token } = await (await fetch("/api/csrf-token")).json()
-        return token
+        const { fetchCSRFTokenSingleton: getToken } = await import("@/hooks/use-csrf-token")
+        return (await getToken()) || ""
     }
 
     const handleSave = async () => {
@@ -243,6 +257,18 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
             const pType = personType === "Pessoa Jurídica" ? "pj" : "pf"
             const token = await getCsrfToken()
 
+            let finalImageUrl = imageUrl
+            if (imageFile) {
+                const uploadRes = await uploadFile(imageFile)
+                if (uploadRes && uploadRes.publicUrl) {
+                    finalImageUrl = uploadRes.publicUrl
+                } else {
+                    notifyError("Erro ao fazer upload da imagem.")
+                    setIsSaving(false)
+                    return
+                }
+            }
+
             const payload = {
                 partnerId,
                 name: supplierName,
@@ -264,7 +290,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                 state: uf,
                 csrf_token: token,
                 notes: observacoes,
-                image_url: imageUrl || null,
+                image_url: finalImageUrl || null,
             }
 
             const res = supplierId
@@ -643,23 +669,18 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                             type="file"
                                                             accept="image/png, image/jpeg, image/webp"
                                                             className="hidden"
-                                                            onChange={async (e) => {
+                                                            onChange={(e) => {
                                                                 const file = e.target.files?.[0]
                                                                 if (file) {
-                                                                    try {
-                                                                        await uploadFile(file)
-                                                                    } catch (err) {
-                                                                        // error already handled by hook onError
-                                                                    }
+                                                                    setSelectedImageForCrop(file)
+                                                                    setShowImageCropper(true)
                                                                 }
+                                                                e.target.value = ""
                                                             }}
-                                                            disabled={isUploadingImage}
                                                         />
-                                                        {isUploadingImage ? (
-                                                            <ThreeDotsLoader className="scale-75" />
-                                                        ) : imageUrl ? (
+                                                        {imagePreview ? (
                                                             <img
-                                                                src={imageUrl}
+                                                                src={imagePreview}
                                                                 alt="Imagem do fornecedor"
                                                                 className="w-full h-full object-cover"
                                                             />
@@ -668,7 +689,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                         )}
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <span className="text-white text-sm font-bold uppercase tracking-wider">
-                                                                {imageUrl ? "Alterar" : "Enviar"}
+                                                                {imagePreview ? "Alterar" : "Enviar"}
                                                             </span>
                                                         </div>
                                                     </label>
@@ -754,6 +775,16 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                 </Tabs>
 
                 {/* Modals */}
+                {showImageCropper && selectedImageForCrop && (
+                    <ImageCropperModal
+                        isOpen={showImageCropper}
+                        onClose={() => setShowImageCropper(false)}
+                        imageFile={selectedImageForCrop}
+                        onCropComplete={handleImageCropComplete}
+                        aspectRatio={1}
+                    />
+                )}
+
                 <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
 
                 <SavingStatusModal isOpen={isSaving} text={supplierId ? "Salvando fornecedor..." : "Criando fornecedor..."} />

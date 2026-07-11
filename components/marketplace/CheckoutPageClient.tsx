@@ -19,7 +19,7 @@ import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction, updateCartItemFulfillmentModeAction, deleteCartItemsAction } from "@/app/actions/marketplace/cart"
 import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
-import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
@@ -232,8 +232,7 @@ export function CheckoutPageClient() {
         let active = true
             ; (async () => {
                 try {
-                    const csrfRes = await fetch("/api/csrf-token")
-                    const { token } = await csrfRes.json()
+                    const token = await fetchCSRFTokenSingleton() || ""
                     const prep = await prepareProductBuyNowCheckoutAction({
                         productId,
                         partnerId: sessionData.partnerId,
@@ -303,7 +302,7 @@ export function CheckoutPageClient() {
 
     const handleFulfillmentModeChange = async (cartItemId: string, mode: "on_site" | "customer_location") => {
         try {
-            const token = csrfToken || await fetch("/api/csrf-token").then((r) => r.json()).then((d) => d.token || "")
+            const token = csrfToken || await fetchCSRFTokenSingleton() || ""
             const result = await updateCartItemFulfillmentModeAction(cartItemId, mode, token)
             if (result.success) {
                 setRefreshTrigger(prev => prev + 1)
@@ -632,18 +631,7 @@ export function CheckoutPageClient() {
             return
         }
         setIsLoading(true)
-        let token = csrfToken || ""
-        if (!token) {
-            try {
-                const csrfRes = await fetch("/api/csrf-token")
-                const csrfData = await csrfRes.json()
-                token = csrfData.token || ""
-            } catch {
-                notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
-                setIsLoading(false)
-                return
-            }
-        }
+        let token = csrfToken || await fetchCSRFTokenSingleton() || ""
         const result = await createAddressAction({
             entityId: userId, entityType: "user",
             street, number: finalNumber, complement: newAddressData.complement,
@@ -917,147 +905,130 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         let active = true
-        if (!partnerId || !formData.deliveryAddress || !productDeliveryQuoteActive) {
-            setDeliveryFee(0)
-            setDeliveryDistanceKm(null)
-            setDeliveryBreakdown(null)
-            setDeliveryQuoteLoading(false)
-            return
-        }
-        setDeliveryQuoteLoading(true)
+
         const timer = window.setTimeout(async () => {
-            const quote = await quoteDeliveryFeeAction({
-                partnerId,
-                destinationAddress: formData.deliveryAddress,
-                freeDeliveryCoupon: hasFreeDeliveryCoupon,
-                orderSubtotal,
-                destinationCoords: selectedAddress?.latitude && selectedAddress?.longitude
-                    ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
-                    : undefined,
-            })
-            if (!active) return
-            if (quote.success) {
-                setDeliveryError(null)
-                setDeliveryFee(Number(quote.fee || 0))
-                setDeliveryDistanceKm(Number(quote.distanceKm || 0))
-                setDeliveryBreakdown({
-                    baseFee: Number(quote.breakdown.baseFee || 0),
-                    distanceFee: Number(quote.breakdown.distanceFee || 0),
-                    timeAdjustmentTotal: Number(quote.breakdown.timeAdjustmentTotal || 0),
+            // Delivery fee quote
+            if (partnerId && formData.deliveryAddress && productDeliveryQuoteActive) {
+                setDeliveryQuoteLoading(true)
+                const quote = await quoteDeliveryFeeAction({
+                    partnerId,
+                    destinationAddress: formData.deliveryAddress,
+                    freeDeliveryCoupon: hasFreeDeliveryCoupon,
+                    orderSubtotal,
+                    destinationCoords: selectedAddress?.latitude && selectedAddress?.longitude
+                        ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                        : undefined,
                 })
-            } else {
-                setDeliveryError(quote.error)
-                if (quote.error?.toLowerCase().includes("raio")) {
-                    setShowOutsideRadiusModal(true)
+                if (!active) return
+                if (quote.success) {
+                    setDeliveryError(null)
+                    setDeliveryFee(Number(quote.fee || 0))
+                    setDeliveryDistanceKm(Number(quote.distanceKm || 0))
+                    setDeliveryBreakdown({
+                        baseFee: Number(quote.breakdown.baseFee || 0),
+                        distanceFee: Number(quote.breakdown.distanceFee || 0),
+                        timeAdjustmentTotal: Number(quote.breakdown.timeAdjustmentTotal || 0),
+                    })
+                } else {
+                    setDeliveryError(quote.error)
+                    if (quote.error?.toLowerCase().includes("raio")) {
+                        setShowOutsideRadiusModal(true)
+                    }
+                    const baseFee = Number(deliverySettings?.baseFee || 0)
+                    setDeliveryFee(baseFee)
+                    setDeliveryDistanceKm(null)
+                    setDeliveryBreakdown(null)
                 }
-                // Fallback to baseFee from server config
-                const baseFee = Number(deliverySettings?.baseFee || 0)
-                setDeliveryFee(baseFee)
+                setDeliveryQuoteLoading(false)
+            } else {
+                setDeliveryFee(0)
                 setDeliveryDistanceKm(null)
                 setDeliveryBreakdown(null)
+                setDeliveryQuoteLoading(false)
             }
-            setDeliveryQuoteLoading(false)
-        }, 250)
-        return () => {
-            active = false
-            window.clearTimeout(timer)
-        }
-    }, [partnerId, formData.deliveryAddress, hasFreeDeliveryCoupon, productDeliveryQuoteActive, orderSubtotal])
-
-    useEffect(() => {
-        let active = true
-        if (!cartItemIds.length || !checkoutContext) {
-            setCheckoutAmounts(null)
-            setCheckoutAmountsLoading(false)
-            return
-        }
-
-        setCheckoutAmountsLoading(true)
-        const timer = window.setTimeout(async () => {
-            const result = await getMarketplaceCheckoutAmountsAction({
-                cartItemIds,
-                deliveryType: formData.deliveryType === "pickup" ? "pickup" : "delivery",
-                deliveryAddress: formData.deliveryAddress || "",
-                couponCode: couponCode || null,
-                payDepositOnly,
-                depositPercent: checkoutContext.deposit?.percent ?? 50,
-                depositAvailable,
-            })
 
             if (!active) return
 
-            if (result.success) {
-                setCheckoutAmounts(result.data)
+            // Checkout amounts
+            if (cartItemIds.length && checkoutContext) {
+                setCheckoutAmountsLoading(true)
+                const result = await getMarketplaceCheckoutAmountsAction({
+                    cartItemIds,
+                    deliveryType: formData.deliveryType === "pickup" ? "pickup" : "delivery",
+                    deliveryAddress: formData.deliveryAddress || "",
+                    couponCode: couponCode || null,
+                    payDepositOnly,
+                    depositPercent: checkoutContext.deposit?.percent ?? 50,
+                    depositAvailable,
+                })
+                if (!active) return
+                if (result.success) {
+                    setCheckoutAmounts(result.data)
+                } else {
+                    setCheckoutAmounts(null)
+                }
+                setCheckoutAmountsLoading(false)
             } else {
                 setCheckoutAmounts(null)
+                setCheckoutAmountsLoading(false)
             }
-            setCheckoutAmountsLoading(false)
-        }, 220)
+
+            if (!active) return
+
+            // Payment preview
+            if (shouldPreviewTraditionalPayment) {
+                setPaymentPreviewLoading(true)
+                setPaymentError(null)
+                const result = await previewMarketplacePaymentAction({
+                    partnerId,
+                    paymentMethodId: formData.paymentMethod,
+                    originalAmount: checkoutChargeTotal,
+                    installmentNumber: Math.max(1, Number(formData.installments || 1)),
+                })
+                if (!active) return
+                if (result.success) {
+                    setPaymentPreview(result)
+                    setPaymentError(null)
+                } else {
+                    setPaymentPreview(null)
+                    setPaymentError(result.error)
+                }
+                setPaymentPreviewLoading(false)
+            } else {
+                setPaymentPreview(null)
+                setPaymentPreviewLoading(false)
+                if (paymentOption !== "traditional") {
+                    setPaymentError(null)
+                }
+            }
+        }, 300)
 
         return () => {
             active = false
             window.clearTimeout(timer)
         }
     }, [
+        partnerId,
+        formData.deliveryAddress,
+        hasFreeDeliveryCoupon,
+        productDeliveryQuoteActive,
+        orderSubtotal,
         cartItemIds,
         checkoutContext,
         formData.deliveryType,
-        formData.deliveryAddress,
         couponCode,
         payDepositOnly,
         depositAvailable,
         refreshTrigger,
-    ])
-
-    useEffect(() => {
-        let active = true
-
-        if (!shouldPreviewTraditionalPayment) {
-            setPaymentPreview(null)
-            setPaymentPreviewLoading(false)
-            if (paymentOption !== "traditional") {
-                setPaymentError(null)
-            }
-            return
-        }
-
-        setPaymentPreviewLoading(true)
-        setPaymentError(null)
-
-        const timer = window.setTimeout(async () => {
-            const result = await previewMarketplacePaymentAction({
-                partnerId,
-                paymentMethodId: formData.paymentMethod,
-                originalAmount: checkoutChargeTotal,
-                installmentNumber: Math.max(1, Number(formData.installments || 1)),
-            })
-
-            if (!active) return
-
-            if (result.success) {
-                setPaymentPreview(result)
-                setPaymentError(null)
-            } else {
-                setPaymentPreview(null)
-                setPaymentError(result.error)
-            }
-
-            setPaymentPreviewLoading(false)
-        }, 180)
-
-        return () => {
-            active = false
-            window.clearTimeout(timer)
-        }
-    }, [
         shouldPreviewTraditionalPayment,
-        partnerId,
         paymentOption,
         formData.paymentMethod,
         formData.installments,
         checkoutChargeTotal,
         isPickup,
         deliveryFee,
+        deliverySettings,
+        selectedAddress,
     ])
 
     useEffect(() => {
@@ -1928,7 +1899,7 @@ export function CheckoutPageClient() {
                     return
                 }
                 const isPickupPayment = isPickup && checkoutContext?.partner?.pickupPaymentPolicy === "allow_pickup_payment" && paymentOption === "traditional"
-                const token = csrfToken || await fetch("/api/csrf-token").then((r) => r.json()).then((d) => d.token || "")
+                const token = csrfToken || await fetchCSRFTokenSingleton() || ""
                 if (sessionData?.source === "cart") {
                     const items = sessionData.cartItems || []
                     const result = await checkoutCartAction(

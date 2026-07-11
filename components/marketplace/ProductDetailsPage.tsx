@@ -23,6 +23,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
@@ -242,13 +243,15 @@ export function ProductDetailsPageClient({
     }, [partner?.id])
 
     useEffect(() => {
-        if (product?.id) {
+        if (!product?.id) return
+        const timer = setTimeout(() => {
             fetch("/api/marketplace/view", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ entityType: "produto", entityId: product.id }),
             }).catch(() => { })
-        }
+        }, 500)
+        return () => clearTimeout(timer)
     }, [product?.id])
 
     const activePromo = useMemo(() => {
@@ -382,16 +385,7 @@ export function ProductDetailsPageClient({
             return
         }
         setDeliveryLoading(true)
-        let csrfToken = ""
-        try {
-            const csrfRes = await fetch("/api/csrf-token")
-            const csrfData = await csrfRes.json()
-            csrfToken = csrfData.token || ""
-        } catch {
-            notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
-            setDeliveryLoading(false)
-            return
-        }
+        const csrfToken = await fetchCSRFTokenSingleton() || ""
         const result = await createAddressAction({
             entityId: userId, entityType: "user",
             street, number: finalNumber, complement: newAddressData.complement,
@@ -797,7 +791,7 @@ export function ProductDetailsPageClient({
         isActionInProgress.current = true
         setLoading(true)
         try {
-            const { token } = await fetch("/api/csrf-token").then((r) => r.json())
+            const token = await fetchCSRFTokenSingleton() || ""
             const result = await addToCartAction(product.id, quantity, token, selectedVariant?.id)
             if (result.error) {
                 notifyError("Erro ao adicionar à sacola", result.error)
@@ -820,7 +814,7 @@ export function ProductDetailsPageClient({
         isActionInProgress.current = true
         setLoading(true)
         try {
-            const { token } = await fetch("/api/csrf-token").then((r) => r.json())
+            const token = await fetchCSRFTokenSingleton() || ""
             const prep = await prepareProductBuyNowCheckoutAction({
                 productId: product.id,
                 partnerId: partner.id,

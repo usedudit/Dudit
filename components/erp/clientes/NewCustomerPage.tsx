@@ -36,6 +36,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getCustomerByIdAction } from "@/app/actions/erp/customers"
 import { useR2Upload } from "@/hooks/use-r2-upload"
+import ImageCropperModal from "@/components/ImageCropperModal"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -66,13 +67,6 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
         prefix: "customers/",
-        onSuccess: (result) => {
-            setImageUrl(result.publicUrl)
-            notifySuccess("Imagem do cliente carregada com sucesso!")
-        },
-        onError: (err) => {
-            notifyError("Erro ao enviar imagem: " + err.message)
-        }
     })
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -100,6 +94,10 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const [fatherName, setFatherName] = useState("")
     const [observacoes, setObservacoes] = useState("")
     const [imageUrl, setImageUrl] = useState("")
+    const [imagePreview, setImagePreview] = useState("")
+    const [showImageCropper, setShowImageCropper] = useState(false)
+    const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
+    const [imageFile, setImageFile] = useState<File | null>(null)
     const [status, setStatus] = useState("Ativo")
     const [contribuinte, setContribuinte] = useState("9")
 
@@ -133,8 +131,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const isDirty = useMemo(() => {
         return customerName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" || rg !== "" ||
             email !== "" || phone !== "" || mobile !== "" || website !== "" || birthDate !== "" || motherName !== "" || fatherName !== "" || observacoes !== "" ||
-            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== ""
-    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city, imageUrl])
+            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== "" || imageFile !== null
+    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city, imageUrl, imageFile])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -162,6 +160,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         setMotherName(c.mother_name || "")
         setFatherName(c.father_name || "")
         setImageUrl(c.image_url || "")
+        setImagePreview(c.image_url || "")
         if (c.phone_fixed) setPhone(c.phone_fixed)
     }, [])
 
@@ -230,6 +229,21 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         }
     }, [customerId, partnerId, populateFormFromCustomer])
 
+    const handleImageCropComplete = useCallback(async (croppedImageDataUrl: string) => {
+        try {
+            const response = await fetch(croppedImageDataUrl)
+            const blob = await response.blob()
+            const extension = blob.type === "image/png" ? "png" : "jpg"
+            const file = new File([blob], `customer-image.${extension}`, { type: blob.type })
+            setImageFile(file)
+            setImagePreview(croppedImageDataUrl)
+            setShowImageCropper(false)
+            setSelectedImageForCrop(null)
+        } catch (error) {
+            console.error("Erro ao processar imagem recortada", error)
+        }
+    }, [])
+
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 
     const getTabErrorCount = useCallback((tab: string) => {
@@ -267,8 +281,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     }, [cnpj, notifySuccess, notifyError])
 
     const getCsrfToken = async (): Promise<string> => {
-        const { token } = await (await fetch("/api/csrf-token")).json()
-        return token
+        const { fetchCSRFTokenSingleton: getToken } = await import("@/hooks/use-csrf-token")
+        return (await getToken()) || ""
     }
 
     const handleSave = async () => {
@@ -324,6 +338,18 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             const pType = personType === "Pessoa Jurídica" ? "pj" : "pf"
             const token = await getCsrfToken()
 
+            let finalImageUrl = imageUrl
+            if (imageFile) {
+                const uploadRes = await uploadFile(imageFile)
+                if (uploadRes && uploadRes.publicUrl) {
+                    finalImageUrl = uploadRes.publicUrl
+                } else {
+                    notifyError("Erro ao fazer upload da imagem.")
+                    setIsSaving(false)
+                    return
+                }
+            }
+
             const payload = {
                 partnerId,
                 name: customerName,
@@ -351,7 +377,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 birthDate: birthDate || null,
                 motherName: motherName || null,
                 fatherName: fatherName || null,
-                image_url: imageUrl || null,
+                image_url: finalImageUrl || null,
                 hasDifferentBillingAddress: hasDifferentBillingAddress,
                 billingZipCode: hasDifferentBillingAddress ? billingCep : undefined,
                 billingStreet: hasDifferentBillingAddress ? billingStreet : undefined,
@@ -807,23 +833,18 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             type="file"
                                                             accept="image/png, image/jpeg, image/webp"
                                                             className="hidden"
-                                                            onChange={async (e) => {
+                                                            onChange={(e) => {
                                                                 const file = e.target.files?.[0]
                                                                 if (file) {
-                                                                    try {
-                                                                        await uploadFile(file)
-                                                                    } catch (err) {
-                                                                        // error already handled by hook onError
-                                                                    }
+                                                                    setSelectedImageForCrop(file)
+                                                                    setShowImageCropper(true)
                                                                 }
+                                                                e.target.value = ""
                                                             }}
-                                                            disabled={isUploadingImage}
                                                         />
-                                                        {isUploadingImage ? (
-                                                            <ThreeDotsLoader className="scale-75" />
-                                                        ) : imageUrl ? (
+                                                        {imagePreview ? (
                                                             <img
-                                                                src={imageUrl}
+                                                                src={imagePreview}
                                                                 alt="Imagem do cliente"
                                                                 className="w-full h-full object-cover"
                                                             />
@@ -832,7 +853,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         )}
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <span className="text-white text-sm font-bold uppercase tracking-wider">
-                                                                {imageUrl ? "Alterar" : "Enviar"}
+                                                                {imagePreview ? "Alterar" : "Enviar"}
                                                             </span>
                                                         </div>
                                                     </label>
@@ -956,6 +977,16 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 </Tabs >
 
                 {/* Modals */}
+                {showImageCropper && selectedImageForCrop && (
+                    <ImageCropperModal
+                        isOpen={showImageCropper}
+                        onClose={() => setShowImageCropper(false)}
+                        imageFile={selectedImageForCrop}
+                        onCropComplete={handleImageCropComplete}
+                        aspectRatio={1}
+                    />
+                )}
+
                 <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
 
                 <SavingStatusModal isOpen={isSaving} text={customerId ? "Salvando cliente..." : "Criando cliente..."} />

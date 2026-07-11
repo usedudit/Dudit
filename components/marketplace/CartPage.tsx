@@ -17,7 +17,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { formatCurrency, formatDateToBR } from "@/lib/utils"
 import { useTransitionDirection } from "@/providers/transition-provider"
-import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
 import { InfoCard } from "@/components/reusable"
@@ -184,8 +184,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const getCsrfToken = async (): Promise<string> => {
         if (csrfToken) return csrfToken
-        const { token } = await (await fetch("/api/csrf-token")).json()
-        return token
+        return (await fetchCSRFTokenSingleton()) || ""
     }
 
     useEffect(() => {

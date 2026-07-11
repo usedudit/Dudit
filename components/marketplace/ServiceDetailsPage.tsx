@@ -26,6 +26,7 @@ import {
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
+import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { InfoCard } from "@/components/reusable/InfoCard"
@@ -176,13 +177,15 @@ export function ServiceDetailsPageClient({
     const transformOrigin = useTransform([zoomOriginX, zoomOriginY], ([x, y]) => `${x}% ${y}%`)
 
     useEffect(() => {
-        if (service?.id) {
+        if (!service?.id) return
+        const timer = setTimeout(() => {
             fetch("/api/marketplace/view", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ entityType: "servico", entityId: service.id }),
             }).catch(() => { })
-        }
+        }, 500)
+        return () => clearTimeout(timer)
     }, [service?.id])
 
     // Redesign states
@@ -415,16 +418,7 @@ export function ServiceDetailsPageClient({
             return
         }
         setDeliveryLoading(true)
-        let csrfToken = ""
-        try {
-            const csrfRes = await fetch("/api/csrf-token")
-            const csrfData = await csrfRes.json()
-            csrfToken = csrfData.token || ""
-        } catch {
-            notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
-            setDeliveryLoading(false)
-            return
-        }
+        const csrfToken = await fetchCSRFTokenSingleton() || ""
         const result = await createAddressAction({
             entityId: userId, entityType: "user",
             street, number: finalNumber, complement: newAddressData.complement,
@@ -798,7 +792,7 @@ export function ServiceDetailsPageClient({
 
         setIsBooking(true)
         try {
-            const { token } = await (await fetch("/api/csrf-token")).json()
+            const token = await fetchCSRFTokenSingleton() || ""
 
             let cartItemId: string | undefined
             if (!schedulingEnabled) {
@@ -882,7 +876,7 @@ export function ServiceDetailsPageClient({
 
         setIsBooking(true)
         try {
-            const { token } = await (await fetch("/api/csrf-token")).json()
+            const token = await fetchCSRFTokenSingleton() || ""
             let result
             if (schedulingEnabled) {
                 result = await addServiceBookingToCartAction({

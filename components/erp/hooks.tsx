@@ -77,10 +77,10 @@ export function useERPData<TData = any, TError = Error>(
   return useQuery({
     queryKey,
     queryFn,
-    staleTime: isCritical ? 3000 : 15000,
-    refetchOnWindowFocus: true,
+    staleTime: isCritical ? 15000 : 30000,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchOnMount: isCritical ? 'always' : true,
+    refetchOnMount: true,
     // Keep showing previous data during background refetch to avoid loading flash
     placeholderData: keepPreviousData,
     ...restOptions
