@@ -13,6 +13,8 @@ import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
+import { QueryClient, dehydrate } from "@tanstack/react-query"
+import { HydrationBoundary } from "@tanstack/react-query"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "casa-e-utilidades": "Casa & Utilidades",
@@ -399,6 +401,22 @@ export default async function ExplorarPage({
         })),
     }
 
+    // TanStack Query Hydration: pre-populate cache with server data
+    const queryClient = new QueryClient()
+    const radius = typeof resolvedSearchParams.radius === "string" ? Number(resolvedSearchParams.radius) : undefined
+    const queryKey = ["explore", query, serverFetchType, searchSlug, radius, section]
+
+    queryClient.setQueryData(queryKey, {
+        pages: [{
+            items: productsWithDistance || [],
+            nextCursor: (productsWithDistance && productsWithDistance.length > 0) ? productsWithDistance[productsWithDistance.length - 1]?.id : null,
+            hasMore: (productsWithDistance && productsWithDistance.length >= 40)
+        }],
+        pageParams: [null]
+    })
+
+    const dehydratedState = dehydrate(queryClient)
+
     return (
         <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <script
@@ -407,31 +425,33 @@ export default async function ExplorarPage({
             />
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
-            <Suspense fallback={
-                    <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
-                        <ThreeDotsLoader />
-                    </div>
-                }>
-                <ExplorarPageClient
-                    initialResults={productsWithDistance}
-                    initialMoreDistantSellers={moreDistantSellersWithDistance}
-                    initialMoreDistantItems={moreDistantItemsWithDistance}
-                    initialSection={section}
-                    query={query}
-                    type={type}
-                    cidade={searchSlug}
-                    resolvedCityName={resolvedCityName}
-                    categoria={categoria}
-                    sectionTitle={sectionTitle}
-                    userProfile={userProfile}
-                    cartCount={cartCount}
-                    hideHeaderAndFooter={true}
-                    exploreAds={exploreAds}
-                    searchAds={searchAds}
-                    isStateRoute={isStateRoute}
-                    communityVideos={communityVideosData.items}
-                />
-            </Suspense>
+            <HydrationBoundary state={dehydratedState}>
+                <Suspense fallback={
+                        <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
+                            <ThreeDotsLoader />
+                        </div>
+                    }>
+                    <ExplorarPageClient
+                        initialResults={productsWithDistance}
+                        initialMoreDistantSellers={moreDistantSellersWithDistance}
+                        initialMoreDistantItems={moreDistantItemsWithDistance}
+                        initialSection={section}
+                        query={query}
+                        type={type}
+                        cidade={searchSlug}
+                        resolvedCityName={resolvedCityName}
+                        categoria={categoria}
+                        sectionTitle={sectionTitle}
+                        userProfile={userProfile}
+                        cartCount={cartCount}
+                        hideHeaderAndFooter={true}
+                        exploreAds={exploreAds}
+                        searchAds={searchAds}
+                        isStateRoute={isStateRoute}
+                        communityVideos={communityVideosData.items}
+                    />
+                </Suspense>
+            </HydrationBoundary>
 
             <MarketplaceFooter />
         </div>

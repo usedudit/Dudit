@@ -384,3 +384,326 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
   }
 }
 
+export async function skipMySubscriptionCycleAction(subscriptionId: string) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    // 1. Fetch subscription details & plan frequency
+    const { data: sub } = await admin
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, next_execution_at, mp_preapproval_id,
+        customers!inner(user_id),
+        recurring_plans(frequency_type, frequency_interval)
+      `)
+      .eq("id", subscriptionId)
+      .single()
+
+    const customerUserId = (sub as any)?.customers?.user_id
+    if (!sub?.id || customerUserId !== user.id) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+
+    // 2. Calculate next execution date by adding plan frequency interval
+    const currentNext = new Date(sub.next_execution_at)
+    const type = (sub.recurring_plans as any).frequency_type
+    const interval = Number((sub.recurring_plans as any).frequency_interval || 1)
+
+    if (type === "daily" || type === "day") {
+      currentNext.setDate(currentNext.getDate() + interval)
+    } else if (type === "weekly" || type === "week") {
+      currentNext.setDate(currentNext.getDate() + interval * 7)
+    } else if (type === "monthly" || type === "month") {
+      currentNext.setMonth(currentNext.getMonth() + interval)
+    } else if (type === "yearly" || type === "year") {
+      currentNext.setFullYear(currentNext.getFullYear() + interval)
+    } else {
+      currentNext.setDate(currentNext.getDate() + 30) // Fallback
+    }
+
+    const newNextStr = currentNext.toISOString()
+
+    // 3. Reschedule in Mercado Pago if automatic Preapproval exists
+    if (sub.mp_preapproval_id) {
+      const { updateMpPreapprovalNextPaymentDate } = await import(
+        "@/lib/services/mercadopago/partner-preapproval"
+      )
+      await updateMpPreapprovalNextPaymentDate(sub.partner_id, sub.mp_preapproval_id, newNextStr)
+    }
+
+    // 4. Update locally
+    const { data, error } = await admin
+      .from("recurring_subscriptions")
+      .update({
+        next_execution_at: newNextStr,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", subscriptionId)
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    await logAuditEvent({
+      partnerId: sub.partner_id,
+      actorUserId: user.id,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: [`cliente pulou um ciclo. Nova data: ${newNextStr.slice(0, 10)}.`],
+      source: "marketplace",
+    })
+
+    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
+  } catch (e: unknown) {
+    console.error("skipMySubscriptionCycleAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao pular ciclo" }
+  }
+}
+
+export async function postponeMySubscriptionCycleAction(subscriptionId: string, days: number) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    if (days <= 0 || days > 90) {
+      return { success: false, error: "Quantidade de dias inválida (máximo 90 dias)." }
+    }
+
+    const { data: sub } = await admin
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, next_execution_at, mp_preapproval_id,
+        customers!inner(user_id)
+      `)
+      .eq("id", subscriptionId)
+      .single()
+
+    const customerUserId = (sub as any)?.customers?.user_id
+    if (!sub?.id || customerUserId !== user.id) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+
+    const currentNext = new Date(sub.next_execution_at)
+    currentNext.setDate(currentNext.getDate() + days)
+    const newNextStr = currentNext.toISOString()
+
+    if (sub.mp_preapproval_id) {
+      const { updateMpPreapprovalNextPaymentDate } = await import(
+        "@/lib/services/mercadopago/partner-preapproval"
+      )
+      await updateMpPreapprovalNextPaymentDate(sub.partner_id, sub.mp_preapproval_id, newNextStr)
+    }
+
+    const { data, error } = await admin
+      .from("recurring_subscriptions")
+      .update({
+        next_execution_at: newNextStr,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", subscriptionId)
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    await logAuditEvent({
+      partnerId: sub.partner_id,
+      actorUserId: user.id,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: [`cliente adiou o ciclo por ${days} dias. Nova data: ${newNextStr.slice(0, 10)}.`],
+      source: "marketplace",
+    })
+
+    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
+  } catch (e: unknown) {
+    console.error("postponeMySubscriptionCycleAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao adiar ciclo" }
+  }
+}
+
+export async function anticipateMySubscriptionCycleAction(subscriptionId: string) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    const { data: sub } = await admin
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, next_execution_at, mp_preapproval_id,
+        customers!inner(user_id)
+      `)
+      .eq("id", subscriptionId)
+      .single()
+
+    const customerUserId = (sub as any)?.customers?.user_id
+    if (!sub?.id || customerUserId !== user.id) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+
+    // Anticipating executes today (or in 2 minutes to allow system batching)
+    const newNextStr = new Date(Date.now() + 2 * 60 * 1000).toISOString()
+
+    if (sub.mp_preapproval_id) {
+      const { updateMpPreapprovalNextPaymentDate } = await import(
+        "@/lib/services/mercadopago/partner-preapproval"
+      )
+      await updateMpPreapprovalNextPaymentDate(sub.partner_id, sub.mp_preapproval_id, newNextStr)
+    }
+
+    const { data, error } = await admin
+      .from("recurring_subscriptions")
+      .update({
+        next_execution_at: newNextStr,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", subscriptionId)
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    await logAuditEvent({
+      partnerId: sub.partner_id,
+      actorUserId: user.id,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: [`cliente antecipou o ciclo para execução imediata.`],
+      source: "marketplace",
+    })
+
+    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
+  } catch (e: unknown) {
+    console.error("anticipateMySubscriptionCycleAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao antecipar ciclo" }
+  }
+}
+
+export async function updateMySubscriptionDetailsAction(
+  subscriptionId: string,
+  input: { deliveryAddress?: string | null; notes?: string | null }
+) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    const { data: sub } = await admin
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id,
+        customers!inner(user_id)
+      `)
+      .eq("id", subscriptionId)
+      .single()
+
+    const customerUserId = (sub as any)?.customers?.user_id
+    if (!sub?.id || customerUserId !== user.id) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    }
+    const changes: string[] = []
+
+    if (input.deliveryAddress !== undefined) {
+      updatePayload.delivery_address = input.deliveryAddress
+      changes.push(`endereço de entrega alterado para "${input.deliveryAddress || "Retirada"}".`)
+    }
+    if (input.notes !== undefined) {
+      updatePayload.notes = input.notes
+      changes.push(`observações alteradas para "${input.notes || ""}".`)
+    }
+
+    const { data, error } = await admin
+      .from("recurring_subscriptions")
+      .update(updatePayload)
+      .eq("id", subscriptionId)
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    if (changes.length > 0) {
+      await logAuditEvent({
+        partnerId: sub.partner_id,
+        actorUserId: user.id,
+        entityType: "recurring_subscription",
+        entityId: subscriptionId,
+        actionType: "updated",
+        changeLines: changes,
+        source: "marketplace",
+      })
+    }
+
+    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
+  } catch (e: unknown) {
+    console.error("updateMySubscriptionDetailsAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao atualizar dados" }
+  }
+}
+
+export async function getMySubscriptionCreditsAction() {
+  try {
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    // 1. Get all customer IDs for the current user
+    const { data: customers } = await admin
+      .from("customers")
+      .select("id")
+      .eq("user_id", user.id)
+
+    const customerIds = (customers || []).map((c: any) => c.id)
+    if (customerIds.length === 0) return { success: true, data: [] }
+
+    // 2. Fetch credits
+    const { data, error } = await admin
+      .from("subscription_item_credits")
+      .select(`
+        id, subscription_id, item_name, total_credits, consumed_credits, expires_at, created_at,
+        recurring_subscriptions(recurring_plans(name)),
+        partners:partner_id(store_name)
+      `)
+      .in("customer_id", customerIds)
+      .gt("expires_at", new Date().toISOString())
+      .order("expires_at", { ascending: true })
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data: (data || []).map((row: any) => ({
+        id: row.id,
+        subscriptionId: row.subscription_id,
+        planName: row.recurring_subscriptions?.recurring_plans?.name || "Plano",
+        storeName: row.partners?.store_name || "Vendedor",
+        itemName: row.item_name,
+        totalCredits: row.total_credits,
+        consumedCredits: row.consumed_credits,
+        remainingCredits: Math.max(0, row.total_credits - row.consumed_credits),
+        expiresAt: row.expires_at,
+        createdAt: row.created_at,
+      })),
+    }
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar créditos" }
+  }
+}
+

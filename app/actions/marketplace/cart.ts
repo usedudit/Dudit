@@ -1089,7 +1089,7 @@ export async function checkoutCartAction(
           } : {})
         }],
       payment_provider: useMercadoPago ? "Mercado Pago" : null,
-      situation: isPickupPayment && orderDelivery === "pickup" ? "awaiting_pickup_payment" : "pending",
+      situation: paymentMethodName === "Assinatura (Créditos)" ? "paid" : (isPickupPayment && orderDelivery === "pickup" ? "awaiting_pickup_payment" : "pending"),
       notes,
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,

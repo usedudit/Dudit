@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon, CrownIcon } from "@/lib/icons"
 import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
@@ -201,6 +201,23 @@ export function CheckoutPageClient() {
     const csrfToken = useCSRFToken()
     const [sessionData, setSessionData] = useState<CheckoutSessionData | null>(null)
     const [pageLoading, setPageLoading] = useState(true)
+    const [userCredits, setUserCredits] = useState<any[]>([])
+    const [loadingCredits, setLoadingCredits] = useState(false)
+
+    useEffect(() => {
+        const fetchUserCredits = async () => {
+            setLoadingCredits(true)
+            const { getMySubscriptionCreditsAction } = await import("@/app/actions/marketplace/recurring-subscriptions")
+            const res = await getMySubscriptionCreditsAction()
+            setLoadingCredits(false)
+            if (res.success) {
+                setUserCredits(res.data || [])
+            }
+        }
+        if (user?.id) {
+            void fetchUserCredits()
+        }
+    }, [user?.id])
 
     useEffect(() => {
         const stored = sessionStorage.getItem("checkout_session")
@@ -293,6 +310,23 @@ export function CheckoutPageClient() {
     })
 
     const requirements: CheckoutRequirements | undefined = checkoutContext?.requirements
+    
+    const serviceLines = useMemo(() => {
+        return checkoutContext?.lines?.filter(l => l.lineKind === "service_booking") || []
+    }, [checkoutContext?.lines])
+
+    const hasSubscriptionCreditsForCheckout = useMemo(() => {
+        if (serviceLines.length === 0) return false
+        return serviceLines.every(line => {
+            const name = line.baseName || line.displayName
+            const match = userCredits.find(c => 
+                c.itemName.toLowerCase() === name.toLowerCase() && 
+                c.remainingCredits >= line.quantity &&
+                new Date(c.expiresAt) > new Date()
+            )
+            return !!match
+        })
+    }, [serviceLines, userCredits])
     const [payDepositOnly, setPayDepositOnly] = useState(false)
     const [checkoutAmounts, setCheckoutAmounts] = useState<MarketplaceCheckoutAmounts | null>(null)
     const [checkoutAmountsLoading, setCheckoutAmountsLoading] = useState(false)
@@ -389,7 +423,7 @@ export function CheckoutPageClient() {
 
 
 
-    const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago" | null>(null)
+    const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago" | "subscription_credits" | null>(null)
     const [paymentPreview, setPaymentPreview] = useState<MarketplacePaymentPreview | null>(null)
     const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false)
     const [deliveryQuoteLoading, setDeliveryQuoteLoading] = useState(false)
@@ -1798,7 +1832,7 @@ export function CheckoutPageClient() {
             }
         }
 
-        if (requirements && paymentOption) {
+        if (requirements && paymentOption && paymentOption !== "subscription_credits") {
             const clientPayCheck = validateMarketplaceCheckoutPayment({
                 requirements,
                 paymentOption,
@@ -1842,7 +1876,71 @@ export function CheckoutPageClient() {
                 return
             }
 
-            if (paymentOption === "mercadopago") {
+            if (paymentOption === "subscription_credits") {
+                // Subscription credits: create order as paid directly
+                const token = csrfToken || await fetchCSRFTokenSingleton() || ""
+                if (sessionData?.source === "cart") {
+                    const items = sessionData.cartItems || []
+                    const result = await checkoutCartAction(
+                        items.map(item => {
+                            const matchedLine = checkoutContext?.lines?.find(l => l.lineId === item.cartItemId)
+                            return {
+                                cartItemId: item.cartItemId,
+                                productId: item.productId || "",
+                                variantId: item.variantId,
+                                quantity:
+                                    quantities[item.cartItemId]
+                                    || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
+                                    || item.quantity,
+                                fulfillmentMode: matchedLine?.fulfillmentMode || undefined,
+                            }
+                        }),
+                        formData.deliveryType,
+                        formData.deliveryAddress,
+                        "Assinatura (Créditos)",
+                        1,
+                        formData.notes,
+                        null,
+                        false,
+                        token,
+                        false,
+                        undefined,
+                        false,
+                        checkoutPricingSnapshot,
+                        false,
+                    )
+                    if (result.error) throw new Error(result.error)
+                    invalidateCartCache()
+                    sessionStorage.removeItem("checkout_session")
+                    notifySuccess("Agendamento confirmado!", "Seus créditos de assinatura foram utilizados.")
+                    setIsLoading(false)
+                    router.push("/minhas-compras")
+                } else {
+                    const result = await createOrderAction({
+                        itemId: sessionData?.itemId || products[0]?.id || "",
+                        itemType: sessionData?.itemType || "product",
+                        quantity: quantities[products[0]?.id] || products[0]?.quantity || 1,
+                        totalAmount: 0,
+                        deliveryType: formData.deliveryType,
+                        deliveryAddress: formData.deliveryAddress,
+                        paymentMethod: "Assinatura (Créditos)",
+                        installments: 1,
+                        notes: formData.notes,
+                        partnerId: partnerId,
+                        csrf_token: token,
+                        couponCode: null,
+                        wantsChange: false,
+                        payWithAmount: undefined,
+                        checkoutPricingSnapshot,
+                    })
+                    if ('error' in result && result.error) throw new Error(result.error)
+                    sessionStorage.removeItem("checkout_session")
+                    notifySuccess("Agendamento confirmado!", "Seus créditos de assinatura foram utilizados.")
+                    setIsLoading(false)
+                    router.push("/minhas-compras")
+                }
+                return
+            } else if (paymentOption === "mercadopago") {
                 const amount = checkoutChargeTotal
                 setPixPaymentData({
                     orderId: "temp-" + Date.now(),
@@ -2194,6 +2292,29 @@ export function CheckoutPageClient() {
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
+                                    {hasSubscriptionCreditsForCheckout && (
+                                        <ListItem
+                                            icon={CrownIcon}
+                                            title="Assinatura (Créditos)"
+                                            description={`Usar créditos do seu plano · ${userCredits.filter(c => new Date(c.expiresAt) > new Date() && c.remainingCredits > 0).map(c => `${c.itemName}: ${c.remainingCredits}`).join(", ")}`}
+                                            className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                            onClick={() => {
+                                                setPaymentOption("subscription_credits")
+                                                setFormData(prev => ({ ...prev, paymentMethod: "subscription_credits", installments: 1 }))
+                                            }}
+                                            right={
+                                                <RadioButton
+                                                    name="paymentOptionDesktop"
+                                                    value="subscription_credits"
+                                                    checked={paymentOption === "subscription_credits"}
+                                                    onChange={() => {
+                                                        setPaymentOption("subscription_credits")
+                                                        setFormData(prev => ({ ...prev, paymentMethod: "subscription_credits", installments: 1 }))
+                                                    }}
+                                                />
+                                            }
+                                        />
+                                    )}
                                     {!partnerInfo.mpConnected && !storefrontMethods.length ? (
                                         <div className="flex items-center gap-3 py-2">
                                             <MoneyIcon className="w-12 h-12 p-2.5 rounded-xl bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body shrink-0" />
@@ -2729,6 +2850,28 @@ export function CheckoutPageClient() {
                                         </div>
                                     )}
 
+                                    {paymentOption === "subscription_credits" && (
+                                        <div className="mt-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2">
+                                            <ListItem
+                                                icon={CrownIcon}
+                                                title="Assinatura (Créditos)"
+                                                description="Pagamento via créditos do seu plano"
+                                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                                right={
+                                                    <Button variant="link" size="sm" onClick={() => setShowPaymentModal(true)}>
+                                                        Trocar
+                                                    </Button>
+                                                }
+                                            />
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {userCredits.filter(c => new Date(c.expiresAt) > new Date() && c.remainingCredits > 0).map((c, idx) => (
+                                                    <span key={idx} className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                                                        {c.itemName}: {c.remainingCredits} restante{c.remainingCredits > 1 ? "s" : ""}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     {paymentError && (
                                         <div className="flex gap-3 mt-4 w-full">
                                             <InfoCard message={`${paymentError}`} color="red" />
@@ -3388,9 +3531,10 @@ export function CheckoutPageClient() {
                             const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
 
                             return (
-                            <Tabs defaultValue={paymentOption || (showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago")}>
-                                {showMercadoPagoTab || showTraditionalTab ? (
+                            <Tabs defaultValue={paymentOption || (hasSubscriptionCreditsForCheckout ? "subscription_credits" : showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago" | "subscription_credits")}>
+                                {(showMercadoPagoTab || showTraditionalTab || hasSubscriptionCreditsForCheckout) ? (
                                     <TabsList className="mb-4">
+                                        {hasSubscriptionCreditsForCheckout && <TabsTrigger value="subscription_credits">Usar Créditos</TabsTrigger>}
                                         {showMercadoPagoTab && <TabsTrigger value="mercadopago">Pagar Online</TabsTrigger>}
                                         {showTraditionalTab && <TabsTrigger value="traditional">{traditionalTabLabel}</TabsTrigger>}
                                     </TabsList>
@@ -3512,6 +3656,46 @@ export function CheckoutPageClient() {
                                         })}
                                     </div>
                                 </TabsContent>
+
+                                {hasSubscriptionCreditsForCheckout && (
+                                    <TabsContent value="subscription_credits" className="pt-2">
+                                        <div
+                                            onClick={() => {
+                                                setPaymentOption("subscription_credits")
+                                                setFormData(prev => ({ ...prev, paymentMethod: "subscription_credits", installments: 1 }))
+                                                setShowPaymentModal(false)
+                                            }}
+                                            className={`group rounded-2xl border p-4 transition-all cursor-pointer flex items-center gap-3 ${formData.paymentMethod === "subscription_credits" ? "border-amber-500 bg-amber-50/30 dark:bg-amber-900/10" : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-amber-400/50 dark:hover:border-amber-600/30"}`}
+                                        >
+                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/40 dark:to-amber-800/30 flex border border-amber-300 dark:border-amber-700 items-center justify-center shrink-0">
+                                                <CrownIcon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">Assinatura (Créditos)</h3>
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">Usar créditos do seu plano</p>
+                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                    {userCredits.filter(c => new Date(c.expiresAt) > new Date() && c.remainingCredits > 0).map((c, idx) => (
+                                                        <span key={idx} className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                                                            {c.itemName}: {c.remainingCredits} restante{c.remainingCredits > 1 ? 's' : ''}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="shrink-0 ml-4">
+                                                <RadioButton
+                                                    name="paymentSelect"
+                                                    value="subscription_credits"
+                                                    checked={formData.paymentMethod === "subscription_credits"}
+                                                    onChange={() => {
+                                                        setPaymentOption("subscription_credits")
+                                                        setFormData(prev => ({ ...prev, paymentMethod: "subscription_credits", installments: 1 }))
+                                                        setShowPaymentModal(false)
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                )}
                             </Tabs>
                         )
                     })()}

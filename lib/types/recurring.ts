@@ -1,6 +1,6 @@
 export type RecurringPlanStatus = "active" | "inactive" | "archived"
 export type RecurringFrequencyType = "daily" | "weekly" | "monthly" | "yearly" | "custom"
-export type RecurringSubscriptionStatus = "active" | "paused" | "cancelled" | "expired"
+export type RecurringSubscriptionStatus = "active" | "paused" | "cancelled" | "expired" | "awaiting_restock"
 export type RecurringExecutionStatus = "pending" | "processing" | "completed" | "failed"
 export type RecurringPlanItemType = "product" | "service"
 
@@ -64,6 +64,8 @@ export type RecurringSubscription = {
   notes: string | null
   createdAt: string
   updatedAt: string
+  mpPreapprovalId?: string | null
+  billingMode?: string | null
   plan?: RecurringPlan | null
   customer?: { id: string; name: string; email?: string | null } | null
 }
@@ -125,6 +127,8 @@ export function mapSubscriptionRow(row: Record<string, unknown>): RecurringSubsc
     notes: row.notes != null ? String(row.notes) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
+    mpPreapprovalId: row.mp_preapproval_id != null ? String(row.mp_preapproval_id) : null,
+    billingMode: row.billing_mode != null ? String(row.billing_mode) : null,
   }
 }
 
@@ -134,6 +138,7 @@ export function getRecurringStatusLabel(status: RecurringSubscriptionStatus): st
     case "paused": return "Pausada"
     case "cancelled": return "Cancelada"
     case "expired": return "Expirada"
+    case "awaiting_restock": return "Aguardando Reposição"
     default: return status
   }
 }

@@ -38,7 +38,7 @@ export function CommunityVideosCarousel({
       <HorizontalCarousel
         title={title}
         items={videos}
-        itemWidthClass="w-[170px] sm:w-[200px]"
+        itemWidthClass="w-[170px]"
         renderItem={(video: any) => (
           <CommunityVideoCard
             video={video}

@@ -14,7 +14,7 @@ interface SubscriptionGridCardProps {
   loadingExecutions: boolean
   executions: any[]
   onToggleHistory: (id: string) => void
-  onRunAction: (action: "pause" | "resume" | "cancel", id: string) => void
+  onRunAction: (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", id: string) => void
 }
 
 export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
@@ -30,6 +30,7 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
     if (status === "active") return "green" as const
     if (status === "paused") return "orange" as const
     if (status === "cancelled") return "red" as const
+    if (status === "awaiting_restock") return "red" as const
     return "gray" as const
   }
 
@@ -84,7 +85,19 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
               <PlayIcon size={14} className="mr-1 text-brand-green" /> Reativar
             </Button>
           )}
+
+          {canManage && sub.status === "awaiting_restock" && (
+            <Button variant="outline" size="sm" className="flex-1 h-9 border-brand-green text-brand-green hover:bg-green-50" onClick={() => onRunAction("resolve_stock", sub.id)}>
+              <PlayIcon size={14} className="mr-1 text-brand-green" /> Repor Estoque
+            </Button>
+          )}
         </div>
+
+        {canManage && sub.mpPreapprovalId && (
+          <Button variant="outline" size="sm" className="w-full h-9 text-brand-primary" onClick={() => onRunAction("sync", sub.id)}>
+            Sincronizar com Mercado Pago
+          </Button>
+        )}
 
         {canManage && sub.status !== "cancelled" && sub.status !== "expired" && (
           <Button

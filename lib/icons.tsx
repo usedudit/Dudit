@@ -1,3 +1,5 @@
+"use client"
+
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
     MenuSquareIcon as MenuSquare01,

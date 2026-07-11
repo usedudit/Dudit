@@ -42,10 +42,7 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
 
   let query = supabase
     .from("community_videos")
-    .select(`
-      *,
-      partner:partner_id(store_name, store_image_url)
-    `)
+    .select("*")
     .eq("moderation_status", "approved")
     .order("published_at", { ascending: false })
     .limit(limit + 1)
@@ -58,6 +55,26 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
   const hasMore = data ? data.length > limit : false
   const items = data ? data.slice(0, limit) as CommunityVideoItem[] : []
   const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].published_at : null
+
+  // Fetch partner data separately to avoid PostgREST schema cache issues
+  if (items.length > 0) {
+    const partnerIds = [...new Set(items.map((i) => i.partner_id).filter(Boolean))]
+    if (partnerIds.length > 0) {
+      const { data: partners } = await supabase
+        .from("partners")
+        .select("id, store_name, store_image_url")
+        .in("id", partnerIds)
+
+      type PartnerRow = { id: string; store_name: string | null; store_image_url: string | null }
+      const partnerMap = new Map<string, PartnerRow>((partners || []).map((p: PartnerRow) => [p.id, p]))
+      for (const item of items) {
+        const p = partnerMap.get(item.partner_id)
+        if (p) {
+          item.partner = { store_name: p.store_name ?? "", store_image_url: p.store_image_url }
+        }
+      }
+    }
+  }
 
   return { items, nextCursor, hasMore }
 }

@@ -252,6 +252,43 @@ async function processWebhookWithRetry(
       return
     }
 
+    // Intercept subscription preapproval payments
+    const preapprovalId = paymentInfo.preapproval_id || paymentInfo.metadata?.preapproval_id
+    if (preapprovalId) {
+      console.log(`[WEBHOOK] Detected subscription preapproval payment (${preapprovalId}) for payment ${paymentId}`)
+      
+      const { data: sub } = await supabase
+        .from("recurring_subscriptions")
+        .select("id")
+        .or(`mp_preapproval_id.eq.${preapprovalId},id.eq.${paymentInfo.external_reference || ""}`)
+        .maybeSingle()
+
+      if (sub?.id) {
+        const { processPreapprovalPaymentWebhook, processPreapprovalPaymentFailed } = await import(
+          "@/lib/services/recurring-execution.service"
+        )
+        
+        if (paymentInfo.status === "approved") {
+          const res = await processPreapprovalPaymentWebhook({
+            subscriptionId: sub.id,
+            paymentId: paymentId.toString(),
+            paymentInfo,
+            partnerId,
+          })
+          console.log(`[WEBHOOK] Preapproval payment processed:`, res)
+        } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(paymentInfo.status)) {
+          const res = await processPreapprovalPaymentFailed({
+            subscriptionId: sub.id,
+            paymentId: paymentId.toString(),
+            paymentInfo,
+            partnerId,
+          })
+          console.log(`[WEBHOOK] Preapproval payment failure processed:`, res)
+        }
+        return
+      }
+    }
+
     // ── Find order in DB ──
     let orderData = existingOrderData
     if (!orderData) {

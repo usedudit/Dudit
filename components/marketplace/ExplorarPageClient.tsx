@@ -152,6 +152,10 @@ export function ExplorarPageClient({
     }, [dbCategories])
 
     useEffect(() => {
+        const categoriesLoadedRef = { current: false }
+        if (categoriesLoadedRef.current) return
+        categoriesLoadedRef.current = true
+
         getMarketplaceCategoriesClient(null).then(cats => {
             if (cats && cats.length > 0) {
                 setDbCategories(cats)
@@ -183,6 +187,7 @@ export function ExplorarPageClient({
 
     const observerTarget = useRef<HTMLDivElement>(null)
     const MAX_ITEMS = 300 // Memory cap
+    const fetchFnMountedRef = useRef(false) // Dev-mode strict-mode guard
 
     const isLandingPage = false
 
@@ -265,7 +270,13 @@ export function ExplorarPageClient({
 
 
     // Handle city synchronization from URL/cookies/localProfile on mount
+    const citySyncDoneRef = useRef(false)
+
     useEffect(() => {
+        // Run only once on mount
+        if (citySyncDoneRef.current) return
+        citySyncDoneRef.current = true
+
         const pathCity = slug[0] || null
         const urlCity = pathCity || searchParams.get("cidade")
         if (urlCity) {
@@ -285,10 +296,13 @@ export function ExplorarPageClient({
                 .replace(/(^-|-$)/g, "")
             const userCitySlug = `${normCity}-${userProfile.state.toLowerCase()}`
 
-            document.cookie = `dudit_city=${userCitySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
-            localStorage.setItem("dudit_city", userCitySlug)
-            setSelectedCitySlug(userCitySlug)
-            updateUrl(userCitySlug, selectedCategories, query, currentType)
+            // Guard: only sync if city actually changed
+            if (userCitySlug !== selectedCitySlug) {
+                document.cookie = `dudit_city=${userCitySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+                localStorage.setItem("dudit_city", userCitySlug)
+                setSelectedCitySlug(userCitySlug)
+                updateUrl(userCitySlug, selectedCategories, query, currentType)
+            }
             return
         }
 
@@ -299,7 +313,7 @@ export function ExplorarPageClient({
             if (match) savedCity = match[1]
         }
 
-        if (savedCity) {
+        if (savedCity && savedCity !== selectedCitySlug) {
             setSelectedCitySlug(savedCity)
             updateUrl(savedCity, selectedCategories, query, currentType)
             return
@@ -315,7 +329,7 @@ export function ExplorarPageClient({
                 console.error("Error querying geolocation permission:", err)
             })
         }
-    }, [searchParams, userProfile])
+    }, [])
 
     const limitConfig = useMemo(() => {
         if (fetchType === "produtos") return { produtos: 40 } as const
@@ -358,6 +372,12 @@ export function ExplorarPageClient({
             }
         })(),
         fetchFn: async ({ cursor }) => {
+            // Dev-mode strict-mode guard: skip second synchronous call
+            if (fetchFnMountedRef.current) {
+                return { items: [], nextCursor: null, hasMore: false }
+            }
+            fetchFnMountedRef.current = true
+
             const userCoords = userProfile?.latitude && userProfile?.longitude
                 ? { lat: userProfile.latitude, lng: userProfile.longitude }
                 : null
@@ -382,7 +402,7 @@ export function ExplorarPageClient({
         },
         dedupeKey: (item) => String(item?.itemType || "") + ":" + String(item?.id || ""),
         staleTime: 30000,
-        refetchOnMount: true,
+        refetchOnMount: false,
         refetchOnWindowFocus: false,
     })
 
@@ -474,12 +494,18 @@ export function ExplorarPageClient({
 
     const matchCategory = (itemCategory: string | null, catName: string) => {
         if (!itemCategory) return false
-        // Ensure itemCategory is a string (handle case where it might be an object)
         const categoryStr = typeof itemCategory === 'string' ? itemCategory : String(itemCategory || "")
         if (!categoryStr) return false
         const normItem = categoryStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
         const normTarget = catName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-        return normItem === normTarget
+        if (normItem === normTarget) return true
+        // Fallback: check if one contains the other (for subcategory variations)
+        // Only if the difference isn't too large (avoid false positives like "casa" matching "casa & utilidades")
+        const lenDiff = Math.abs(normItem.length - normTarget.length)
+        if (lenDiff <= 8 && (normItem.includes(normTarget) || normTarget.includes(normItem))) {
+            return true
+        }
+        return false
     }
 
     const getItemCategoryNames = (item: any) => {
@@ -1036,7 +1062,7 @@ export function ExplorarPageClient({
                 {!isLandingPage && rawItems.length > 0 && <div className="lg:hidden h-[46px]" />}
 
                 {/* MAIN CONTENT */}
-                <div className="container mx-auto px-4 max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
+                <div className="container mx-auto max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
                     {/* ─── SECTIONS MODE: Discover sections on top ─── */}
                     {showExploreSections && (
                         <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
@@ -1195,180 +1221,180 @@ export function ExplorarPageClient({
                             <div
                                 key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
                                 style={{ animation: 'fadeIn 0.2s ease-out' }}
-                                >
-                                    {isLoading || (isFetching && !isFetchingNextPage) ? (
-                                        <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
-                                    ) : !selectedCitySlug ? (
-                                        <div className="flex justify-center">
-                                            <IconPlaceholder
-                                                placeholderType="image"
-                                                imageSrc="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                                                imageAlt="Onde você está?"
-                                                title="Onde você está?"
-                                                subtitle="Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização."
-                                                itemButton={{
-                                                    text: "Escolher Cidade",
+                            >
+                                {isLoading || (isFetching && !isFetchingNextPage) ? (
+                                    <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
+                                ) : !selectedCitySlug ? (
+                                    <div className="flex justify-center">
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                                            imageAlt="Onde você está?"
+                                            title="Onde você está?"
+                                            subtitle="Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização."
+                                            itemButton={{
+                                                text: "Escolher Cidade",
+                                                action: () => {
+                                                    setIsCityModalOpen(true)
+                                                },
+                                                variant: "default"
+                                            }}
+                                        />
+                                    </div>
+                                ) : rawItems.length === 0 && !isCategoryMode ? (
+                                    <div className="flex justify-center">
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
+                                            imageAlt="Estamos Chegando!"
+                                            title="Estamos Chegando!"
+                                            subtitle={emptySubtitle}
+                                            buttons={[
+                                                {
+                                                    text: "Eu vendo algo",
                                                     action: () => {
-                                                        setIsCityModalOpen(true)
+                                                        router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
                                                     },
                                                     variant: "default"
-                                                }}
-                                            />
-                                        </div>
-                                    ) : rawItems.length === 0 && !isCategoryMode ? (
-                                        <div className="flex justify-center">
-                                            <IconPlaceholder
-                                                placeholderType="image"
-                                                imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
-                                                imageAlt="Estamos Chegando!"
-                                                title="Estamos Chegando!"
-                                                subtitle={emptySubtitle}
-                                                buttons={[
-                                                    {
-                                                        text: "Eu vendo algo",
-                                                        action: () => {
-                                                            router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
-                                                        },
-                                                        variant: "default"
-                                                    },
-                                                    {
-                                                        text: "Conheço quem vende",
-                                                        action: handleInvite,
-                                                        variant: "outline"
-                                                    }
-                                                ]}
-                                            />
-                                        </div>
-                                    ) : isLandingPage ? (
-                                        <div className="space-y-12">
-                                            {/* Landing page content */}
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {/* Carrossel de Lojas Locais na Busca */}
-                                            {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
-                                                <div className="mb-6">
-                                                    <HorizontalCarousel
-                                                        title="Lojas encontradas"
-                                                        items={vitrinesDestaque}
-                                                        renderItem={(vitrine) => (
-                                                            <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
-                                                        )}
-                                                        onSeeAll={() => {
-                                                            setCurrentType("vitrines")
-                                                            updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
-                                                        }}
-                                                        itemWidthClass="w-[270px] sm:w-[320px]"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* Carrossel de Lojas Distantes na Busca */}
-                                            {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
-                                                <div className="mb-6">
-                                                    <HorizontalCarousel
-                                                        title="Lojas um pouco mais distantes do seu raio de busca"
-                                                        items={moreDistantSellers}
-                                                        renderItem={(vitrine) => (
-                                                            <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} className="w-full" />
-                                                        )}
-                                                        onSeeAll={() => {
-                                                            const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
-                                                            setSelectedCitySlug(stateSlug)
-                                                            setCurrentType("vitrines")
-                                                            updateUrl(stateSlug, selectedCategories, query, "vitrines")
-                                                        }}
-                                                        itemWidthClass="w-[270px] sm:w-[320px]"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* View Controls and Results */}
-                                            <ExplorarViewControls
-                                                viewMode={viewMode}
-                                                onViewModeChange={setViewMode}
-                                                resultsCount={filteredResults.length}
-                                            />
-
-
-                                            {filteredResults.length === 0 && !hasNextPage ? (
-                                                <div className="py-12 flex flex-col items-center">
-                                                    <IconPlaceholder
-                                                        placeholderType="image"
-                                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                        imageAlt="Nada encontrado"
-                                                        title="Nada encontrado"
-                                                        subtitle="Ainda não temos itens nessa cidade ou com essa combinação de filtros. Tente limpar os filtros ou trocar a cidade."
-                                                    />
-                                                    {activeFiltersCount > 0 && (
-                                                        <button
-                                                            onClick={clearFilters}
-                                                            className="mt-6 px-6 py-2.5 bg-brand-green text-white font-bold rounded-xl text-xs shadow-md hover:bg-brand-dark transition-colors duration-200 select-none cursor-pointer"
-                                                        >
-                                                            Limpar filtros
-                                                        </button>
+                                                },
+                                                {
+                                                    text: "Conheço quem vende",
+                                                    action: handleInvite,
+                                                    variant: "outline"
+                                                }
+                                            ]}
+                                        />
+                                    </div>
+                                ) : isLandingPage ? (
+                                    <div className="space-y-12">
+                                        {/* Landing page content */}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Carrossel de Lojas Locais na Busca */}
+                                        {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
+                                            <div className="mb-6">
+                                                <HorizontalCarousel
+                                                    title="Lojas encontradas"
+                                                    items={vitrinesDestaque}
+                                                    renderItem={(vitrine) => (
+                                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
                                                     )}
-                                                </div>
-                                            ) : (
-                                                <div className={viewMode === "grid"
-                                                    ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-3 md:gap-4 lg:gap-6 mt-4`
-                                                    : "rounded-lg border border-gray-100 bg-white mt-4"
-                                                }>
-                                                    {filteredResults.map((item, index) => {
-                                                        const resultNode = renderListingItem(item)
-                                                        const shouldInjectSearchAds = !!query && searchAds.length > 0 && index === 5
+                                                    onSeeAll={() => {
+                                                        setCurrentType("vitrines")
+                                                        updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
+                                                    }}
+                                                    itemWidthClass="w-[270px] sm:w-[320px]"
+                                                />
+                                            </div>
+                                        )}
 
-                                                        if (!shouldInjectSearchAds) return resultNode
-
-                                                        return (
-                                                            <Fragment key={`result-with-ads-${item.id}`}>
-                                                                {resultNode}
-                                                                <SponsoredAdsSearchInline ads={searchAds} />
-                                                            </Fragment>
-                                                        )
-                                                    })}
-
-                                                    {hasNextPage && (
-                                                        <div
-                                                            ref={observerTarget}
-                                                            className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
-                                                        >
-                                                            {isFetchingNextPage ? (
-                                                                <div className="flex flex-col items-center gap-2 animate-pulse">
-                                                                    <SkeletonLoader height={24} width={180} />
-                                                                    <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opcoes...</span>
-                                                                </div>
-                                                            ) : null}
-                                                        </div>
+                                        {/* Carrossel de Lojas Distantes na Busca */}
+                                        {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
+                                            <div className="mb-6">
+                                                <HorizontalCarousel
+                                                    title="Lojas um pouco mais distantes do seu raio de busca"
+                                                    items={moreDistantSellers}
+                                                    renderItem={(vitrine) => (
+                                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} className="w-full" />
                                                     )}
-                                                </div>
-                                            )}
+                                                    onSeeAll={() => {
+                                                        const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
+                                                        setSelectedCitySlug(stateSlug)
+                                                        setCurrentType("vitrines")
+                                                        updateUrl(stateSlug, selectedCategories, query, "vitrines")
+                                                    }}
+                                                    itemWidthClass="w-[270px] sm:w-[320px]"
+                                                />
+                                            </div>
+                                        )}
 
-                                            {/* Carrossel de Itens Distantes na Busca */}
-                                            {!!query && moreDistantItems.length > 0 && (
-                                                <div className="mt-12 pt-8 border-t border-gray-100">
-                                                    <HorizontalCarousel
-                                                        title="Um pouco mais distantes do seu raio de busca"
-                                                        items={moreDistantItems}
-                                                        renderItem={(item) => (
-                                                            <ItemCard
-                                                                key={item.id}
-                                                                product={item}
-                                                                userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                                                                className="w-full"
-                                                            />
-                                                        )}
-                                                        onSeeAll={() => {
-                                                            const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
-                                                            setSelectedCitySlug(stateSlug)
-                                                            updateUrl(stateSlug, selectedCategories, query, currentType)
-                                                        }}
-                                                        itemWidthClass="w-[190px] sm:w-[210px]"
-                                                    />
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
+                                        {/* View Controls and Results */}
+                                        <ExplorarViewControls
+                                            viewMode={viewMode}
+                                            onViewModeChange={setViewMode}
+                                            resultsCount={filteredResults.length}
+                                        />
+
+
+                                        {filteredResults.length === 0 && !hasNextPage ? (
+                                            <div className="py-12 flex flex-col items-center">
+                                                <IconPlaceholder
+                                                    placeholderType="image"
+                                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                    imageAlt="Nada encontrado"
+                                                    title="Nada encontrado"
+                                                    subtitle="Ainda não temos itens nessa cidade ou com essa combinação de filtros. Tente limpar os filtros ou trocar a cidade."
+                                                />
+                                                {activeFiltersCount > 0 && (
+                                                    <button
+                                                        onClick={clearFilters}
+                                                        className="mt-6 px-6 py-2.5 bg-brand-green text-white font-bold rounded-xl text-xs shadow-md hover:bg-brand-dark transition-colors duration-200 select-none cursor-pointer"
+                                                    >
+                                                        Limpar filtros
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className={viewMode === "grid"
+                                                ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-3 md:gap-4 lg:gap-6 mt-4`
+                                                : "rounded-lg border border-gray-100 bg-white mt-4"
+                                            }>
+                                                {filteredResults.map((item, index) => {
+                                                    const resultNode = renderListingItem(item)
+                                                    const shouldInjectSearchAds = !!query && searchAds.length > 0 && index === 5
+
+                                                    if (!shouldInjectSearchAds) return resultNode
+
+                                                    return (
+                                                        <Fragment key={`result-with-ads-${item.id}`}>
+                                                            {resultNode}
+                                                            <SponsoredAdsSearchInline ads={searchAds} />
+                                                        </Fragment>
+                                                    )
+                                                })}
+
+                                                {hasNextPage && (
+                                                    <div
+                                                        ref={observerTarget}
+                                                        className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
+                                                    >
+                                                        {isFetchingNextPage ? (
+                                                            <div className="flex flex-col items-center gap-2 animate-pulse">
+                                                                <SkeletonLoader height={24} width={180} />
+                                                                <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opcoes...</span>
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Carrossel de Itens Distantes na Busca */}
+                                        {!!query && moreDistantItems.length > 0 && (
+                                            <div className="mt-12 pt-8 border-t border-gray-100">
+                                                <HorizontalCarousel
+                                                    title="Um pouco mais distantes do seu raio de busca"
+                                                    items={moreDistantItems}
+                                                    renderItem={(item) => (
+                                                        <ItemCard
+                                                            key={item.id}
+                                                            product={item}
+                                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                                                            className="w-full"
+                                                        />
+                                                    )}
+                                                    onSeeAll={() => {
+                                                        const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
+                                                        setSelectedCitySlug(stateSlug)
+                                                        updateUrl(stateSlug, selectedCategories, query, currentType)
+                                                    }}
+                                                    itemWidthClass="w-[190px] sm:w-[210px]"
+                                                />
+                                            </div>
+                                        )}
+                                    </>
+                                )}
 
                             </div>
                         </div>

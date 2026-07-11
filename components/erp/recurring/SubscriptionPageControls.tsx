@@ -13,8 +13,8 @@ import {
 } from "@/lib/icons"
 
 interface SubscriptionPageControlsProps {
-  statusFilter: "all" | "active" | "paused" | "cancelled" | "expired"
-  setStatusFilter: (status: "all" | "active" | "paused" | "cancelled" | "expired") => void
+  statusFilter: "all" | "active" | "paused" | "cancelled" | "expired" | "awaiting_restock"
+  setStatusFilter: (status: "all" | "active" | "paused" | "cancelled" | "expired" | "awaiting_restock") => void
   search: string
   onSearchChange: (value: string) => void
   viewMode: "list" | "grid"
@@ -43,6 +43,9 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
             </TabsTrigger>
             <TabsTrigger value="paused" icon={CancelCircleIcon}>
               Pausadas
+            </TabsTrigger>
+            <TabsTrigger value="awaiting_restock" icon={BlockedIcon}>
+              Sem Estoque
             </TabsTrigger>
             <TabsTrigger value="cancelled" icon={BlockedIcon}>
               Canceladas

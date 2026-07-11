@@ -42,7 +42,7 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
           .limit(500),
         supabase
           .from("coupons")
-          .select("id, code, usage_count, max_uses, discount_type, discount_value, is_active")
+          .select("id, code, max_uses, discount_type, discount_value, is_active")
           .eq("partner_id", partnerId)
           .eq("is_active", true)
           .limit(200),
@@ -84,7 +84,7 @@ const getCachedMarketingData = cache(async (partnerId: string, period: Period = 
 
       const coupons = couponsResult.data || []
       const totalCoupons = coupons.length
-      const usedCoupons = coupons.filter((c: any) => (c.usage_count || 0) > 0).length
+      const usedCoupons = coupons.filter((c: any) => (usageByCoupon.get(c.id) || 0) > 0).length
       const usageRate = totalCoupons > 0 ? Math.round((usedCoupons / totalCoupons) * 100) : 0
 
       const couponUsages = couponUsagesResult.data || []

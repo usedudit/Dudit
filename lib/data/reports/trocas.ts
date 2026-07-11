@@ -30,14 +30,14 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
       const [periodReturnsResult, prevReturnsResult, ordersResult, prevOrdersResult] = await Promise.all([
         supabase
           .from("return_requests")
-          .select("id, customer_name, reason_code, status, refund_amount, total_amount, created_at")
+          .select("id, customer_name_snapshot, reason_code, status, refund_amount, total_amount, created_at")
           .eq("partner_id", partnerId)
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(300),
         supabase
           .from("return_requests")
-          .select("id, customer_name, reason_code, status, refund_amount, total_amount, created_at")
+          .select("id, customer_name_snapshot, reason_code, status, refund_amount, total_amount, created_at")
           .eq("partner_id", partnerId)
           .gte("created_at", `${previousFrom}T00:00:00`)
           .lt("created_at", `${from}T00:00:00`)
@@ -153,7 +153,7 @@ const getCachedReturnsData = cache(async (partnerId: string, period: Period = "m
           .map(([key, value]) => ({ label: statusLabels[key] || key, value })),
         recentReturns: periodReturns.slice(0, 8).map((r: any) => ({
           id: r.id,
-          customer: r.customer_name || "Cliente",
+          customer: r.customer_name_snapshot || "Cliente",
           reason: reasonLabels[r.reason_code] || r.reason_code,
           amount: brl(money(r.refund_amount ?? r.total_amount)),
           status: statusLabels[r.status] || r.status,

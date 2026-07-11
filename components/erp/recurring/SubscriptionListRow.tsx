@@ -15,7 +15,7 @@ interface SubscriptionListRowProps {
   loadingExecutions: boolean
   executions: any[]
   onToggleHistory: (id: string) => void
-  onRunAction: (action: "pause" | "resume" | "cancel", id: string) => void
+  onRunAction: (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", id: string) => void
 }
 
 export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
@@ -32,6 +32,7 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
     if (status === "active") return "green" as const
     if (status === "paused") return "orange" as const
     if (status === "cancelled") return "red" as const
+    if (status === "awaiting_restock") return "red" as const
     return "gray" as const
   }
 
@@ -92,6 +93,12 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
               <ClockIcon size={14} className="mr-1" /> Histórico
             </Button>
 
+            {canManage && sub.mpPreapprovalId && (
+              <Button variant="outline" size="sm" className="h-8 px-3.5 text-brand-primary" onClick={() => onRunAction("sync", sub.id)}>
+                Sincronizar
+              </Button>
+            )}
+
             {canManage && sub.status === "active" && (
               <Button variant="outline" size="sm" className="h-8 px-3.5" onClick={() => onRunAction("pause", sub.id)}>
                 <BlockedIcon size={14} className="mr-1 text-brand-orange" /> Pausar
@@ -101,6 +108,12 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
             {canManage && sub.status === "paused" && (
               <Button variant="outline" size="sm" className="h-8 px-3.5" onClick={() => onRunAction("resume", sub.id)}>
                 <PlayIcon size={14} className="mr-1 text-brand-green" /> Reativar
+              </Button>
+            )}
+
+            {canManage && sub.status === "awaiting_restock" && (
+              <Button variant="outline" size="sm" className="h-8 px-3.5 border-brand-green text-brand-green hover:bg-green-50" onClick={() => onRunAction("resolve_stock", sub.id)}>
+                <PlayIcon size={14} className="mr-1 text-brand-green" /> Resolver Estoque
               </Button>
             )}
 

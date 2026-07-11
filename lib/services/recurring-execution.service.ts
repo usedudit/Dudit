@@ -7,7 +7,7 @@ import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { increment_usage_counter } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
-import { getDateComponents, getDefaultTimezone, startOfDay } from "@/lib/date"
+import { getDateComponents, getDefaultTimezone } from "@/lib/date"
 
 export type ClaimedRecurringExecution = {
   executionId: string
@@ -35,96 +35,118 @@ type PlanItemRow = {
   sort_order: number
 }
 
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(":").map(Number)
-  const total = h * 60 + m + minutes
-  const nh = Math.floor(total / 60) % 24
-  const nm = total % 60
-  return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}:00`
-}
+/**
+ * Checks stock availability for all products in the items list.
+ * Returns deficit details if stock is insufficient.
+ */
+export async function checkStockAvailability(
+  supabase: SupabaseClient,
+  partnerId: string,
+  items: PlanItemRow[]
+): Promise<{ available: boolean; deficit: Array<{ product_id: string; variant_id: string | null; name: string; quantity_demanded: number; quantity_available: number; quantity_missing: number }> }> {
+  const deficit: Array<{
+    product_id: string
+    variant_id: string | null
+    name: string
+    quantity_demanded: number
+    quantity_available: number
+    quantity_missing: number
+  }> = []
 
-function scheduledDateParts(iso: string, tz?: string): { date: string; time: string } {
-  const { year, month, day, hour, minute } = getDateComponents(iso, tz || getDefaultTimezone())
+  const productItems = items.filter(i => i.item_type === "product")
+  const productIds = productItems.map(i => i.product_id).filter(Boolean) as string[]
+  const variantIds = productItems.map(i => i.variant_id).filter(Boolean) as string[]
+
+  if (productIds.length === 0) {
+    return { available: true, deficit: [] }
+  }
+
+  // Fetch products
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, stock_available")
+    .in("id", productIds)
+    .eq("partner_id", partnerId)
+
+  const productsMap = new Map((products || []).map(p => [p.id, p]))
+
+  // Fetch variants
+  const variantsMap = new Map<string, any>()
+  if (variantIds.length > 0) {
+    const { data: variants } = await supabase
+      .from("product_variants")
+      .select("id, variant_name, stock_available")
+      .in("id", variantIds)
+    for (const v of variants || []) {
+      variantsMap.set(v.id, v)
+    }
+  }
+
+  for (const item of productItems) {
+    const qtyDemanded = Number(item.quantity || 1)
+    let qtyAvailable = 0
+    let name = "Produto"
+
+    if (item.variant_id) {
+      const v = variantsMap.get(item.variant_id)
+      const p = productsMap.get(item.product_id!)
+      qtyAvailable = Number(v?.stock_available || 0)
+      name = p ? `${p.name} - ${v?.variant_name || "Variante"}` : "Variante"
+    } else {
+      const p = productsMap.get(item.product_id!)
+      qtyAvailable = Number(p?.stock_available || 0)
+      name = p?.name || "Produto"
+    }
+
+    if (qtyAvailable < qtyDemanded) {
+      deficit.push({
+        product_id: item.product_id!,
+        variant_id: item.variant_id || null,
+        name,
+        quantity_demanded: qtyDemanded,
+        quantity_available: qtyAvailable,
+        quantity_missing: qtyDemanded - qtyAvailable
+      })
+    }
+  }
+
   return {
-    date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-    time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`,
+    available: deficit.length === 0,
+    deficit
   }
 }
 
-async function syncAppointmentReceivable(params: {
-  supabase: SupabaseClient
-  partnerId: string
-  appointment: Record<string, unknown>
-}) {
-  const price = Number(params.appointment.price || 0)
-  if (price <= 0.009) return null
-
-  const ref = `appointment:${params.appointment.id}:receivable`
-  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
-    params.supabase,
-    params.partnerId,
-    false,
-  )
-
-  const { data: existing } = await params.supabase
-    .from("transactions")
-    .select("id")
-    .eq("partner_id", params.partnerId)
-    .eq("reference_note", ref)
-    .limit(1)
-    .maybeSingle()
-
-  if (existing?.id) return existing.id
-
-  const { data, error } = await params.supabase
-    .from("transactions")
-    .insert({
-      partner_id: params.partnerId,
-      description: String(params.appointment.service_name || "Serviço"),
-      category: "Vendas",
-      customer_id: params.appointment.customer_id || null,
-      contact_type: "customer",
-      amount: price,
-      due_date: params.appointment.start_date,
-      payment_date: null,
-      transaction_date: startOfDay(String(params.appointment.start_date), getDefaultTimezone()).toISOString(),
-      status: "pending",
-      payment_type: "Agendamento",
-      original_amount: price,
-      interest_amount: null,
-      fee_amount: 0,
-      transaction_type: "income",
-      origin: "system",
-      reference_note: ref,
-      account_id: financeAccountId || null,
-      created_by_user_id: null,
-    })
-    .select("id")
-    .single()
-
-  if (error) throw error
-  return data?.id || null
-}
-
+/**
+ * Creates the order for a recurring execution cycle containing products and services.
+ */
 async function createRecurringOrder(params: {
   supabase: SupabaseClient
   claim: ClaimedRecurringExecution
-  productItems: PlanItemRow[]
+  items: PlanItemRow[]
   customer: { id: string; name: string; user_id?: string | null }
   financeAccountId: string
+  situation?: "pending" | "paid"
 }) {
-  const { supabase, claim, productItems, customer, financeAccountId } = params
+  const { supabase, claim, items, customer, financeAccountId, situation = "pending" } = params
+
+  const productItems = items.filter(i => i.item_type === "product")
+  const serviceItems = items.filter(i => i.item_type === "service")
 
   const productIds = productItems.map((i) => i.product_id).filter(Boolean) as string[]
   const variantIds = productItems.map((i) => i.variant_id).filter(Boolean) as string[]
+  const serviceIds = serviceItems.map((i) => i.service_id).filter(Boolean) as string[]
 
-  // Fetch products with cost_price for unit_cost snapshot
+  // 1. Fetch products data
   const { data: products } = await supabase
     .from("products")
     .select("id, name, price, cost_price")
     .in("id", productIds)
     .eq("partner_id", claim.partnerId)
 
+  const productsMap = new Map((products || []).map((p) => [p.id, p]))
+  const productCostMap = new Map((products || []).map((p) => [p.id, Number(p.cost_price || 0)]))
+
+  // 2. Fetch variants data
   const variantsMap = new Map<string, { name: string; price: number }>()
   const variantCostMap = new Map<string, number>()
   if (variantIds.length > 0) {
@@ -138,12 +160,19 @@ async function createRecurringOrder(params: {
     }
   }
 
-  const productsMap = new Map((products || []).map((p) => [p.id, p]))
-  const productCostMap = new Map((products || []).map((p) => [p.id, Number(p.cost_price || 0)]))
+  // 3. Fetch services data
+  const { data: services } = await supabase
+    .from("services")
+    .select("id, name, price")
+    .in("id", serviceIds)
+    .eq("partner_id", claim.partnerId)
+
+  const servicesMap = new Map((services || []).map((s) => [s.id, s]))
 
   const orderItemsPayload: Array<Record<string, unknown>> = []
   const pricingItems: import("@/lib/services/pricing-engine").PricingItem[] = []
 
+  // Process Products
   for (const item of productItems) {
     const product = productsMap.get(item.product_id!)
     if (!product) throw new Error(`Produto ${item.product_id} indisponível`)
@@ -175,6 +204,39 @@ async function createRecurringOrder(params: {
       subtotal: lineSubtotal,
       sort_order: item.sort_order ?? 0,
       unit_cost: unitCost,
+      line_type: "product"
+    })
+  }
+
+  // Process Services
+  for (const item of serviceItems) {
+    const service = servicesMap.get(item.service_id!)
+    if (!service) throw new Error(`Serviço ${item.service_id} indisponível`)
+
+    const unitPrice = item.unit_price != null
+      ? Number(item.unit_price)
+      : Number(service.price || 0)
+    const qty = Number(item.quantity || 1)
+    const lineSubtotal = unitPrice * qty
+
+    pricingItems.push({
+      serviceId: item.service_id,
+      unitPrice,
+      quantity: qty,
+      basePrice: unitPrice,
+    })
+
+    orderItemsPayload.push({
+      product_id: null,
+      variant_id: null,
+      product_name: service.name,
+      product_price: unitPrice,
+      quantity: qty,
+      subtotal: lineSubtotal,
+      sort_order: item.sort_order ?? 0,
+      unit_cost: 0,
+      service_id: item.service_id,
+      line_type: "service_booking"
     })
   }
 
@@ -183,9 +245,8 @@ async function createRecurringOrder(params: {
     shippingCost: 0,
   })
   const totalAmount = pricingResult.finalTotal
-  const subtotal = pricingResult.subtotal
 
-  // Fetch delivery_payer for snapshot
+  // Fetch delivery settings
   const { data: deliverySettings } = await supabase
     .from("delivery_settings")
     .select("delivery_payer")
@@ -194,19 +255,16 @@ async function createRecurringOrder(params: {
 
   const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
 
-  // For recurring orders, no seller commission (system-generated)
-  const sellerCommissionAmount = 0
-
   const orderPayload: Record<string, unknown> = {
     partner_id: claim.partnerId,
     buyer_id: customer.user_id || null,
     customer_name: customer.name,
     order_source: "Assinatura",
     delivery_type: claim.deliveryType,
-    situation: "pending",
+    situation: situation,
     delivery_status: claim.deliveryType === "pickup" ? "delivered" : "not_sent",
     total_amount: totalAmount,
-    paid_amount: 0,
+    paid_amount: situation === "paid" ? totalAmount : 0,
     discount_value: 0,
     discount_type: "fixed",
     discount_amount: 0,
@@ -221,7 +279,7 @@ async function createRecurringOrder(params: {
     recurring_execution_id: claim.executionId,
     pricing_version: pricingResult.pricingVersion,
     delivery_payer: deliveryPayer,
-    seller_commission_amount: sellerCommissionAmount,
+    seller_commission_amount: 0,
   }
 
   const { data: order, error: orderError } = await supabase
@@ -243,23 +301,26 @@ async function createRecurringOrder(params: {
     throw itemsError
   }
 
-  const stockItems = productItems.map((item) => ({
-    product_id: item.product_id!,
-    variant_id: item.variant_id || null,
-    quantity: Number(item.quantity || 1),
-  }))
+  // Reserve stock for products if stock is sufficient and order is not immediately finalized
+  if (productItems.length > 0 && situation !== "paid") {
+    const stockItems = productItems.map((item) => ({
+      product_id: item.product_id!,
+      variant_id: item.variant_id || null,
+      quantity: Number(item.quantity || 1),
+    }))
 
-  const reserveResult = await reserveOrderInventory({
-    client: supabase as any,
-    partnerId: claim.partnerId,
-    orderId: order.id,
-    items: stockItems,
-  })
+    const reserveResult = await reserveOrderInventory({
+      client: supabase as any,
+      partnerId: claim.partnerId,
+      orderId: order.id,
+      items: stockItems,
+    })
 
-  if ("error" in reserveResult) {
-    await supabase.from("order_items").delete().eq("order_id", order.id)
-    await supabase.from("orders").delete().eq("id", order.id)
-    throw new Error(reserveResult.error)
+    if ("error" in reserveResult) {
+      await supabase.from("order_items").delete().eq("order_id", order.id)
+      await supabase.from("orders").delete().eq("id", order.id)
+      throw new Error(reserveResult.error)
+    }
   }
 
   await logAuditEvent({
@@ -278,131 +339,29 @@ async function createRecurringOrder(params: {
   return order.id as string
 }
 
-async function createRecurringAppointments(params: {
-  supabase: SupabaseClient
-  claim: ClaimedRecurringExecution
-  serviceItems: PlanItemRow[]
-  customer: { id: string; name: string }
-}) {
-  const { supabase, claim, serviceItems, customer } = params
-  const { date, time } = scheduledDateParts(claim.scheduledFor)
-  const appointmentIds: string[] = []
-
-  const serviceIds = serviceItems.map((i) => i.service_id).filter(Boolean) as string[]
-  const { data: services } = await supabase
-    .from("services")
-    .select("id, name, price, duration_minutes")
-    .in("id", serviceIds)
-    .eq("partner_id", claim.partnerId)
-
-  const servicesMap = new Map((services || []).map((s) => [s.id, s]))
-
-  const { data: subscription } = await supabase
-    .from("recurring_subscriptions")
-    .select("sales_channel")
-    .eq("id", claim.subscriptionId)
-    .maybeSingle()
-
-  const appointmentSalesChannel =
-    subscription?.sales_channel === "online_storefront" ? "online_storefront" : "booking"
-
-  for (const item of serviceItems) {
-    const service = servicesMap.get(item.service_id!)
-    if (!service) throw new Error(`Serviço ${item.service_id} indisponível`)
-
-    if (!item.staff_partner_user_id) {
-      throw new Error(`Profissional não configurado para o serviço ${service.name}`)
-    }
-
-    const { data: staff } = await supabase
-      .from("partner_users")
-      .select("id, user_id")
-      .eq("id", item.staff_partner_user_id)
-      .eq("partner_id", claim.partnerId)
-      .maybeSingle()
-
-    if (!staff?.id) throw new Error("Profissional da assinatura inválido")
-
-    let staffName = "Profissional"
-    if (staff.user_id) {
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("full_name")
-        .eq("user_id", staff.user_id)
-        .maybeSingle()
-      if (profile?.full_name) staffName = profile.full_name
-    }
-
-    const duration = item.duration_minutes ?? Number(service.duration_minutes || 60)
-    const startTime = item.preferred_time || time
-    const endTime = addMinutesToTime(startTime, duration)
-    const price = item.unit_price != null ? Number(item.unit_price) : Number(service.price || 0)
-
-    const { data: appointment, error } = await supabase
-      .from("appointments")
-      .insert({
-        partner_id: claim.partnerId,
-        customer_id: customer.id,
-        customer_name: customer.name,
-        service_name: service.name,
-        start_date: date,
-        start_time: startTime,
-        end_date: date,
-        end_time: endTime,
-        duration_minutes: duration,
-        staff_partner_user_id: staff.id,
-        staff_name: staffName,
-        status: "Reservado",
-        price,
-        pricing_unit: "Por Serviço",
-        notes: "Agendamento gerado automaticamente por assinatura recorrente.",
-        source: "appointment",
-        sales_channel: appointmentSalesChannel,
-        recurring_subscription_id: claim.subscriptionId,
-        recurring_execution_id: claim.executionId,
-      })
-      .select("*")
-      .single()
-
-    if (error) throw error
-
-    if (price > 0.009) {
-      const receivableId = await syncAppointmentReceivable({
-        supabase,
-        partnerId: claim.partnerId,
-        appointment,
-      })
-      if (receivableId) {
-        await supabase
-          .from("appointments")
-          .update({ receivable_transaction_id: receivableId })
-          .eq("id", appointment.id)
-      }
-    }
-
-    await logAuditEvent({
-      partnerId: claim.partnerId,
-      actorUserId: null,
-      entityType: "appointment",
-      entityId: appointment.id,
-      actionType: "created",
-      changeLines: [`agendamento recorrente gerado automaticamente para ${customer.name}.`],
-      source: "system",
-      metadata: { recurring_subscription_id: claim.subscriptionId, recurring_execution_id: claim.executionId },
-    })
-
-    appointmentIds.push(appointment.id)
-  }
-
-  if (appointmentIds.length > 0) {
-    increment_usage_counter(claim.partnerId, "appointments_month_count", appointmentIds.length).catch(console.error)
-  }
-
-  return appointmentIds
-}
-
 export async function executeRecurringClaim(claim: ClaimedRecurringExecution): Promise<void> {
   const supabase = getAdminClient()
+
+  // Get subscription details to verify billing_mode
+  const { data: subDetails } = await supabase
+    .from("recurring_subscriptions")
+    .select(`
+      id, billing_mode,
+      recurring_plans(billing_mode)
+    `)
+    .eq("id", claim.subscriptionId)
+    .single()
+
+  const billingMode = subDetails?.billing_mode || (subDetails?.recurring_plans as any)?.billing_mode || "manual"
+  if (billingMode === "auto_mercado_pago") {
+    // For auto_mercado_pago, we do NOT execute and create orders in the background.
+    // Instead, we wait for the webhook, so we transition the execution to awaiting_payment.
+    await supabase
+      .from("recurring_executions")
+      .update({ status: "awaiting_payment" })
+      .eq("id", claim.executionId)
+    return
+  }
 
   await supabase
     .from("recurring_executions")
@@ -421,52 +380,95 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
     throw new Error("Cliente da assinatura não encontrado")
   }
 
-  const { data: planItems, error: itemsError } = await supabase
-    .from("recurring_plan_items")
+  // Fetch from the versioned snapshot table recurring_subscription_items
+  let { data: items, error: itemsError } = await supabase
+    .from("recurring_subscription_items")
     .select("*")
-    .eq("plan_id", claim.recurringPlanId)
+    .eq("subscription_id", claim.subscriptionId)
     .order("sort_order", { ascending: true })
 
-  if (itemsError) throw itemsError
-  if (!planItems?.length) throw new Error("Plano sem itens configurados")
+  // Fallback for pre-existing subscriptions without snapshot items
+  if (!items || items.length === 0) {
+    const { data: planItems, error: fallbackErr } = await supabase
+      .from("recurring_plan_items")
+      .select("*")
+      .eq("plan_id", claim.recurringPlanId)
+      .order("sort_order", { ascending: true })
 
-  const productItems = planItems.filter((i: any) => i.item_type === "product") as PlanItemRow[]
-  const serviceItems = planItems.filter((i: any) => i.item_type === "service") as PlanItemRow[]
+    if (fallbackErr) throw fallbackErr
+    items = (planItems || []) as any[]
+  }
+
+  if (!items?.length) throw new Error("Assinatura sem itens configurados")
+
+  const productItems = items.filter((i: any) => i.item_type === "product") as PlanItemRow[]
+  const serviceItems = items.filter((i: any) => i.item_type === "service") as PlanItemRow[]
 
   let financeAccountId = claim.financeAccountId
   if (!financeAccountId) {
     financeAccountId = await resolveMarketplaceOrderFinanceAccountId(supabase, claim.partnerId, false)
   }
-  if (productItems.length > 0 && !financeAccountId) {
-    throw new Error("Conta financeira padrão não configurada para pedidos recorrentes")
+  if ((productItems.length > 0 || serviceItems.length > 0) && !financeAccountId) {
+    throw new Error("Conta financeira padrão não configurada para faturamento de assinaturas")
+  }
+
+  // --- CHECK STOCK AVAILABILITY FIRST (Out of stock handling) ---
+  if (productItems.length > 0) {
+    const stockStatus = await checkStockAvailability(supabase, claim.partnerId, productItems)
+    if (!stockStatus.available) {
+      // 1. Put subscription in awaiting_restock status
+      await supabase
+        .from("recurring_subscriptions")
+        .update({ status: "awaiting_restock", updated_at: new Date().toISOString() })
+        .eq("id", claim.subscriptionId)
+
+      // 2. Set execution status as failed with deficit log
+      await supabase
+        .from("recurring_executions")
+        .update({
+          status: "failed",
+          error_message: "Falta de estoque para itens físicos da assinatura.",
+          restock_deficit: stockStatus.deficit,
+          completed_at: new Date().toISOString()
+        })
+        .eq("id", claim.executionId)
+
+      await logAuditEvent({
+        partnerId: claim.partnerId,
+        actorUserId: null,
+        entityType: "recurring_subscription",
+        entityId: claim.subscriptionId,
+        actionType: "stock_shortage",
+        changeLines: ["assinatura bloqueada por falta de estoque. Aguardando reposição."],
+        source: "system",
+        metadata: {
+          execution_id: claim.executionId,
+          deficit: stockStatus.deficit
+        }
+      })
+
+      throw new Error(`Falta de estoque detectada. Assinatura colocada em "Aguardando reposição".`)
+    }
   }
 
   let orderId: string | null = null
-  let appointmentIds: string[] | null = null
 
-  if (productItems.length > 0) {
+  // Mixed or Product / Service plans generate a billing order
+  if (items.length > 0) {
     orderId = await createRecurringOrder({
       supabase,
       claim,
-      productItems,
+      items: items as PlanItemRow[],
       customer,
       financeAccountId: financeAccountId!,
     })
   }
 
-  if (serviceItems.length > 0) {
-    appointmentIds = await createRecurringAppointments({
-      supabase,
-      claim,
-      serviceItems,
-      customer,
-    })
-  }
-
+  // Complete execution
   const { error: completeError } = await supabase.rpc("complete_recurring_execution", {
     p_execution_id: claim.executionId,
     p_order_id: orderId,
-    p_appointment_ids: appointmentIds,
+    p_appointment_ids: null, // Appointments are created when client books using credits
   })
 
   if (completeError) throw completeError
@@ -477,15 +479,13 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
     entityType: "recurring_subscription",
     entityId: claim.subscriptionId,
     actionType: "recurring_executed",
-    changeLines: ["execução automática de assinatura concluída."],
+    changeLines: ["execução automática de assinatura concluída com sucesso."],
     source: "system",
     metadata: {
       execution_id: claim.executionId,
       order_id: orderId,
-      appointment_ids: appointmentIds,
     },
   })
-
 }
 
 export async function failRecurringClaim(executionId: string, errorMessage: string): Promise<void> {
@@ -519,6 +519,14 @@ export async function processDueRecurringExecutions(limit = 100): Promise<{
   completed: number
   failed: number
 }> {
+  const supabase = getAdminClient()
+  try {
+    const { expireObsoleteCreditsGlobally } = await import("@/lib/services/credit.service")
+    await expireObsoleteCreditsGlobally(supabase)
+  } catch (sweepErr) {
+    console.error("[recurring] Failed to sweep expired credits:", sweepErr)
+  }
+
   const claims = await claimDueRecurringExecutions(limit)
   let completed = 0
   let failed = 0
@@ -536,4 +544,291 @@ export async function processDueRecurringExecutions(limit = 100): Promise<{
   }
 
   return { claimed: claims.length, completed, failed }
+}
+
+/**
+ * Handle approved preapproval payments (webhook/sync) inside a transaction.
+ */
+export async function processPreapprovalPaymentWebhook(params: {
+  subscriptionId: string
+  paymentId: string
+  paymentInfo: any
+  partnerId: string
+}): Promise<{ success: boolean; message: string }> {
+  const supabase = getAdminClient()
+
+  // 1. Idempotency Check: search if there is already an order for this payment
+  const { data: existingOrder } = await supabase
+    .from("orders")
+    .select("id, situation")
+    .eq("mp_payment_id", params.paymentId)
+    .maybeSingle()
+
+  if (existingOrder) {
+    console.log(`[preapproval-webhook] Payment ${params.paymentId} already processed (order: ${existingOrder.id}), skipping.`)
+    return { success: true, message: "Já processado" }
+  }
+
+  // 2. Lock the subscription row to prevent race conditions
+  const { data: sub, error: subErr } = await supabase
+    .from("recurring_subscriptions")
+    .select(`
+      id, partner_id, customer_id, recurring_plan_id, status, billing_mode, next_execution_at, delivery_type, delivery_address,
+      customers(id, name, user_id),
+      recurring_plans(id, name, billing_mode)
+    `)
+    .eq("id", params.subscriptionId)
+    .single()
+
+  if (subErr || !sub) {
+    throw new Error(`Subscription ${params.subscriptionId} not found`)
+  }
+
+  await supabase.rpc("lock_subscription_row", { p_subscription_id: sub.id })
+
+  // 3. Find or create the execution cycle
+  let { data: exec } = await supabase
+    .from("recurring_executions")
+    .select("id, status, scheduled_for, order_id")
+    .eq("subscription_id", sub.id)
+    .in("status", ["pending", "failed", "awaiting_payment", "processing"])
+    .order("scheduled_for", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!exec) {
+    // Create new execution for next_execution_at
+    const { data: newExec, error: execErr } = await supabase
+      .from("recurring_executions")
+      .insert({
+        subscription_id: sub.id,
+        partner_id: sub.partner_id,
+        scheduled_for: sub.next_execution_at || new Date().toISOString(),
+        status: "processing"
+      })
+      .select("id, status, scheduled_for, order_id")
+      .single()
+    if (execErr) throw execErr
+    exec = newExec
+  }
+
+  // Mark execution as processing
+  await supabase
+    .from("recurring_executions")
+    .update({ status: "processing" })
+    .eq("id", exec.id)
+
+  try {
+    // 4. Fetch versioned items snapshot
+    let { data: items } = await supabase
+      .from("recurring_subscription_items")
+      .select("*")
+      .eq("subscription_id", sub.id)
+      .order("sort_order", { ascending: true })
+
+    if (!items || items.length === 0) {
+      const { data: planItems } = await supabase
+        .from("recurring_plan_items")
+        .select("*")
+        .eq("plan_id", sub.recurring_plan_id)
+        .order("sort_order", { ascending: true })
+      items = (planItems || []) as any[]
+    }
+
+    if (!items?.length) throw new Error("Assinatura sem itens")
+
+    // 5. Stock check
+    const productItems = items.filter((i: any) => i.item_type === "product") as PlanItemRow[]
+    const stockStatus = await checkStockAvailability(supabase, sub.partner_id, productItems)
+    
+    let targetSubscriptionStatus: "active" | "awaiting_restock" = "active"
+    let shortageDeficit: any = null
+
+    if (!stockStatus.available) {
+      targetSubscriptionStatus = "awaiting_restock"
+      shortageDeficit = stockStatus.deficit
+    }
+
+    // 6. Resolve default finance account
+    const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(supabase, sub.partner_id, false)
+    if (!financeAccountId) throw new Error("Conta financeira padrão não configurada")
+
+    const claimMock: ClaimedRecurringExecution = {
+      executionId: exec.id,
+      subscriptionId: sub.id,
+      partnerId: sub.partner_id,
+      customerId: sub.customer_id,
+      recurringPlanId: sub.recurring_plan_id,
+      scheduledFor: exec.scheduled_for,
+      deliveryType: (sub as any).delivery_type || "pickup",
+      deliveryAddress: (sub as any).delivery_address || null,
+      financeAccountId,
+    }
+
+    // 7. Create paid order
+    const orderId = await createRecurringOrder({
+      supabase,
+      claim: claimMock,
+      items: items as PlanItemRow[],
+      customer: {
+        id: sub.customer_id,
+        name: (sub.customers as any)?.name || "Cliente",
+        user_id: (sub.customers as any)?.user_id || null,
+      },
+      financeAccountId,
+      situation: "paid",
+    })
+
+    // Update payment method & breakdown references
+    await supabase
+      .from("orders")
+      .update({
+        mp_payment_id: params.paymentId,
+        payment_method: "Cartão de Crédito",
+        payment_provider: "Mercado Pago",
+        payment_breakdown: [{
+          method: "Cartão de Crédito",
+          amount: Number(params.paymentInfo.transaction_amount || 0),
+          provider: "Mercado Pago",
+          paymentStatus: "approved",
+          preapprovalId: params.paymentInfo.preapproval_id || null,
+          paymentId: params.paymentId,
+        }]
+      })
+      .eq("id", orderId)
+
+    // 8. Complete cycle execution
+    const { error: completeError } = await supabase.rpc("complete_recurring_execution", {
+      p_execution_id: exec.id,
+      p_order_id: orderId,
+      p_appointment_ids: null,
+    })
+    if (completeError) throw completeError
+
+    // 9. Update state based on stock shortage
+    if (!stockStatus.available) {
+      await supabase
+        .from("recurring_executions")
+        .update({
+          error_message: "Falta de estoque para itens físicos da assinatura.",
+          restock_deficit: shortageDeficit
+        })
+        .eq("id", exec.id)
+
+      await supabase
+        .from("recurring_subscriptions")
+        .update({ status: "awaiting_restock", updated_at: new Date().toISOString() })
+        .eq("id", sub.id)
+
+      await logAuditEvent({
+        partnerId: sub.partner_id,
+        actorUserId: null,
+        entityType: "recurring_subscription",
+        entityId: sub.id,
+        actionType: "stock_shortage",
+        changeLines: ["assinatura bloqueada por falta de estoque. Aguardando reposição."],
+        source: "webhook",
+        metadata: { execution_id: exec.id, deficit: shortageDeficit }
+      })
+    } else {
+      await supabase
+        .from("recurring_subscriptions")
+        .update({ status: "active", updated_at: new Date().toISOString() })
+        .eq("id", sub.id)
+    }
+
+    // Timeline logs
+    await logAuditEvent({
+      partnerId: sub.partner_id,
+      actorUserId: null,
+      entityType: "recurring_subscription",
+      entityId: sub.id,
+      actionType: "paid",
+      changeLines: [
+        `cobrança aprovada no Mercado Pago (Preapproval: ${params.paymentInfo.preapproval_id}, Pagamento: #${params.paymentId}).`,
+        `benefícios liberados e pedido gerado.`
+      ],
+      source: "webhook",
+      metadata: {
+        payment_id: params.paymentId,
+        preapproval_id: params.paymentInfo.preapproval_id,
+        order_id: orderId,
+      }
+    })
+
+    return { success: true, message: "Pagamento processado com sucesso" }
+
+  } catch (err: any) {
+    console.error("[preapproval-webhook] Error processing preapproval webhook:", err.message)
+    await supabase
+      .from("recurring_executions")
+      .update({ status: "failed", error_message: err.message })
+      .eq("id", exec.id)
+    throw err
+  }
+}
+
+/**
+ * Handle failed preapproval payments (webhook/sync).
+ */
+export async function processPreapprovalPaymentFailed(params: {
+  subscriptionId: string
+  paymentId: string
+  paymentInfo: any
+  partnerId: string
+}): Promise<{ success: boolean; message: string }> {
+  const supabase = getAdminClient()
+
+  const { data: sub } = await supabase
+    .from("recurring_subscriptions")
+    .select("id, partner_id")
+    .eq("id", params.subscriptionId)
+    .single()
+
+  if (!sub) return { success: false, message: "Subscription not found" }
+
+  await supabase
+    .from("recurring_subscriptions")
+    .update({ status: "payment_failed", updated_at: new Date().toISOString() })
+    .eq("id", sub.id)
+
+  const { data: exec } = await supabase
+    .from("recurring_executions")
+    .select("id")
+    .eq("subscription_id", sub.id)
+    .in("status", ["pending", "awaiting_payment", "processing"])
+    .order("scheduled_for", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (exec) {
+    await supabase
+      .from("recurring_executions")
+      .update({
+        status: "failed",
+        error_message: `Pagamento recusado no Mercado Pago (Status: ${params.paymentInfo.status}, Detalhe: ${params.paymentInfo.status_detail})`,
+        completed_at: new Date().toISOString()
+      })
+      .eq("id", exec.id)
+  }
+
+  await logAuditEvent({
+    partnerId: sub.partner_id,
+    actorUserId: null,
+    entityType: "recurring_subscription",
+    entityId: sub.id,
+    actionType: "payment_failed",
+    changeLines: [
+      `cobrança recusada no Mercado Pago (Status: ${params.paymentInfo.status}, Detalhe: ${params.paymentInfo.status_detail}, Pagamento: #${params.paymentId}).`,
+      `assinatura marcada como "Falha no pagamento".`
+    ],
+    source: "webhook",
+    metadata: {
+      payment_id: params.paymentId,
+      status: params.paymentInfo.status,
+      status_detail: params.paymentInfo.status_detail
+    }
+  })
+
+  return { success: true, message: "Falha de pagamento registrada" }
 }

@@ -52,3 +52,6 @@ export type { GoalReportData } from "./metas"
 
 export { getServiceOrderReportData } from "./service-orders"
 export type { ServiceOrderReportData } from "./service-orders"
+
+export { getSubscriptionReportData } from "./assinaturas"
+export type { SubscriptionReportData } from "./assinaturas"

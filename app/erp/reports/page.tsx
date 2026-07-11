@@ -20,6 +20,7 @@ import {
     getProductivityReportData,
     getServiceOrderReportData,
     getGoalReportData,
+    getSubscriptionReportData,
 } from "@/lib/data/reports"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
@@ -52,7 +53,7 @@ export default async function ERPReportsPage(props: {
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
 
-    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, stockValue] = await Promise.all([
+    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, subscriptionData, stockValue] = await Promise.all([
         checkPermission(partnerId, "products", "view").then(res => res.allowed ? getDashboardProductsData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getDashboardServicesData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "financial", "view").then(res => res.allowed ? getDashboardFinancialData(partnerId).catch(() => null) : null),
@@ -64,6 +65,7 @@ export default async function ERPReportsPage(props: {
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getProductivityReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "service_orders", "view").then(res => res.allowed ? getServiceOrderReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getGoalReportData(partnerId, period).catch(() => null) : null),
+        checkPermission(partnerId, "recurring_subscriptions", "view").then(res => res.allowed ? getSubscriptionReportData(partnerId, period).catch(() => null) : null),
         checkPermission(partnerId, "products", "view").then(async (res) => {
           if (!res.allowed) return 0
           try {
@@ -110,6 +112,7 @@ export default async function ERPReportsPage(props: {
                                 productivityData={productivityData}
                                 serviceOrdersData={serviceOrdersData}
                                 goalData={goalData}
+                                subscriptionData={subscriptionData}
                                 stockValue={stockValue}
                             />
                         </Suspense>

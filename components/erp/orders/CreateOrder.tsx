@@ -301,9 +301,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false)
 
     const [orderPromotions, setOrderPromotions] = useState<any[]>([])
+    const promotionsLoadedRef = useRef(false)
 
     useEffect(() => {
-        if (!partnerId) return
+        if (!partnerId || promotionsLoadedRef.current) return
+        promotionsLoadedRef.current = true
         listActivePromotionsForMarketplaceAction(partnerId).then(res => {
             if (Array.isArray(res)) setOrderPromotions(res)
         }).catch(() => { })

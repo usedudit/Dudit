@@ -731,14 +731,26 @@ export async function getAdminCommunityVideos(
                 moderation_status,
                 views_count,
                 clicks_count,
-                created_at,
-                partner:partner_id(store_name)
+                created_at
             `)
             .not("moderation_status", "eq", "approved")
             .order("created_at", { ascending: false })
             .range(from, to)
 
         if (error) return { success: false, error: error.message }
+
+        // Fetch partner data separately to avoid PostgREST schema cache issues
+        let partnerMap = new Map()
+        if (data && data.length > 0) {
+            const partnerIds = [...new Set(data.map((v: any) => v.partner_id).filter(Boolean))]
+            if (partnerIds.length > 0) {
+                const { data: partners } = await supabase
+                    .from("partners")
+                    .select("id, store_name")
+                    .in("id", partnerIds)
+                partnerMap = new Map((partners || []).map((p) => [p.id, p]))
+            }
+        }
 
         const mapped = (data || []).map((v: any) => ({
             id: v.id,
@@ -753,7 +765,7 @@ export async function getAdminCommunityVideos(
             views_count: v.views_count || 0,
             clicks_count: v.clicks_count || 0,
             created_at: v.created_at,
-            partner_store_name: v.partner?.store_name || "Desconhecido",
+            partner_store_name: partnerMap.get(v.partner_id)?.store_name || "Desconhecido",
         }))
 
         return { success: true, data: mapped, total: total || 0 }

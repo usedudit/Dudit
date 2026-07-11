@@ -16,9 +16,9 @@ interface CommunityVideoCardProps {
   className?: string
 }
 
-export function CommunityVideoCard({ video, onOpen, className = "w-[200px] sm:w-[230px]" }: CommunityVideoCardProps) {
+export function CommunityVideoCard({ video, onOpen, className = "w-[170px]" }: CommunityVideoCardProps) {
   const handleOpen = useCallback(() => {
-    recordVideoView(video.id).catch(() => {})
+    recordVideoView(video.id).catch(() => { })
     onOpen(video.id)
   }, [video.id, onOpen])
 

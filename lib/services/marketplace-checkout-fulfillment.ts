@@ -464,6 +464,38 @@ export async function fulfillMarketplaceOrder(
           })
         } else if (bookingResult.appointmentId) {
           result.appointmentIds!.push(bookingResult.appointmentId)
+
+          if (order.payment_method === "Assinatura (Créditos)" || order.payment_method === "subscription_credits") {
+            const { data: customer } = await supabase
+              .from("customers")
+              .select("id")
+              .eq("partner_id", order.partner_id)
+              .eq("marketplace_user_id", order.buyer_id)
+              .maybeSingle()
+
+            if (customer?.id) {
+              // Resolve serviceId from service name
+              const { data: svc } = await supabase
+                .from("services")
+                .select("id")
+                .eq("partner_id", order.partner_id)
+                .eq("name", line.bookingMetadata.serviceName)
+                .maybeSingle()
+
+              if (svc?.id) {
+                const { consumeSubscriptionCredits } = await import("@/lib/services/credit.service")
+                await consumeSubscriptionCredits(supabase, {
+                  partnerId: order.partner_id,
+                  customerId: customer.id,
+                  serviceId: svc.id,
+                  quantity: line.quantity,
+                  orderId: order.id,
+                  appointmentId: bookingResult.appointmentId,
+                  idempotencyKey: `checkout:credits:${order.id}:${bookingResult.appointmentId}`,
+                })
+              }
+            }
+          }
         }
 
         if (bookingResult.appointmentId && line.bookingMetadata) {

@@ -75,7 +75,8 @@ export function useInfiniteList<
     staleTime,
     gcTime,
     refetchOnWindowFocus,
-    refetchOnMount,
+    // Default to false when initialPage is provided (server data is fresh)
+    refetchOnMount: refetchOnMount ?? (initialPage ? false : undefined),
   })
 
   const items = useMemo(() => {

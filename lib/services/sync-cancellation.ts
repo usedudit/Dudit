@@ -11,6 +11,26 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
   supabase: SupabaseClient,
   orderId: string,
 ): Promise<void> {
+  // Refund subscription credits if any were consumed
+  try {
+    const { data: order } = await supabase
+      .from("orders")
+      .select("partner_id, buyer_id")
+      .eq("id", orderId)
+      .single()
+
+    if (order?.partner_id && order?.buyer_id) {
+      const { refundSubscriptionCredits } = await import("@/lib/services/credit.service")
+      await refundSubscriptionCredits(supabase, {
+        partnerId: order.partner_id,
+        customerId: order.buyer_id,
+        orderId,
+      })
+    }
+  } catch (err) {
+    console.error("[syncCancelledOrder] Error refunding subscription credits:", err)
+  }
+
   // 1. Fetch appointments linked to the order
   const { data: appointments, error: fetchApptsError } = await supabase
     .from("appointments")

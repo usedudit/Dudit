@@ -1179,6 +1179,19 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       metadata: { oldStatus: current.status, newStatus: normalizedStatus, paidAmount: effectivePaidAmount },
     })
 
+    if (normalizedStatus === "Cancelado" && current.status !== "Cancelado" && updated.customer_id) {
+      try {
+        const { refundSubscriptionCredits } = await import("@/lib/services/credit.service")
+        await refundSubscriptionCredits(supabase, {
+          partnerId,
+          customerId: updated.customer_id,
+          appointmentId,
+        })
+      } catch (err) {
+        console.error("[updateAppointment] Error refunding credits:", err)
+      }
+    }
+
     // -- Stock Movement Integration --
     try {
       const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
@@ -1406,6 +1419,19 @@ export async function deleteAppointmentAction(appointmentId: string, notifyClien
             onAppointmentStatusChanged(currentWithNote, current.status, "Cancelado", "manual"),
           )
           .catch(console.error)
+      }
+
+      if (current.customer_id) {
+        try {
+          const { refundSubscriptionCredits } = await import("@/lib/services/credit.service")
+          await refundSubscriptionCredits(supabase, {
+            partnerId,
+            customerId: current.customer_id,
+            appointmentId,
+          })
+        } catch (err) {
+          console.error("[deleteAppointment] Error refunding credits:", err)
+        }
       }
     }
 
