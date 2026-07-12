@@ -676,8 +676,19 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                         })
                         if (!uploadRes.ok) throw new Error("Erro ao fazer upload para R2")
 
+                        // Calculate SHA-256 hash on client to optimize performance and prevent server traffic
+                        let fileHash = ""
+                        try {
+                            const buffer = await file.arrayBuffer()
+                            const hashBuffer = await window.crypto.subtle.digest("SHA-256", buffer)
+                            const hashArray = Array.from(new Uint8Array(hashBuffer))
+                            fileHash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
+                        } catch (hashErr) {
+                            console.error("Erro ao calcular hash no cliente:", hashErr)
+                        }
+
                         const saveRes = await saveAttachmentAction(
-                            partnerId, orderId, urlRes.key, file.name, file.type, file.size, att.category || "normal"
+                            partnerId, orderId, urlRes.key, file.name, file.type, file.size, att.category || "normal", fileHash
                         )
                         if (!saveRes.success) throw new Error(saveRes.error || "Erro ao salvar anexo")
                     } catch (err: any) {

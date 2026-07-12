@@ -220,6 +220,9 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   return {
     storeName: partner.store_name,
     isQuickMode: context.isQuickMode,
+    planSlug: context.planSlug,
+    sellsProducts: context.sellsProducts,
+    sellsServices: context.sellsServices,
     greeting,
     checklist,
     cards,

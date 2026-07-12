@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-    PlusIcon,
     ShoppingCartIcon,
     Package,
     WrenchIcon,
@@ -20,57 +19,23 @@ import {
     BriefcaseIcon,
     WhatsappIcon,
     CreditCardIcon,
-    TruckIcon,
-    DownloadIcon,
     UploadSheetIcon,
+    DownloadIcon,
     HelpCircleIcon,
     LinkIcon,
     CopyIcon,
     PlayIcon,
     MailIcon,
 } from "@/lib/icons";
-import { Button, Badge, ListItem, Accordion, DefaultModal } from "@/components/reusable";
+import { Button, Badge, ListItem, FormSection, DefaultModal } from "@/components/reusable";
 import { Tooltip } from "@/components/reusable/Tooltip"
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/utils";
 import QuickModeItemCard from "./QuickModeItemCard";
 import { deleteProductAction, duplicateProductAction } from "@/app/actions/erp/products";
 import { deleteServiceAction, duplicateServiceAction } from "@/app/actions/erp/servicos";
 import AlertModal from "@/components/reusable/AlertModal";
 import { ERPPageHeader } from "@/components/erp/page-header-state";
 import { DashboardLayout } from "@/lib/dashboard-engine/types";
-
-const IconMap: Record<string, React.ComponentType<any>> = {
-    PlusIcon,
-    ShoppingCartIcon,
-    Package,
-    WrenchIcon,
-    ChevronRightIcon,
-    AlertTriangleIcon,
-    CheckCircleIcon,
-    StoreIcon,
-    QRCodeIcon,
-    SettingsIcon,
-    ShareIcon,
-    RocketIcon,
-    InfoIcon,
-    BriefcaseIcon,
-    WhatsappIcon,
-    CreditCardIcon,
-    TruckIcon,
-    DownloadIcon,
-    UploadSheetIcon,
-    HelpCircleIcon,
-    LinkIcon,
-    CopyIcon,
-    PlayIcon,
-    MailIcon,
-};
-
-function renderIcon(iconName: string, className?: string) {
-    const IconComp = IconMap[iconName] || InfoIcon;
-    return <IconComp className={className} />;
-}
 
 interface QuickModeHomeProps {
     data: DashboardLayout;
@@ -184,61 +149,6 @@ function QRCodeCard({ partnerId, storeName }: { partnerId: string; storeName: st
                     </Button>
                 </div>
             </div>
-        </div>
-    );
-}
-
-function IntegrationsCard({ integrations, isWhatsAppConnected, isMercadoPagoConnected }: {
-    integrations: DashboardLayout["integrations"];
-    isWhatsAppConnected: boolean;
-    isMercadoPagoConnected: boolean;
-}) {
-    const router = useRouter();
-
-    return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                    <LinkIcon size={20} className="text-brand-green" />
-                </div>
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Integrações</h3>
-            </div>
-
-            <div className="space-y-3">
-                <ListItem
-                    icon={WhatsappIcon}
-                    title="WhatsApp Business"
-                    description={isWhatsAppConnected ? "Conectado e recebendo pedidos" : "Conecte para receber pedidos no WhatsApp"}
-                    right={
-                        <Badge variant={isWhatsAppConnected ? "green" : "gray"}>
-                            {isWhatsAppConnected ? "Conectado" : "Desconectado"}
-                        </Badge>
-                    }
-                    onClick={() => router.push("/erp/integrations/whatsapp")}
-                    className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
-                />
-                <ListItem
-                    icon={CreditCardIcon}
-                    title="Mercado Pago"
-                    description={isMercadoPagoConnected ? "Recebendo pagamentos online" : "Conecte para receber via Pix, cartão e boleto"}
-                    right={
-                        <Badge variant={isMercadoPagoConnected ? "green" : "gray"}>
-                            {isMercadoPagoConnected ? "Conectado" : "Desconectado"}
-                        </Badge>
-                    }
-                    onClick={() => router.push("/erp/settings?tab=formas-de-pagamento")}
-                    className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
-                />
-            </div>
-
-            <Button
-                variant="ghost"
-                size="sm"
-                className="w-full mt-4 text-brand-green font-bold"
-                onClick={() => router.push("/erp/integrations")}
-            >
-                Ver todas as integrações <ChevronRightIcon size={16} />
-            </Button>
         </div>
     );
 }
@@ -402,52 +312,31 @@ function ProgressCard({
                 />
             </div>
 
-            <div className="flex flex-col gap-4 flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-3 flex-1 overflow-y-auto">
                 {checklist.items.map((item, idx) => (
-                    <div
+                    <ListItem
                         key={item.id}
-                        className={`bg-white dark:bg-dark-surface border rounded-[20px] p-5 flex items-start gap-4 transition-all shadow-sm ${
-                            item.completed
-                                ? 'border-brand-border/60 dark:border-dark-border/40 opacity-80'
-                                : 'border-brand-green/30 dark:border-brand-green/20'
-                        }`}
-                    >
-                        <div className="shrink-0 mt-0.5">
-                            {item.completed ? (
-                                <CheckCircleIcon size={22} className="text-brand-green" />
+                        left={
+                            item.completed ? (
+                                <CheckCircleIcon size={22} className="text-brand-green shrink-0" />
                             ) : (
-                                <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-green/30 dark:border-brand-green/20 flex items-center justify-center text-xs font-black text-brand-green">
+                                <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-green/30 dark:border-brand-green/20 flex items-center justify-center text-xs font-black text-brand-green shrink-0">
                                     {idx + 1}
                                 </div>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <h4 className={`text-[15px] font-bold ${item.completed ? 'text-brand-dark/70 dark:text-dark-heading/70 line-through' : 'text-brand-dark dark:text-dark-heading'}`}>
+                            )
+                        }
+                        title={
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[15px] ${item.completed ? 'line-through text-brand-dark/70 dark:text-dark-heading/70' : 'text-brand-dark dark:text-dark-heading'}`}>
                                     {item.title}
-                                </h4>
+                                </span>
                                 {item.completed && (
-                                    <Badge variant="green" className="self-start sm:self-auto text-[10px] py-0.5 px-2">Concluído</Badge>
+                                    <Badge variant="green" className="text-[10px] py-0.5 px-2">Concluído</Badge>
                                 )}
                             </div>
-                            <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-1">
-                                {item.description}
-                            </p>
-                            {item.importOptions && !item.completed && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="mt-3 text-brand-green border-brand-green hover:bg-brand-green/5 text-sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onImportClick();
-                                    }}
-                                >
-                                    <PlusIcon className="w-3.5 h-3.5" /> Ver opções de cadastro
-                                </Button>
-                            )}
-                        </div>
-                        <div className="shrink-0 ml-2">
+                        }
+                        description={item.description}
+                        right={
                             <Button
                                 variant={item.completed ? "outline" : "default"}
                                 size="sm"
@@ -455,12 +344,14 @@ function ProgressCard({
                                     e.stopPropagation();
                                     onItemClick(item);
                                 }}
-                                className={item.completed ? "text-brand-inactive-text border-brand-border h-9" : "h-9"}
+                                className={item.completed ? "text-brand-inactive-text border-brand-border h-9 shrink-0" : "h-9 shrink-0"}
                             >
                                 {item.completed ? "Configurar" : "Começar"}
                             </Button>
-                        </div>
-                    </div>
+                        }
+                        onClick={() => onItemClick(item)}
+                        className={`border-0 shadow-sm ${item.completed ? 'bg-brand-gray/20 dark:bg-dark-border/20' : 'bg-brand-green/5 dark:bg-brand-green/10'}`}
+                    />
                 ))}
             </div>
         </div>
@@ -550,64 +441,332 @@ function ImportOptionsModal({
         >
             <div className="space-y-6">
                 {sellsProducts && (
-                    <div className="space-y-4">
-                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                            <Package className="w-5 h-5 text-brand-green" />
-                            Produtos
-                        </h4>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                    <FormSection title="Produtos">
+                        <div className="space-y-3">
                             {productOptions.map((opt, idx) => (
-                                <Button
+                                <ListItem
                                     key={idx}
-                                    variant={opt.variant}
-                                    size="lg"
-                                    className="h-28 w-full justify-start gap-4 text-left rounded-2xl border-2 hover:border-brand-green/50 transition-colors"
+                                    title={opt.label}
+                                    description={opt.description}
+                                    right={<ChevronRightIcon className="text-brand-inactive-text w-5 h-5 shrink-0" />}
                                     onClick={() => handleNavigate(opt.href)}
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
-                                        {renderIcon(opt.icon, "w-6 h-6 text-brand-green")}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-bold text-brand-dark dark:text-dark-heading">{opt.label}</p>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{opt.description}</p>
-                                    </div>
-                                    <ChevronRightIcon className="text-brand-inactive-text w-5 h-5" />
-                                </Button>
+                                    className="border-brand-border"
+                                />
                             ))}
                         </div>
-                    </div>
+                    </FormSection>
                 )}
 
                 {sellsServices && (
-                    <div className="space-y-4 pt-6 border-t border-brand-border dark:border-dark-border">
-                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                            <WrenchIcon className="w-5 h-5 text-brand-green" />
-                            Serviços
-                        </h4>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                    <FormSection title="Serviços" hasSeparator={sellsProducts}>
+                        <div className="space-y-3">
                             {serviceOptions.map((opt, idx) => (
-                                <Button
+                                <ListItem
                                     key={idx}
-                                    variant={opt.variant}
-                                    size="lg"
-                                    className="h-28 w-full justify-start gap-4 text-left rounded-2xl border-2 hover:border-brand-green/50 transition-colors"
+                                    title={opt.label}
+                                    description={opt.description}
+                                    right={<ChevronRightIcon className="text-brand-inactive-text w-5 h-5 shrink-0" />}
                                     onClick={() => handleNavigate(opt.href)}
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
-                                        {renderIcon(opt.icon, "w-6 h-6 text-brand-green")}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-bold text-brand-dark dark:text-dark-heading">{opt.label}</p>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{opt.description}</p>
-                                    </div>
-                                    <ChevronRightIcon className="text-brand-inactive-text w-5 h-5" />
-                                </Button>
+                                    className="border-brand-border"
+                                />
                             ))}
                         </div>
-                    </div>
+                    </FormSection>
                 )}
             </div>
         </DefaultModal>
+    );
+}
+
+// ============================================
+// ADAPTIVE BOTTOM CARD (Plan / Integrations)
+// ============================================
+
+interface FeatureItem {
+    icon: React.ComponentType<any>;
+    title: string;
+    description: string;
+}
+
+function getFeatureList(sellsProducts: boolean, sellsServices: boolean, isQuickMode: boolean): FeatureItem[] {
+    const features: FeatureItem[] = [
+        { icon: StoreIcon, title: "Catálogo Digital", description: "Produtos e serviços com fotos e descrição" },
+        { icon: ShareIcon, title: "Perfil Compartilhável", description: "Compartilhe seu link em redes sociais" },
+        { icon: ShoppingCartIcon, title: "Pedidos Online", description: "Receba pedidos diretamente pelo sistema" },
+    ];
+
+    if (sellsProducts) {
+        features.push(
+            { icon: Package, title: "Controle de Estoque", description: "Gerencie entrada e saída de produtos" },
+            { icon: UploadSheetIcon, title: "Importação em Massa", description: "Importe produtos via planilha" },
+        );
+    }
+
+    if (sellsServices) {
+        features.push(
+            { icon: WrenchIcon, title: "Agendamento de Serviços", description: "Clientes agendam serviços online" },
+            { icon: BriefcaseIcon, title: "Ordem de Serviço", description: "Controle completo de OS" },
+        );
+    }
+
+    if (isQuickMode) {
+        features.push(
+            { icon: QRCodeIcon, title: "QR Code do Perfil", description: "QR Code para vendas rápidas" },
+            { icon: LinkIcon, title: "Link de Vendas", description: "Venda direto pelo link do perfil" },
+        );
+    } else {
+        features.push(
+            { icon: CreditCardIcon, title: "Gestão Financeira", description: "Fluxo de caixa e controle financeiro" },
+            { icon: RocketIcon, title: "DRE Simplificado", description: "Demonstração de resultados automatizada" },
+        );
+    }
+
+    return features;
+}
+
+function AdaptiveBottomCard({
+    planSlug,
+    isQuickMode,
+    sellsProducts,
+    sellsServices,
+    isWhatsAppConnected,
+    isMercadoPagoConnected,
+}: {
+    planSlug: "free" | "crescer" | "escalar";
+    isQuickMode: boolean;
+    sellsProducts: boolean;
+    sellsServices: boolean;
+    isWhatsAppConnected: boolean;
+    isMercadoPagoConnected: boolean;
+}) {
+    const router = useRouter();
+    const features = useMemo(
+        () => getFeatureList(sellsProducts, sellsServices, isQuickMode),
+        [sellsProducts, sellsServices, isQuickMode]
+    );
+    const [currentSlide, setCurrentSlide] = useState(0);
+    const [currentFeature, setCurrentFeature] = useState(0);
+
+    const slides = useMemo(() => {
+        const s: string[] = [];
+        if (planSlug === "free") s.push("upgrade-crescer");
+        if (planSlug === "crescer" || planSlug === "escalar") s.push("integrations");
+        if (planSlug === "crescer") s.push("upgrade-escalar");
+        if (planSlug === "escalar" && isQuickMode) s.push("erp-mode");
+        return s;
+    }, [planSlug, isQuickMode]);
+
+    useEffect(() => {
+        if (slides.length <= 1) return;
+        setCurrentSlide(0);
+        const interval = setInterval(() => {
+            setCurrentSlide(prev => (prev + 1) % slides.length);
+        }, 7000);
+        return () => clearInterval(interval);
+    }, [slides.length]);
+
+    useEffect(() => {
+        if (features.length <= 1) return;
+        const interval = setInterval(() => {
+            setCurrentFeature(prev => (prev + 1) % features.length);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [features.length]);
+
+    const slideId = slides[currentSlide] || slides[0];
+
+    function renderSlideContent() {
+        switch (slideId) {
+            case "upgrade-crescer":
+                return (
+                    <div className="flex flex-col items-center text-center gap-3">
+                        <Badge variant="green" className="bg-brand-green border-none text-white px-3 py-1">
+                            RECURSO PREMIUM
+                        </Badge>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                            Ative o Plano Crescer
+                        </h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais para vender mais.
+                        </p>
+                        <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-brand-green hover:bg-brand-green/90 text-white border-none mt-1"
+                            onClick={() => router.push("/erp/settings")}
+                        >
+                            Ver Planos
+                        </Button>
+                    </div>
+                );
+            case "upgrade-escalar":
+                return (
+                    <div className="flex flex-col items-center text-center gap-3">
+                        <Badge variant="green" className="bg-brand-green border-none text-white px-3 py-1">
+                            GESTÃO COMPLETA
+                        </Badge>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                            Migre para o Plano Escalar
+                        </h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            Tenha itens e pedidos ilimitados, financeiro avançado com fluxo de caixa e DRE simplificado.
+                        </p>
+                        <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-brand-green hover:bg-brand-green/90 text-white border-none mt-1"
+                            onClick={() => router.push("/erp/settings")}
+                        >
+                            Ver Planos
+                        </Button>
+                    </div>
+                );
+            case "integrations":
+                return (
+                    <div className="space-y-3">
+                        <ListItem
+                            icon={WhatsappIcon}
+                            title="WhatsApp Business"
+                            description={isWhatsAppConnected ? "Conectado e recebendo pedidos" : "Conecte para receber pedidos no WhatsApp"}
+                            right={
+                                <Badge variant={isWhatsAppConnected ? "green" : "gray"}>
+                                    {isWhatsAppConnected ? "Conectado" : "Desconectado"}
+                                </Badge>
+                            }
+                            onClick={() => router.push("/erp/integrations/whatsapp")}
+                            className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
+                        />
+                        <ListItem
+                            icon={CreditCardIcon}
+                            title="Mercado Pago"
+                            description={isMercadoPagoConnected ? "Recebendo pagamentos online" : "Conecte para receber via Pix, cartão e boleto"}
+                            right={
+                                <Badge variant={isMercadoPagoConnected ? "green" : "gray"}>
+                                    {isMercadoPagoConnected ? "Conectado" : "Desconectado"}
+                                </Badge>
+                            }
+                            onClick={() => router.push("/erp/settings?tab=formas-de-pagamento")}
+                            className="border-0 bg-transparent hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 p-3"
+                        />
+                    </div>
+                );
+            case "erp-mode":
+                return (
+                    <div className="flex flex-col items-center text-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center">
+                            <RocketIcon size={24} className="text-brand-green" />
+                        </div>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                            Modo ERP Completo
+                        </h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            Dashboard financeiro, fluxo de caixa, DRE, controle de estoque e relatórios avançados.
+                        </p>
+                        <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-brand-green hover:bg-brand-green/90 text-white border-none mt-1"
+                            onClick={() => router.push("/erp/dashboard")}
+                        >
+                            Ir para o Dashboard
+                        </Button>
+                    </div>
+                );
+            default:
+                return null;
+        }
+    }
+
+    return (
+        <div className={`bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col ${slides.length <= 1 ? '' : 'min-h-[280px]'}`}>
+            <div className="flex-1 flex flex-col justify-center">
+                {renderSlideContent()}
+            </div>
+
+            {features.length > 0 && (
+                <>
+                    <div className="border-t border-brand-border dark:border-dark-border my-4" />
+                    <div className="flex items-center gap-3 min-h-[44px]">
+                        <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                            {React.createElement(features[currentFeature].icon, {
+                                className: "w-4 h-4 text-brand-green",
+                            })}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                {features[currentFeature].title}
+                            </p>
+                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
+                                {features[currentFeature].description}
+                            </p>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {slides.length > 1 && (
+                <div className="flex items-center justify-center gap-1.5 mt-3">
+                    {slides.map((_, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => setCurrentSlide(idx)}
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentSlide ? 'bg-brand-green w-4' : 'bg-brand-border dark:bg-dark-border'}`}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ============================================
+// MODE CARD (Switch to ERP)
+// ============================================
+
+function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () => void }) {
+    const [loading, setLoading] = useState(false);
+    const { toast } = useToast();
+
+    const handleUpgrade = async () => {
+        setLoading(true);
+        try {
+            const { upgradeToERPAction } = await import("@/app/actions/erp/quick-mode");
+            const res = await upgradeToERPAction(partnerId);
+            if (res.success) {
+                toast({ title: "Modo ERP ativado!", description: "Bem-vindo ao modo ERP completo." });
+                onSuccess();
+            } else {
+                toast({ title: "Erro", description: res.error, variant: "destructive" });
+            }
+        } catch {
+            toast({ title: "Erro", description: "Não foi possível ativar o modo ERP", variant: "destructive" });
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6">
+            <div className="flex flex-col items-center text-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center">
+                    <RocketIcon size={24} className="text-brand-green" />
+                </div>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                    Desbloqueie o Modo ERP
+                </h3>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                    Migre para o modo ERP completo com dashboard financeiro, fluxo de caixa, DRE, controle de estoque e relatórios avançados.
+                </p>
+                <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-brand-green hover:bg-brand-green/90 text-white border-none w-full"
+                    onClick={handleUpgrade}
+                    disabled={loading}
+                >
+                    {loading ? "Ativando..." : "Ativar Modo ERP"}
+                </Button>
+            </div>
+        </div>
     );
 }
 
@@ -719,13 +878,12 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                 key={alert.id}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className={`border rounded-2xl p-5 flex items-start gap-4 shadow-sm transition-all ${
-                                    alert.type === "danger"
-                                        ? "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/20 dark:border-red-900/40 dark:text-red-300"
-                                        : alert.type === "warning"
-                                            ? "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300"
-                                            : "bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/40 dark:text-blue-300"
-                                }`}
+                                className={`border rounded-2xl p-5 flex items-start gap-4 shadow-sm transition-all ${alert.type === "danger"
+                                    ? "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/20 dark:border-red-900/40 dark:text-red-300"
+                                    : alert.type === "warning"
+                                        ? "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300"
+                                        : "bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/40 dark:text-blue-300"
+                                    }`}
                             >
                                 <div className="shrink-0 mt-0.5 text-brand-dark dark:text-dark-heading">
                                     <AlertTriangleIcon size={20} className={alert.type === "danger" ? "text-brand-red" : alert.type === "warning" ? "text-amber-500" : "text-blue-500"} />
@@ -739,9 +897,8 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                         variant={alert.type === "danger" ? "default" : "outline"}
                                         size="sm"
                                         onClick={() => router.push(alert.actionHref!)}
-                                        className={`shrink-0 rounded-full font-bold ${
-                                            alert.type === "danger" ? "bg-brand-red hover:bg-brand-red/90 border-none text-white" : ""
-                                        }`}
+                                        className={`shrink-0 rounded-full font-bold ${alert.type === "danger" ? "bg-brand-red hover:bg-brand-red/90 border-none text-white" : ""
+                                            }`}
                                     >
                                         {alert.actionLabel}
                                     </Button>
@@ -772,82 +929,58 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     )}
                 </div>
 
-                {/* Bottom 3 Cards - Integrations, Shortcuts, Help */}
+                {/* Adaptive Bottom Cards - Plan/Integrations, Shortcuts, Help */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <IntegrationsCard
-                        integrations={data.integrations}
-                        isWhatsAppConnected={data.integrations.find(i => i.id === "whatsapp")?.status === "connected"}
-                        isMercadoPagoConnected={data.integrations.find(i => i.id === "mercadopago")?.status === "connected"}
-                    />
+                    {/* First Column: Adaptive Card + Mode Card (if quick mode) */}
+                    <div className="flex flex-col gap-6">
+                        <AdaptiveBottomCard
+                            planSlug={data.planSlug}
+                            isQuickMode={data.isQuickMode}
+                            sellsProducts={data.sellsProducts}
+                            sellsServices={data.sellsServices}
+                            isWhatsAppConnected={data.integrations.find(i => i.id === "whatsapp")?.status === "connected"}
+                            isMercadoPagoConnected={data.integrations.find(i => i.id === "mercadopago")?.status === "connected"}
+                        />
+                        {data.isQuickMode && (
+                            <ModeCard partnerId={partnerId} onSuccess={() => router.refresh()} />
+                        )}
+                    </div>
                     <ShortcutsCard
                         shortcuts={data.shortcuts}
-                        sellsProducts={data.checklist?.items.some(i => i.importOptions?.sellsProducts) ?? true}
-                        sellsServices={data.checklist?.items.some(i => i.importOptions?.sellsServices) ?? false}
+                        sellsProducts={data.sellsProducts}
+                        sellsServices={data.sellsServices}
                     />
                     <HelpCard />
                 </div>
 
-                {/* Recomendações e Dicas */}
-                {data.recommendations.length > 0 && (
+                {/* Dicas (apenas tip, upgrade movido para o card adaptativo) */}
+                {data.recommendations.filter(r => r.variant === "tip").length > 0 && (
                     <div className="flex flex-col gap-6">
-                        {data.recommendations.map((rec) => {
-                            if (rec.variant === "upgrade") {
-                                return (
-                                    <section key={rec.id} className="bg-brand-dark dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-8 md:p-12 relative overflow-hidden text-white shadow-md">
-                                        <div className="relative z-10 max-w-2xl">
-                                            {rec.badge && (
-                                                <Badge variant="green" className="mb-4 bg-brand-green border-none text-white px-4 py-1.5 text-sm">
-                                                    {rec.badge}
-                                                </Badge>
-                                            )}
-                                            <h2 className="text-4xl font-black mb-4 leading-tight text-white">
-                                                {rec.title}
-                                            </h2>
-                                            <p className="text-slate-300 text-lg font-medium mb-8">
-                                                {rec.description}
-                                            </p>
-                                            <Button
-                                                size="lg"
-                                                className="bg-brand-green hover:bg-brand-green/90 text-white border-none h-12 px-8 text-base font-bold transition-all rounded-full"
-                                                onClick={() => router.push(rec.actionHref)}
-                                            >
-                                                {rec.actionLabel}
-                                            </Button>
-                                        </div>
-                                        <div className="absolute right-[-100px] bottom-[-100px] w-[500px] h-[500px] bg-brand-green/10 rounded-full blur-[100px]" />
-                                        <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden lg:block opacity-20">
-                                            <StoreIcon size={240} className="text-brand-green" />
-                                        </div>
-                                    </section>
-                                )
-                            } else {
-                                return (
-                                    <motion.div
-                                        key={rec.id}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green shrink-0 mt-0.5">
-                                                <InfoIcon size={22} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">
-                                                    {rec.title}
-                                                </h3>
-                                                <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed max-w-2xl">
-                                                    {rec.description}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Button variant="outline" className="shrink-0 rounded-full font-bold" onClick={() => router.push(rec.actionHref)}>
-                                            {rec.actionLabel}
-                                        </Button>
-                                    </motion.div>
-                                )
-                            }
-                        })}
+                        {data.recommendations.filter(r => r.variant === "tip").map((rec) => (
+                            <motion.div
+                                key={rec.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green shrink-0 mt-0.5">
+                                        <InfoIcon size={22} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">
+                                            {rec.title}
+                                        </h3>
+                                        <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed max-w-2xl">
+                                            {rec.description}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button variant="outline" className="shrink-0 rounded-full font-bold" onClick={() => router.push(rec.actionHref)}>
+                                    {rec.actionLabel}
+                                </Button>
+                            </motion.div>
+                        ))}
                     </div>
                 )}
 

@@ -1,14 +1,13 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useState, useRef } from "react"
 import type { SignedUrlResponse } from "@/lib/r2/server"
-
-const CLIENT_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"]
-const CLIENT_MAX_SIZE = 5 * 1024 * 1024
-const CLIENT_DANGEROUS_EXTENSIONS = [
-  ".exe", ".dll", ".bat", ".cmd", ".sh", ".js", ".html", ".htm",
-  ".php", ".svg", ".py", ".rb", ".msi", ".com", ".scr", ".vbs",
-]
+import {
+  ALL_ALLOWED_MIME_TYPES,
+  DANGEROUS_EXTENSIONS,
+  getUploadValidationRules,
+  getUploadKindFromMimeType,
+} from "@/lib/r2/config"
 
 export interface UseR2UploadOptions {
   prefix?: string
@@ -21,6 +20,7 @@ export interface UseR2UploadOptions {
 
 export interface UseR2UploadReturn {
   uploadFile: (file: File) => Promise<SignedUrlResponse & { fileName: string }>
+  cancelUpload: () => void
   isLoading: boolean
   error: Error | null
   progress: number
@@ -30,6 +30,13 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [progress, setProgress] = useState(0)
+  const xhrRef = useRef<XMLHttpRequest | null>(null)
+
+  const cancelUpload = useCallback(() => {
+    if (xhrRef.current) {
+      xhrRef.current.abort()
+    }
+  }, [])
 
   const uploadFile = useCallback(async (file: File) => {
     setIsLoading(true)
@@ -37,23 +44,27 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
     setProgress(0)
 
     try {
-      const allowedTypes = options?.allowedTypes || CLIENT_ALLOWED_TYPES
-      const maxSize = options?.maxSize || CLIENT_MAX_SIZE
+      const resolvedKind = getUploadKindFromMimeType(file.type)
+      const rules = resolvedKind ? getUploadValidationRules(resolvedKind) : null
+
+      const allowedTypes = (options?.allowedTypes || ALL_ALLOWED_MIME_TYPES) as readonly string[]
+      const maxSize = options?.maxSize || rules?.maxSize || 5 * 1024 * 1024 // 5MB fallback
 
       if (!allowedTypes.includes(file.type)) {
-        throw new Error(`Tipo de arquivo nao permitido: ${file.type}.`)
+        throw new Error(`Tipo de arquivo não permitido: ${file.type}.`)
       }
 
       if (file.size > maxSize) {
         const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
-        throw new Error(`Arquivo muito grande (${sizeMB}MB).`)
+        const maxMB = (maxSize / (1024 * 1024)).toFixed(0)
+        throw new Error(`Arquivo muito grande (${sizeMB}MB). Limite: ${maxMB}MB.`)
       }
 
-      if (file.size === 0) throw new Error("Arquivo vazio nao e permitido")
+      if (file.size === 0) throw new Error("Arquivo vazio não é permitido")
 
       const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."))
-      if (CLIENT_DANGEROUS_EXTENSIONS.includes(ext)) {
-        throw new Error(`Extensao de arquivo nao permitida: ${ext}`)
+      if (DANGEROUS_EXTENSIONS.includes(ext as any)) {
+        throw new Error(`Extensão de arquivo não permitida: ${ext}`)
       }
 
       const endpoint = options?.endpoint || "/api/r2/get-signed-url"
@@ -87,22 +98,38 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
       }
 
       const signedUrlData = (await signedUrlResponse.json()) as SignedUrlResponse
-      setProgress(10)
 
-      const uploadResponse = await fetch(signedUrlData.uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": signedUrlData.contentType || file.type,
-        },
+      // Real upload progress tracking using XMLHttpRequest
+      const xhr = new XMLHttpRequest()
+      xhrRef.current = xhr
+
+      const uploadPromise = new Promise<void>((resolve, reject) => {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const pct = Math.round((event.loaded / event.total) * 100)
+            setProgress(pct)
+          }
+        }
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve()
+          } else {
+            reject(new Error(`Erro no upload para storage: ${xhr.statusText || xhr.status}`))
+          }
+        }
+
+        xhr.onerror = () => reject(new Error("Erro de conexão durante o upload"))
+        xhr.onabort = () => reject(new Error("Upload cancelado pelo usuário"))
+
+        xhr.open("PUT", signedUrlData.uploadUrl)
+        xhr.setRequestHeader("Content-Type", signedUrlData.contentType || file.type)
+        xhr.send(file)
       })
 
-      if (!uploadResponse.ok) {
-        throw new Error(`Erro no upload: ${uploadResponse.statusText}`)
-      }
+      await uploadPromise
 
       setProgress(100)
-
       const result = {
         ...signedUrlData,
         fileName: file.name,
@@ -110,14 +137,15 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
       options?.onSuccess?.(result)
       return result
     } catch (err) {
-      const error = err instanceof Error ? err : new Error("Erro desconhecido no upload")
-      setError(error)
-      options?.onError?.(error)
-      throw error
+      const errorObj = err instanceof Error ? err : new Error("Erro desconhecido no upload")
+      setError(errorObj)
+      options?.onError?.(errorObj)
+      throw errorObj
     } finally {
       setIsLoading(false)
+      xhrRef.current = null
     }
   }, [options])
 
-  return { uploadFile, isLoading, error, progress }
+  return { uploadFile, cancelUpload, isLoading, error, progress }
 }

@@ -31,6 +31,7 @@ import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { PromotionType, DiscountType } from "@/lib/types/promotion"
 
 interface VendorPageClientProps {
     partner: any
@@ -587,6 +588,55 @@ function isItemInPromotion(item: any, promo: any, itemType: "produto" | "servico
     return false
 }
 
+function getPromotionScore(promo: any): number {
+    switch (promo.promotionType) {
+        case PromotionType.DISCOUNT:
+            if (promo.discountType === DiscountType.PERCENTAGE) {
+                return 10000 + (promo.discountValue || 0)
+            }
+            return (promo.discountValue || 0)
+        case PromotionType.BUY_X_PAY_Y: {
+            const buy = promo.buyQuantity || 1
+            const pay = promo.payQuantity || 0
+            return 20000 + ((buy - pay) / buy) * 100
+        }
+        case PromotionType.GIFT:
+            return 15000 + (promo.priority || 0)
+        default:
+            return 0
+    }
+}
+
+function pickBestSection(sections: any[]): any | null {
+    if (!sections.length) return null
+
+    const discountSections = sections.filter(
+        s => s.promotion.promotionType === PromotionType.DISCOUNT
+    )
+    const benefitSections = sections.filter(
+        s => s.promotion.promotionType === PromotionType.BUY_X_PAY_Y ||
+             s.promotion.promotionType === PromotionType.GIFT
+    )
+
+    const bestDiscount = discountSections.length > 0
+        ? discountSections.reduce((best, s) =>
+            getPromotionScore(s.promotion) > getPromotionScore(best.promotion) ? s : best
+        )
+        : null
+
+    const bestBenefit = benefitSections.length > 0
+        ? benefitSections.reduce((best, s) =>
+            getPromotionScore(s.promotion) > getPromotionScore(best.promotion) ? s : best
+        )
+        : null
+
+    if (bestDiscount && bestBenefit) {
+        return Math.random() < 0.5 ? bestDiscount : bestBenefit
+    }
+
+    return bestDiscount || bestBenefit
+}
+
 export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
     const calculatedReviewsCount = reviews?.length || 0
     const calculatedAverageRating = useMemo(() => {
@@ -687,6 +737,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             }
         }).filter(sec => sec.items.length > 0)
     }, [partnerPromotions, products, services])
+
+    const bestCampaignSection = useMemo(() => pickBestSection(campaignSections), [campaignSections])
 
     const partnerRawImage = partner.store_avatar || partner.store_image_url || partner.profile_image_url || partner.storeImageUrl || null
     const partnerProfileImageUrl = getImageUrl(partnerRawImage)
@@ -1249,7 +1301,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                     </div>
                                     {categoryFilteredItems.length > 0 ? (
                                         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4">
-                                            {categoryFilteredItems.map(item => (
+                                            {categoryFilteredItems.map((item: any) => (
                                                 <ItemCard
                                                     key={item.id}
                                                     product={normalizeItemForCard(item, partner)}
@@ -1274,11 +1326,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 <>
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
 
-                                    {/* Seção de Ofertas Relâmpago / Campanhas */}
-                                    {campaignSections.map(sec => {
-                                        const promo = sec.promotion
-                                        const items = sec.items.slice(0, 20)
-
+                                    {/* Seção de Ofertas Relâmpago / Campanhas — mostra no máximo UMA */}
+                                    {bestCampaignSection && (() => {
+                                        const promo = bestCampaignSection.promotion
+                                        const items = bestCampaignSection.items.slice(0, 20)
                                         return (
                                             <div key={promo.id} className="mb-10 w-full rounded-2xl p-4 bg-gradient-to-r from-amber-400 to-amber-300 text-brand-dark animate-fade-in shadow-md">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -1298,7 +1349,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                 </div>
 
                                                 <div className="flex gap-3 overflow-x-auto scrollbar-hide px-1 snap-x snap-mandatory">
-                                                    {items.map(item => (
+                                                    {items.map((item: any) => (
                                                         <div key={item.id} className="snap-start shrink-0">
                                                             <ItemCard
                                                                 product={normalizeItemForCard(item, partner)}
@@ -1312,7 +1363,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                 </div>
                                             </div>
                                         )
-                                    })}
+                                    })()}
 
                                     {featuredItems.length > 0 && (
                                         <div id="featured" data-category-section="featured" className="scroll-mt-[150px]">
@@ -1769,7 +1820,7 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
 
                                 {/* Thumbnails column */}
                                 <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
-                                    {galleryItems.map((item, i: number) => (
+                                    {galleryItems.map((item: any, i: number) => (
                                         <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
                                             className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
                                                 ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>

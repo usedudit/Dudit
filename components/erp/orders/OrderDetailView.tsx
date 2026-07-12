@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import {
     ChevronLeftIcon,
     ThreeDotsIcon,
-    UserIcon,
     CheckCircleIcon,
     AlertCircleIcon,
     XIcon,
@@ -20,24 +19,22 @@ import {
     TabsContent,
     TabsList,
     TabsTrigger,
-    Input,
     ListItem,
     FormSection,
     Pagination
 } from "@/components/reusable"
-import DefaultModal from "@/components/reusable/DefaultModal"
 import { usePermissions } from "@/lib/permission-context"
 
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
 import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries"
 import { OrderHistoryTab } from "./OrderHistoryTab"
+import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
 import { useNotification } from "@/hooks/use-notification"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDateTime, formatTime, formatDayMonth } from "@/lib/utils"
-import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
+import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
-
 import { useStore } from "@/lib/store-context"
 import { parseAddressString } from "./CreateOrder"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -421,7 +418,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
 
     const hasDetailedAmounts = paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined)
-    
+
     const detailedInterestAmount = hasDetailedAmounts
         ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0)
         : paymentMethodExtraAmount
@@ -686,6 +683,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="summary">Dados gerais</TabsTrigger>
                                             <TabsTrigger value="history">Histórico</TabsTrigger>
+                                            <TabsTrigger value="attachments">Anexos</TabsTrigger>
                                         </TabsList>
                                     </div>
                                 </div>
@@ -1470,25 +1468,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                         )}
                                                         {!hasDetailedAmounts && paymentMethodExtraAmount > 0 && (
-                                                             <PaymentRow
-                                                                 label="Taxa do Método"
-                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
-                                                         )}
-                                                         {hasDetailedAmounts && detailedInterestAmount > 0 && (
-                                                             <PaymentRow
-                                                                 label="Juros do Método"
-                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedInterestAmount)}</span>} />
-                                                         )}
-                                                         {hasDetailedAmounts && detailedFeeAmount > 0 && (
-                                                             <PaymentRow
-                                                                 label="Taxa do Método"
-                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFeeAmount)}</span>} />
-                                                         )}
-                                                         {hasDetailedAmounts && detailedFixedFeeAmount > 0 && (
-                                                             <PaymentRow
-                                                                 label="Custo do Método"
-                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFixedFeeAmount)}</span>} />
-                                                         )}
+                                                            <PaymentRow
+                                                                label="Taxa do Método"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
+                                                        )}
+                                                        {hasDetailedAmounts && detailedInterestAmount > 0 && (
+                                                            <PaymentRow
+                                                                label="Juros do Método"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedInterestAmount)}</span>} />
+                                                        )}
+                                                        {hasDetailedAmounts && detailedFeeAmount > 0 && (
+                                                            <PaymentRow
+                                                                label="Taxa do Método"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFeeAmount)}</span>} />
+                                                        )}
+                                                        {hasDetailedAmounts && detailedFixedFeeAmount > 0 && (
+                                                            <PaymentRow
+                                                                label="Custo do Método"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFixedFeeAmount)}</span>} />
+                                                        )}
                                                         {changeAmount > 0.009 && (
                                                             <PaymentRow
                                                                 label="Troco"
@@ -1522,6 +1520,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <TabsContent value="history" className="mt-0">
                                         <FadeIn key="history">
                                             <OrderHistoryTab entries={historyEntries} loading={historyLoading} />
+                                        </FadeIn>
+                                    </TabsContent>
+
+                                    <TabsContent value="attachments" className="mt-0">
+                                        <FadeIn key="attachments">
+                                            <OrderAttachmentsTab orderId={order.id} partnerId={partnerId} />
                                         </FadeIn>
                                     </TabsContent>
                                 </Tabs>

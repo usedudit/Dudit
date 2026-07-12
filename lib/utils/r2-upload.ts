@@ -3,12 +3,15 @@
  * Usa endpoint backend para gerar presigned URLs
  *
  * SECURITY:
- * - Client-side type validation (defense-in-depth, server is authoritative)
- * - Server enforces all validation via /api/r2/presigned-url
+ * - Client-side validation (defense-in-depth, server is authoritative)
+ * - Load dynamic validation rules from config
  */
 
-const CLIENT_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"]
-const CLIENT_MAX_SIZE = 5 * 1024 * 1024 // 5MB
+import {
+  ALL_ALLOWED_MIME_TYPES,
+  getUploadKindFromMimeType,
+  getUploadValidationRules,
+} from "@/lib/r2/config"
 
 export async function getPresignedUploadUrl(
   filename: string,
@@ -17,12 +20,14 @@ export async function getPresignedUploadUrl(
 ): Promise<{ uploadUrl: string; key: string; publicUrl: string; contentType: string } | null> {
   try {
     // Client-side pre-validation (defense-in-depth)
-    if (!CLIENT_ALLOWED_TYPES.includes(contentType)) {
+    const kind = getUploadKindFromMimeType(contentType)
+    if (!kind || !ALL_ALLOWED_MIME_TYPES.includes(contentType as any)) {
       console.error("[R2] Tipo de arquivo não permitido:", contentType)
       return null
     }
 
-    if (fileSize && fileSize > CLIENT_MAX_SIZE) {
+    const rules = getUploadValidationRules(kind)
+    if (fileSize && fileSize > rules.maxSize) {
       console.error("[R2] Arquivo muito grande:", fileSize)
       return null
     }
@@ -53,12 +58,14 @@ export async function uploadToR2(
     const signedContentType = presignedData.contentType || file.type
 
     // Client-side pre-validation
-    if (!CLIENT_ALLOWED_TYPES.includes(signedContentType)) {
+    const kind = getUploadKindFromMimeType(signedContentType)
+    if (!kind || !ALL_ALLOWED_MIME_TYPES.includes(signedContentType as any)) {
       console.error("[R2] Tipo de arquivo não permitido:", signedContentType)
       return null
     }
 
-    if (file.size > CLIENT_MAX_SIZE) {
+    const rules = getUploadValidationRules(kind)
+    if (file.size > rules.maxSize) {
       console.error("[R2] Arquivo muito grande:", file.size)
       return null
     }

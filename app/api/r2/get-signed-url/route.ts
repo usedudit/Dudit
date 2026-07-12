@@ -1,23 +1,8 @@
-/**
- * API Route: GET /api/r2/get-signed-url
- * Generates a signed URL for direct client-to-R2 upload.
- *
- * SECURITY:
- * - Authentication via requireUser() (strict)
- * - MIME type + extension validation
- * - User-scoped keys (multi-tenant isolation)
- * - Expiry capped at 120 seconds
- * - Client cannot control storage prefix
- */
-
 import { NextRequest, NextResponse } from "next/server"
 import { requireUser } from "@/lib/auth/authorization"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
+import { validateUploadRequest } from "@/lib/security/file-validator"
 import {
-  ALLOWED_MIME_TYPES,
-  ALLOWED_EXTENSIONS,
-  DANGEROUS_EXTENSIONS,
-  MAX_FILE_SIZE,
   MAX_PRESIGNED_URL_EXPIRY,
   R2_PREFIXES,
 } from "@/lib/r2/config"
@@ -54,35 +39,24 @@ export async function GET(request: NextRequest) {
       prefix = requestedPrefix
     }
 
-    // 4. VALIDATE MIME TYPE - strict allowlist
-    if (!ALLOWED_MIME_TYPES.includes(fileType as any)) {
+    // 4. UNIFIED FILE VALIDATION
+    const valResult = validateUploadRequest(fileName, fileType)
+    if (!valResult.success) {
       return NextResponse.json(
-        { error: `Tipo de arquivo não permitido. Permitidos: ${ALLOWED_MIME_TYPES.join(", ")}` },
+        { error: valResult.error },
         { status: 400 }
       )
     }
 
-    // 5. VALIDATE EXTENSION - allowlist + dangerous blocklist
-    const ext = fileName.toLowerCase().substring(fileName.lastIndexOf("."))
-    if (DANGEROUS_EXTENSIONS.includes(ext as any)) {
-      return NextResponse.json(
-        { error: "Extensão de arquivo perigosa bloqueada" },
-        { status: 400 }
-      )
-    }
-    if (!ALLOWED_EXTENSIONS.includes(ext as any)) {
-      return NextResponse.json(
-        { error: `Extensão não permitida. Permitidas: ${ALLOWED_EXTENSIONS.join(", ")}` },
-        { status: 400 }
-      )
-    }
+    const { kind } = valResult.data
 
-    // 6. GENERATE SIGNED URL - user-scoped, short expiry
+    // 5. GENERATE SIGNED URL - user-scoped, short expiry
     const result = await generateSignedUploadUrl({
       fileName,
       fileType,
       userId: user.id,
       prefix,
+      kind,
       expiresIn: MAX_PRESIGNED_URL_EXPIRY, // Capped at 120s
     })
 

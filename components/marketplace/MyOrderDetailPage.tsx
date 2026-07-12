@@ -11,6 +11,8 @@ import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
 import { cancelBuyerOrderAction, confirmOrderFulfillmentAction } from '@/app/actions/marketplace/orders';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
+import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/actions/erp/orders';
+import { FileIcon } from '@/lib/icons';
 import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
 import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
@@ -493,7 +495,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     };
 
     const [userAddresses, setUserAddresses] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<"details" | "history">("details");
+    const [activeTab, setActiveTab] = useState<"details" | "history" | "attachments">("details");
+    const [attachments, setAttachments] = useState<any[]>([]);
+    const [loadingAttachments, setLoadingAttachments] = useState(false);
 
     useEffect(() => {
         if (!order?.buyer_id) return;
@@ -505,6 +509,32 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             })
             .catch(err => console.error("Error fetching user addresses:", err));
     }, [order?.buyer_id]);
+
+    useEffect(() => {
+        if (!order?.id) return;
+        setLoadingAttachments(true);
+        getOrderAttachmentsAction(order.id)
+            .then(res => {
+                if (res.success && res.data) {
+                    setAttachments(res.data);
+                }
+            })
+            .catch(err => console.error("Erro ao carregar anexos:", err))
+            .finally(() => setLoadingAttachments(false));
+    }, [order?.id]);
+
+    const handleDownloadAttachment = async (fileKey: string, fileName: string) => {
+        try {
+            const res = await getOrderAttachmentUrlAction(order.id, fileKey)
+            if (res.success) {
+                window.open(res.downloadUrl, "_blank")
+            } else {
+                toast({ description: res.error || "Erro ao obter arquivo." })
+            }
+        } catch (err) {
+            toast({ description: "Erro ao abrir documento." })
+        }
+    }
 
     const activeSteps = getClientTimelineSteps(order).filter(s => s.active);
     const historyEntries = activeSteps.map((step, idx) => {
@@ -1205,6 +1235,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <TabsList className="mb-8">
                             <TabsTrigger value="details">Detalhes do Pedido</TabsTrigger>
                             <TabsTrigger value="history">Histórico do Pedido</TabsTrigger>
+                            {attachments.length > 0 && (
+                                <TabsTrigger value="attachments">Anexos ({attachments.length})</TabsTrigger>
+                            )}
                         </TabsList>
 
                         <TabsContent value="details" className="mt-0 focus-visible:ring-0">
@@ -1606,6 +1639,41 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     subtitle="Acompanhe todas as movimentações e alterações de status detalhadas realizadas neste pedido."
                                     emptyMessage="Nenhum histórico encontrado para este pedido."
                                 />
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="attachments" className="mt-0 focus-visible:ring-0">
+                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border">
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Anexos do Pedido</h3>
+                                {loadingAttachments ? (
+                                    <div className="flex justify-center py-8">
+                                        <Spinner className="w-8 h-8 text-brand-primary" />
+                                    </div>
+                                ) : attachments.length === 0 ? (
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum anexo encontrado para este pedido.</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                        {attachments.map((att) => (
+                                            <div
+                                                key={att.id}
+                                                onClick={() => handleDownloadAttachment(att.file_key, att.file_name)}
+                                                className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors"
+                                            >
+                                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
+                                                    <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                        {att.file_name || "Documento"}
+                                                    </p>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                        {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : "Tamanho desconhecido"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </TabsContent>
                     </Tabs>

@@ -45,6 +45,9 @@ export type AuditAction =
     | "subscription.downgraded"
     | "subscription.payment_failed"
     | "subscription.status_changed"
+    // Document uploads
+    | "document.uploaded"
+    | "document.deleted"
 
 interface AuditLogEntry {
     /** The action being logged */
@@ -84,6 +87,8 @@ const ACTION_MESSAGES: Record<string, string> = {
     "subscription.downgraded": "fez downgrade do plano.",
     "subscription.payment_failed": "pagamento da assinatura falhou.",
     "subscription.status_changed": "status da assinatura alterado.",
+    "document.uploaded": "enviou um documento.",
+    "document.deleted": "deletou um documento.",
 }
 
 // ─── Main Logger ────────────────────────────────────────────────────────────

@@ -8,7 +8,15 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
-import { R2_PREFIXES, ALLOWED_MIME_TYPES, ALLOWED_EXTENSIONS, MAX_FILE_SIZE } from "@/lib/r2/config"
+import {
+  R2_PREFIXES,
+  ALLOWED_MIME_TYPES,
+  ALLOWED_EXTENSIONS,
+  MAX_FILE_SIZE,
+  getUploadKindFromMimeType,
+  getUploadValidationRules,
+  ALL_MIME_TO_EXT,
+} from "@/lib/r2/config"
 import { createNotification } from "@/lib/services/notification.service"
 import { revalidatePath } from "next/cache"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
@@ -618,8 +626,12 @@ export async function getPresignedUploadUrlAction(
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
 
-    if (fileSize > MAX_FILE_SIZE) {
-      return { success: false, error: "Arquivo muito grande. Máximo: 5MB." }
+    const kind = getUploadKindFromMimeType(fileType) || "image"
+    const rules = getUploadValidationRules(kind)
+
+    if (fileSize > rules.maxSize) {
+      const maxMB = (rules.maxSize / (1024 * 1024)).toFixed(0)
+      return { success: false, error: `Arquivo muito grande. Máximo: ${maxMB}MB.` }
     }
 
     const result = await generateSignedUploadUrl({
@@ -627,8 +639,7 @@ export async function getPresignedUploadUrlAction(
       fileType,
       userId: user.id,
       prefix,
-      allowedMimeTypes: [...ALLOWED_MIME_TYPES, "application/pdf", "image/svg+xml"].filter(t => t !== "image/svg+xml"),
-      allowedExtensions: [...ALLOWED_EXTENSIONS, ".pdf"] as any,
+      kind,
     })
 
     return {
@@ -650,31 +661,114 @@ export async function saveAttachmentAction(
   fileType: string,
   fileSize: number,
   category?: "normal" | "antes" | "depois",
+  fileHash?: string,
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
     const admin = getAdminClient()
 
+    // Enforce plan-based attachment count limits: Max 2 for crescer, Max 5 for escalar
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+    const plan = await getPartnerPlan(partnerId)
+    const limit = plan.slug === "crescer" ? 2 : plan.slug === "escalar" ? 5 : 0
+
+    const { count, error: countErr } = await admin
+      .from("service_order_attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("service_order_id", serviceOrderId)
+
+    if (countErr) throw countErr
+
+    if ((count || 0) >= limit) {
+      return { success: false, error: `Limite de anexos excedido para o seu plano (${limit} arquivo(s)). Faça upgrade para enviar mais.` }
+    }
+
+    // 1. Compute/verify file hash on server if not provided (fallback for small files)
+    let finalHash = fileHash || ""
+    if (!finalHash && fileSize < 5 * 1024 * 1024) {
+      try {
+        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+        const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
+        const serverConfig = getR2ServerConfig()
+        const s3 = new S3Client({
+          region: "auto",
+          credentials: {
+            accessKeyId: serverConfig.accessKeyId,
+            secretAccessKey: serverConfig.secretAccessKey,
+          },
+          endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+        })
+        const obj = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+        if (obj.Body) {
+          const bytes = await obj.Body.transformToByteArray()
+          const crypto = await import("crypto")
+          finalHash = crypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex")
+        }
+        s3.destroy()
+      } catch (e) {
+        console.error("Erro ao calcular hash do R2 no fallback:", e)
+      }
+    }
+
+    // 2. Resolve safe Content-Type based on extension (ignore browser Content-Type)
+    const extension = fileKey.substring(fileKey.lastIndexOf(".")).toLowerCase()
+    const canonicalMime = Object.entries(ALL_MIME_TO_EXT).find(([_, ext]) => `.${ext}` === extension)?.[0]
+    const validatedFileType = canonicalMime || "application/octet-stream"
+
+    // 3. Save to database
     const { data, error } = await admin
       .from("service_order_attachments")
       .insert({
         service_order_id: serviceOrderId,
         file_key: fileKey,
-        file_name: fileName,
-        file_type: fileType,
+        file_name: fileName, // Stores original filename
+        file_type: validatedFileType, // Stores server-validated MIME
         file_size: fileSize,
         uploaded_by: user.id,
         category: category || "normal",
+        file_hash: finalHash,
       })
       .select("*")
       .single()
 
     if (error) throw error
+
+    // 4. Audit Log
+    const { auditLog } = await import("@/lib/security/audit-logger")
+    await auditLog({
+      action: "document.uploaded",
+      actorUserId: user.id,
+      partnerId,
+      metadata: {
+        documentType: "Anexo de OS",
+        fileName,
+        fileSize,
+        serviceOrderId,
+        fileKey,
+        fileHash: finalHash,
+        fileType: validatedFileType,
+      },
+    })
+
     revalidatePath("/erp/service-orders")
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao salvar anexo" }
+  }
+}
+
+export async function getServiceOrderAttachmentUrlAction(
+  partnerId: string,
+  fileKey: string
+): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
+  try {
+    await requirePermission(partnerId, "service_orders", "view")
+    const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+    const downloadUrl = await generateSignedDownloadUrl(fileKey)
+    return { success: true, downloadUrl }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao obter URL de download" }
   }
 }
 

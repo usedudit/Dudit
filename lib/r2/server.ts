@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  GetObjectCommand,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { getR2ServerConfig, getR2PublicUrl } from "./r2-server-config"
@@ -16,7 +17,10 @@ import {
   MAX_PRESIGNED_URL_EXPIRY,
   DEFAULT_PRESIGNED_URL_EXPIRY,
   MIME_TO_EXT,
+  ALL_MIME_TO_EXT,
   R2_PREFIXES,
+  UploadKind,
+  getUploadValidationRules,
 } from "./config"
 
 export interface SignedUrlResponse {
@@ -35,6 +39,7 @@ export interface UploadConfig {
   prefix?: string
   key?: string
   expiresIn?: number
+  kind?: UploadKind
   allowedMimeTypes?: readonly string[]
   allowedExtensions?: readonly string[]
   mimeToExt?: Record<string, string>
@@ -62,15 +67,14 @@ function createR2Client(): S3Client {
 }
 
 /**
- * Sanitize filename: strip path components, null bytes, control chars.
+ * Sanitize filename: strip path components, null bytes, control chars, RTL.
  * Returns only the basename with safe characters.
  */
 function sanitizeFileName(name: string): string {
-  // Remove path separators, null bytes, control characters
   return name
     .replace(/[\\/]/g, "")
     .replace(/\.\./g, "")
-    .replace(/[\x00-\x1f\x7f]/g, "")
+    .replace(/[\x00-\x1f\x7f\u202e\u202b\u200b]/g, "")
     .replace(/[<>:"|?*]/g, "")
     .trim()
 }
@@ -83,7 +87,7 @@ function validateAndGetExtension(
   fileName: string,
   mimeType: string,
   allowedExtensions: readonly string[] = ALLOWED_EXTENSIONS,
-  mimeToExt: Record<string, string> = MIME_TO_EXT
+  mimeToExt: Record<string, string> = ALL_MIME_TO_EXT
 ): string {
   const sanitized = sanitizeFileName(fileName)
   const dotIndex = sanitized.lastIndexOf(".")
@@ -124,6 +128,10 @@ function validateAndGetExtension(
 export async function generateSignedUploadUrl(
   config: UploadConfig
 ): Promise<SignedUrlResponse> {
+  // Resolve validation rules dynamically based on kind or fallbacks
+  const resolvedKind = config.kind || "image"
+  const defaultRules = getUploadValidationRules(resolvedKind)
+
   const {
     fileName,
     fileType,
@@ -131,9 +139,9 @@ export async function generateSignedUploadUrl(
     prefix = R2_PREFIXES.products,
     key: requestedKey,
     expiresIn: requestedExpiry,
-    allowedMimeTypes = ALLOWED_MIME_TYPES,
-    allowedExtensions = ALLOWED_EXTENSIONS,
-    mimeToExt = MIME_TO_EXT,
+    allowedMimeTypes = config.allowedMimeTypes || defaultRules.allowedMimeTypes,
+    allowedExtensions = config.allowedExtensions || defaultRules.allowedExtensions,
+    mimeToExt = config.mimeToExt || defaultRules.mimeToExt,
   } = config
 
   // 1. Validate user ID (multi-tenant isolation)
@@ -190,6 +198,31 @@ export async function generateSignedUploadUrl(
   }
 }
 
+/**
+ * Generates temporary signed download URL for private files/documents.
+ */
+export async function generateSignedDownloadUrl(
+  key: string,
+  expiresIn = 900 // 15 minutes short expiry for security
+): Promise<string> {
+  // Validate key is not empty and doesn't contain traversal
+  if (!key || key.includes("..") || key.startsWith("/")) {
+    throw new Error("Chave de arquivo inválida")
+  }
+
+  const serverConfig = getR2ServerConfig()
+  const client = createR2Client()
+  try {
+    const command = new GetObjectCommand({
+      Bucket: serverConfig.bucketName,
+      Key: key,
+    })
+    return await getSignedUrl(client, command, { expiresIn })
+  } finally {
+    client.destroy()
+  }
+}
+
 export async function deleteFileFromR2(key: string) {
   // Validate key is not empty and doesn't contain traversal
   if (!key || key.includes("..") || key.startsWith("/")) {
@@ -212,7 +245,7 @@ export async function deleteFileFromR2(key: string) {
 
 export async function getFileMetadataFromR2(key: string) {
   if (!key || key.includes("..") || key.startsWith("/")) {
-    throw new Error("Chave de arquivo invÃ¡lida")
+    throw new Error("Chave de arquivo inválida")
   }
 
   const serverConfig = getR2ServerConfig()

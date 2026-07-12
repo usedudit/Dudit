@@ -10,6 +10,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade, planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
+import { getServiceOrderAttachmentUrlAction } from "@/app/actions/erp/service-orders"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
@@ -124,6 +125,19 @@ export default function AttachmentsTab({
         onChange?.(updated, deletedIds)
     }
 
+    const handleDownloadDoc = async (fileKey: string, fileName: string) => {
+        try {
+            const res = await getServiceOrderAttachmentUrlAction(partnerId, fileKey)
+            if (res.success) {
+                window.open(res.downloadUrl, "_blank")
+            } else {
+                toast({ description: res.error || "Erro ao obter arquivo." })
+            }
+        } catch (err) {
+            toast({ description: "Erro ao abrir documento." })
+        }
+    }
+
     const grouped = (() => {
         const g: Record<string, any[]> = { normal: [], antes: [], depois: [] }
         for (const att of localAttachments || []) {
@@ -147,7 +161,14 @@ export default function AttachmentsTab({
                 {docs.map((doc) => (
                     <div
                         key={doc.id}
-                        className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative"
+                        onClick={() => {
+                            if (!doc.file && doc.file_key) {
+                                handleDownloadDoc(doc.file_key, doc.file_name || "Documento")
+                            }
+                        }}
+                        className={`flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative ${
+                            !doc.file && doc.file_key ? "cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors" : ""
+                        }`}
                     >
                         <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
                             <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -163,7 +184,10 @@ export default function AttachmentsTab({
                         {isEditing && (
                             <button
                                 type="button"
-                                onClick={() => handleDeleteDoc(doc.id)}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteDoc(doc.id)
+                                }}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg"
                             >
                                 <TrashIcon className="w-3.5 h-3.5" />

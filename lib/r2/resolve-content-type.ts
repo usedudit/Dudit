@@ -1,23 +1,47 @@
 import {
-  ALLOWED_VIDEO_MIME_TYPES,
-  VIDEO_MIME_TO_EXT,
-} from "@/lib/r2/config"
+  ALL_ALLOWED_MIME_TYPES,
+  ALL_MIME_TO_EXT,
+  UploadKind,
+  getUploadValidationRules,
+} from "./config"
 
 /**
- * Canonical Content-Type for R2 presigned PUT.
- * Must match exactly what the client sends in the Content-Type header.
+ * Resolves safe/canonical Content-Type based on filename and requested/actual type.
  */
-export function resolveVideoUploadContentType(contentType: string, filename: string): string {
+export function resolveUploadContentType(
+  contentType: string,
+  filename: string,
+  kind?: UploadKind
+): string {
   const trimmed = (contentType || "").trim()
-  if (ALLOWED_VIDEO_MIME_TYPES.includes(trimmed as (typeof ALLOWED_VIDEO_MIME_TYPES)[number])) {
-    return trimmed
-  }
 
-  const dot = filename.lastIndexOf(".")
-  const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : ""
-  for (const [mime, extension] of Object.entries(VIDEO_MIME_TO_EXT)) {
-    if (`.${extension}` === ext) return mime
+  if (kind) {
+    const rules = getUploadValidationRules(kind)
+    if (rules.allowedMimeTypes.includes(trimmed as any)) {
+      return trimmed
+    }
+    const dot = filename.lastIndexOf(".")
+    const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : ""
+    for (const [mime, extension] of Object.entries(rules.mimeToExt)) {
+      if (`.${extension}` === ext) return mime
+    }
+  } else {
+    if (ALL_ALLOWED_MIME_TYPES.includes(trimmed as any)) {
+      return trimmed
+    }
+    const dot = filename.lastIndexOf(".")
+    const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : ""
+    for (const [mime, extension] of Object.entries(ALL_MIME_TO_EXT)) {
+      if (`.${extension}` === ext) return mime
+    }
   }
 
   return trimmed
+}
+
+/**
+ * Backward-compatible helper for videos.
+ */
+export function resolveVideoUploadContentType(contentType: string, filename: string): string {
+  return resolveUploadContentType(contentType, filename, "video")
 }

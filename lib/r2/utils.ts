@@ -1,3 +1,7 @@
+import { R2_PREFIXES } from "./config"
+
+export { R2_PREFIXES } from "./config"
+
 export function buildR2ImageUrl(
   key?: string,
   publicUrl?: string,
@@ -25,17 +29,5 @@ export function isR2Url(url: string, cdnUrl?: string): boolean {
     return false
   }
 }
-
-export const R2_PREFIXES = {
-  products: "products/",
-  partners: "partners/",
-  customers: "customers/",
-  orders: "orders/",
-  temp: "temp/",
-  serviceOrders: "service-orders/",
-  serviceOrderSignatures: "service-orders/signatures/",
-  serviceOrderAttachments: "service-orders/attachments/",
-  serviceOrderPdfs: "service-orders/pdfs/",
-} as const
 
 export type R2Prefix = (typeof R2_PREFIXES)[keyof typeof R2_PREFIXES]

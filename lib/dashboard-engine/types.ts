@@ -91,6 +91,9 @@ export interface DashboardRecommendation {
 export interface DashboardLayout {
   storeName: string;
   isQuickMode: boolean;
+  planSlug: "free" | "crescer" | "escalar";
+  sellsProducts: boolean;
+  sellsServices: boolean;
   greeting: {
     title: string;
     subtitle: string;

@@ -1,13 +1,20 @@
 /**
- * File validation utilities for security
- * Production-grade: strict allowlist, dangerous extension blocklist, magic byte validation
+ * File validation utilities for security.
+ * Production-grade: strict whitelisting, double extension block, magic byte validation,
+ * path traversal protection, unicode/control char blocks, and plain text script safety scanning.
  */
 
 import {
-  ALLOWED_MIME_TYPES,
-  ALLOWED_EXTENSIONS,
+  ALL_ALLOWED_MIME_TYPES,
+  ALL_ALLOWED_EXTENSIONS,
   DANGEROUS_EXTENSIONS,
   MAX_FILE_SIZE,
+  ALLOWED_IMAGE_EXTENSIONS,
+  ALLOWED_VIDEO_EXTENSIONS,
+  ALLOWED_DOCUMENT_EXTENSIONS,
+  getUploadKindFromMimeType,
+  getUploadValidationRules,
+  UploadKind,
 } from "@/lib/r2/config"
 
 export interface FileValidationResult {
@@ -15,9 +22,9 @@ export interface FileValidationResult {
   error?: string
 }
 
-// ─── Magic Bytes for Image Format Verification ──────────────────────────────
+// ─── Magic Bytes Signatures ──────────────────────────────────────────────────
 
-const IMAGE_MAGIC_BYTES: Record<string, number[][]> = {
+const MAGIC_BYTES: Record<string, number[][]> = {
   "image/jpeg": [
     [0xff, 0xd8, 0xff], // JPEG/JFIF
   ],
@@ -27,30 +34,51 @@ const IMAGE_MAGIC_BYTES: Record<string, number[][]> = {
   "image/webp": [
     [0x52, 0x49, 0x46, 0x46], // RIFF (WebP container)
   ],
-  "image/avif": [
-    // AVIF uses ISOBMFF - magic at offset 4: "ftyp"
-    // We check bytes 4-7 for "ftyp" (0x66, 0x74, 0x79, 0x70)
+  // Documents
+  "application/pdf": [
+    [0x25, 0x50, 0x44, 0x46, 0x2d], // %PDF-
+  ],
+  "application/msword": [
+    [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1], // CFBF (.doc)
+  ],
+  "application/vnd.ms-excel": [
+    [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1], // CFBF (.xls)
+  ],
+  "application/vnd.ms-powerpoint": [
+    [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1], // CFBF (.ppt)
+  ],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    [0x50, 0x4b, 0x03, 0x04], // ZIP (.docx)
+  ],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+    [0x50, 0x4b, 0x03, 0x04], // ZIP (.xlsx)
+  ],
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
+    [0x50, 0x4b, 0x03, 0x04], // ZIP (.pptx)
+  ],
+  "application/vnd.oasis.opendocument.text": [
+    [0x50, 0x4b, 0x03, 0x04], // ZIP (.odt)
   ],
 }
 
 /**
- * Validates file type by MIME type against strict allowlist
+ * Validates file type by MIME type against strict whitelist.
  */
 export function validateFileType(
   file: File,
-  allowedTypes: readonly string[] = ALLOWED_MIME_TYPES
+  allowedTypes: readonly string[] = ALL_ALLOWED_MIME_TYPES
 ): FileValidationResult {
   if (!file.type || !allowedTypes.includes(file.type)) {
     return {
       valid: false,
-      error: `Tipo de arquivo não permitido. Tipos permitidos: ${allowedTypes.join(", ")}`,
+      error: `Tipo de arquivo não permitido.`,
     }
   }
   return { valid: true }
 }
 
 /**
- * Validates file size with strict enforcement
+ * Validates file size with strict enforcement.
  */
 export function validateFileSize(
   file: File,
@@ -74,15 +102,18 @@ export function validateFileSize(
 }
 
 /**
- * Validates file extension against allowlist AND dangerous blocklist
+ * Validates file extension against whitelist AND dangerous blocklist.
+ * Includes double extension protection check.
  */
 export function validateFileExtension(
   fileName: string,
-  allowedExtensions: readonly string[] = ALLOWED_EXTENSIONS
+  allowedExtensions: readonly string[] = ALL_ALLOWED_EXTENSIONS
 ): FileValidationResult {
-  const extension = fileName.toLowerCase().substring(fileName.lastIndexOf("."))
+  const normalizedName = fileName.toLowerCase()
+  const dotIndex = normalizedName.lastIndexOf(".")
+  const extension = dotIndex >= 0 ? normalizedName.substring(dotIndex) : ""
 
-  // First: check dangerous blocklist
+  // 1. Check dangerous blocklist
   if (DANGEROUS_EXTENSIONS.includes(extension as any)) {
     return {
       valid: false,
@@ -90,18 +121,40 @@ export function validateFileExtension(
     }
   }
 
-  // Then: check allowlist
+  // 2. Check allowlist
   if (!allowedExtensions.includes(extension)) {
     return {
       valid: false,
-      error: `Extensão de arquivo não permitida. Extensões permitidas: ${allowedExtensions.join(", ")}`,
+      error: `Extensão de arquivo não permitida.`,
     }
   }
+
+  // 3. Double extension protection
+  const parts = normalizedName.split(".")
+  if (parts.length > 2) {
+    const intermediateParts = parts.slice(1, -1)
+    const allKnownExtensions = [
+      ...DANGEROUS_EXTENSIONS,
+      ...ALLOWED_IMAGE_EXTENSIONS,
+      ...ALLOWED_VIDEO_EXTENSIONS,
+      ...ALLOWED_DOCUMENT_EXTENSIONS,
+    ]
+    for (const part of intermediateParts) {
+      const extWithDot = `.${part}`
+      if (allKnownExtensions.includes(extWithDot as any)) {
+        return {
+          valid: false,
+          error: `Nome de arquivo suspeito (possível dupla extensão): ${fileName}`,
+        }
+      }
+    }
+  }
+
   return { valid: true }
 }
 
 /**
- * Validates file name for path traversal attacks, null bytes, and control characters
+ * Validates file name for path traversal attacks, null bytes, unicode spoofing, and control characters.
  */
 export function validateFileName(fileName: string): FileValidationResult {
   // Prevent path traversal
@@ -112,7 +165,7 @@ export function validateFileName(fileName: string): FileValidationResult {
   ) {
     return {
       valid: false,
-      error: "Nome de arquivo inválido",
+      error: "Nome de arquivo inválido (tentativa de path traversal)",
     }
   }
 
@@ -120,15 +173,15 @@ export function validateFileName(fileName: string): FileValidationResult {
   if (fileName.includes("\0")) {
     return {
       valid: false,
-      error: "Nome de arquivo inválido",
+      error: "Nome de arquivo inválido (null byte)",
     }
   }
 
-  // Prevent control characters (0x00-0x1F, 0x7F)
-  if (/[\x00-\x1f\x7f]/.test(fileName)) {
+  // Prevent control characters (0x00-0x1F, 0x7F) and unicode RTLO / spoof characters
+  if (/[\x00-\x1f\x7f\u202e\u202b\u200b]/.test(fileName)) {
     return {
       valid: false,
-      error: "Nome de arquivo contém caracteres inválidos",
+      error: "Nome de arquivo contém caracteres unicode ou de controle inválidos",
     }
   }
 
@@ -144,14 +197,61 @@ export function validateFileName(fileName: string): FileValidationResult {
 }
 
 /**
- * Validates image magic bytes (file signature) to prevent MIME spoofing.
- * Call this with the first few bytes of the file buffer.
+ * Validates file magic bytes (file signature) to prevent Content-Type spoofing.
  */
 export function validateMagicBytes(
   buffer: Buffer | Uint8Array,
   declaredMimeType: string
 ): FileValidationResult {
-  // AVIF check: bytes 4-7 should be "ftyp"
+  if (buffer.length === 0) {
+    return { valid: false, error: "Arquivo vazio" }
+  }
+
+  // 1. Block known executable signatures globally (MZ, ELF, Java CAFEBABE)
+  if (buffer.length >= 2 && buffer[0] === 0x4d && buffer[1] === 0x5a) {
+    return { valid: false, error: "Arquivo executável bloqueado (MZ signature)" }
+  }
+  if (buffer.length >= 4 && buffer[0] === 0x7f && buffer[1] === 0x45 && buffer[2] === 0x4c && buffer[3] === 0x46) {
+    return { valid: false, error: "Arquivo executável bloqueado (ELF signature)" }
+  }
+  if (buffer.length >= 4 && buffer[0] === 0xca && buffer[1] === 0xfe && buffer[2] === 0xba && buffer[3] === 0xbe) {
+    return { valid: false, error: "Arquivo classe Java bloqueado (CAFEBABE signature)" }
+  }
+
+  // 2. Plain Text & CSV Validation: Scan contents to reject HTML, XML, SVG, JS scripts
+  if (declaredMimeType === "text/plain" || declaredMimeType === "text/csv") {
+    try {
+      const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
+      const lowerText = text.toLowerCase()
+      const maliciousPatterns = [
+        "<script",
+        "javascript:",
+        "<html",
+        "<svg",
+        "<?xml",
+        "onload=",
+        "onerror=",
+        "<body",
+        "<iframe>",
+      ]
+      for (const pattern of maliciousPatterns) {
+        if (lowerText.includes(pattern)) {
+          return {
+            valid: false,
+            error: `Conteúdo de texto suspeito ou malicioso detectado (${pattern})`,
+          }
+        }
+      }
+      return { valid: true }
+    } catch {
+      return {
+        valid: false,
+        error: "Falha ao decodificar conteúdo de texto",
+      }
+    }
+  }
+
+  // 3. AVIF check: bytes 4-7 should be "ftyp"
   if (declaredMimeType === "image/avif") {
     if (buffer.length >= 8) {
       const ftyp = String.fromCharCode(buffer[4], buffer[5], buffer[6], buffer[7])
@@ -165,11 +265,37 @@ export function validateMagicBytes(
     }
   }
 
-  const signatures = IMAGE_MAGIC_BYTES[declaredMimeType]
+  // 4. MP4 / MOV checks: bytes 4-7 should be "ftyp"
+  if (declaredMimeType === "video/mp4" || declaredMimeType === "video/quicktime") {
+    if (buffer.length >= 8) {
+      const ftyp = String.fromCharCode(buffer[4], buffer[5], buffer[6], buffer[7])
+      if (ftyp === "ftyp") {
+        return { valid: true }
+      }
+    }
+    return {
+      valid: false,
+      error: "Arquivo não é um vídeo MP4/MOV válido",
+    }
+  }
+
+  // 5. WebM check: starts with [0x1a, 0x45, 0xdf, 0xa3] (EBML header)
+  if (declaredMimeType === "video/webm") {
+    if (buffer.length >= 4 && buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) {
+      return { valid: true }
+    }
+    return {
+      valid: false,
+      error: "Arquivo não é um vídeo WebM válido",
+    }
+  }
+
+  // 6. Look up static signature lists
+  const signatures = MAGIC_BYTES[declaredMimeType]
   if (!signatures || signatures.length === 0) {
     return {
       valid: false,
-      error: `Tipo MIME não suportado para validação: ${declaredMimeType}`,
+      error: `Validação de assinatura não configurada para o tipo: ${declaredMimeType}`,
     }
   }
 
@@ -181,7 +307,7 @@ export function validateMagicBytes(
   if (!isValid) {
     return {
       valid: false,
-      error: `Conteúdo do arquivo não corresponde ao tipo declarado (${declaredMimeType}). Possível arquivo malicioso.`,
+      error: `Conteúdo do arquivo não corresponde ao tipo declarado (${declaredMimeType}).`,
     }
   }
 
@@ -199,9 +325,95 @@ export function validateMagicBytes(
   return { valid: true }
 }
 
+// ─── Unified Request Validation ──────────────────────────────────────────────
+
+export interface ValidatedUploadRequest {
+  kind: UploadKind
+  rules: ReturnType<typeof getUploadValidationRules>
+  extension: string
+  canonicalMime: string
+}
+
 /**
- * Comprehensive file validation (all checks combined)
+ * Single entrypoint to validate upload request parameters.
  */
+export function validateUploadRequest(
+  filename: string,
+  contentType: string,
+  fileSize?: number
+): { success: true; data: ValidatedUploadRequest } | { success: false; error: string } {
+  // 1. Filename validation
+  const nameVal = validateFileName(filename)
+  if (!nameVal.valid) {
+    return { success: false, error: nameVal.error || "Nome de arquivo inválido" }
+  }
+
+  // 2. Check supported kind
+  const kind = getUploadKindFromMimeType(contentType)
+  if (!kind) {
+    return { success: false, error: "Tipo de arquivo não permitido." }
+  }
+
+  const rules = getUploadValidationRules(kind)
+
+  // 3. Extension validations (incorporates double-extension checking)
+  const extVal = validateFileExtension(filename, rules.allowedExtensions)
+  if (!extVal.valid) {
+    return { success: false, error: extVal.error || "Extensão não permitida" }
+  }
+
+  // 4. Cross validate Extension with MIME
+  const ext = filename.toLowerCase().substring(filename.lastIndexOf("."))
+  const expectedExt = rules.mimeToExt[contentType]
+  if (expectedExt) {
+    const normalizedExt = ext === ".jpeg" ? ".jpg" : ext
+    if (normalizedExt !== `.${expectedExt}`) {
+      return { success: false, error: `Extensão ${ext} não corresponde ao tipo ${contentType}` }
+    }
+  }
+
+  // 5. Size validation
+  if (fileSize && typeof fileSize === "number") {
+    if (fileSize > rules.maxSize) {
+      const maxMB = (rules.maxSize / (1024 * 1024)).toFixed(0)
+      return { success: false, error: `Arquivo muito grande. Máximo: ${maxMB}MB` }
+    }
+    if (fileSize <= 0) {
+      return { success: false, error: "Arquivo vazio não é permitido" }
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      kind,
+      rules,
+      extension: ext,
+      canonicalMime: contentType,
+    },
+  }
+}
+
+// ─── Future Malware Scanning Prep Hook ──────────────────────────────────────────
+
+/**
+ * Placeholder interface for future asynchronous/synchronous malware scanning.
+ * This can be connected to ClamAV, a scanner microservice, or R2 Object Scanning
+ * without changing the rest of the application's code.
+ */
+export async function scanFileForMalware(
+  key: string,
+  buffer?: Buffer | Uint8Array
+): Promise<{ clean: boolean; error?: string }> {
+  // FUTURE INTEGRATION POINT:
+  // e.g. Call ClamAV REST api or execute local clamscan process:
+  // const scannerResult = await clamav.scanBuffer(buffer)
+  // if (!scannerResult.clean) return { clean: false, error: "Ameaça ou vírus de computador detectado." }
+  return { clean: true }
+}
+
+// ─── Legacy Wrappers ─────────────────────────────────────────────────────────
+
 export function validateFile(
   file: File,
   options?: {
@@ -210,39 +422,21 @@ export function validateFile(
     allowedExtensions?: readonly string[]
   }
 ): FileValidationResult {
-  // Validate file name
-  const nameValidation = validateFileName(file.name)
-  if (!nameValidation.valid) {
-    return nameValidation
-  }
+  const nameVal = validateFileName(file.name)
+  if (!nameVal.valid) return nameVal
 
-  // Validate file type
-  const typeValidation = validateFileType(file, options?.allowedTypes)
-  if (!typeValidation.valid) {
-    return typeValidation
-  }
+  const typeVal = validateFileType(file, options?.allowedTypes)
+  if (!typeVal.valid) return typeVal
 
-  // Validate file extension (allowlist + dangerous blocklist)
-  const extensionValidation = validateFileExtension(
-    file.name,
-    options?.allowedExtensions
-  )
-  if (!extensionValidation.valid) {
-    return extensionValidation
-  }
+  const extVal = validateFileExtension(file.name, options?.allowedExtensions)
+  if (!extVal.valid) return extVal
 
-  // Validate file size
-  const sizeValidation = validateFileSize(file, options?.maxSize)
-  if (!sizeValidation.valid) {
-    return sizeValidation
-  }
+  const sizeVal = validateFileSize(file, options?.maxSize)
+  if (!sizeVal.valid) return sizeVal
 
   return { valid: true }
 }
 
-/**
- * Validates base64 image data
- */
 export function validateBase64Image(
   base64Data: string,
   maxSizeMB: number = 5
@@ -254,7 +448,6 @@ export function validateBase64Image(
     }
   }
 
-  // Check if it's a valid base64 string with allowed MIME types only
   if (!/^data:image\/(jpeg|jpg|png|webp|avif);base64,/.test(base64Data)) {
     return {
       valid: false,
@@ -262,7 +455,6 @@ export function validateBase64Image(
     }
   }
 
-  // Calculate size (base64 is ~1.37x larger than binary)
   const sizeInMB = (base64Data.length * 0.75) / (1024 * 1024)
   if (sizeInMB > maxSizeMB) {
     return {
