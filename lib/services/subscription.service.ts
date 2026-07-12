@@ -7,6 +7,7 @@
  * @module subscription-service
  */
 
+import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -197,7 +198,7 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
  *
  * ⚠️ DO NOT use this for access control. Use getPartnerPlan() instead.
  */
-export async function getPartnerSubscription(partnerId: string): Promise<SubscriptionWithPlan | null> {
+export const getPartnerSubscription = cache(async (partnerId: string): Promise<SubscriptionWithPlan | null> => {
   const admin = getAdminClient()
   const { data, error } = await admin
     .from("subscriptions")
@@ -219,7 +220,7 @@ export async function getPartnerSubscription(partnerId: string): Promise<Subscri
     ...data,
     plan: data.plan as Plan,
   } as SubscriptionWithPlan
-}
+})
 
 /**
  * Get the EFFECTIVE plan for a partner - used for access control.
@@ -242,7 +243,7 @@ export async function getPartnerSubscription(partnerId: string): Promise<Subscri
  * CACHE: 10-second TTL. Webhooks force-invalidate on every status change,
  * so stale access windows are bounded to max ~10 seconds in worst case.
  */
-export async function getPartnerPlan(partnerId: string): Promise<Plan> {
+export const getPartnerPlan = cache(async (partnerId: string): Promise<Plan> => {
   const cached = getCached(partnerPlanCache.get(partnerId))
   if (cached) return cached
 
@@ -314,7 +315,7 @@ export async function getPartnerPlan(partnerId: string): Promise<Plan> {
 
   partnerPlanCache.set(partnerId, { data: plan, expiresAt: Date.now() + PARTNER_PLAN_TTL_MS })
   return plan
-}
+})
 
 /**
  * Check if a partner can use a specific feature.
@@ -347,7 +348,7 @@ export async function getLimit(partnerId: string, limitName: string): Promise<nu
  * Get the usage counters for a partner.
  * Returns null if no counters row exists yet.
  */
-export async function getUsageCounters(partnerId: string): Promise<UsageCounters | null> {
+export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCounters | null> => {
   const admin = getAdminClient()
   const { data, error } = await admin
     .from("usage_counters")
@@ -404,7 +405,7 @@ export async function getUsageCounters(partnerId: string): Promise<UsageCounters
   }
 
   return counters
-}
+})
 
 // ─── Counter name → usage_counters column mapping ───────────────────────────
 

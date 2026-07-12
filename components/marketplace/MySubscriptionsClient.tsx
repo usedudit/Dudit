@@ -534,8 +534,8 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                       </div>
 
                       <div className="mt-4 pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between text-[11px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                        <span>Adquirido em: {cred.createdAt.slice(0, 10)}</span>
-                        <span>Expira em: {cred.expiresAt.slice(0, 10)}</span>
+                        <span>Adquirido em: {cred.createdAt ? cred.createdAt.slice(0, 10) : ""}</span>
+                        <span>Expira em: {cred.expiresAt ? cred.expiresAt.slice(0, 10) : "Não expira"}</span>
                       </div>
                     </div>
                   )

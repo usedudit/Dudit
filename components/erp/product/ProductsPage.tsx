@@ -446,11 +446,16 @@ export default function ProductsPage({
         sortedProducts.slice((page - 1) * itemsPerPage, page * itemsPerPage),
         [sortedProducts, page, itemsPerPage])
 
+    const prevSortedLengthRef = useRef(0)
     useEffect(() => {
+        const lengthChanged = sortedProducts.length !== prevSortedLengthRef.current
+        prevSortedLengthRef.current = sortedProducts.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, sortedProducts.length])
 
     // --- Handlers ---
 

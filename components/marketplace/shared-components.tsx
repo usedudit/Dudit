@@ -34,10 +34,10 @@ function getProductImageUrl(images: string[] | null | undefined): string {
 
 const DURATION = 5000;
 
-export const HeroBanner: React.FC = () => {
+export const HeroBanner: React.FC<{ height?: number }> = ({ height = 300 }) => {
     return (
         <section className="mt-6 mb-12 px-4 lg:px-0 group flex justify-center w-full">
-            <div className="w-[82vw] md:w-full max-w-[1400px] h-[200px] relative rounded-[20px] overflow-hidden cursor-pointer select-none active:scale-[0.99] hover:shadow-lg transition-all duration-300">
+            <div className={`w-[82vw] md:w-full max-w-[1400px] h-[${height}px] relative rounded-[20px] overflow-hidden cursor-pointer select-none active:scale-[0.99] hover:shadow-lg transition-all duration-300`}>
                 <img
                     src="https://img.dudit.com.br/static/banners/Banner-1.png"
                     alt="Dudit Marketplace"

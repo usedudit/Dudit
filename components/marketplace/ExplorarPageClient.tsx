@@ -1093,7 +1093,7 @@ export function ExplorarPageClient({
                             </div>
 
                             {/* 2. BANNER PADRÃO (HOMEPAGE) */}
-                            <HeroBanner />
+                            <HeroBanner height={200} />
 
                             {/* 3. VÍDEOS DA COMUNIDADE */}
                             {showCommunityVideos && (

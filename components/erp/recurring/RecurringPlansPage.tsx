@@ -216,11 +216,16 @@ export default function RecurringPlansPage({
         return rawPlans.find((p) => p.id === entityState.entityId) || null
     }, [entityState.entityId, currentEntity, rawPlans])
 
+    const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
+        const lengthChanged = filteredPlans.length !== prevFilteredLengthRef.current
+        prevFilteredLengthRef.current = filteredPlans.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredPlans.length])
 
     const hasPlans = rawPlans?.length > 0
 
@@ -410,7 +415,7 @@ export default function RecurringPlansPage({
                                         <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                             <IconPlaceholder
                                                 placeholderType="image"
-                                                imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                                                imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
                                                 imageAlt="Sem planos"
                                                 title="Você ainda não tem planos"
                                                 subtitle="Crie planos de recorrência para vender produtos ou agendar serviços de forma programada."

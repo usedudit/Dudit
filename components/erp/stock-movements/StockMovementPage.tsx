@@ -363,11 +363,16 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         page * ITEMS_PER_PAGE
     );
 
+    const prevFilteredLengthRef = useRef(0);
     useEffect(() => {
+        const lengthChanged = filteredMovements.length !== prevFilteredLengthRef.current
+        prevFilteredLengthRef.current = filteredMovements.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage]);
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredMovements.length]);
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,

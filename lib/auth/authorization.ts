@@ -40,7 +40,8 @@ export class ForbiddenError extends AuthError {
 // ─── Core Auth Helpers ──────────────────────────────────────────────────────
 
 import { getCurrentUser } from "@/lib/auth/server-user"
-export { getCurrentUser }
+import { getCurrentContext } from "@/lib/auth/partner-context"
+export { getCurrentUser, getCurrentContext }
 
 /**
  * Strict authentication check - use in ALL state-changing server actions.
@@ -51,11 +52,11 @@ export { getCurrentUser }
  */
 export async function requireUser(resolvedUser?: User | any): Promise<User> {
   if (resolvedUser && resolvedUser.id) return resolvedUser as User
-  const user = await getCurrentUser()
-  if (!user) {
+  const context = await getCurrentContext()
+  if (!context.user) {
     redirect("/auth/login")
   }
-  return user
+  return context.user
 }
 
 /**
@@ -74,18 +75,11 @@ export const getCurrentPartner = cache(async (resolvedUser?: User | any): Promis
   const user = resolvedUser || await getCurrentUser()
   if (!user) return null
 
-  const supabase = await getSupabaseServerClient()
-  const { data: partner } = await supabase
-    .from("partners")
-    .select("id, user_id, is_active, erp_disabled")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const context = await getCurrentContext()
+  const ownerAccess = context.allPartners.find(a => a.roleId === "owner")
+  if (!ownerAccess) return null
 
-  if (!partner || partner.is_active === false || partner.erp_disabled === true) {
-    return null
-  }
-
-  return { id: partner.id, user_id: partner.user_id }
+  return { id: ownerAccess.partnerId, user_id: ownerAccess.userId }
 })
 
 /**
@@ -125,23 +119,17 @@ const checkPartnerAccess = async (
   userId: string
 ): Promise<{ roleId: RoleId; permissions: any } | null> => {
   // 1. FAST PATH: Check the active partner context in the current request memory.
-  try {
-    const context = await getPartnerContextHelper({ id: userId });
-    if (context && context.partnerId === partnerId) {
-      if (context.roleId && context.permissions) {
-        return { roleId: context.roleId, permissions: context.permissions };
-      }
+  const context = await getCurrentContext()
+  if (context.activePartner && context.activePartner.partnerId === partnerId) {
+    if (context.activePartner.roleId && context.activePartner.permissions) {
+      return { roleId: context.activePartner.roleId as RoleId, permissions: context.activePartner.permissions }
     }
-  } catch (err) {
-    // Graceful fail of fast-path; do not block fallback
   }
 
-  // 2. FALLBACK/LAYER 2: Utilize the optimized RPC cached loader to avoid N+1 queries.
-  const allAccess = await getAllUserPartnerAccess({ id: userId });
-  const match = allAccess.find(a => a.partnerId === partnerId);
-
+  // 2. FALLBACK/LAYER 2: Utilize the pre-resolved list of all partner accesses.
+  const match = context.allPartners.find(a => a.partnerId === partnerId)
   if (match && match.roleId && match.permissions) {
-    return { roleId: match.roleId, permissions: match.permissions };
+    return { roleId: match.roleId, permissions: match.permissions }
   }
 
   // 3. AUTHORITATIVE DB FALLBACK
@@ -521,17 +509,21 @@ export const hasBusinessCapability = cache(async (
   partnerId: string,
   capability: "products" | "services"
 ): Promise<boolean> => {
-  // Try to get business_info from cached partner context first (avoids extra DB query)
-  const { getCurrentPartnerContext: getCtx } = await import("@/lib/auth/partner-context")
-  const ctx = await getCtx()
+  // Try to get business_info from cached context first (avoids extra DB query)
+  const context = await getCurrentContext()
   let info: any = null
 
-  if (ctx && ctx.partnerId === partnerId && ctx.businessInfo) {
-    info = ctx.businessInfo
+  if (context.activePartner && context.activePartner.partnerId === partnerId && context.activePartner.businessInfo) {
+    info = context.activePartner.businessInfo
   } else {
-    const admin = getAdminClient()
-    const { data: partner } = await admin.from("partners").select("business_info").eq("id", partnerId).single()
-    info = normalizeBusinessInfo(partner?.business_info)
+    const match = context.allPartners.find(p => p.partnerId === partnerId)
+    if (match) {
+      info = match.businessInfo
+    } else {
+      const admin = getAdminClient()
+      const { data: partner } = await admin.from("partners").select("business_info").eq("id", partnerId).single()
+      info = normalizeBusinessInfo(partner?.business_info)
+    }
   }
 
   const sells = normalizeBusinessInfo(info).sells || []

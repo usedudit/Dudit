@@ -255,11 +255,16 @@ export default function SuppliersPage({
     return filteredSuppliers.find(s => s.originalId === entityState.entityId) || null
   }, [entityState.entityId, currentEntity, filteredSuppliers])
 
+  const prevFilteredLengthRef = useRef(0)
   useEffect(() => {
+    const lengthChanged = filteredSuppliers.length !== prevFilteredLengthRef.current
+    prevFilteredLengthRef.current = filteredSuppliers.length
+    if (lengthChanged) return
+
     if (page === totalPages && hasNextPage && !isFetchingNextPage) {
       void fetchNextPage()
     }
-  }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredSuppliers.length])
 
   const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
   const hasSuppliers = (rawSuppliers?.length || 0) > 0

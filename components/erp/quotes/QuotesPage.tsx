@@ -397,11 +397,16 @@ export default function QuotesPage({
         }
     }, [totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
+    const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
+        const lengthChanged = filteredQuotes.length !== prevFilteredLengthRef.current
+        prevFilteredLengthRef.current = filteredQuotes.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredQuotes.length])
 
     const hasActiveFilters =
         filters.status.length > 0 ||

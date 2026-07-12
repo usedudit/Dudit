@@ -211,6 +211,37 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
     }
 );
 
+import type { User } from "@supabase/supabase-js"
+
+export interface RequestContext {
+    user: User | null
+    activePartner: PartnerContext | null
+    allPartners: PartnerAccessRecord[]
+}
+
+/**
+ * Unified request-scoped context resolver.
+ * Resolves user, active partner context, and all partner access records in parallel.
+ * Reused by Server Actions and server components during a single request.
+ */
+export const getCurrentContext = cache(async (): Promise<RequestContext> => {
+    const user = await getCurrentUser()
+    if (!user) {
+        return { user: null, activePartner: null, allPartners: [] }
+    }
+
+    const [allPartners, activePartner] = await Promise.all([
+        getAllUserPartnerAccess(user),
+        getCurrentPartnerContext(user),
+    ])
+
+    return {
+        user,
+        activePartner,
+        allPartners,
+    }
+})
+
 /**
  * Gets ALL partner access records for the current user.
  * Built safely using cache factory injection and real fallback logic.
@@ -296,3 +327,4 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
 
     return null
 })
+

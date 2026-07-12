@@ -323,28 +323,28 @@ export default function RecurringSubscriptionsPage({
 
         {/* Inner Page Tabs */}
         <div className="flex border-b border-brand-border dark:border-dark-border mb-6 px-4 md:px-8 shrink-0 overflow-x-auto scrollbar-none gap-2">
-          <button 
+          <button
             className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "list" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
             onClick={() => setCurrentTab("list")}
           >
             Assinaturas
             {currentTab === "list" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-full" />}
           </button>
-          <button 
+          <button
             className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "billing" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
             onClick={() => setCurrentTab("billing")}
           >
             Faturamento / Cobranças
             {currentTab === "billing" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-full" />}
           </button>
-          <button 
+          <button
             className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "forecast" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
             onClick={() => setCurrentTab("forecast")}
           >
             Calendário & Demanda
             {currentTab === "forecast" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-full" />}
           </button>
-          <button 
+          <button
             className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "credits" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
             onClick={() => setCurrentTab("credits")}
           >
@@ -375,7 +375,7 @@ export default function RecurringSubscriptionsPage({
                   <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                     <IconPlaceholder
                       placeholderType="image"
-                      imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                      imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
                       imageAlt="Nenhuma assinatura"
                       title="Nenhuma assinatura encontrada"
                       subtitle="Tente ajustar a busca ou os filtros de status."
@@ -494,7 +494,7 @@ export default function RecurringSubscriptionsPage({
                   <tbody className="divide-y divide-brand-border dark:divide-dark-border">
                     {billingData.map((order) => (
                       <tr key={order.id} className="hover:bg-brand-gray/10 dark:hover:bg-dark-border/10 transition-colors">
-                        <td className="py-3 px-6 font-bold">#{order.order_number || order.id.slice(0,8)}</td>
+                        <td className="py-3 px-6 font-bold">#{order.order_number || order.id.slice(0, 8)}</td>
                         <td className="py-3 px-6 font-medium">{order.customer_name}</td>
                         <td className="py-3 px-6">{new Date(order.created_at).toLocaleDateString("pt-BR")}</td>
                         <td className="py-3 px-6 text-right font-semibold">{formatCurrency(order.total_amount)}</td>
@@ -560,11 +560,11 @@ export default function RecurringSubscriptionsPage({
                 <Users size={20} /> Saldo de Créditos dos Clientes
               </h2>
               <div className="w-full md:w-72">
-                <input 
-                  type="text" 
-                  placeholder="Buscar por cliente..." 
-                  value={creditsSearch} 
-                  onChange={(e) => setCreditsSearch(e.target.value)} 
+                <input
+                  type="text"
+                  placeholder="Buscar por cliente..."
+                  value={creditsSearch}
+                  onChange={(e) => setCreditsSearch(e.target.value)}
                   className="w-full px-4 py-2 border border-brand-border dark:border-dark-border rounded-lg text-sm bg-brand-gray/20 text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-1 focus:ring-brand-primary"
                 />
               </div>

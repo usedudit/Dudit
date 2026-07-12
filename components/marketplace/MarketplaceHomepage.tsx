@@ -7,10 +7,8 @@ import { HeroBanner, HorizontalCarousel, ItemCard, VitrineCard } from "./shared-
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
 import type { HomeSection } from "@/app/actions/marketplace/discover"
-import { CollectionCard } from "./CollectionCard"
 import { CommunityVideoCard } from "./CommunityVideoCard"
 import { VideoModal } from "./VideoModal"
-import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 
 import { useRouter } from "next/navigation"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
@@ -660,29 +658,6 @@ export default function MarketplaceHome({
                                     items={section.items}
                                     renderItem={(item: any) => <VitrineCard vitrine={item} className="w-full" />}
                                     itemWidthClass="w-[270px] sm:w-[320px]"
-                                />
-                            )
-                        }
-                        if (section.id === "communityCollections") {
-                            if (!section.items || section.items.length === 0) return null
-                            return (
-                                <HorizontalCarousel
-                                    key={section.id}
-                                    title={section.title}
-                                    subtitle={section.subtitle}
-                                    items={section.items}
-                                    renderItem={(item: any) => <CollectionCard collection={item} className="w-full" />}
-                                    itemWidthClass="w-[270px] sm:w-[320px]"
-                                />
-                            )
-                        }
-                        if (section.id === "communityVideos") {
-                            if (!section.items || section.items.length === 0) return null
-                            return (
-                                <CommunityVideosCarousel
-                                    key={section.id}
-                                    videos={section.items}
-                                    title={section.title}
                                 />
                             )
                         }

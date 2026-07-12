@@ -302,11 +302,16 @@ export default function CustomersPage({
         return filteredCustomers.find(c => c.originalId === entityState.entityId) || null
     }, [entityState.entityId, currentEntity, filteredCustomers])
 
+    const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
+        const lengthChanged = filteredCustomers.length !== prevFilteredLengthRef.current
+        prevFilteredLengthRef.current = filteredCustomers.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredCustomers.length])
 
     const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
     const hasCustomers = (rawCustomers?.length || 0) > 0

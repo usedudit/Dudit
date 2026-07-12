@@ -42,8 +42,11 @@ export function SupabaseProvider({
 
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+        } = supabase.auth.onAuthStateChange((event: any, session: any) => {
             setUser(session?.user ?? null)
+            if (event === "SIGNED_IN") {
+                localStorage.removeItem("dudit_city")
+            }
         })
 
         return () => {

@@ -418,7 +418,7 @@ export function WhatsAppIntegrationPage({
 
                   {evoConfigured === true && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                      
+
                       {/* Left Column - FormSection with borderless ListItem */}
                       <div className="border border-brand-border dark:border-dark-border rounded-2xl p-6 bg-white dark:bg-dark-surface transition-all">
                         <FormSection title="Integração Evolution">
@@ -448,7 +448,7 @@ export function WhatsAppIntegrationPage({
 
                       {/* Right Column - Dynamic IconPlaceholder, QR code, and buttons */}
                       <div className="border border-brand-border dark:border-dark-border rounded-2xl p-6 bg-white dark:bg-dark-surface transition-all flex flex-col items-center justify-center min-h-[300px]">
-                        
+
                         {/* 1. Connected State */}
                         {evoStatus === "connected" && (
                           <div className="flex flex-col items-center gap-6 w-full">
@@ -457,7 +457,7 @@ export function WhatsAppIntegrationPage({
                               title="WhatsApp Conectado"
                               subtitle={`Seu WhatsApp (${evoPhoneNumber || evoConnection?.phoneNumber || ""}) está pareado e pronto para o envio de mensagens.`}
                             />
-                            
+
                             <div className="w-full max-w-sm border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-brand-gray/30 dark:bg-dark-surface/50">
                               <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Testar envio de mensagem</h3>
                               <div className="flex gap-2 mb-4">
@@ -489,7 +489,6 @@ export function WhatsAppIntegrationPage({
                                 text: evoIsLoading ? "Conectando..." : "Conectar WhatsApp",
                                 action: handleEvoConnect,
                                 disabled: evoIsLoading,
-                                variant: "filled",
                                 className: "w-full max-w-xs h-[46px]"
                               }
                             ]}
@@ -501,8 +500,8 @@ export function WhatsAppIntegrationPage({
                           <div className="flex flex-col items-center justify-center text-center w-full">
                             <IconPlaceholder
                               icon={QRCodeIcon}
-                              title="Scan QR code"
-                              subtitle="Scan this QR code in-app to verify a device."
+                              title="Escaneie o QR Code"
+                              subtitle="Abra o WhatsApp > Aparelhos Conectados > Conectar um Aparelho"
                             />
                             {evoQrCode ? (
                               <div className="mt-6 bg-white p-4 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm">

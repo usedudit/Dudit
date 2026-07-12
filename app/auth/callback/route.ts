@@ -54,8 +54,11 @@ export async function GET(request: Request) {
         }
       }
 
-      // Força o redirecionamento para o domínio real
-      return NextResponse.redirect(`${baseUrl}${next}`)
+      // Clear old city cookie so a new user doesn't see previous user's city
+      const response = NextResponse.redirect(`${baseUrl}${next}`)
+      response.cookies.set("dudit_city", "", { maxAge: 0, path: "/" })
+      response.cookies.set("dudit_state", "", { maxAge: 0, path: "/" })
+      return response
     }
   }
 

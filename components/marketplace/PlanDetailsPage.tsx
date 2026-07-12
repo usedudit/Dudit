@@ -689,13 +689,13 @@ export function PlanDetailsPageClient({
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
                         {partner.city && partner.state && (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {partner.city} - {partner.state}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         )}
-                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=planos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=planos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                             Assinaturas
                         </Link>
                         <ChevronRightIcon size={10} />

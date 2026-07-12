@@ -162,6 +162,9 @@ export async function createRecurringPlanAction(input: {
   showInMarketplace?: boolean
   items: RecurringPlanItem[]
   images?: string[] | null
+  billingMode?: "manual" | "auto_mercado_pago"
+  creditExpirationPolicy?: "never" | "end_of_cycle" | "fixed_days"
+  creditExpirationDays?: number | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -197,6 +200,9 @@ export async function createRecurringPlanAction(input: {
         end_date: input.endDate || null,
         show_in_marketplace: input.showInMarketplace !== false,
         images: input.images || [],
+        billing_mode: input.billingMode || "manual",
+        credit_expiration_policy: input.creditExpirationPolicy || "end_of_cycle",
+        credit_expiration_days: input.creditExpirationDays ?? null,
       })
       .select("*")
       .single()
@@ -259,6 +265,9 @@ export async function updateRecurringPlanAction(input: {
   showInMarketplace?: boolean
   items?: RecurringPlanItem[]
   images?: string[] | null
+  billingMode?: "manual" | "auto_mercado_pago"
+  creditExpirationPolicy?: "never" | "end_of_cycle" | "fixed_days"
+  creditExpirationDays?: number | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -300,6 +309,9 @@ export async function updateRecurringPlanAction(input: {
     if (input.endDate !== undefined) updatePayload.end_date = input.endDate
     if (input.showInMarketplace !== undefined) updatePayload.show_in_marketplace = input.showInMarketplace
     if (input.images !== undefined) updatePayload.images = input.images
+    if (input.billingMode) updatePayload.billing_mode = input.billingMode
+    if (input.creditExpirationPolicy) updatePayload.credit_expiration_policy = input.creditExpirationPolicy
+    if (input.creditExpirationDays !== undefined) updatePayload.credit_expiration_days = input.creditExpirationDays
 
     const { data: plan, error } = await supabase
       .from("recurring_plans")

@@ -463,11 +463,16 @@ export default function CashRegisterPage({
         threshold: 0,
     })
 
+    const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
+        const lengthChanged = filtered.length !== prevFilteredLengthRef.current
+        prevFilteredLengthRef.current = filtered.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filtered.length])
 
     const columns: { id: string; label: string; align: "left" | "center" | "right"; width?: string }[] = [
         { id: "session", label: "Sessão", align: "left", width: "250px" },

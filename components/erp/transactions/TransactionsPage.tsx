@@ -710,11 +710,16 @@ export default function TransactionsPage({
         return { paginatedTransactions: paginated, totalPages: pages }
     }, [filteredTransactions, page])
 
+    const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
+        const lengthChanged = filteredTransactions.length !== prevFilteredLengthRef.current
+        prevFilteredLengthRef.current = filteredTransactions.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredTransactions.length])
 
     const hasActiveFilters =
         search.length > 0 ||

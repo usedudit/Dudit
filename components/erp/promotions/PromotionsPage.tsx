@@ -511,7 +511,7 @@ export default function PromotionsPage({
               campaign={formCampaign}
               scopeData={scopeData}
               promotions={promotions}
-               onBack={() => {
+              onBack={() => {
                 closeEntity()
                 afterMutation()
                 refreshPromotions()
@@ -603,7 +603,7 @@ export default function PromotionsPage({
                         {campaigns.length === 0 ? (
                           <IconPlaceholder
                             placeholderType="image"
-                            imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                            imageSrc="https://img.dudit.com.br/static/mascots/Campanhas.png"
                             imageAlt="Sem campanhas"
                             title="Nenhuma campanha cadastrada"
                             subtitle="Crie campanhas de marketing para oferecer descontos e brindes."

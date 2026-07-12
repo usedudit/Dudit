@@ -322,7 +322,7 @@ export function CheckoutPageClient() {
             const match = userCredits.find(c => 
                 c.itemName.toLowerCase() === name.toLowerCase() && 
                 c.remainingCredits >= line.quantity &&
-                new Date(c.expiresAt) > new Date()
+                (!c.expiresAt || new Date(c.expiresAt) > new Date())
             )
             return !!match
         })
@@ -2296,7 +2296,7 @@ export function CheckoutPageClient() {
                                         <ListItem
                                             icon={CrownIcon}
                                             title="Assinatura (Créditos)"
-                                            description={`Usar créditos do seu plano · ${userCredits.filter(c => new Date(c.expiresAt) > new Date() && c.remainingCredits > 0).map(c => `${c.itemName}: ${c.remainingCredits}`).join(", ")}`}
+                                            description={`Usar créditos do seu plano · ${userCredits.filter(c => (!c.expiresAt || new Date(c.expiresAt) > new Date()) && c.remainingCredits > 0).map(c => `${c.itemName}: ${c.remainingCredits}`).join(", ")}`}
                                             className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                             onClick={() => {
                                                 setPaymentOption("subscription_credits")
@@ -2864,7 +2864,7 @@ export function CheckoutPageClient() {
                                                 }
                                             />
                                             <div className="mt-2 flex flex-wrap gap-1.5">
-                                                {userCredits.filter(c => new Date(c.expiresAt) > new Date() && c.remainingCredits > 0).map((c, idx) => (
+                                                {userCredits.filter(c => (!c.expiresAt || new Date(c.expiresAt) > new Date()) && c.remainingCredits > 0).map((c, idx) => (
                                                     <span key={idx} className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
                                                         {c.itemName}: {c.remainingCredits} restante{c.remainingCredits > 1 ? "s" : ""}
                                                     </span>
@@ -3674,7 +3674,7 @@ export function CheckoutPageClient() {
                                                 <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">Assinatura (Créditos)</h3>
                                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">Usar créditos do seu plano</p>
                                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                    {userCredits.filter(c => new Date(c.expiresAt) > new Date() && c.remainingCredits > 0).map((c, idx) => (
+                                                    {userCredits.filter(c => (!c.expiresAt || new Date(c.expiresAt) > new Date()) && c.remainingCredits > 0).map((c, idx) => (
                                                         <span key={idx} className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
                                                             {c.itemName}: {c.remainingCredits} restante{c.remainingCredits > 1 ? 's' : ''}
                                                         </span>

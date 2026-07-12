@@ -91,6 +91,11 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     const [showInMarketplace, setShowInMarketplace] = useState(true)
     const [items, setItems] = useState<any[]>([])
 
+    // Novas configuracoes de cobranca e validade dos creditos
+    const [billingMode, setBillingMode] = useState<"manual" | "auto_mercado_pago">("manual")
+    const [creditExpirationPolicy, setCreditExpirationPolicy] = useState<"never" | "end_of_cycle" | "fixed_days">("end_of_cycle")
+    const [creditExpirationDays, setCreditExpirationDays] = useState<number | null>(null)
+
     // Plan images state (similar to AddProductPage.tsx)
     const [images, setImages] = useState<(string | File)[]>([])
     const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
@@ -163,6 +168,9 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             }
             const planImages = Array.isArray(plan.images) ? plan.images.filter((img: any) => typeof img === "string" && !img.startsWith("data:")) : []
             setImages(planImages)
+            setBillingMode(plan.billingMode || plan.billing_mode || "manual")
+            setCreditExpirationPolicy(plan.creditExpirationPolicy || plan.credit_expiration_policy || "end_of_cycle")
+            setCreditExpirationDays(plan.creditExpirationDays != null ? Number(plan.creditExpirationDays) : (plan.credit_expiration_days != null ? Number(plan.credit_expiration_days) : null))
         }
     }, [plan])
 
@@ -179,10 +187,13 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             startDate !== (plan.startDate ? plan.startDate.slice(0, 10) : (plan.start_date ? plan.start_date.slice(0, 10) : "")) ||
             endDate !== (plan.endDate ? plan.endDate.slice(0, 10) : (plan.end_date ? plan.end_date.slice(0, 10) : "")) ||
             showInMarketplace !== (plan.showInMarketplace !== false && plan.show_in_marketplace !== false) ||
+            billingMode !== (plan.billingMode || plan.billing_mode || "manual") ||
+            creditExpirationPolicy !== (plan.creditExpirationPolicy || plan.credit_expiration_policy || "end_of_cycle") ||
+            creditExpirationDays !== (plan.creditExpirationDays != null ? Number(plan.creditExpirationDays) : (plan.credit_expiration_days != null ? Number(plan.credit_expiration_days) : null)) ||
             JSON.stringify(items) !== JSON.stringify(plan.items) ||
             JSON.stringify(images) !== JSON.stringify(plan.images || [])
         )
-    }, [name, description, status, frequencyType, frequencyInterval, startDate, endDate, showInMarketplace, items, images, plan])
+    }, [name, description, status, frequencyType, frequencyInterval, startDate, endDate, showInMarketplace, billingMode, creditExpirationPolicy, creditExpirationDays, items, images, plan])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -366,6 +377,9 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                 startDate: `${startDate}T12:00:00.000Z`,
                 endDate: endDate ? `${endDate}T23:59:59.000Z` : null,
                 showInMarketplace,
+                billingMode,
+                creditExpirationPolicy,
+                creditExpirationDays: creditExpirationPolicy === "fixed_days" ? creditExpirationDays : null,
                 items: items.map((item) => ({
                     itemType: item.itemType,
                     productId: item.productId,
@@ -424,6 +438,17 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
         { value: "active", label: "Ativo" },
         { value: "inactive", label: "Inativo" },
         { value: "archived", label: "Arquivado" }
+    ]
+
+    const billingModeOptions = [
+        { value: "manual", label: "Manual (A combinar)" },
+        { value: "auto_mercado_pago", label: "Automático (Mercado Pago)" }
+    ]
+
+    const creditExpirationOptions = [
+        { value: "end_of_cycle", label: "Fim do ciclo" },
+        { value: "fixed_days", label: "Dias fixos" },
+        { value: "never", label: "Nunca expira" }
     ]
 
     // Filter and sort items locally
@@ -657,6 +682,37 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         value={endDate}
                                                         onChange={(e) => setEndDate(e.target.value)}
                                                     />
+                                                </div>
+                                            </SidebarCard>
+
+                                            <SidebarCard>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Cobrança e Créditos</h3>
+                                                <div className="space-y-5">
+                                                    <FormDropdown
+                                                        label="Modo de Cobrança"
+                                                        value={billingMode}
+                                                        setValue={(val) => setBillingMode(val as any)}
+                                                        options={billingModeOptions}
+                                                    />
+
+                                                    <FormDropdown
+                                                        label="Validade dos Créditos"
+                                                        value={creditExpirationPolicy}
+                                                        setValue={(val) => setCreditExpirationPolicy(val as any)}
+                                                        options={creditExpirationOptions}
+                                                    />
+
+                                                    {creditExpirationPolicy === "fixed_days" && (
+                                                        <Input
+                                                            type="number"
+                                                            label="Dias de Validade"
+                                                            placeholder="Ex: 30"
+                                                            value={creditExpirationDays !== null ? creditExpirationDays : ""}
+                                                            onChange={(e) => setCreditExpirationDays(e.target.value === "" ? null : Number(e.target.value))}
+                                                            required
+                                                            min={1}
+                                                        />
+                                                    )}
                                                 </div>
                                             </SidebarCard>
                                         </div>

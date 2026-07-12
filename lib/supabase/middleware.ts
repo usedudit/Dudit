@@ -70,7 +70,8 @@ export async function middleware(request: NextRequest) {
   // ============================================================================
   const segments = pathname.split('/').filter(Boolean)
   const isSystemPath =
-    PUBLIC_PATHS.some(p => pathname.startsWith(p)) ||
+    pathname === "/" ||
+    PUBLIC_PATHS.filter(p => p !== "/").some(p => pathname.startsWith(p)) ||
     ["/institucional", "/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/vitrine", "/produto"].some(p => pathname.startsWith(p));
 
   // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema

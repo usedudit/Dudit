@@ -286,13 +286,13 @@ export default function OrdersPage({
         threshold: 0,
     })
 
-    // Aggressive prefetch: pre-warm cache for first 10 visible items
+    // Aggressive prefetch: pre-warm cache for first 3 visible items
     const prefetchedRef = useRef(false)
     useEffect(() => {
         if (prefetchedRef.current || !effectiveOrders?.length) return
         prefetchedRef.current = true
-        const first10 = effectiveOrders.slice(0, 10)
-        for (const o of first10) {
+        const first3 = effectiveOrders.slice(0, 3)
+        for (const o of first3) {
             if (o?.id) cache.prefetchEntity(o.id)
         }
     }, [effectiveOrders, cache])
@@ -441,11 +441,16 @@ export default function OrdersPage({
     const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
     const paginated = filteredOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
+    const prevFilteredLengthRef = useRef(0)
     useEffect(() => {
+        const lengthChanged = filteredOrders.length !== prevFilteredLengthRef.current
+        prevFilteredLengthRef.current = filteredOrders.length
+        if (lengthChanged) return
+
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
         }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredOrders.length])
 
     const hasActiveFilters =
         filters.status.length > 0 ||

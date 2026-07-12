@@ -337,7 +337,7 @@ function FavoritesEmpty({
                 imageSrc="https://img.dudit.com.br/static/mascots/Favoritos.png"
                 imageAlt="Seus favoritos estão vazios"
                 title="Seus favoritos estão vazios"
-                subtitle="Clique no ♥ nos produtos e serviços que gostar para encontrá-los rapidamente aqui depois!"
+                subtitle="Clique no 💚 nos produtos e serviços que gostar para encontrá-los rapidamente aqui depois!"
                 itemButton={{
                     text: "Explorar marketplace",
                     action: () => window.location.href = "/explorar",

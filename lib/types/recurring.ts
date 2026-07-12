@@ -38,6 +38,9 @@ export type RecurringPlan = {
   updatedAt: string
   items?: RecurringPlanItemRow[]
   images?: string[] | null
+  billingMode?: "manual" | "auto_mercado_pago"
+  creditExpirationPolicy?: "never" | "end_of_cycle" | "fixed_days"
+  creditExpirationDays?: number | null
 }
 
 export type RecurringPlanItemRow = RecurringPlanItem & {
@@ -106,6 +109,9 @@ export function mapPlanRow(row: Record<string, unknown>): RecurringPlan {
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     images: Array.isArray(row.images) ? (row.images as string[]) : null,
+    billingMode: (row.billing_mode as "manual" | "auto_mercado_pago" | undefined) || "manual",
+    creditExpirationPolicy: (row.credit_expiration_policy as "never" | "end_of_cycle" | "fixed_days" | undefined) || "end_of_cycle",
+    creditExpirationDays: row.credit_expiration_days != null ? Number(row.credit_expiration_days) : null,
   }
 }
 

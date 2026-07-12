@@ -1939,26 +1939,26 @@ export function ProductDetailsPageClient({
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
                         {partner.city && partner.state && (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {partner.city} - {partner.state}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         )}
-                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=produtos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                             Produtos
                         </Link>
                         <ChevronRightIcon size={10} />
                         {product.marketplace_category?.parent?.name || product.marketplace_category?.name ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.marketplace_category.parent?.name || product.marketplace_category.name)}?type=produtos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.marketplace_category.parent?.name || product.marketplace_category.name)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {product.marketplace_category.parent?.name || product.marketplace_category.name}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         ) : product.category && !product.marketplace_category ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.category)}?type=produtos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.category)}?type=produtos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {product.category}
                                 </Link>
                                 <ChevronRightIcon size={10} />

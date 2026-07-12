@@ -4,7 +4,6 @@ import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { selectErpAction } from "./actions"
-import { getPartnerStatus } from "@/lib/data/partner"
 import Link from "next/link"
 import { Button, ListItem, Badge } from "@/components/reusable"
 import { PlusIcon, StoreIcon } from "@/lib/icons"
@@ -35,11 +34,11 @@ export default async function SelectErpPage() {
     }
 
     // Check if user has their own partner account
-    const ownPartner = await getPartnerStatus(user.id)
-    const hasOwnPartner = !!ownPartner
+    const hasOwnPartner = partnerAccess.some(a => a.roleId === "owner")
 
     // Check if user has access to any ERP that isn't theirs
     const hasNonOwnAccess = partnerAccess.some(a => a.roleId !== "owner")
+
 
     // Only auto-redirect if the user has a single ERP that belongs to them
     if (partnerAccess.length === 1 && !hasNonOwnAccess) {

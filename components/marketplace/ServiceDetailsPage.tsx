@@ -1941,26 +1941,26 @@ export function ServiceDetailsPageClient({
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
                         {partner.city && partner.state && (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {partner.city} - {partner.state}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         )}
-                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=servicos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                             Serviços
                         </Link>
                         <ChevronRightIcon size={10} />
                         {service.marketplace_category?.parent?.name || service.marketplace_category?.name ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.marketplace_category.parent?.name || service.marketplace_category.name)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.marketplace_category.parent?.name || service.marketplace_category.name)}?type=servicos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {service.marketplace_category.parent?.name || service.marketplace_category.name}
                                 </Link>
                                 <ChevronRightIcon size={10} />
                             </>
                         ) : service.service_categories?.name && !service.marketplace_category ? (
                             <>
-                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.service_categories.name)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(service.service_categories.name)}?type=servicos`} prefetch={false} className="hover:text-brand-dark transition-colors">
                                     {service.service_categories.name}
                                 </Link>
                                 <ChevronRightIcon size={10} />

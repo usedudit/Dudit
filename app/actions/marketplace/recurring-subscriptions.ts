@@ -677,13 +677,15 @@ export async function getMySubscriptionCreditsAction() {
     const { data, error } = await admin
       .from("subscription_item_credits")
       .select(`
-        id, subscription_id, item_name, total_credits, consumed_credits, expires_at, created_at,
+        id, subscription_id, quantity, consumed, expires_at, created_at,
         recurring_subscriptions(recurring_plans(name)),
-        partners:partner_id(store_name)
+        partners:partner_id(store_name),
+        services(name),
+        products(name)
       `)
       .in("customer_id", customerIds)
-      .gt("expires_at", new Date().toISOString())
-      .order("expires_at", { ascending: true })
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order("expires_at", { ascending: true, nullsFirst: false })
 
     if (error) throw error
 
@@ -694,15 +696,16 @@ export async function getMySubscriptionCreditsAction() {
         subscriptionId: row.subscription_id,
         planName: row.recurring_subscriptions?.recurring_plans?.name || "Plano",
         storeName: row.partners?.store_name || "Vendedor",
-        itemName: row.item_name,
-        totalCredits: row.total_credits,
-        consumedCredits: row.consumed_credits,
-        remainingCredits: Math.max(0, row.total_credits - row.consumed_credits),
+        itemName: row.services?.name || row.products?.name || "Item",
+        totalCredits: row.quantity,
+        consumedCredits: row.consumed,
+        remainingCredits: Math.max(0, row.quantity - row.consumed),
         expiresAt: row.expires_at,
         createdAt: row.created_at,
       })),
     }
   } catch (e: unknown) {
+    console.error("getMySubscriptionCreditsAction error:", e)
     return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar créditos" }
   }
 }

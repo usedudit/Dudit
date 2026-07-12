@@ -309,3 +309,29 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
     image: s.images && s.images.length > 0 ? s.images[0] : null,
   }))
 }
+
+/**
+ * Consolidates products, customers, coupons, and services buckets fetching
+ * in a single Server Action request (Promise.all) to save round-trips.
+ */
+export async function fetchERPInitializationData() {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("Unauthorized")
+  const context = await getCurrentPartnerContext()
+  if (!context) throw new Error("No context")
+
+  const [products, customers, coupons, services] = await Promise.all([
+    fetchPartnerProductsBucket(),
+    fetchPartnerCustomersBucket(),
+    fetchPartnerCouponsBucket(),
+    fetchPartnerServicesBucket(),
+  ])
+
+  return {
+    products,
+    customers,
+    coupons,
+    services,
+  }
+}
+
