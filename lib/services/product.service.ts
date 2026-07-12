@@ -1,5 +1,6 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { Product, ProductInput, ProductWithDetails } from "@/lib/types/product"
+import { buildSoftDeletePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
 
 export class ProductService {
   private async getSupabase() {
@@ -57,7 +58,7 @@ export class ProductService {
 
   async findByPartnerId(partnerId: string): Promise<Product[]> {
     const supabase = await this.getSupabase()
-    const { data, error } = await supabase
+    const { data, error } = await scopeActiveOnly(supabase
       .from("products")
       .select(`
         *,
@@ -66,7 +67,7 @@ export class ProductService {
         brand:brands!brand_id(name),
         location:storage_locations!location_id(name)
       `)
-      .eq("partner_id", partnerId)
+      .eq("partner_id", partnerId))
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -111,7 +112,10 @@ export class ProductService {
 
   async delete(productId: string, partnerId: string): Promise<{ success: boolean; error?: string }> {
     const supabase = await this.getSupabase()
-    const { error } = await supabase.from("products").delete().eq("id", productId).eq("partner_id", partnerId)
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || "00000000-0000-0000-0000-000000000000"
+    const payload = buildSoftDeletePayload(userId)
+    const { error } = await supabase.from("products").update(payload).eq("id", productId).eq("partner_id", partnerId)
 
     if (error) {
       return { success: false, error: error.message }
@@ -122,7 +126,10 @@ export class ProductService {
 
   async batchDelete(productIds: string[], partnerId: string): Promise<{ success: boolean; error?: string }> {
     const supabase = await this.getSupabase()
-    const { error } = await supabase.from("products").delete().in("id", productIds).eq("partner_id", partnerId)
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || "00000000-0000-0000-0000-000000000000"
+    const payload = buildSoftDeletePayload(userId)
+    const { error } = await supabase.from("products").update(payload).in("id", productIds).eq("partner_id", partnerId)
 
     if (error) {
       return { success: false, error: error.message }

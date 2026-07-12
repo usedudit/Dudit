@@ -133,20 +133,16 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
                 <AlertModal
                     onClose={() => setShowDeleteModal(false)}
                     onConfirm={handleConfirmDelete}
-                    title="Excluir produto?"
-                    message={
-                        pendingOrdersCount > 0
-                            ? `Atenção: Este produto está em ${pendingOrdersCount} ${pendingOrdersCount === 1 ? "pedido pendente" : "pedidos pendentes"}. Tem certeza que deseja excluir?`
-                            : "Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita."
-                    }
-                    confirmText={isDeleting ? "Excluindo..." : "Excluir"}
+                    title="Arquivar produto?"
+                    message="O item será arquivado e deixará de aparecer nos locais públicos e listagens, mas continuará disponível para preservar o histórico."
+                    confirmText={isDeleting ? "Arquivando..." : "Arquivar"}
                     icon={<TrashIcon />}
                     isDestructive
                     disabled={isDeleting}
                 />
             )}
 
-            <SavingStatusModal isOpen={isDeleting} text="Excluindo produto..." />
+            <SavingStatusModal isOpen={isDeleting} text="Arquivando produto..." />
         </>
     )
 }

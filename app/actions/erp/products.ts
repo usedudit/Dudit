@@ -25,6 +25,9 @@ import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_cou
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
+import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { logAuditEvent } from "@/lib/services/timeline.service"
+import { headers } from "next/headers"
 
 const _deleteFromR2 = async (url: string) => {
     if (!url || !url.trim()) return;
@@ -185,51 +188,81 @@ export async function updateProductAction(data: {
     return updateProductComprehensiveAction(productId, rest)
 }
 
-export async function deleteProductAction(productId: string) {
+export async function deleteProductAction(productId: string, reason?: string | null) {
     const actionStart = performance.now()
     await requireRateLimit(RateLimitCategory.PRODUCT_DELETE)
     try {
-        const product = await fetchProductAndVerifyOwnership(productId, "delete", "id, partner_id, images, sku, name, video_type, video_url, video_thumbnail")
+        const product = await fetchProductAndVerifyOwnership(productId, "delete", "id, partner_id, sku, name")
 
+        const user = await requireUser()
         const admin = getAdminClient()
 
-        // Sequential: fetch variants FIRST (before delete cascades them away)
-        const variantsRes = await admin.from("product_variants").select("variant_options").eq("product_id", productId)
-
-        // Now safe to delete the product
-        const deleteResult = await admin.from("products").delete().eq("id", productId)
+        // 1. Soft delete update payload
+        const payload = buildSoftDeletePayload(user.id, reason)
+        const deleteResult = await admin.from("products").update(payload).eq("id", productId)
         if (deleteResult.error) return { error: deleteResult.error.message }
 
-        // Coletar TODAS as imagens para deletar: produto + variantes
-        const imagesToDelete: string[] = []
+        // 2. Fetch IP and write to audit logs (logAuditEvent)
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
 
-        if (product.images?.length) {
-            imagesToDelete.push(...product.images.filter((img: any) => img && typeof img === 'string' && img.trim()))
-        }
-
-        variantsRes.data?.forEach((variant: any) => {
-            if (variant.variant_options && typeof variant.variant_options === 'object') {
-                const image = variant.variant_options.image
-                if (image && typeof image === 'string' && image.trim()) {
-                    imagesToDelete.push(image)
-                }
-            }
+        await logAuditEvent({
+            partnerId: product.partner_id,
+            actorUserId: user.id,
+            entityType: "product",
+            entityId: productId,
+            actionType: "deleted",
+            changeLines: [`Arquivou o produto: ${product.name} (SKU: ${product.sku || 'N/A'})`],
+            metadata: {
+                ip_address: ip,
+                deleted_reason: reason || "Nenhum motivo informado",
+                name: product.name,
+                sku: product.sku
+            },
+            source: "manual"
         })
 
-        // Fire-and-forget: R2 image cleanup (non-blocking)
-        if (imagesToDelete.length > 0) {
-            Promise.all(imagesToDelete.map(img => _deleteFromR2(img))).catch(console.error)
-            await decrement_usage_counter(product.partner_id, "images_count", imagesToDelete.length)
-        }
-        if (product.video_type === "upload") {
-            Promise.all([
-                product.video_url ? _deleteFromR2(product.video_url) : Promise.resolve(),
-                product.video_thumbnail ? _deleteFromR2(product.video_thumbnail) : Promise.resolve(),
-            ]).catch(console.error)
-        }
-
-        // Synchronous revalidation and Redis sync to prevent stale data
+        // 3. Synchronous revalidation and Redis sync to prevent stale data
         await invalidateProductCache(productId, product.partner_id, 'delete')
+
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function restoreProductAction(productId: string) {
+    try {
+        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name")
+        const user = await requireUser()
+        const admin = getAdminClient()
+
+        // 1. Explicit restore update
+        const payload = buildRestorePayload()
+        const restoreResult = await admin.from("products").update(payload).eq("id", productId)
+        if (restoreResult.error) return { error: restoreResult.error.message }
+
+        // 2. Fetch IP and write to audit logs
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        await logAuditEvent({
+            partnerId: product.partner_id,
+            actorUserId: user.id,
+            entityType: "product",
+            entityId: productId,
+            actionType: "restored",
+            changeLines: [`Restaurou o produto: ${product.name} (SKU: ${product.sku || 'N/A'})`],
+            metadata: {
+                ip_address: ip,
+                name: product.name,
+                sku: product.sku
+            },
+            source: "manual"
+        })
+
+        // 3. Synchronous revalidation and Redis sync
+        await invalidateProductCache(productId, product.partner_id, 'update')
 
         return { success: true }
     } catch (error: any) {
@@ -1489,20 +1522,44 @@ export async function toggleProductStatusAction(productIds: string[], isActive: 
     }
 }
 
-export async function deleteProductsInBatchAction(productIds: string[]) {
+export async function deleteProductsInBatchAction(productIds: string[], reason?: string | null) {
     try {
         await verifyAuth()
+        const user = await requireUser()
         const { sanitized, partnerId } = await verifyBatchOwnership(productIds)
         await requirePermission(partnerId, "products", "delete")
         const admin = getAdminClient()
 
-        const { data: products } = await admin.from("products").select("images").in("id", sanitized)
-        const { error } = await admin.from("products").delete().in("id", sanitized)
+        // Fetch products details first for audit logging
+        const { data: products } = await admin.from("products").select("id, name, sku").in("id", sanitized)
+
+        // 1. Explicit batch update (soft delete)
+        const payload = buildSoftDeletePayload(user.id, reason)
+        const { error } = await admin.from("products").update(payload).in("id", sanitized)
         if (error) return { error: error.message }
 
+        // 2. Log audit event for each product in batch
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
         if (products?.length) {
-            const allImages = products.flatMap((p: any) => p.images || [])
-            Promise.all(allImages.map((img: string) => _deleteFromR2(img))).catch(() => null)
+            for (const p of products) {
+                await logAuditEvent({
+                    partnerId: partnerId,
+                    actorUserId: user.id,
+                    entityType: "product",
+                    entityId: p.id,
+                    actionType: "deleted",
+                    changeLines: [`Arquivou o produto em lote: ${p.name} (SKU: ${p.sku || 'N/A'})`],
+                    metadata: {
+                        ip_address: ip,
+                        deleted_reason: reason || "Exclusão em lote",
+                        name: p.name,
+                        sku: p.sku
+                    },
+                    source: "manual"
+                })
+            }
         }
 
         if (partnerId) {
@@ -1741,7 +1798,7 @@ export async function getProducts(partnerId: string) {
         const user = await requireUser()
         await requirePermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
-        const { data } = await supabase.from("products").select("*").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(100)
+        const { data } = await scopeActiveOnly(supabase.from("products").select("*").eq("partner_id", partnerId)).order("created_at", { ascending: false }).limit(100)
         return data || []
     } catch (error) {
         console.error("[getProducts] Error fetching products:", error)
@@ -1854,6 +1911,10 @@ export async function getERPProductsPageAction(
             .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
             .eq("partner_id", partnerId)
 
+        if (!options?.filters?.includeArchived) {
+            q = scopeActiveOnly(q)
+        }
+
         if (cursor) {
             q = q.or(buildProductsKeysetOrFilter(cursor))
         }
@@ -1920,12 +1981,12 @@ export async function searchProductByBarcodeAction(
         if (!cleanCode) return { success: false, error: "Código inválido" }
 
         // 1. GTIN exact match on products
-        const { data: gtinMatch } = await supabase
+        const { data: gtinMatch } = await scopeActiveOnly(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("gtin", cleanCode)
-            .eq("is_active", true)
+            .eq("is_active", true))
             .maybeSingle()
 
         if (gtinMatch) {
@@ -1933,24 +1994,25 @@ export async function searchProductByBarcodeAction(
         }
 
         // 2. SKU exact match on products
-        const { data: skuMatch } = await supabase
+        const { data: skuMatch } = await scopeActiveOnly(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("sku", cleanCode)
-            .eq("is_active", true)
+            .eq("is_active", true))
             .maybeSingle()
 
         if (skuMatch) {
             return { success: true, data: skuMatch }
         }
 
-        // 3. SKU exact match on product variants
+        // 3. SKU exact match on product variants (joining active product only)
         const { data: variantMatch } = await supabase
             .from("product_variants")
-            .select("*, products(*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options))")
+            .select("*, products!inner(*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options))")
             .eq("sku", cleanCode)
             .eq("is_active", true)
+            .is("products.deleted_at", null)
             .maybeSingle()
 
         if (variantMatch && variantMatch.products && variantMatch.products.partner_id === resolvedPartnerId) {
@@ -1962,12 +2024,12 @@ export async function searchProductByBarcodeAction(
         }
 
         // 4. Partial SKU fallback
-        const { data: partialSkuMatch } = await supabase
+        const { data: partialSkuMatch } = await scopeActiveOnly(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("is_active", true)
-            .ilike("sku", `%${cleanCode}%`)
+            .ilike("sku", `%${cleanCode}%`))
             .limit(1)
 
         if (partialSkuMatch && partialSkuMatch.length > 0) {
@@ -1975,12 +2037,12 @@ export async function searchProductByBarcodeAction(
         }
 
         // 5. Product name fallback
-        const { data: nameMatch } = await supabase
+        const { data: nameMatch } = await scopeActiveOnly(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
             .eq("is_active", true)
-            .ilike("name", `%${cleanCode}%`)
+            .ilike("name", `%${cleanCode}%`))
             .limit(1)
 
         if (nameMatch && nameMatch.length > 0) {

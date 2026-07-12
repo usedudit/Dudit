@@ -8,6 +8,7 @@ import { increment_usage_counter } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getDateComponents, getDefaultTimezone } from "@/lib/date"
+import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 
 export type ClaimedRecurringExecution = {
   executionId: string
@@ -62,11 +63,11 @@ export async function checkStockAvailability(
   }
 
   // Fetch products
-  const { data: products } = await supabase
+  const { data: products } = await scopeActiveOnly(supabase
     .from("products")
     .select("id, name, stock_available")
     .in("id", productIds)
-    .eq("partner_id", partnerId)
+    .eq("partner_id", partnerId))
 
   const productsMap = new Map((products || []).map(p => [p.id, p]))
 
@@ -137,11 +138,11 @@ async function createRecurringOrder(params: {
   const serviceIds = serviceItems.map((i) => i.service_id).filter(Boolean) as string[]
 
   // 1. Fetch products data
-  const { data: products } = await supabase
+  const { data: products } = await scopeActiveOnly(supabase
     .from("products")
     .select("id, name, price, cost_price")
     .in("id", productIds)
-    .eq("partner_id", claim.partnerId)
+    .eq("partner_id", claim.partnerId))
 
   const productsMap = new Map((products || []).map((p) => [p.id, p]))
   const productCostMap = new Map((products || []).map((p) => [p.id, Number(p.cost_price || 0)]))
@@ -161,11 +162,11 @@ async function createRecurringOrder(params: {
   }
 
   // 3. Fetch services data
-  const { data: services } = await supabase
+  const { data: services } = await scopeActiveOnly(supabase
     .from("services")
     .select("id, name, price")
     .in("id", serviceIds)
-    .eq("partner_id", claim.partnerId)
+    .eq("partner_id", claim.partnerId))
 
   const servicesMap = new Map((services || []).map((s) => [s.id, s]))
 

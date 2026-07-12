@@ -8,6 +8,7 @@ import { normalizeBusinessInfo } from "@/lib/business-info"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getDashboardLayout } from "@/lib/dashboard-engine/engine"
+import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 
 export async function getQuickModeHomeDataAction(partnerId: string) {
     try {
@@ -36,8 +37,8 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
         // - Views (mocked for now)
 
         const [productsCount, servicesCount, ordersCount] = await Promise.all([
-            supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true),
-            supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true),
+            scopeActiveOnly(supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
+            scopeActiveOnly(supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
             supabase.from("orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId)
         ])
 
@@ -48,14 +49,14 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
 
         // 3. Fetch Recent Items (Products + Services merged)
         const [recentProducts, recentServices] = await Promise.all([
-            supabase.from("products")
+            scopeActiveOnly(supabase.from("products")
                 .select("id, name, price, images, is_active, created_at, type:id") // type trick to identify
-                .eq("partner_id", partnerId)
+                .eq("partner_id", partnerId))
                 .order("created_at", { ascending: false })
                 .limit(4),
-            supabase.from("services")
+            scopeActiveOnly(supabase.from("services")
                 .select("id, name, price, images, is_active, created_at, type:id")
-                .eq("partner_id", partnerId)
+                .eq("partner_id", partnerId))
                 .order("created_at", { ascending: false })
                 .limit(4)
         ])
@@ -168,8 +169,8 @@ export async function getOnboardingStatusAction(partnerId: string) {
 
         // 4. Fetch Products/Services count
         const [productsCount, servicesCount] = await Promise.all([
-            supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true),
-            supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true),
+            scopeActiveOnly(supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
+            scopeActiveOnly(supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
         ])
 
         const hasPix = (paymentMethods || []).some((m: any) => (m.type === 'pix' || m.payment_type === 'pix') && m.is_active)

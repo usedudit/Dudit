@@ -6,6 +6,7 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 
 export const dynamic = "force-dynamic"
 
@@ -36,11 +37,11 @@ async function loadCatalogs(partnerId: string) {
       .eq("status", "ativo")
       .order("name", { ascending: true })
       .limit(500),
-    supabase
+    scopeActiveOnly(supabase
       .from("services")
       .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, resources, service_categories!category_id(name)")
       .eq("partner_id", partnerId)
-      .eq("is_active", true)
+      .eq("is_active", true))
       .order("name")
       .limit(500),
     supabase

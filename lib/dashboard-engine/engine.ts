@@ -41,7 +41,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
     // Parcerias/Dados Gerais
     supabase
       .from("partners")
-      .select("slug, store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active, mp_user_id, business_info")
+      .select("store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active, mp_user_id, business_info")
       .eq("id", partnerId)
       .single(),
     
@@ -221,7 +221,6 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   // 7. Gera a URL pública do perfil do vendedor
   const partnerForUrl = {
     id: partnerId,
-    slug: partner.slug,
     store_name: partner.store_name,
     addresses: addressRes.data || [],
   };

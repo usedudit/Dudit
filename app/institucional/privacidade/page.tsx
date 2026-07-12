@@ -37,7 +37,7 @@ export default function PrivacyPage() {
                                 Política de Privacidade
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
-                                Versão 1.0 - Última atualização: Maio de 2026
+                                Versão 1.5 - Última atualização: Julho de 2026
                             </p>
                         </motion.div>
                     </div>
@@ -45,8 +45,14 @@ export default function PrivacyPage() {
 
                 <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                     <div className="prose prose-lg max-w-none text-brand-dark leading-relaxed space-y-12">
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8">
+                            <p className="text-sm text-amber-800">
+                                <strong>⚠️ Este documento é uma base jurídica para revisão com advogado antes da publicação oficial.</strong> Os trechos entre colchetes (ex.: [SEU NOME COMPLETO]) devem ser preenchidos antes da publicação.
+                            </p>
+                        </div>
+
                         <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray rounded-r-xl">
-                            Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)</strong> e o <strong>Marco Civil da Internet (Lei 12.965/2014)</strong>.
+                            Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018)</strong> e o <strong>Marco Civil da Internet (Lei 12.965/2014)</strong>.
                         </p>
 
                         <div className="bg-brand-gray p-8 rounded-2xl border border-brand-border shadow-sm">
@@ -90,7 +96,7 @@ export default function PrivacyPage() {
                                                     { d: 'Telefone', f: 'Suporte e notificações via WhatsApp', b: 'Execução de contrato' },
                                                     { d: 'Endereço', f: 'Exibição na vitrine e logística', b: 'Execução de contrato' },
                                                     { d: 'Dados bancários/gateway', f: 'Processamento de pagamentos (via Mercado Pago)', b: 'Execução de contrato' },
-                                                    { d: 'Fotos de produtos', f: 'Exibição na vitrine digital', b: 'Execução de contrato' }
+                                                    { d: 'Fotos e vídeos de produtos', f: 'Exibição na vitrine digital', b: 'Execução de contrato' }
                                                 ].map((item, i) => (
                                                     <tr key={i} className="hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors">
                                                         <td className="px-6 py-4 font-medium text-brand-dark dark:text-dark-heading">{item.d}</td>
@@ -123,7 +129,8 @@ export default function PrivacyPage() {
                                                     { d: 'E-mail', f: 'Confirmação de pedido e comunicação', b: 'Execução de contrato' },
                                                     { d: 'Telefone', f: 'Contato sobre pedido', b: 'Execução de contrato' },
                                                     { d: 'Endereço de entrega', f: 'Logística de entrega', b: 'Execução de contrato' },
-                                                    { d: 'Histórico de pedidos', f: 'Gestão de compras e suporte', b: 'Execução de contrato' }
+                                                    { d: 'Histórico de pedidos', f: 'Gestão de compras e suporte', b: 'Execução de contrato' },
+                                                    { d: 'Avaliações publicadas', f: 'Exibição na vitrine digital', b: 'Execução de contrato / Legítimo interesse' }
                                                 ].map((item, i) => (
                                                     <tr key={i} className="hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors">
                                                         <td className="px-6 py-4 font-medium text-brand-dark dark:text-dark-heading">{item.d}</td>
@@ -177,8 +184,8 @@ export default function PrivacyPage() {
                                 <p>Os dados coletados são utilizados exclusivamente para as seguintes finalidades:</p>
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
                                     <li><strong className="text-brand-dark">Execução do contrato:</strong> identificação, autenticação, processamento de pedidos, exibição na vitrine digital, comunicações operacionais e suporte ao Parceiro e ao Usuário.</li>
-                                    <li><strong className="text-brand-dark">Segurança e prevenção de fraudes:</strong> verificação de identidade, análise de logs de acesso e colaboração com autoridades competentes quando necessário e previsto em lei.</li>
-                                    <li><strong className="text-brand-dark">Logística:</strong> repasse de dados de endereço e contato a entregadores para viabilizar a entrega de pedidos.</li>
+                                    <li><strong className="text-brand-dark">Segurança e prevenção de fraudes:</strong> verificação de identidade, análise de logs de acesso, detecção automatizada e manual de comportamentos suspeitos, e colaboração com autoridades competentes quando necessário e previsto em lei.</li>
+                                    <li><strong className="text-brand-dark">Logística:</strong> repasse de dados de endereço e contato a transportadoras para viabilizar a entrega de pedidos.</li>
                                     <li><strong className="text-brand-dark">Melhoria da plataforma:</strong> análise de comportamento de navegação por meio de ferramentas analíticas (PostHog), de forma agregada e não identificável sempre que possível.</li>
                                     <li><strong className="text-brand-dark">Obrigações legais:</strong> manutenção de registros de acesso (Marco Civil da Internet) e de transações financeiras (legislação fiscal), pelo prazo exigido por lei.</li>
                                 </ul>
@@ -195,9 +202,11 @@ export default function PrivacyPage() {
                                 <p>A DUDIT <strong>não vende dados pessoais</strong> a terceiros. Os dados são compartilhados apenas nas seguintes situações:</p>
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
                                     <li><strong className="text-brand-dark">Mercado Pago:</strong> dados necessários para processar pagamentos online (nome, e-mail, CPF, valor da transação);</li>
-                                    <li><strong className="text-brand-dark">Cloudflare:</strong> dados de tráfego para segurança e proteção contra ataques;</li>
-                                    <li><strong className="text-brand-dark">Autoridades competentes:</strong> quando exigido por lei, ordem judicial ou para apuração de fraudes, conforme item 2.4 dos Termos de Uso.</li>
+                                    <li><strong className="text-brand-dark">Superfrete / Transportadoras:</strong> nome, endereço e telefone do destinatário para geração de etiquetas de envio;</li>
+                                    <li><strong className="text-brand-dark">Cloudflare:</strong> dados de tráfego para segurança e proteção contra ataques, e armazenamento de imagens, vídeos e arquivos (Cloudflare R2);</li>
+                                    <li><strong className="text-brand-dark">Autoridades competentes, mediante obrigação legal ou ordem judicial:</strong> quando exigido por lei, decisão judicial ou outra hipótese autorizada pela LGPD, para apuração de fraudes, ilícitos ou proteção de direitos, conforme item 2.4 dos Termos de Uso.</li>
                                 </ul>
+                                <p className="mt-4">A DUDIT não compartilha dados cadastrais de Parceiros diretamente com Usuários (ou vice-versa) que aleguem ter sido lesados, exceto quando amparada por obrigação legal, ordem judicial ou outra hipótese prevista na legislação aplicável.</p>
                             </div>
                         </div>
 
@@ -221,10 +230,11 @@ export default function PrivacyPage() {
                             <div className="space-y-6 md:pl-12 pl-6">
                                 <p><strong>5.1.</strong> Os dados são armazenados em servidores seguros (Supabase/Vercel), com criptografia em trânsito (HTTPS/TLS) e em repouso.</p>
                                 <p><strong>5.2.</strong> Chaves e tokens sensíveis são armazenados com criptografia adicional, com sistema de rotação de chaves (master key versionada) para garantir que eventual comprometimento não exponha dados históricos.</p>
-                                <p><strong>5.3.</strong> Senhas nunca são armazenadas em texto simples - utilizamos hash seguro (bcrypt ou equivalente).</p>
+                                <p><strong>5.3.</strong> Senhas nunca são armazenadas em texto simples — utilizamos hash seguro (bcrypt ou equivalente).</p>
                                 <p><strong>5.4.</strong> Tokens de integração com gateways de pagamento são criptografados e nunca expostos em logs ou interfaces.</p>
-                                <p><strong>5.5.</strong> A DUDIT adota moderação de conteúdo automatizada para imagens e textos, visando proteger a plataforma e seus usuários.</p>
-                                <p><strong>5.6.</strong> Apesar de todos os esforços técnicos, nenhum sistema é 100% inviolável. Em caso de incidente de segurança que afete dados pessoais, a DUDIT notificará os titulares afetados e a Autoridade Nacional de Proteção de Dados (ANPD) no prazo legal.</p>
+                                <p><strong>5.5.</strong> A DUDIT adota moderação de conteúdo automatizada para imagens, vídeos e textos, visando proteger a plataforma e seus usuários.</p>
+                                <p><strong>5.6. Armazenamento de Imagens, Vídeos e Arquivos:</strong> Imagens, vídeos e arquivos enviados por Parceiros e Usuários são armazenados em infraestrutura de terceiros (Cloudflare R2). Conteúdos públicos (imagens e vídeos de anúncios e da vitrine) passam por processo de moderação, conforme item 5.5 dos Termos de Uso. Arquivos e anexos de caráter privado, trocados entre Parceiro e Usuário, não são monitorados rotineiramente, mas a DUDIT possui acesso técnico a todo o conteúdo armazenado, o qual poderá ser acessado para fins de moderação, suporte, segurança, apuração de denúncias ou cumprimento de obrigação legal, sempre limitado a essas finalidades.</p>
+                                <p><strong>5.7.</strong> Apesar de todos os esforços técnicos, nenhum sistema é 100% inviolável. Em caso de incidente de segurança que afete dados pessoais, a DUDIT notificará os titulares afetados e a Autoridade Nacional de Proteção de Dados (ANPD) no prazo legal.</p>
                             </div>
                         </div>
 
@@ -248,7 +258,7 @@ export default function PrivacyPage() {
                                                 { t: 'Dados de cadastro (após exclusão)', p: 'Até 6 meses (para fins de segurança e disputas)' },
                                                 { t: 'Logs de acesso (IP, data, hora)', p: '6 meses (conforme Marco Civil da Internet)' },
                                                 { t: 'Dados de transações financeiras', p: '5 anos (obrigação fiscal e legal)' },
-                                                { t: 'Dados de pedidos', p: '5 anos (CDC - prazo de prescrição)' }
+                                                { t: 'Dados de pedidos', p: '5 anos (CDC — prazo de prescrição)' }
                                             ].map((item, i) => (
                                                 <tr key={i} className="hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors">
                                                     <td className="px-6 py-4 font-medium text-brand-dark dark:text-dark-heading">{item.t}</td>

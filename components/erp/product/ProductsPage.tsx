@@ -1090,9 +1090,9 @@ export default function ProductsPage({
                 isOpen={confirmations.delete}
                 onClose={() => setConfirmations((p) => ({ ...p, delete: false }))}
                 onConfirm={confirmDelete}
-                title="Excluir"
-                message="Tem certeza que deseja excluir este produto?"
-                confirmText="Excluir"
+                title="Arquivar Produto"
+                message="O item será arquivado e deixará de aparecer nos locais públicos e listagens, mas continuará disponível para preservar o histórico."
+                confirmText="Arquivar"
                 icon={<TrashIcon />}
                 variant="danger"
             />
@@ -1100,9 +1100,9 @@ export default function ProductsPage({
                 isOpen={confirmations.bulkDelete}
                 onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
                 onConfirm={() => confirmBulk("delete")}
-                title="Excluir Produtos"
-                message={`Tem certeza que deseja excluir ${selection.ids.size} produtos? Esta ação não pode ser desfeita.`}
-                confirmText="Excluir"
+                title="Arquivar Produtos"
+                message={`Os ${selection.ids.size} produtos selecionados serão arquivados e deixarão de aparecer nos locais públicos e listagens, mas continuarão disponíveis para preservar o histórico.`}
+                confirmText="Arquivar"
                 variant="danger"
             />
 

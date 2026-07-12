@@ -838,9 +838,9 @@ export default function ServicesPage({
                 isOpen={confirmations.delete}
                 onClose={() => setConfirmations(p => ({ ...p, delete: false }))}
                 onConfirm={confirmDelete}
-                title="Excluir Serviço"
-                description={`Tem certeza que deseja excluir o serviço "${selection.delete?.name}"? Esta ação não pode ser desfeita.`}
-                confirmText="Excluir"
+                title="Arquivar Serviço"
+                description="O item será arquivado e deixará de aparecer nos locais públicos e listagens, mas continuará disponível para preservar o histórico."
+                confirmText="Arquivar"
                 cancelText="Cancelar"
                 variant="danger"
             />
@@ -849,9 +849,9 @@ export default function ServicesPage({
                 isOpen={confirmations.bulkDelete}
                 onClose={() => setConfirmations(p => ({ ...p, bulkDelete: false }))}
                 onConfirm={() => confirmBulk("delete")}
-                title="Excluir Serviços"
-                description={`Tem certeza que deseja excluir ${selection.ids.size} serviços? Esta ação não pode ser desfeita.`}
-                confirmText="Excluir"
+                title="Arquivar Serviços"
+                description={`Os ${selection.ids.size} serviços selecionados serão arquivados e deixarão de aparecer nos locais públicos e listagens, mas continuarão disponíveis para preservar o histórico.`}
+                confirmText="Arquivar"
                 cancelText="Cancelar"
                 variant="danger"
             />

@@ -17,6 +17,9 @@ import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
+import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { logAuditEvent } from "@/lib/services/timeline.service"
+import { headers } from "next/headers"
 
 const getBrasiliaTime = () => new Date(new Date().getTime() - 3 * 60 * 60 * 1000).toISOString()
 
@@ -61,7 +64,7 @@ const ERP_SERVICES_PAGE_SIZE = 100
 
 export async function getERPServicesPageAction(
     partnerId: string,
-    options?: { cursor?: ERPServiceListCursor | null; limit?: number },
+    options?: { cursor?: ERPServiceListCursor | null; limit?: number; filters?: any },
 ): Promise<
     | { success: true; items: any[]; nextCursor: ERPServiceListCursor | null; hasMore: boolean }
     | { success: false; error: string }
@@ -79,6 +82,10 @@ export async function getERPServicesPageAction(
             .from("services")
             .select("id, name, category_id, subcategory_id, price, cost_price, is_active, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
             .eq("partner_id", partnerId)
+
+        if (!options?.filters?.includeArchived) {
+            q = scopeActiveOnly(q)
+        }
 
         if (cursor) {
             q = q.or(buildServicesKeysetOrFilter(cursor))
@@ -363,31 +370,42 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
     }
 }
 
-export async function deleteServiceAction(serviceId: string): Promise<ActionResponse<any>> {
+export async function deleteServiceAction(serviceId: string, reason?: string | null): Promise<ActionResponse<any>> {
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const user = await requireUser()
         if (!user) return errorResponse("Não autenticado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, video_type, video_url, video_thumbnail").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePermission(existing.partner_id, "services", "delete", user)
 
-        const supabase = await getSupabaseServerClient()
-        const { error } = await supabase.from("services").delete().eq("id", serviceId)
-
+        // 1. Soft delete update payload
+        const payload = buildSoftDeletePayload(user.id, reason)
+        const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
 
-        if (existing.video_type === "upload") {
-            const { extractKeyFromR2Url, deleteFileFromR2 } = await import("@/lib/r2/server")
-            const cleanup = [existing.video_url, existing.video_thumbnail].filter(Boolean).map(async (url: string) => {
-                const key = url.startsWith("http") ? extractKeyFromR2Url(url) : url
-                if (key) await deleteFileFromR2(key)
-            })
-            Promise.all(cleanup).catch(console.error)
-        }
+        // 2. Fetch IP and write to audit logs (logAuditEvent)
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        await logAuditEvent({
+            partnerId: existing.partner_id,
+            actorUserId: user.id,
+            entityType: "service",
+            entityId: serviceId,
+            actionType: "deleted",
+            changeLines: [`Arquivou o serviço: ${existing.name} (SKU: ${existing.sku || 'N/A'})`],
+            metadata: {
+                ip_address: ip,
+                deleted_reason: reason || "Nenhum motivo informado",
+                name: existing.name,
+                sku: existing.sku
+            },
+            source: "manual"
+        })
 
         revalidatePath("/erp/servicos")
         return successResponse({ deleted: true })
@@ -396,7 +414,50 @@ export async function deleteServiceAction(serviceId: string): Promise<ActionResp
     }
 }
 
-export async function deleteServicesInBatchAction(serviceIds: string[]): Promise<ActionResponse<any>> {
+export async function restoreServiceAction(serviceId: string): Promise<ActionResponse<any>> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const user = await requireUser()
+        if (!user) return errorResponse("Não autenticado")
+
+        const admin = getAdminClient()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
+        if (fetchError || !existing) return errorResponse("Serviço não encontrado")
+
+        await requirePermission(existing.partner_id, "services", "edit", user)
+
+        // 1. Explicit restore update
+        const payload = buildRestorePayload()
+        const { error } = await admin.from("services").update(payload).eq("id", serviceId)
+        if (error) return errorResponse(error.message)
+
+        // 2. Fetch IP and write to audit logs
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        await logAuditEvent({
+            partnerId: existing.partner_id,
+            actorUserId: user.id,
+            entityType: "service",
+            entityId: serviceId,
+            actionType: "restored",
+            changeLines: [`Restaurou o serviço: ${existing.name} (SKU: ${existing.sku || 'N/A'})`],
+            metadata: {
+                ip_address: ip,
+                name: existing.name,
+                sku: existing.sku
+            },
+            source: "manual"
+        })
+
+        revalidatePath("/erp/servicos")
+        return successResponse({ restored: true })
+    } catch (error: any) {
+        return errorResponse(error.message)
+    }
+}
+
+export async function deleteServicesInBatchAction(serviceIds: string[], reason?: string | null): Promise<ActionResponse<any>> {
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const user = await requireUser()
@@ -405,7 +466,7 @@ export async function deleteServicesInBatchAction(serviceIds: string[]): Promise
         if (!serviceIds || serviceIds.length === 0) return errorResponse("Nenhum serviço selecionado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("id, partner_id").in("id", serviceIds)
+        const { data: existing, error: fetchError } = await admin.from("services").select("id, partner_id, name, sku").in("id", serviceIds)
         if (fetchError || !existing || existing.length === 0) return errorResponse("Serviços não encontrados")
 
         const partnerId = existing[0].partner_id
@@ -413,10 +474,32 @@ export async function deleteServicesInBatchAction(serviceIds: string[]): Promise
 
         await requirePermission(partnerId, "services", "delete", user)
 
-        const supabase = await getSupabaseServerClient()
-        const { error } = await supabase.from("services").delete().in("id", serviceIds)
-
+        // 1. Explicit batch update (soft delete)
+        const payload = buildSoftDeletePayload(user.id, reason)
+        const { error } = await admin.from("services").update(payload).in("id", serviceIds)
         if (error) return errorResponse(error.message)
+
+        // 2. Log audit event for each service in batch
+        const reqHeaders = await headers()
+        const ip = reqHeaders.get("x-forwarded-for") || "127.0.0.1"
+
+        for (const s of existing) {
+            await logAuditEvent({
+                partnerId: partnerId,
+                actorUserId: user.id,
+                entityType: "service",
+                entityId: s.id,
+                actionType: "deleted",
+                changeLines: [`Arquivou o serviço em lote: ${s.name} (SKU: ${s.sku || 'N/A'})`],
+                metadata: {
+                    ip_address: ip,
+                    deleted_reason: reason || "Exclusão em lote",
+                    name: s.name,
+                    sku: s.sku
+                },
+                source: "manual"
+            })
+        }
 
         revalidatePath("/erp/servicos")
         return successResponse({ deletedCount: serviceIds.length })

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getQuickModeHomeDataAction } from "@/app/actions/erp/quick-mode"
 import QuickModeHome from "@/components/erp/quick-mode/QuickModeHome"
-import { SkeletonLoader } from "@/components/reusable"
+import { IconPlaceholder, SkeletonLoader } from "@/components/reusable"
 
 export const metadata = {
     title: "Painel de Vendas - Dudit Marketplace",
@@ -11,7 +11,7 @@ export const metadata = {
 
 export default async function PainelPage() {
     const context = await getCurrentPartnerContext()
-    
+
     if (!context) {
         redirect("/erp/switch")
     }
@@ -26,10 +26,13 @@ export default async function PainelPage() {
 
     if (!result.success) {
         return (
-            <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
-                <h1 className="text-xl font-bold text-brand-red">Erro ao carregar dados</h1>
-                <p className="text-brand-inactive-text dark:text-dark-body mt-2">{result.error}</p>
-            </div>
+            <IconPlaceholder
+                placeholderType="image"
+                imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                imageAlt="Erro"
+                title="Ops! Algo deu errado por aqui"
+                subtitle={result.error}
+            />
         )
     }
 
@@ -49,7 +52,7 @@ function QuickModeLoadingSkeleton() {
                 <SkeletonLoader className="h-10 w-64" />
                 <SkeletonLoader className="h-6 w-96" />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <SkeletonLoader className="h-32 rounded-3xl" />
                 <SkeletonLoader className="h-32 rounded-3xl" />

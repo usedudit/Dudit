@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 import { getDateComponents } from "@/lib/date"
 import type { Period } from "@/lib/period-types"
+import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 
 function getDateRangeForPeriod(period: Period, todayOverride?: string) {
   const today = todayOverride || getTodayYmdSaoPaulo()
@@ -195,7 +196,7 @@ async function getCachedGeneral(partnerId: string): Promise<GeneralDashboardData
         supabase.from("orders").select("id, order_number, customer_name, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${previousFrom}T00:00:00`).order("created_at", { ascending: false }).limit(120),
         supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, status, price, staff_name, source").eq("partner_id", partnerId).gte("start_date", today).lte("start_date", next7).order("start_date").order("start_time").limit(60),
         supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type").eq("partner_id", partnerId).or(`created_at.gte.${from}T00:00:00,due_date.gte.${today}`).order("created_at", { ascending: false }).limit(400),
-        supabase.from("products").select("id, name, stock_quantity, is_active, category_id, category:product_categories!category_id(name)").eq("partner_id", partnerId).eq("is_active", true).order("stock_quantity").limit(80),
+        scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, is_active, category_id, category:product_categories!category_id(name)").eq("partner_id", partnerId).eq("is_active", true)).order("stock_quantity").limit(80),
       ])
 
       if (orders.error) throw orders.error
@@ -285,7 +286,7 @@ async function getCachedProducts(partnerId: string): Promise<ProductsDashboardDa
       const today = getTodayYmdSaoPaulo()
       const from = addDays(today, -29)
       const [products, orders, items] = await Promise.all([
-        supabase.from("products").select("id, name, stock_quantity, price, is_active, created_at, category_id, category:product_categories!category_id(name)").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(300),
+        scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, price, is_active, created_at, category_id, category:product_categories!category_id(name)").eq("partner_id", partnerId)).order("created_at", { ascending: false }).limit(300),
         supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).order("created_at", { ascending: false }).limit(300),
         supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(600),
       ])
@@ -344,7 +345,7 @@ async function getCachedServices(partnerId: string): Promise<ServicesDashboardDa
       const from = addDays(today, -29)
       const [appointments, services] = await Promise.all([
         supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, staff_name, status, price, source").eq("partner_id", partnerId).gte("start_date", from).order("start_date", { ascending: false }).order("start_time").limit(400),
-        supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, service_categories(name)").eq("partner_id", partnerId).eq("is_active", true).limit(300),
+        scopeActiveOnly(supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, service_categories(name)").eq("partner_id", partnerId).eq("is_active", true)).limit(300),
       ])
       if (appointments.error) throw appointments.error
       if (services.error) throw services.error
@@ -615,7 +616,7 @@ async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promi
 
       // Conditional: low stock (only if sells products)
       if (sells.includes("products")) {
-        const { data: prodData } = await supabase.from("products").select("id, stock_quantity").eq("partner_id", partnerId).eq("is_active", true).lte("stock_quantity", 5).limit(50)
+        const { data: prodData } = await scopeActiveOnly(supabase.from("products").select("id, stock_quantity").eq("partner_id", partnerId).eq("is_active", true).lte("stock_quantity", 5)).limit(50)
         const lowStock = (prodData || []).filter((p: any) => p.stock_quantity != null)
         if (lowStock.length > 0) {
           alerts.push({ id: "low-stock", message: `${lowStock.length} produto${lowStock.length > 1 ? "s" : ""} com estoque baixo`, count: lowStock.length, tone: "red", icon: "package" })
