@@ -27,7 +27,7 @@ import {
     PlayIcon,
     MailIcon,
 } from "@/lib/icons";
-import { Button, Badge, ListItem, FormSection, DefaultModal } from "@/components/reusable";
+import { Button, Badge, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
 import { Tooltip } from "@/components/reusable/Tooltip"
 import { useToast } from "@/hooks/use-toast";
 import QuickModeItemCard from "./QuickModeItemCard";
@@ -69,12 +69,13 @@ interface DashboardChecklistItem {
 // SUB-COMPONENTS
 // ============================================
 
-function QRCodeCard({ partnerId, storeName }: { partnerId: string; storeName: string }) {
+function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: string }) {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
     const [copied, setCopied] = useState(false);
     const { toast } = useToast();
 
-    const profileUrl = `${typeof window !== "undefined" ? window.location.origin : "https://dudit.com.br"}/perfil/${partnerId}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://dudit.com.br";
+    const profileUrl = `${origin}${partnerUrl}`;
 
     React.useEffect(() => {
         setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(profileUrl)}`);
@@ -320,19 +321,16 @@ function ProgressCard({
                             item.completed ? (
                                 <CheckCircleIcon size={22} className="text-brand-green shrink-0" />
                             ) : (
-                                <div className="w-[22px] h-[22px] rounded-full border-2 border-brand-green/30 dark:border-brand-green/20 flex items-center justify-center text-xs font-black text-brand-green shrink-0">
+                                <div>
                                     {idx + 1}
                                 </div>
                             )
                         }
                         title={
                             <div className="flex items-center gap-2">
-                                <span className={`text-[15px] ${item.completed ? 'line-through text-brand-dark/70 dark:text-dark-heading/70' : 'text-brand-dark dark:text-dark-heading'}`}>
+                                <span className={`${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
                                     {item.title}
                                 </span>
-                                {item.completed && (
-                                    <Badge variant="green" className="text-[10px] py-0.5 px-2">Concluído</Badge>
-                                )}
                             </div>
                         }
                         description={item.description}
@@ -344,13 +342,13 @@ function ProgressCard({
                                     e.stopPropagation();
                                     onItemClick(item);
                                 }}
-                                className={item.completed ? "text-brand-inactive-text border-brand-border h-9 shrink-0" : "h-9 shrink-0"}
+                                className={item.completed ? "hidden" : "h-9 shrink-0"}
                             >
                                 {item.completed ? "Configurar" : "Começar"}
                             </Button>
                         }
                         onClick={() => onItemClick(item)}
-                        className={`border-0 shadow-sm ${item.completed ? 'bg-brand-gray/20 dark:bg-dark-border/20' : 'bg-brand-green/5 dark:bg-brand-green/10'}`}
+                        className="px-4 py-3 gap-4 border-0"
                     />
                 ))}
             </div>
@@ -838,8 +836,6 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
         }
     };
 
-    const isQuickMode = data.isQuickMode;
-
     return (
         <>
             <ERPPageHeader title={data.storeName || "Início"} />
@@ -874,59 +870,52 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                 {data.alerts.length > 0 && (
                     <div className="flex flex-col gap-4">
                         {data.alerts.map((alert) => (
-                            <motion.div
-                                key={alert.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className={`border rounded-2xl p-5 flex items-start gap-4 shadow-sm transition-all ${alert.type === "danger"
-                                    ? "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/20 dark:border-red-900/40 dark:text-red-300"
-                                    : alert.type === "warning"
-                                        ? "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300"
-                                        : "bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/40 dark:text-blue-300"
-                                    }`}
-                            >
-                                <div className="shrink-0 mt-0.5 text-brand-dark dark:text-dark-heading">
-                                    <AlertTriangleIcon size={20} className={alert.type === "danger" ? "text-brand-red" : alert.type === "warning" ? "text-amber-500" : "text-blue-500"} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="text-[15px] font-bold">{alert.title}</h4>
-                                    <p className="text-[13px] font-medium mt-1 opacity-90">{alert.description}</p>
-                                </div>
-                                {alert.actionLabel && alert.actionHref && (
-                                    <Button
-                                        variant={alert.type === "danger" ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => router.push(alert.actionHref!)}
-                                        className={`shrink-0 rounded-full font-bold ${alert.type === "danger" ? "bg-brand-red hover:bg-brand-red/90 border-none text-white" : ""
-                                            }`}
-                                    >
-                                        {alert.actionLabel}
-                                    </Button>
-                                )}
-                            </motion.div>
+                            <InfoCard
+                                key={alert.id ?? alert.title}
+                                title={alert.title}
+                                message={alert.description}
+                                color={
+                                    alert.type === "danger"
+                                        ? "orange"
+                                        : alert.type === "warning"
+                                            ? "red"
+                                            : undefined
+                                }
+                                rightElement={
+                                    alert.actionLabel &&
+                                    alert.actionHref && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => router.push(alert.actionHref!)}
+                                        >
+                                            {alert.actionLabel}
+                                        </Button>
+                                    )
+                                }
+                            />
                         ))}
                     </div>
                 )}
 
                 {/* Main Grid - Progress Card (2/3) + QR Code Card (1/3) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                < div className="grid grid-cols-1 lg:grid-cols-12 gap-6" >
                     {/* Progress/Onboarding Card - 2/3 width */}
-                    <div className="lg:col-span-8">
-                        {data.checklist && (
-                            <ProgressCard
-                                checklist={data.checklist}
-                                onItemClick={handleChecklistItemClick}
-                                onImportClick={handleImportClick}
-                            />
-                        )}
+                    < div className="lg:col-span-8" >
+                        {
+                            data.checklist && (
+                                <ProgressCard
+                                    checklist={data.checklist}
+                                    onItemClick={handleChecklistItemClick}
+                                    onImportClick={handleImportClick}
+                                />
+                            )
+                        }
                     </div>
 
-                    {/* QR Code Card - 1/3 width (only in quick mode) */}
-                    {isQuickMode && (
-                        <div className="lg:col-span-4">
-                            <QRCodeCard partnerId={partnerId} storeName={data.storeName || "Sua Loja"} />
-                        </div>
-                    )}
+                    {/* QR Code Card - 1/3 width */}
+                    <div className="lg:col-span-4">
+                        <QRCodeCard partnerUrl={data.partnerUrl} storeName={data.storeName || "Sua Loja"} />
+                    </div>
                 </div>
 
                 {/* Adaptive Bottom Cards - Plan/Integrations, Shortcuts, Help */}
@@ -953,37 +942,6 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     <HelpCard />
                 </div>
 
-                {/* Dicas (apenas tip, upgrade movido para o card adaptativo) */}
-                {data.recommendations.filter(r => r.variant === "tip").length > 0 && (
-                    <div className="flex flex-col gap-6">
-                        {data.recommendations.filter(r => r.variant === "tip").map((rec) => (
-                            <motion.div
-                                key={rec.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green shrink-0 mt-0.5">
-                                        <InfoIcon size={22} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">
-                                            {rec.title}
-                                        </h3>
-                                        <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed max-w-2xl">
-                                            {rec.description}
-                                        </p>
-                                    </div>
-                                </div>
-                                <Button variant="outline" className="shrink-0 rounded-full font-bold" onClick={() => router.push(rec.actionHref)}>
-                                    {rec.actionLabel}
-                                </Button>
-                            </motion.div>
-                        ))}
-                    </div>
-                )}
-
                 {/* Import Modal */}
                 <ImportOptionsModal
                     isOpen={showImportModal}
@@ -1004,7 +962,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     cancelText="Cancelar"
                     variant="danger"
                 />
-            </div>
+            </div >
         </>
     )
 }

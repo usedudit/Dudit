@@ -9,11 +9,11 @@ import { getUserSessionData } from "@/lib/data/user"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
 import {
-  getPartnerProfile,
-  getPartnerProducts,
-  getPartnerServices,
-  getPartnerReviews,
-  getPartnerStats,
+  getCachedPartnerProfile as getPartnerProfile,
+  getCachedPartnerProducts as getPartnerProducts,
+  getCachedPartnerServices as getPartnerServices,
+  getCachedPartnerReviews as getPartnerReviews,
+  getCachedPartnerStats as getPartnerStats,
   getPartnerPublicCoupons,
 } from "@/app/actions/marketplace/partners"
 import { getPartnerPlan } from "@/lib/services/subscription.service"

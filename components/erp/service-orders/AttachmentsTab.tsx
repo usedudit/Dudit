@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { Button, FormSection, Accordion, IconPlaceholder } from "@/components/reusable"
+import { Button, FormSection, Accordion, IconPlaceholder, DefaultModal } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -11,6 +11,7 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade, planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { getServiceOrderAttachmentUrlAction } from "@/app/actions/erp/service-orders"
+import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
@@ -42,6 +43,8 @@ export default function AttachmentsTab({
     const [showCropper, setShowCropper] = useState(false)
     const [imageForCrop, setImageForCrop] = useState<File | null>(null)
     const [pendingCategory, setPendingCategory] = useState<"normal" | "antes" | "depois">("normal")
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+    const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
 
     useEffect(() => {
         setLocalAttachments(attachments)
@@ -125,6 +128,18 @@ export default function AttachmentsTab({
         onChange?.(updated, deletedIds)
     }
 
+    const requestDeleteDoc = (docId: string) => {
+        setDeletingDocId(docId)
+        setDeleteModalOpen(true)
+    }
+
+    const confirmDeleteDoc = () => {
+        if (!deletingDocId) return
+        handleDeleteDoc(deletingDocId)
+        setDeleteModalOpen(false)
+        setDeletingDocId(null)
+    }
+
     const handleDownloadDoc = async (fileKey: string, fileName: string) => {
         try {
             const res = await getServiceOrderAttachmentUrlAction(partnerId, fileKey)
@@ -178,7 +193,7 @@ export default function AttachmentsTab({
                                 {doc.file_name || doc.file?.name || "Documento"}
                             </p>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                {doc.file ? "Pendente de salvamento" : "Salvo"}
+                                {doc.file ? "Pendente de salvamento" : (doc.file_size ? formatFileSize(doc.file_size) : "Salvo")}
                             </p>
                         </div>
                         {isEditing && (
@@ -186,7 +201,7 @@ export default function AttachmentsTab({
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation()
-                                    handleDeleteDoc(doc.id)
+                                    requestDeleteDoc(doc.id)
                                 }}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg"
                             >
@@ -213,20 +228,38 @@ export default function AttachmentsTab({
                     isEditing={isEditing}
                 />
 
-                {renderDocsGrid(docs)}
-
-                {isEditing && (
-                    <div className="flex justify-end pt-2">
-                        <Button
-                            type="button"
-                            variant="link"
-                            onClick={() => handleDocUploadClick(category)}
-                            className="text-xs gap-1.5"
-                        >
-                            <UploadIcon className="w-4 h-4" />
-                            Adicionar Documento (PDF, etc.)
-                        </Button>
-                    </div>
+                {docs.length === 0 ? (
+                    isEditing && (
+                        <div className="py-6 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/10 dark:bg-dark-border/5">
+                            <IconPlaceholder
+                                icon={FileIcon}
+                                title="Nenhum documento adicionado"
+                                subtitle="Adicione documentos em PDF, Word, Excel, etc. para esta OS."
+                                itemButton={{
+                                    text: "Adicionar Documento",
+                                    action: () => handleDocUploadClick(category),
+                                    variant: "outline",
+                                }}
+                            />
+                        </div>
+                    )
+                ) : (
+                    <>
+                        {renderDocsGrid(docs)}
+                        {isEditing && (
+                            <div className="flex justify-end pt-2">
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    onClick={() => handleDocUploadClick(category)}
+                                    className="text-xs gap-1.5"
+                                >
+                                    <UploadIcon className="w-4 h-4" />
+                                    Adicionar Documento (PDF, etc.)
+                                </Button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         )
@@ -396,6 +429,37 @@ export default function AttachmentsTab({
                     onClose={() => { setShowCropper(false); setImageForCrop(null) }}
                     onCropComplete={handleCropComplete}
                 />
+            )}
+
+            {deleteModalOpen && (
+                <DefaultModal
+                    isOpen={deleteModalOpen}
+                    onClose={() => setDeleteModalOpen(false)}
+                    title="Excluir Anexo"
+                    maxWidth="sm"
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita.
+                        </p>
+                        <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setDeleteModalOpen(false)}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={confirmDeleteDoc}
+                            >
+                                Confirmar Exclusão
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
             )}
         </>
     )

@@ -58,7 +58,7 @@ Apenas acesse a página do portal gestor clicando aqui: https://dudit.com.br/aut
 ## Visão geral
 O acesso à plataforma Dudit é o ponto de partida para gerenciar seu negócio ou realizar compras. Oferecemos métodos de autenticação seguros e rápidos para garantir que você chegue ao que importa com poucos cliques.
 
-![Tela de Login](https://img.dudit.com.br/static/Help_Login_Screen.png)
+![Tela de Login](https://img.dudit.com.br/static/screens/Login.png)
 
 ## O que é possível fazer
 *   Entrar com E-mail e Senha.
@@ -108,9 +108,9 @@ Certifique-se de que o *Caps Lock* não está ativado. Se persistir, utilize a o
                 category: "login-registro",
                 content: `
 ## Visão geral
-Seja você um cliente em busca de produtos locais ou um empreendedor pronto para abrir sua loja, o primeiro passo é criar sua conta na Dudit. O processo é simples e focado na segurança dos seus dados.
+Seja você um cliente em busca de produtos locais ou um empreendedor pronto para abrir seu negócio, o primeiro passo é criar sua conta na Dudit. O processo é simples e focado na segurança dos seus dados.
 
-![Tela de Cadastro](https://img.dudit.com.br/static/Help_Signup_Screen.png)
+![Tela de Cadastro](https://img.dudit.com.br/static/screens/Cadastro.png)
 
 ## O que é possível fazer
 *   Criar uma conta nova usando seu e-mail.

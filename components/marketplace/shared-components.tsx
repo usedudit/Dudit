@@ -11,7 +11,7 @@ import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from "@/lib/u
 import { formatCurrency } from "@/lib/utils";
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
-import { Badge, Button } from "@/components/reusable"
+import { Badge } from "@/components/reusable"
 import { useFavorites } from "@/providers/favorites-provider"
 import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -25,14 +25,6 @@ const HOME_BANNERS = [
 const HOME_CATEGORIES = [
     { name: 'Decoração', image: 'https://img.dudit.com.br/static/Placeholder.png' },
 ];
-
-function getProductImageUrl(images: string[] | null | undefined): string {
-    if (!images || images.length === 0) return "https://img.dudit.com.br/static/Placeholder.png"
-    const firstImage = images[0]
-    return getR2ImageUrl(firstImage)
-}
-
-const DURATION = 5000;
 
 export const HeroBanner: React.FC<{ height?: number }> = ({ height = 300 }) => {
     return (
@@ -153,6 +145,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({ vitrines = [] }) => 
                     <div className="text-gray-500 font-normal text-sm md:text-base">Explore lojas e encontre itens únicos da sua região.</div>
                 </div>
                 <Link
+                    prefetch={false}
                     href="/explorar?type=vitrines"
                     className="hidden md:flex font-bold text-brand-green hover:underline text-sm mb-1 items-center gap-1"
                 >
@@ -508,7 +501,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                     </div>
                     <Link
                         href={seeMoreLink}
-                        prefetch={true}
+                        prefetch={false}
                         className="hidden md:flex font-bold text-brand-green hover:underline text-sm mb-1 items-center gap-1"
                     >
                         Exibir mais <ChevronRightIcon size={16} />
@@ -573,7 +566,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                 </div>
                 <Link
                     href={seeMoreLink}
-                    prefetch={true}
+                    prefetch={false}
                     className="hidden md:flex font-bold text-brand-green hover:underline text-sm mb-1 items-center gap-1"
                 >
                     Exibir mais <ChevronRightIcon size={16} />

@@ -302,17 +302,17 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
     if (videoPlanBlocked) {
         return (
             <div className="mt-6 border-t border-brand-border dark:border-dark-border pt-6">
-                <div className="flex flex-col items-center py-10 text-center">
-                    <div className="w-24 h-24 mb-4 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                        <LockIcon className="w-10 h-10 text-amber-500" />
-                    </div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Vídeo</h3>
-                    <p className="text-sm text-brand-inactive-text mb-6 max-w-md">
-                        Adicione vídeos aos seus {itemType === "product" ? "produtos" : "serviços"} para aumentar o engajamento. Disponível nos planos Crescer e Escalar.
-                    </p>
-                    <Button type="button" onClick={() => openPlanUpgrade("crescer")} className="bg-amber-500 hover:bg-amber-600 text-white">
-                        Fazer upgrade
-                    </Button>
+                <div className="flex flex-col items-center">
+                    <IconPlaceholder
+                        icon={LockIcon}
+                        title="Vídeo"
+                        subtitle={"Adicione vídeos aos seus " + (itemType === "product" ? "produtos" : "serviços") + " para aumentar o engajamento. Disponível nos planos Crescer e Escalar."}
+                        itemButton={{
+                            text: "Fazer upgrade",
+                            action: () => openPlanUpgrade("crescer"),
+                            variant: "outline"
+                        }}
+                    />
                 </div>
             </div>
         )

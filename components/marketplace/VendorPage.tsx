@@ -615,7 +615,7 @@ function pickBestSection(sections: any[]): any | null {
     )
     const benefitSections = sections.filter(
         s => s.promotion.promotionType === PromotionType.BUY_X_PAY_Y ||
-             s.promotion.promotionType === PromotionType.GIFT
+            s.promotion.promotionType === PromotionType.GIFT
     )
 
     const bestDiscount = discountSections.length > 0

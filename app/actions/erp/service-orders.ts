@@ -751,6 +751,18 @@ export async function saveAttachmentAction(
       },
     })
 
+    // 5. Timeline Audit Log (Service Order History)
+    const { logAuditEvent } = await import("@/lib/services/timeline.service")
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "service_order",
+      entityId: serviceOrderId,
+      actionType: "attachment_created",
+      source: "manual",
+      changeLines: [`Anexo adicionado: ${fileName}`],
+    })
+
     revalidatePath("/erp/service-orders")
     return { success: true, data }
   } catch (err: any) {
@@ -785,7 +797,7 @@ export async function deleteAttachmentAction(
 
     const { data: attachment } = await admin
       .from("service_order_attachments")
-      .select("file_key")
+      .select("file_key, file_name")
       .eq("id", attachmentId)
       .single()
 
@@ -800,7 +812,7 @@ export async function deleteAttachmentAction(
       partnerId, actorUserId: user.id,
       entityType: "service_order", entityId: serviceOrderId,
       actionType: "attachment_deleted", source: "manual",
-      changeLines: ["Anexo removido"],
+      changeLines: [`Anexo removido: ${attachment?.file_name || "Documento"}`],
     })
 
     revalidatePath("/erp/service-orders")

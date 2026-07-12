@@ -99,8 +99,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             disabled={!isEditing}
                         />
                     </div>
-
-                    <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
                 </FormSection>
 
                 {/*
@@ -214,6 +212,10 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         </div>
                     </Accordion>
                 </div>
+
+                <FormSection title="Vídeos" hasSeparator>
+                    <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
+                </FormSection>
             </div>
 
             {/* --- COLUNA DIREITA (SIDEBAR) --- */}

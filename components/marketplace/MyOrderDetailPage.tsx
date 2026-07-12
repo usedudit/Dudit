@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
@@ -13,6 +13,7 @@ import { cancelBuyerOrderAction, confirmOrderFulfillmentAction } from '@/app/act
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/actions/erp/orders';
 import { FileIcon } from '@/lib/icons';
+import { formatFileSize } from '@/components/erp/orders/OrderAttachmentsTab';
 import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
 import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
@@ -1643,11 +1644,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </TabsContent>
 
                         <TabsContent value="attachments" className="mt-0 focus-visible:ring-0">
-                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border">
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Anexos do Pedido</h3>
+                            <FormSection title="Anexos do Pedido">
                                 {loadingAttachments ? (
                                     <div className="flex justify-center py-8">
-                                        <Spinner className="w-8 h-8 text-brand-primary" />
+                                        <ThreeDotsLoader />
                                     </div>
                                 ) : attachments.length === 0 ? (
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum anexo encontrado para este pedido.</p>
@@ -1667,14 +1667,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         {att.file_name || "Documento"}
                                                     </p>
                                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : "Tamanho desconhecido"}
+                                                        {formatFileSize(att.file_size)}
                                                     </p>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-                            </div>
+                            </FormSection>
                         </TabsContent>
                     </Tabs>
                 </div>

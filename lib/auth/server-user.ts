@@ -3,7 +3,7 @@ import { cache } from "react"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { User } from "@supabase/supabase-js"
 
-import { headers } from "next/headers"
+import { headers, cookies } from "next/headers"
 
 /**
  * Single request-scoped auth resolver.
@@ -19,7 +19,8 @@ const requestCache = new WeakMap<any, User | null>()
  * Ensures `auth.getUser()` is called AT MOST ONCE per server request.
  * 1. Checks internal module-level request cache (deduplication across util functions in Route Handlers).
  * 2. Checks middleware headers (Fast path - no DB call).
- * 3. Fallback to Supabase verification (Slow path - cached for current request).
+ * 3. Decodes Supabase session cookie locally (Fast path 2 - no DB call).
+ * 4. Fallback to Supabase verification (Slow path - cached for current request).
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
     // 0. Use headers() object as a request-specific identifier key
@@ -59,7 +60,49 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
         return user
     }
 
-    // 3. Fallback to full Supabase verification if headers are missing
+    // 3. Fast-path: Decode the Supabase JWT token from cookies locally.
+    // Safe because the cookie has already passed through the Next.js Middleware.
+    try {
+        const cookieStore = await cookies()
+        const authCookies = cookieStore.getAll()
+            .filter(c => c.name.startsWith("sb-") && c.name.includes("-auth-token"))
+            .sort((a, b) => a.name.localeCompare(b.name))
+
+        if (authCookies.length > 0) {
+            const rawValue = authCookies.map(c => c.value).join("")
+            let accessToken: string | null = null
+            if (rawValue.startsWith("[") || rawValue.startsWith("{")) {
+                const parsed = JSON.parse(rawValue)
+                accessToken = Array.isArray(parsed) ? parsed[0] : parsed.access_token
+            } else {
+                accessToken = rawValue
+            }
+
+            if (accessToken) {
+                const parts = accessToken.split(".")
+                if (parts.length === 3) {
+                    const base64Payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+                    const payload = JSON.parse(Buffer.from(base64Payload, "base64").toString("utf-8"))
+                    if (payload && payload.sub && payload.exp && payload.exp > Date.now() / 1000) {
+                        const user = {
+                            id: payload.sub,
+                            email: payload.email || undefined,
+                            app_metadata: {},
+                            user_metadata: {},
+                            aud: "authenticated",
+                            created_at: "",
+                        } as User
+                        requestCache.set(headerList, user)
+                        return user
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // Fallback silently to full Supabase getUser() below
+    }
+
+    // 4. Fallback to full Supabase verification if headers and cookie parsing are missing
     const supabase = await getSupabaseServerClient()
     const { data: { user } } = await supabase.auth.getUser()
 

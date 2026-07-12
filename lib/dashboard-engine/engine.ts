@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getPartnerPlan } from "@/lib/services/subscription.service";
 import { normalizeBusinessInfo } from "@/lib/business-info";
 import { DashboardContext, DashboardLayout } from "./types";
+import { getPartnerUrl } from "@/lib/utils/url-generator";
 import {
   getChecklistItems,
   getCards,
@@ -40,14 +41,14 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
     // Parcerias/Dados Gerais
     supabase
       .from("partners")
-      .select("store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active, mp_user_id, business_info")
+      .select("slug, store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active, mp_user_id, business_info")
       .eq("id", partnerId)
       .single(),
     
-    // Endereço Padrão
+    // Endereço Padrão (precisa de city/state para URL pública)
     supabase
       .from("addresses")
-      .select("id")
+      .select("city, state")
       .eq("partner_id", partnerId)
       .eq("is_default", true)
       .limit(1),
@@ -217,8 +218,18 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       : "Veja como está seu negócio hoje no Marketplace."
   };
 
+  // 7. Gera a URL pública do perfil do vendedor
+  const partnerForUrl = {
+    id: partnerId,
+    slug: partner.slug,
+    store_name: partner.store_name,
+    addresses: addressRes.data || [],
+  };
+  const partnerUrl = getPartnerUrl(partnerForUrl);
+
   return {
     storeName: partner.store_name,
+    partnerUrl,
     isQuickMode: context.isQuickMode,
     planSlug: context.planSlug,
     sellsProducts: context.sellsProducts,

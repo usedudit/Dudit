@@ -90,6 +90,7 @@ export interface DashboardRecommendation {
 
 export interface DashboardLayout {
   storeName: string;
+  partnerUrl: string;
   isQuickMode: boolean;
   planSlug: "free" | "crescer" | "escalar";
   sellsProducts: boolean;

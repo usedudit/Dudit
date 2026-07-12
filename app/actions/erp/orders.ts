@@ -4140,6 +4140,18 @@ export async function saveOrderAttachmentAction(
       },
     })
 
+    // 5. Timeline Audit Log (Order History)
+    const { logAuditEvent } = await import("@/lib/services/timeline.service")
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "attachment_created",
+      source: "manual",
+      changeLines: [`Anexo adicionado: ${fileName}`],
+    })
+
     const { revalidatePath } = await import("next/cache")
     revalidatePath("/erp/orders")
     return { success: true, data }
@@ -4203,7 +4215,7 @@ export async function deleteOrderAttachmentAction(
 
     const { data: attachment } = await admin
       .from("order_attachments")
-      .select("file_key")
+      .select("file_key, file_name")
       .eq("id", attachmentId)
       .eq("order_id", orderId)
       .maybeSingle()
@@ -4231,6 +4243,18 @@ export async function deleteOrderAttachmentAction(
       },
     })
 
+    // Timeline Audit Log (Order History)
+    const { logAuditEvent } = await import("@/lib/services/timeline.service")
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "attachment_deleted",
+      source: "manual",
+      changeLines: [`Anexo removido: ${attachment.file_name || "Documento"}`],
+    })
+
     const { revalidatePath } = await import("next/cache")
     revalidatePath("/erp/orders")
     return { success: true }
@@ -4242,41 +4266,9 @@ export async function deleteOrderAttachmentAction(
 export async function getOrderAttachmentsAction(orderId: string): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
   try {
     const user = await requireUser()
-    const { getAdminClient } = await import("@/lib/supabase/admin")
-    const admin = getAdminClient()
+    const supabase = await getSupabaseServerClient()
 
-    // Verify buyer ownership or partner access
-    const { data: order, error: orderErr } = await admin
-      .from("orders")
-      .select("buyer_id, partner_id")
-      .eq("id", orderId)
-      .maybeSingle()
-
-    if (!order) {
-      return { success: false, error: "Pedido não encontrado" }
-    }
-
-    let allowed = order.buyer_id === user.id
-
-    if (!allowed) {
-      // Check if user is a member of the partner of the order
-      const { data: partnerUser } = await admin
-        .from("partner_users")
-        .select("id")
-        .eq("partner_id", order.partner_id)
-        .eq("user_id", user.id)
-        .maybeSingle()
-
-      if (partnerUser) {
-        allowed = true
-      }
-    }
-
-    if (!allowed) {
-      return { success: false, error: "Acesso negado." }
-    }
-
-    const { data, error } = await admin
+    const { data, error } = await supabase
       .from("order_attachments")
       .select("*")
       .eq("order_id", orderId)
@@ -4284,7 +4276,7 @@ export async function getOrderAttachmentsAction(orderId: string): Promise<{ succ
 
     if (error) throw error
 
-    return { success: true, data }
+    return { success: true, data: data || [] }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao listar anexos" }
   }

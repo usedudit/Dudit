@@ -1,7 +1,9 @@
 import "server-only"
 
 import { cache } from "react"
+import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import { calculateDistance } from "@/lib/services/location.service"
 
 const DISCOVER_DEBUG = false
@@ -1596,7 +1598,7 @@ const PROXIMITY_SECTIONS: SectionDef[] = [
 
 // ─── MAIN ENTRY POINT ────────────────────────────────────────────────────────
 
-export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> {
+async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]> {
     const t0 = performance.now()
     dLog(`[Discover] START | scope=${ctx.scope} city=${ctx.city} state=${ctx.state} user=${ctx.userId ? "logged" : "anon"}`)
 
@@ -1797,4 +1799,19 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
     }
 
     return result
+}
+
+export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> {
+    const lat = ctx.coords?.lat != null ? ctx.coords.lat.toFixed(2) : "na"
+    const lng = ctx.coords?.lng != null ? ctx.coords.lng.toFixed(2) : "na"
+    const cacheKey = `discover:home:${ctx.scope}:${ctx.citySlug}:${ctx.stateOnly ? "state" : "city"}:${ctx.userId || "anon"}:${lat}:${lng}`
+
+    return unstable_cache(
+        async () => getHomeSectionsUncached(ctx),
+        [cacheKey],
+        {
+            revalidate: 60, // Cache for 60 seconds
+            tags: [TAGS.marketplace, TAGS.products(), "services", "campaigns", TAGS.advertisements],
+        }
+    )()
 }
