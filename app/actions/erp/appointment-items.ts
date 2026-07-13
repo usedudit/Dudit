@@ -43,7 +43,7 @@ export async function getAppointmentItemsAction(appointmentId: string) {
                 usage_type, 
                 created_at, 
                 updated_at,
-                products(name, sku, stock_quantity, stock_available, images),
+                products(name, sku, stock_available, images),
                 services(name)
             `)
             .eq("appointment_id", appointmentId)
@@ -73,7 +73,7 @@ export async function getAppointmentItemsAction(appointmentId: string) {
                     name: p.name,
                     sku: p.sku || 'N/A',
                     image: p.images?.[0] || null,
-                    stock: p.stock_available ?? p.stock_quantity ?? 0,
+                    stock: p.stock_available ?? 0,
                 } : null,
                 serviceName: s?.name || null,
             }
@@ -231,7 +231,6 @@ export async function handleAppointmentItemsStockMovement(params: {
 
     // 3. Execute Movements
     if (action === 'reserve') {
-        // Reserve returnable items only
         const returnableItems = appointmentItems
             .filter((i: any) => i.usage_type === 'returnable' && i.product_id)
             .map((i: any) => ({
@@ -241,15 +240,17 @@ export async function handleAppointmentItemsStockMovement(params: {
             }))
 
         if (returnableItems.length > 0) {
-            await reserveOrderInventory({
+            const result = await reserveOrderInventory({
                 client: supabase,
                 partnerId,
                 orderId: appointmentId,
                 items: returnableItems,
             })
+            if (!result.success) {
+                console.error(`[appointment_stock] reserve failed for ${appointmentId}:`, result.error)
+            }
         }
     } else if (action === 'finalize') {
-        // Consumable items → finalize (deduct from stock)
         const consumableItems = appointmentItems
             .filter((i: any) => i.usage_type === 'consumed' && i.product_id)
             .map((i: any) => ({
@@ -258,7 +259,6 @@ export async function handleAppointmentItemsStockMovement(params: {
                 quantity: Number(i.quantity),
             }))
 
-        // Returnable items → release back to stock
         const returnableItems = appointmentItems
             .filter((i: any) => i.usage_type === 'returnable' && i.product_id)
             .map((i: any) => ({
@@ -268,7 +268,7 @@ export async function handleAppointmentItemsStockMovement(params: {
             }))
 
         if (consumableItems.length > 0) {
-            await finalizeOrderInventory({
+            const result = await finalizeOrderInventory({
                 client: supabase,
                 partnerId,
                 orderId: appointmentId,
@@ -277,18 +277,23 @@ export async function handleAppointmentItemsStockMovement(params: {
                 reason: "Uso em serviço",
                 notes: `Agendamento concluído`,
             })
+            if (!result.success) {
+                console.error(`[appointment_stock] finalize (consumed) failed for ${appointmentId}:`, result.error)
+            }
         }
 
         if (returnableItems.length > 0) {
-            await releaseOrderInventory({
+            const result = await releaseOrderInventory({
                 client: supabase,
                 partnerId,
                 orderId: appointmentId,
                 items: returnableItems,
             })
+            if (!result.success) {
+                console.error(`[appointment_stock] release (returnable) failed for ${appointmentId}:`, result.error)
+            }
         }
     } else if (action === 'release') {
-        // Release all reserved items back to stock
         const allItems = appointmentItems
             .filter((i: any) => i.product_id)
             .map((i: any) => ({
@@ -298,21 +303,32 @@ export async function handleAppointmentItemsStockMovement(params: {
             }))
 
         if (allItems.length > 0) {
-            await releaseOrderInventory({
+            const result = await releaseOrderInventory({
                 client: supabase,
                 partnerId,
                 orderId: appointmentId,
                 items: allItems,
             })
+            if (!result.success) {
+                console.error(`[appointment_stock] release failed for ${appointmentId}:`, result.error)
+            }
         }
     }
 
     // 4. Invalidate Caches
     const productIds = Array.from(new Set(appointmentItems.filter((i: any) => i.product_id).map((i: any) => i.product_id))) as string[]
     for (const pid of productIds) {
-        await invalidateProductCache(pid, partnerId, 'update', { silent: true })
+        try {
+            await invalidateProductCache(pid, partnerId, 'update', { silent: true })
+        } catch (err) {
+            console.error(`[appointment_stock] cache invalidation error for ${pid}:`, err)
+        }
     }
-    revalidateStockMovements(partnerId)
+    try {
+        revalidateStockMovements(partnerId)
+    } catch (err) {
+        console.error("[appointment_stock] revalidation error:", err)
+    }
 }
 
 export async function fetchProductsByIdsAction(productIds: string[], partnerId?: string) {
@@ -327,19 +343,19 @@ export async function fetchProductsByIdsAction(productIds: string[], partnerId?:
         const supabase = createAdminClient()
         const { data } = await supabase
             .from("products")
-            .select("id, name, sku, stock_quantity, stock_available, min_stock_quantity, images, product_variants(id, stock_available)")
+            .select("id, name, sku, stock_available, min_stock_quantity, images, product_variants(id, stock_quantity)")
             .eq("partner_id", resolvedPartnerId)
             .in("id", productIds)
         return (data || []).map((p: any) => ({
             id: p.id,
             name: p.name,
             sku: p.sku || 'N/A',
-            stock: p.stock_available ?? p.stock_quantity ?? 0,
+            stock: p.stock_available ?? 0,
             minStock: p.min_stock_quantity || 0,
             image: p.images?.[0] || null,
             variants: (p.product_variants || []).map((v: any) => ({
                 id: v.id,
-                stock: v.stock_available ?? 0,
+                stock: v.stock_quantity ?? 0,
             })),
         }))
     } catch (err) {
@@ -389,7 +405,7 @@ export async function searchProductsForAppointmentItems(query: string) {
 
         const { data, error } = await supabase
             .from("products")
-            .select("id, name, sku, price, promotional_price, category_id, stock_quantity, stock_available, images, product_variants(id, variant_name, sku, price_adjustment, stock_available)")
+            .select("id, name, sku, price, promotional_price, category_id, stock_available, images, product_variants(id, variant_name, sku, price_adjustment, stock_quantity)")
             .eq("partner_id", ctx.partnerId)
             .eq("is_active", true)
             .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
@@ -407,13 +423,13 @@ export async function searchProductsForAppointmentItems(query: string) {
             price: p.price || 0,
             promotional_price: p.promotional_price,
             category_id: p.category_id || null,
-            stock: p.stock_available ?? p.stock_quantity ?? 0,
+            stock: p.stock_available ?? 0,
             image: p.images && p.images.length > 0 ? p.images[0] : null,
             variants: (p.product_variants || []).map((variant: any) => ({
                 id: variant.id,
                 name: variant.variant_name,
                 sku: variant.sku,
-                stock: variant.stock_available ?? 0,
+                stock: variant.stock_quantity ?? 0,
                 price: (p.price || 0) + (variant.price_adjustment || 0),
             })),
         }))

@@ -560,7 +560,7 @@ export default function ServiceOrdersPage({
                   <FadeIn key="empty-state" className="w-full h-full">
                     <IconPlaceholder
                       placeholderType="image"
-                      imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                      imageSrc="https://img.dudit.com.br/static/mascots/OrdemServico.png"
                       title="Nenhuma ordem de serviço"
                       subtitle={debouncedSearch ? "Nenhum resultado para esta busca." : "Crie sua primeira ordem de serviço."}
                       itemButton={debouncedSearch ? undefined : { text: "Nova OS", action: () => openEntity("create") }}

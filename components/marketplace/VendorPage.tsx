@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon, ClockIcon } from "@/lib/icons"
+import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon, ClockIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -1290,10 +1290,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div className="animate-fade-in">
                             {categoryView ? (
                                 <section data-category-section={categoryView} className="scroll-mt-[150px] pt-4 lg:pt-0">
-                                    <div className="hidden lg:flex items-center gap-2 mb-6 pt-4 lg:pt-0">
-                                        <button onClick={() => openCategory(null)} className="w-9 h-9 rounded-full bg-brand-gray flex items-center justify-center text-brand-dark">
-                                            <ArrowLeftIcon size={18} />
-                                        </button>
+                                    <div className="hidden lg:flex mb-8 items-center gap-4">
+                                        <Button variant="filled" onClick={() => openCategory(null)} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </Button>
                                         <div>
                                             <h2 className="text-xl lg:text-[24px] font-semibold text-brand-dark">{categoryName}</h2>
                                             <p className="text-sm font-medium text-brand-inactive-text mt-1">{categoryFilteredItems.length} resultado{categoryFilteredItems.length !== 1 ? "s" : ""} encontrado{categoryFilteredItems.length !== 1 ? "s" : ""}</p>
@@ -1326,7 +1326,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 <>
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
 
-                                    {/* Seção de Ofertas Relâmpago / Campanhas — mostra no máximo UMA */}
+                                    {/* Seção de Ofertas Relâmpago / Campanhas - mostra no máximo UMA */}
                                     {bestCampaignSection && (() => {
                                         const promo = bestCampaignSection.promotion
                                         const items = bestCampaignSection.items.slice(0, 20)

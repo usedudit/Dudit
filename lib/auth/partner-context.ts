@@ -263,6 +263,31 @@ export const getUserPartnerCount = cache(async (): Promise<number> => {
     return access.length
 })
 
+const checkRealTimePartnerAccess = (partnerId: string, userId: string) => unstable_cache(
+    async () => {
+        try {
+            const admin = createAdminClient()
+            const { data: stillHasAccess, error: accessError } = await admin.rpc("user_has_partner_access", {
+                p_partner_id: partnerId,
+                p_user_id: userId,
+            })
+            if (accessError) {
+                console.error("[checkRealTimePartnerAccess] RPC error:", accessError)
+                return { stillHasAccess: true, hasError: true }
+            }
+            return { stillHasAccess: stillHasAccess === true, hasError: false }
+        } catch (err) {
+            console.error("[checkRealTimePartnerAccess] unexpected error:", err)
+            return { stillHasAccess: true, hasError: true }
+        }
+    },
+    [`realtime-access-${userId}-${partnerId}`],
+    {
+        tags: [`realtime-access-${userId}-${partnerId}`],
+        revalidate: 30 // 30 seconds
+    }
+)
+
 /**
  * Gets the current authenticated user's partner context.
  * 
@@ -286,14 +311,10 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
             // Real-time DB check: verify the user still has access (defense against stale cache)
             // This prevents removed users from accessing the ERP during the cache TTL window.
             // P1: usa uma única RPC (owner OR membro) em vez de 2 queries separadas por request.
-            const admin = createAdminClient()
-            const { data: stillHasAccess, error: accessError } = await admin.rpc("user_has_partner_access", {
-                p_partner_id: activePartnerId,
-                p_user_id: user.id,
-            })
+            const { stillHasAccess, hasError } = await checkRealTimePartnerAccess(activePartnerId, user.id)()
 
             // Em caso de erro inesperado na RPC, não bloqueamos o acesso já validado pelo cache.
-            if (!accessError && stillHasAccess === false) {
+            if (!hasError && stillHasAccess === false) {
                 // Access revoked - clear stale cookie and invalidate cached access
                 await clearActivePartner()
                 const { revalidateUserAccess } = await import("@/lib/utils/revalidation")

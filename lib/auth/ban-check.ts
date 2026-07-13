@@ -10,6 +10,8 @@
 import "server-only"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 
+import { unstable_cache } from "next/cache"
+
 export async function checkAndClearExpiredBan(userId: string): Promise<boolean> {
     const supabase = await getSupabaseServerClient()
 
@@ -46,3 +48,14 @@ export async function checkAndClearExpiredBan(userId: string): Promise<boolean> 
     // Actively banned (permanent or not yet expired)
     return true
 }
+
+export const getCachedBanStatus = (userId: string) => unstable_cache(
+    async () => {
+        return checkAndClearExpiredBan(userId)
+    },
+    [`user-ban-${userId}`],
+    {
+        tags: [`user-ban-${userId}`],
+        revalidate: 60 // 60 seconds TTL
+    }
+)

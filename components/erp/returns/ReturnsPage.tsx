@@ -219,11 +219,11 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                     returnToInventory: Boolean(data.returnToInventory),
                     returnToInventoryItems: data.returnToInventoryItems || null,
                     customerId: data.customerId || null,
-                        storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
-                        exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
-                        exchangeBalanceResolution: data.exchangeBalanceResolution || null,
-                        notes: data.observations || "",
-                        idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
+                    storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
+                    exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
+                    exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                    notes: data.observations || "",
+                    idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
                 }
                 const response = await processReturnRequestAction(processPayload)
                 if (!response.success) throw new Error(response.error)
@@ -320,7 +320,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                 <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
                     <IconPlaceholder
                         placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                        imageSrc="https://img.dudit.com.br/static/mascots/Devolucoes.png"
                         imageAlt="Recurso bloqueado"
                         title="Trocas e Devoluções"
                         subtitle="Gerencie trocas e devoluções de forma organizada. Disponível nos planos Crescer e Escalar."
@@ -570,7 +570,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                             className={`flex-1 h-[46px] text-white border-none transition-colors ${mpPaymentNotFoundChecked
                                 ? "bg-amber-600 hover:bg-amber-700"
                                 : "bg-amber-600/50 cursor-not-allowed opacity-50"
-                            }`}
+                                }`}
                             disabled={!mpPaymentNotFoundChecked || isSaving}
                         >
                             {isSaving ? "Salvando..." : "Continuar mesmo assim"}

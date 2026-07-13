@@ -235,63 +235,93 @@ function filterByScope<T extends WithTier>(items: T[], displayScope: "city" | "s
 
 // ─── Partner IDs by tier (city → state → country) ───────────────────────────
 
+interface PartnerTiersRaw {
+    cityIds: string[]
+    stateIds: string[]
+    allIds: string[]
+}
+
+const getCachedPartnerIdsByTier = (
+    city: string,
+    state: string,
+    stateOnly: boolean,
+) => unstable_cache(
+    async (): Promise<PartnerTiersRaw> => {
+        const supabase = getAdminClient()
+
+        const { data: partners, error } = await supabase
+            .from("partners")
+            .select("id, addresses!inner(city, state)")
+            .eq("is_active", true)
+
+        if (error) {
+            dError(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
+            return { cityIds: [], stateIds: [], allIds: [] }
+        }
+
+        if (!partners || partners.length === 0) {
+            dWarn("[DISCOVER][PARTNER_IDS] No active partners found in Brazil")
+            return { cityIds: [], stateIds: [], allIds: [] }
+        }
+
+        const allIds = new Set<string>()
+        const stateIds = new Set<string>()
+        let statePartnerCount = 0
+        const targetState = state.toLowerCase()
+
+        for (const p of partners) {
+            allIds.add(p.id)
+            const addr = p.addresses?.[0] || p.addresses
+            if (addr?.state?.toLowerCase() === targetState) {
+                stateIds.add(p.id)
+                statePartnerCount++
+            }
+        }
+
+        let cityIds: Set<string>
+        let cityPartnerCount = 0
+
+        if (stateOnly) {
+            cityIds = new Set(stateIds)
+            cityPartnerCount = statePartnerCount
+        } else {
+            cityIds = new Set<string>()
+            const targetCitySlug = normalizeCitySlug(city)
+            for (const p of partners) {
+                const addr = p.addresses?.[0] || p.addresses
+                if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug) {
+                    cityIds.add(p.id)
+                    cityPartnerCount++
+                }
+            }
+        }
+
+        dLog(`[DISCOVER][PARTNER_IDS] city=${cityPartnerCount} | state=${statePartnerCount} | country=${allIds.size}`)
+
+        return {
+            cityIds: Array.from(cityIds),
+            stateIds: Array.from(stateIds),
+            allIds: Array.from(allIds),
+        }
+    },
+    [`partner-ids-by-tier-${city}-${state}-${stateOnly}`],
+    {
+        tags: ["partners", "addresses"],
+        revalidate: 3600 // 1 hour TTL
+    }
+)
+
 const getPartnerIdsByTier = cache(async (
     city: string,
     state: string,
     stateOnly: boolean,
 ): Promise<PartnerTiers> => {
-    const supabase = getAdminClient()
-
-    const { data: partners, error } = await supabase
-        .from("partners")
-        .select("id, addresses!inner(city, state)")
-        .eq("is_active", true)
-
-    if (error) {
-        dError(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
-        return { cityIds: new Set(), stateIds: new Set(), allIds: new Set() }
+    const raw = await getCachedPartnerIdsByTier(city, state, stateOnly)()
+    return {
+        cityIds: new Set(raw.cityIds),
+        stateIds: new Set(raw.stateIds),
+        allIds: new Set(raw.allIds),
     }
-
-    if (!partners || partners.length === 0) {
-        dWarn("[DISCOVER][PARTNER_IDS] No active partners found in Brazil")
-        return { cityIds: new Set(), stateIds: new Set(), allIds: new Set() }
-    }
-
-    const allIds = new Set<string>()
-    const stateIds = new Set<string>()
-    let statePartnerCount = 0
-    const targetState = state.toLowerCase()
-
-    for (const p of partners) {
-        allIds.add(p.id)
-        const addr = p.addresses?.[0] || p.addresses
-        if (addr?.state?.toLowerCase() === targetState) {
-            stateIds.add(p.id)
-            statePartnerCount++
-        }
-    }
-
-    let cityIds: Set<string>
-    let cityPartnerCount = 0
-
-    if (stateOnly) {
-        cityIds = new Set(stateIds)
-        cityPartnerCount = statePartnerCount
-    } else {
-        cityIds = new Set<string>()
-        const targetCitySlug = normalizeCitySlug(city)
-        for (const p of partners) {
-            const addr = p.addresses?.[0] || p.addresses
-            if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug) {
-                cityIds.add(p.id)
-                cityPartnerCount++
-            }
-        }
-    }
-
-    dLog(`[DISCOVER][PARTNER_IDS] city=${cityPartnerCount} | state=${statePartnerCount} | country=${allIds.size}`)
-
-    return { cityIds, stateIds, allIds }
 })
 
 // ─── Tier sort helper ───────────────────────────────────────────────────────
@@ -451,40 +481,42 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     }
 
     const now = new Date()
+    const limit7d = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-    const windows = [
-        { label: "24h", end: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
-        { label: "48h", end: new Date(now.getTime() + 48 * 60 * 60 * 1000) },
-        { label: "7d", end: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) },
-    ]
+    const { data: rawCampaigns, error } = await supabase
+        .from("campaigns")
+        .select("id, ends_at")
+        .eq("is_active", true)
+        .in("partner_id", allIds)
+        .gte("ends_at", now.toISOString())
+        .lte("ends_at", limit7d.toISOString())
+        .order("ends_at", { ascending: true })
 
-    let campaigns: Record<string, any>[] | null = null
-
-    for (const w of windows) {
-        const { data, error } = await supabase
-            .from("campaigns")
-            .select("id, ends_at")
-            .eq("is_active", true)
-            .in("partner_id", allIds)
-            .gte("ends_at", now.toISOString())
-            .lte("ends_at", w.end.toISOString())
-            .order("ends_at", { ascending: true })
-
-        if (error) {
-            dError(`[DISCOVER][ENDING_SOON] Error (${w.label}):`, error)
-            dLog(`[Discover] SKIP endingSoon reason=error`)
-            return null
-        }
-
-        if (data && data.length > 0) {
-            campaigns = data
-            break
-        }
+    if (error) {
+        dError(`[DISCOVER][ENDING_SOON] Error:`, error)
+        dLog(`[Discover] SKIP endingSoon reason=error`)
+        return null
     }
 
-    if (!campaigns || campaigns.length === 0) {
-        dLog(`[Discover] SKIP endingSoon reason=no_campaigns_in_24h_48h_7d`)
+    if (!rawCampaigns || rawCampaigns.length === 0) {
+        dLog(`[Discover] SKIP endingSoon reason=no_campaigns_in_7d`)
         return null
+    }
+
+    let campaigns: Record<string, any>[] = []
+    const limit24h = now.getTime() + 24 * 60 * 60 * 1000
+    const limit48h = now.getTime() + 48 * 60 * 60 * 1000
+
+    const c24h = rawCampaigns.filter((c: any) => new Date(c.ends_at).getTime() <= limit24h)
+    if (c24h.length > 0) {
+        campaigns = c24h
+    } else {
+        const c48h = rawCampaigns.filter((c: any) => new Date(c.ends_at).getTime() <= limit48h)
+        if (c48h.length > 0) {
+            campaigns = c48h
+        } else {
+            campaigns = rawCampaigns
+        }
     }
 
     const campaignIds = campaigns.map((c: Record<string, any>) => c.id)
@@ -1801,17 +1833,50 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     return result
 }
 
+const getSharedHomeSections = (
+    scope: string,
+    citySlug: string,
+    stateOnly: boolean,
+    lat: string,
+    lng: string,
+    ctx: DiscoverCtx,
+) => unstable_cache(
+    async () => getHomeSectionsUncached({ ...ctx, userId: null }),
+    [`discover:home:shared:${scope}:${citySlug}:${stateOnly ? "state" : "city"}:${lat}:${lng}`],
+    {
+        revalidate: 60, // Cache for 60 seconds
+        tags: [TAGS.marketplace, TAGS.products(), "services", "campaigns", TAGS.advertisements],
+    }
+)
+
 export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> {
     const lat = ctx.coords?.lat != null ? ctx.coords.lat.toFixed(2) : "na"
     const lng = ctx.coords?.lng != null ? ctx.coords.lng.toFixed(2) : "na"
-    const cacheKey = `discover:home:${ctx.scope}:${ctx.citySlug}:${ctx.stateOnly ? "state" : "city"}:${ctx.userId || "anon"}:${lat}:${lng}`
 
-    return unstable_cache(
-        async () => getHomeSectionsUncached(ctx),
-        [cacheKey],
-        {
-            revalidate: 60, // Cache for 60 seconds
-            tags: [TAGS.marketplace, TAGS.products(), "services", "campaigns", TAGS.advertisements],
-        }
+    const shared = await getSharedHomeSections(
+        ctx.scope,
+        ctx.citySlug,
+        ctx.stateOnly,
+        lat,
+        lng,
+        ctx
     )()
+
+    const sections = [...shared]
+
+    if (ctx.userId) {
+        const tiers = await getPartnerIdsByTier(ctx.city, ctx.state, ctx.stateOnly)
+        if (tiers.allIds.size > 0) {
+            const persResult = await fetchPersonalized(tiers, ctx)
+            if (persResult) {
+                if (sections.length >= 6) {
+                    sections[5] = persResult
+                } else {
+                    sections.push(persResult)
+                }
+            }
+        }
+    }
+
+    return sections
 }

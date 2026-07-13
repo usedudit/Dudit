@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
   const isSystemPath =
     pathname === "/" ||
     PUBLIC_PATHS.filter(p => p !== "/").some(p => pathname.startsWith(p)) ||
-    ["/institucional", "/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/vitrine", "/produto"].some(p => pathname.startsWith(p));
+    ["/institucional", "/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos"].some(p => pathname.startsWith(p));
 
   // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema
   if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {
@@ -307,7 +307,7 @@ export async function middleware(request: NextRequest) {
   // 4. CACHE-CONTROL HEADERS (Route-aware) - Must be set BEFORE auth block
   // Public marketplace pages: edge-cacheable with stale-while-revalidate
   // Private/auth pages: never cached
-  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin"]
+  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/assinaturas", "/colecoes", "/favoritos"]
   const PUBLIC_CACHEABLE_PATTERNS = ["/services", "/partners", "/produto"]
 
   const isPrivatePage = PRIVATE_PREFIXES.some(prefix => pathname.startsWith(prefix))
@@ -329,7 +329,7 @@ export async function middleware(request: NextRequest) {
   const isPost = request.method === "POST"
   const isAction = request.headers.has("Next-Action")
   const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
-  const needsAuthCheck = isPost || isAction || hasAuthCookie || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"))
+  const needsAuthCheck = !isAction && (isPost || hasAuthCookie || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
 
   if (needsAuthCheck) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

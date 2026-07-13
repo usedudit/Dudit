@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache"
 import { PaymentMethodSchema } from "@/lib/validation/schemas"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -126,38 +126,50 @@ function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxIn
     return Array.from(dedupe.entries()).map(([installment_number, fee_percent]) => ({ installment_number, fee_percent }))
 }
 
-export async function getPaymentMethodsAction(partnerId: string) {
-    await requirePartnerAccessWithPermission(partnerId)
+const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
+    async () => {
+        const supabase = createAdminClient()
+        const { data: methods, error } = await supabase
+            .from("payment_methods")
+            .select(
+                "id, name, payment_type, type, is_active, " +
+                "is_default, is_online_default, " +
+                "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
+                "max_installments, card_brand, priority, " +
+                "percentage_rate, fixed_amount, created_at"
+            )
+            .eq("partner_id", partnerId)
+            .order("is_default", { ascending: false })
+            .order("priority", { ascending: false })
+            .order("created_at", { ascending: true })
 
-    // Use admin client after authz check so invited ERP users can read methods.
-    const supabase = createAdminClient()
+        if (error) {
+            throw error
+        }
 
-    const { data: methods, error } = await supabase
-        .from("payment_methods")
-        .select(
-            "id, name, payment_type, type, is_active, " +
-            "is_default, is_online_default, " +
-            "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
-            "max_installments, card_brand, priority, " +
-            "percentage_rate, fixed_amount, created_at"
-        )
-        .eq("partner_id", partnerId)
-        .order("is_default", { ascending: false })
-        .order("priority", { ascending: false })
-        .order("created_at", { ascending: true })
-
-    if (error) {
-        return { error: error.message }
-    }
-
-    return {
-        methods: (methods || []).map((method: any) => ({
+        return (methods || []).map((method: any) => ({
             ...method,
             type: method.type || toCanonicalPaymentType(method.payment_type),
             fee_percent: method.fee_percent ?? method.percentage_rate ?? null,
             fee_fixed: method.fee_fixed ?? method.fixed_amount ?? null,
             fee_bearer: method.fee_bearer || "merchant",
-        })),
+        }))
+    },
+    [`payment-methods-${partnerId}`],
+    {
+        tags: [`payment-methods-${partnerId}`],
+        revalidate: 3600 // 1 hour TTL
+    }
+)
+
+export async function getPaymentMethodsAction(partnerId: string) {
+    await requirePartnerAccessWithPermission(partnerId)
+
+    try {
+        const methods = await getCachedPaymentMethods(partnerId)()
+        return { methods }
+    } catch (err: any) {
+        return { error: err?.message || "Erro ao carregar métodos de pagamento" }
     }
 }
 
@@ -482,6 +494,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
         if (feesError) return { error: feesError.message }
     }
 
+    revalidateTag(`payment-methods-${data.partnerId}`, "max")
     revalidatePath("/erp/settings")
 
     return { success: true, method }
@@ -637,6 +650,7 @@ export async function updatePaymentMethodAction(
         }
     }
 
+    revalidateTag(`payment-methods-${method.partner_id}`, "max")
     revalidatePath("/erp/settings")
 
     return { success: true }
@@ -670,6 +684,7 @@ export async function deletePaymentMethodAction(methodId: string) {
         return { error: error.message }
     }
 
+    revalidateTag(`payment-methods-${method.partner_id}`, "max")
     revalidatePath("/erp/settings")
 
     return { success: true }

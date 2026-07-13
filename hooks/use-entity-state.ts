@@ -146,19 +146,36 @@ export function useEntityState() {
 
             const entityId = value === "true" ? null : value
 
+            // Guard against duplicate opens with the exact same configuration
+            if (
+                localStateRef.current.isOpen &&
+                localStateRef.current.action === action &&
+                localStateRef.current.entityId === entityId &&
+                localStateRef.current.entityType === entityType
+            ) {
+                return
+            }
+
             const params = new URLSearchParams({ [action]: value })
             if (entityType) params.set("type", entityType)
             const url = `${pathname}?${params.toString()}`
 
             // 1. INSTANT: Update local state synchronously
+            const wasOpen = localStateRef.current.isOpen
             setLocalState({ action, entityId, isOpen: true, entityType })
             lastUserActionRef.current = Date.now()
             expectedHrefRef.current = url
 
-            // 2. INSTANT: Sync URL via replaceState (no pushState to avoid history pollution)
-            // Always replaceState so that close() never sends the user to an unexpected URL via back()
+            // 2. INSTANT: Sync URL via pushState/replaceState
+            // If the entity modal was already open, we replace the state to avoid polluting history with multiple action steps
             if (typeof window !== "undefined") {
-                window.history.replaceState(null, "", url)
+                const existingState = window.history.state
+                const stateObj = { ...existingState, isEntityOpen: true }
+                if (wasOpen) {
+                    window.history.replaceState(stateObj, "", url)
+                } else {
+                    window.history.pushState(stateObj, "", url)
+                }
             }
         },
         [pathname],
@@ -167,6 +184,10 @@ export function useEntityState() {
     // ── Close: instant local state + instant URL sync ────────────────────
 
     const close = useCallback(() => {
+        // Guard: if it's already closed, do nothing. This prevents double-back history navigations
+        // when close() is called multiple times or as cleanup.
+        if (!localStateRef.current.isOpen) return
+
         // Safety: if the current URL pathname doesn't match this page's pathname,
         // it means navigation already occurred. Don't replace the URL or we'd
         // override the new page's history entry, causing a "back to previous page".
@@ -180,10 +201,14 @@ export function useEntityState() {
         lastUserActionRef.current = Date.now()
         expectedHrefRef.current = pathname
 
-        // 2. INSTANT: Sync URL back to clean list page
-        // Always replaceState so we never send the user to an unexpected URL
-        if (typeof window !== "undefined") {
-            window.history.replaceState(null, "", pathname)
+        // 2. INSTANT: Sync URL
+        // If we pushed state to open this, use history.back() to clean up browser history
+        if (typeof window !== "undefined" && window.history.state?.isEntityOpen) {
+            window.history.back()
+        } else {
+            if (typeof window !== "undefined") {
+                window.history.replaceState(null, "", pathname)
+            }
         }
     }, [pathname])
 

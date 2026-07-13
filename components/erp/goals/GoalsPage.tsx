@@ -334,7 +334,7 @@ export default function GoalsPage(props: {
                 <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
                     <IconPlaceholder
                         placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                        imageSrc="https://img.dudit.com.br/static/mascots/Metas.png"
                         imageAlt="Recurso bloqueado"
                         title="Metas de Vendas"
                         subtitle="Crie metas de vendas para sua equipe e acompanhe o desempenho com rankings e bônus. Disponível nos planos Crescer e Escalar."

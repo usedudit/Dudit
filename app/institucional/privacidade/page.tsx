@@ -52,7 +52,7 @@ export default function PrivacyPage() {
                         </div>
 
                         <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray rounded-r-xl">
-                            Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018)</strong> e o <strong>Marco Civil da Internet (Lei 12.965/2014)</strong>.
+                            Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)</strong> e o <strong>Marco Civil da Internet (Lei 12.965/2014)</strong>.
                         </p>
 
                         <div className="bg-brand-gray p-8 rounded-2xl border border-brand-border shadow-sm">
@@ -230,7 +230,7 @@ export default function PrivacyPage() {
                             <div className="space-y-6 md:pl-12 pl-6">
                                 <p><strong>5.1.</strong> Os dados são armazenados em servidores seguros (Supabase/Vercel), com criptografia em trânsito (HTTPS/TLS) e em repouso.</p>
                                 <p><strong>5.2.</strong> Chaves e tokens sensíveis são armazenados com criptografia adicional, com sistema de rotação de chaves (master key versionada) para garantir que eventual comprometimento não exponha dados históricos.</p>
-                                <p><strong>5.3.</strong> Senhas nunca são armazenadas em texto simples — utilizamos hash seguro (bcrypt ou equivalente).</p>
+                                <p><strong>5.3.</strong> Senhas nunca são armazenadas em texto simples - utilizamos hash seguro (bcrypt ou equivalente).</p>
                                 <p><strong>5.4.</strong> Tokens de integração com gateways de pagamento são criptografados e nunca expostos em logs ou interfaces.</p>
                                 <p><strong>5.5.</strong> A DUDIT adota moderação de conteúdo automatizada para imagens, vídeos e textos, visando proteger a plataforma e seus usuários.</p>
                                 <p><strong>5.6. Armazenamento de Imagens, Vídeos e Arquivos:</strong> Imagens, vídeos e arquivos enviados por Parceiros e Usuários são armazenados em infraestrutura de terceiros (Cloudflare R2). Conteúdos públicos (imagens e vídeos de anúncios e da vitrine) passam por processo de moderação, conforme item 5.5 dos Termos de Uso. Arquivos e anexos de caráter privado, trocados entre Parceiro e Usuário, não são monitorados rotineiramente, mas a DUDIT possui acesso técnico a todo o conteúdo armazenado, o qual poderá ser acessado para fins de moderação, suporte, segurança, apuração de denúncias ou cumprimento de obrigação legal, sempre limitado a essas finalidades.</p>
@@ -258,7 +258,7 @@ export default function PrivacyPage() {
                                                 { t: 'Dados de cadastro (após exclusão)', p: 'Até 6 meses (para fins de segurança e disputas)' },
                                                 { t: 'Logs de acesso (IP, data, hora)', p: '6 meses (conforme Marco Civil da Internet)' },
                                                 { t: 'Dados de transações financeiras', p: '5 anos (obrigação fiscal e legal)' },
-                                                { t: 'Dados de pedidos', p: '5 anos (CDC — prazo de prescrição)' }
+                                                { t: 'Dados de pedidos', p: '5 anos (CDC - prazo de prescrição)' }
                                             ].map((item, i) => (
                                                 <tr key={i} className="hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors">
                                                     <td className="px-6 py-4 font-medium text-brand-dark dark:text-dark-heading">{item.t}</td>

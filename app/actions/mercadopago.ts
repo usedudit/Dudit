@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache"
 import { encrypt, decrypt } from "@/lib/cryptoService"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -68,38 +68,55 @@ export async function disconnectMercadoPagoAction() {
     .eq("partner_id", partner.id)
     .eq("integration_source", "mercadopago")
 
+  revalidateTag(`mp-status-${partner.id}`, "max")
   revalidatePath("/erp/settings")
   return { success: true }
 }
 
+const getCachedMercadoPagoStatus = (partnerId: string) => unstable_cache(
+  async () => {
+    const supabase = await getSupabaseServerClient()
+    const { data: partner } = await supabase
+      .from("partners")
+      .select("mp_user_id, mp_connected_at, mp_public_key, mp_accepted_payment_methods")
+      .eq("id", partnerId)
+      .single()
+
+    if (!partner) {
+      throw new Error("Parceiro não encontrado")
+    }
+
+    const acceptedPaymentMethods: MpAcceptedPaymentMethods = {
+      ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
+      ...(partner.mp_accepted_payment_methods as Partial<MpAcceptedPaymentMethods> || {}),
+    }
+
+    return {
+      connected: !!partner.mp_user_id,
+      connectedAt: partner.mp_connected_at,
+      publicKey: partner.mp_public_key,
+      acceptedPaymentMethods,
+    }
+  },
+  [`mp-status-${partnerId}`],
+  {
+    tags: [`mp-status-${partnerId}`],
+    revalidate: 3600 // Cache for 1 hour
+  }
+)
+
 export async function getMercadoPagoStatusAction() {
   const user = await requireUser()
-  const supabase = await getSupabaseServerClient()
 
   const ctx = await getCurrentPartnerContext()
   if (!ctx) return { error: "Contexto de ERP não encontrado" }
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
 
-  const { data: partner } = await supabase
-    .from("partners")
-    .select("mp_user_id, mp_connected_at, mp_public_key, mp_accepted_payment_methods")
-    .eq("id", ctx.partnerId)
-    .single()
-
-  if (!partner) {
-    return { error: "Parceiro não encontrado" }
-  }
-
-  const acceptedPaymentMethods: MpAcceptedPaymentMethods = {
-    ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
-    ...(partner.mp_accepted_payment_methods as Partial<MpAcceptedPaymentMethods> || {}),
-  }
-
-  return {
-    connected: !!partner.mp_user_id,
-    connectedAt: partner.mp_connected_at,
-    publicKey: partner.mp_public_key,
-    acceptedPaymentMethods,
+  try {
+    const status = await getCachedMercadoPagoStatus(ctx.partnerId)()
+    return status
+  } catch (err: any) {
+    return { error: err?.message || "Erro ao carregar status do Mercado Pago" }
   }
 }
 
@@ -159,6 +176,7 @@ export async function refreshMercadoPagoTokenAction() {
       return { error: error.message }
     }
 
+    revalidateTag(`mp-status-${partner.id}`, "max")
     revalidatePath("/erp/settings")
     return { success: true }
   } catch (error: any) {
@@ -195,6 +213,7 @@ export async function updateMpAcceptedPaymentMethodsAction(methods: MpAcceptedPa
     return { error: error.message }
   }
 
+  revalidateTag(`mp-status-${ctx.partnerId}`, "max")
   revalidatePath("/erp/settings")
   return { success: true }
 }
@@ -205,22 +224,11 @@ export async function updateMpAcceptedPaymentMethodsAction(methods: MpAcceptedPa
  */
 export async function getMpAcceptedPaymentMethodsPublicAction(partnerId: string) {
   await requireUser()
-
-  const supabase = await getSupabaseServerClient()
-
-  const { data: partner } = await supabase
-    .from("partners")
-    .select("mp_accepted_payment_methods")
-    .eq("id", partnerId)
-    .single()
-
-  if (!partner) {
+  try {
+    const status = await getCachedMercadoPagoStatus(partnerId)()
+    return status.acceptedPaymentMethods
+  } catch (err) {
     return { ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS }
-  }
-
-  return {
-    ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
-    ...(partner.mp_accepted_payment_methods as Partial<MpAcceptedPaymentMethods> || {}),
   }
 }
 

@@ -4,18 +4,15 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { successResponse, errorResponse } from "@/lib/utils/action-helpers"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
+import { unstable_cache } from "next/cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import {
     buildPartnerTaxIdLine,
     type SaleReceiptPartnerHeader,
 } from "@/lib/sales/sale-receipt"
 
-export async function getPartnerReceiptHeaderAction(partnerId: string) {
-    try {
-        const user = await requireUser()
-        if (!user) return errorResponse("Não autenticado")
-
-        await requirePermission(partnerId, "orders", "view")
-
+const getCachedPartnerReceiptHeader = (partnerId: string) => unstable_cache(
+    async () => {
         const supabase = await getSupabaseServerClient()
 
         const [{ data: partner, error: partnerError }, { data: address, error: addressError }] =
@@ -36,10 +33,10 @@ export async function getPartnerReceiptHeaderAction(partnerId: string) {
             ])
 
         if (partnerError) {
-            console.error("[getPartnerReceiptHeaderAction] partner:", partnerError)
-            return errorResponse("Erro ao buscar dados do estabelecimento")
+            console.error("[getCachedPartnerReceiptHeader] partner:", partnerError)
+            throw new Error("Erro ao buscar dados do estabelecimento")
         }
-        if (!partner) return errorResponse("Parceiro não encontrado")
+        if (!partner) throw new Error("Parceiro não encontrado")
 
         const addr = address || {}
         const addressParts = [
@@ -62,12 +59,29 @@ export async function getPartnerReceiptHeaderAction(partnerId: string) {
         }
 
         if (addressError) {
-            console.warn("[getPartnerReceiptHeaderAction] address:", addressError)
+            console.warn("[getCachedPartnerReceiptHeader] address:", addressError)
         }
 
+        return header
+    },
+    [`partner-receipt-header-${partnerId}`],
+    {
+        tags: [TAGS.partner(partnerId), TAGS.addresses("partner", partnerId)],
+        revalidate: 3600 // 1 hour TTL
+    }
+)
+
+export async function getPartnerReceiptHeaderAction(partnerId: string) {
+    try {
+        const user = await requireUser()
+        if (!user) return errorResponse("Não autenticado")
+
+        await requirePermission(partnerId, "orders", "view")
+
+        const header = await getCachedPartnerReceiptHeader(partnerId)()
         return successResponse(header)
-    } catch (err) {
+    } catch (err: any) {
         console.error("[getPartnerReceiptHeaderAction]", err)
-        return errorResponse("Erro interno ao buscar dados do recibo")
+        return errorResponse(err?.message || "Erro interno ao buscar dados do recibo")
     }
 }

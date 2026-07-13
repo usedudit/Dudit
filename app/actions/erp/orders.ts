@@ -2630,7 +2630,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         )
         .catch(console.error)
 
-    return { success: true }
+    return { success: true, orderNumber: currentOrder.order_number }
 }
 
 export async function deleteOrdersInBatchAction(orderIds: string[], partnerId: string) {
@@ -3027,8 +3027,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
         if (processingWarnings.length > 0) {
             return { success: true, warning: processingWarnings.join(" | ") }
         }
-        return { success: true }
-    }
+    return { success: true, orderNumber: currentOrder.order_number }
+}
 
     const paymentStatusMap: Record<string, ERPOrderPayload["paymentStatus"]> = {
         pending: "unpaid",

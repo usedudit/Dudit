@@ -161,7 +161,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                             partnerId,
                                             settings: {
                                                 baseFee: Number(settings.baseFee || 0),
-                                                includedKm: chargeByDistance ? Number(settings.includedKm || 0) : 0,
+                                                includedKm: Number(settings.includedKm || 0),
                                                 extraKmPrice: chargeByDistance ? Number(settings.extraKmPrice || 0) : 0,
                                                 maxDeliveryKm: chargeByDistance && settings.maxDeliveryKm ? Number(settings.maxDeliveryKm) : null,
                                                 isDeliveryEnabled: settings.isDeliveryEnabled,
@@ -267,7 +267,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                                     placeholder="R$ 0,00"
                                                 />
                                                 <Input
-                                                    disabled={!advancedEnabled || !chargeByDistance}
+                                                    disabled={!advancedEnabled}
                                                     label="KM incluído"
                                                     value={settings.includedKm}
                                                     onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}

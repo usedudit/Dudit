@@ -393,14 +393,14 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
                                     )}
                                 </div>
                             </div>
-                        ) : !hasVideo && !localPreview ? (
+                        ) : !localPreview ? (
                             <div className="w-full flex-col flex items-center justify-center mt-10">
                                 <IconPlaceholder
                                     icon={UploadIcon}
-                                    title="Selecionar MP4, WebM ou MOV"
-                                    subtitle="Arraste e solte aqui ou clique para selecionar"
+                                    title={hasVideo ? "Substituir vídeo" : "Selecionar MP4, WebM ou MOV"}
+                                    subtitle={hasVideo ? "Clique para fazer upload de um novo vídeo" : "Arraste e solte aqui ou clique para selecionar"}
                                     itemButton={{
-                                        text: "Selecionar vídeo",
+                                        text: hasVideo ? "Substituir vídeo" : "Selecionar vídeo",
                                         type: "file",
                                         accept: "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov",
                                         onChange: (e) => {

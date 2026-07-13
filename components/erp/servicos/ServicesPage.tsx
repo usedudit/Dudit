@@ -104,7 +104,7 @@ const EmptyState = React.memo(({ type, onAddFirst, onClearFilters }: EmptyStateP
     let title = ""
     let description = ""
     let imageAlt = ""
-    let image = type === "no-data" ? "https://img.dudit.com.br/static/mascots/Estoque.png" : "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+    let image = type === "no-data" ? "https://img.dudit.com.br/static/mascots/Servicos.png" : "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
 
     if (type === "no-data") {
         title = "Você ainda não tem serviços"

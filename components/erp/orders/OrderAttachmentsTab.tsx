@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { Button, Spinner, DefaultModal } from "@/components/reusable"
+import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon, XIcon, CheckCircleIcon, AlertCircleIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
@@ -288,22 +288,23 @@ export function OrderAttachmentsTab({ orderId, partnerId }: OrderAttachmentsTabP
   }
 
   return (
-    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border">
+    <div>
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Anexos do Pedido</h3>
-          <p className="text-xs text-brand-inactive-text dark:text-dark-body">Gerencie contratos, faturas, ordens ou comprovantes deste pedido.</p>
-        </div>
-        <div>
-          <Button
-            type="button"
-            onClick={handleUploadClick}
-            className="flex items-center gap-2"
-          >
-            <UploadIcon className="w-4 h-4" />
-            <span>Adicionar Anexo</span>
-          </Button>
-        </div>
+        <FormSection
+          title="Anexos do Pedido"
+          description="Gerencie contratos, faturas, ordens ou comprovantes deste pedido."
+        >
+          <div>
+            <Button
+              type="button"
+              onClick={handleUploadClick}
+              className="flex items-center gap-2"
+            >
+              <UploadIcon className="w-4 h-4" />
+              <span>Adicionar Anexo</span>
+            </Button>
+          </div>
+        </FormSection>
       </div>
 
       {loading ? (
@@ -375,15 +376,7 @@ export function OrderAttachmentsTab({ orderId, partnerId }: OrderAttachmentsTabP
                 multiple
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.odt,.ppt,.pptx,image/jpeg,image/png,image/webp,image/avif"
               />
-              <div className="w-12 h-12 rounded-full bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border mb-4">
-                <UploadIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
-              </div>
-              <p className="text-sm font-bold text-brand-dark dark:text-dark-heading text-center">
-                Selecione um arquivo ou arraste & solte aqui.
-              </p>
-              <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center mt-1">
-                Formatos suportados: PDF, Word, Excel, CSV, Imagens. Até 10MB por arquivo.
-              </p>
+              <IconPlaceholder icon={UploadIcon} title="Upload de arquivos" subtitle="Formatos suportados: PDF, Word, Excel, CSV, Imagens. Até 10MB por arquivo." />
             </div>
 
             {/* List of files selected */}
@@ -474,34 +467,15 @@ export function OrderAttachmentsTab({ orderId, partnerId }: OrderAttachmentsTabP
       )}
 
       {deleteModalOpen && (
-        <DefaultModal
+        <AlertModal
           isOpen={deleteModalOpen}
           onClose={() => setDeleteModalOpen(false)}
+          onConfirm={confirmDeleteDoc}
           title="Excluir Anexo"
-          maxWidth="sm"
-        >
-          <div className="space-y-4">
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-              Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita.
-            </p>
-            <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDeleteModalOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={confirmDeleteDoc}
-              >
-                Confirmar Exclusão
-              </Button>
-            </div>
-          </div>
-        </DefaultModal>
+          message="Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita."
+          confirmText="Excluir"
+          variant="danger"
+        />
       )}
     </div>
   )

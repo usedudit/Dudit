@@ -54,7 +54,13 @@ export async function invalidateProductCache(
   // 3. Purge Next.js Cache Layers
   try {
     const { revalidateTag, revalidatePath } = await import('next/cache')
-    const safeRevalidateTag = (tag: string) => (revalidateTag as any)(tag, 'max')
+    const safeRevalidateTag = (tag: string) => {
+      try {
+        (revalidateTag as any)(tag, 'max')
+      } catch {
+        // Silently ignore - Next.js 16 throws if called during render
+      }
+    }
 
     // Always revalidate the specific product tag (for vitrine consistency)
     safeRevalidateTag(`product-${productId}`)

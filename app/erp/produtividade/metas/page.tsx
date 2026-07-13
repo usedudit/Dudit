@@ -16,7 +16,7 @@ export default async function ProdutividadeMetasPage() {
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
   const role = (context.role || "DELIVERY") as PartnerRole
-  const routePermissions = normalizeToRoutePermissions(role, context.permissions)
+  const routePermissions = normalizeToRoutePermissions(role, context.roleId === "owner" ? null : context.permissions)
   if (!canAccessRoute(routePermissions, "productivity_goals")) return <AccessDenied />
 
   const [plan, goalsRes, rankingRes, summaryRes] = await Promise.all([

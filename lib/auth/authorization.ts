@@ -51,10 +51,22 @@ export { getCurrentUser, getCurrentContext }
  * Performance: Uses React cache() to deduplicate within the same request.
  */
 export async function requireUser(resolvedUser?: User | any): Promise<User> {
-  if (resolvedUser && resolvedUser.id) return resolvedUser as User
+  if (resolvedUser && resolvedUser.id) {
+    const { getCachedBanStatus } = await import("@/lib/auth/ban-check")
+    const isBanned = await getCachedBanStatus(resolvedUser.id)()
+    if (isBanned) {
+      throw new ForbiddenError("Sua conta está banida.")
+    }
+    return resolvedUser as User
+  }
   const context = await getCurrentContext()
   if (!context.user) {
     redirect("/auth/login")
+  }
+  const { getCachedBanStatus } = await import("@/lib/auth/ban-check")
+  const isBanned = await getCachedBanStatus(context.user.id)()
+  if (isBanned) {
+    throw new ForbiddenError("Sua conta está banida.")
   }
   return context.user
 }

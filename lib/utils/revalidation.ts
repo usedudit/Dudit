@@ -10,8 +10,14 @@ const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 // Helper interno para evitar repetição do "max"
 export async function safeRevalidateTag(tag: string) {
-    // @ts-ignore - Ignora erro se a tipagem local mudar, mas garante o envio do 'max'
-    revalidateTag(tag, "max")
+    try {
+        // @ts-ignore - Ignora erro se a tipagem local mudar, mas garante o envio do 'max'
+        revalidateTag(tag, "max")
+    } catch (err) {
+        // Next.js 16 pode lançar unhandledRejection se revalidateTag for chamado
+        // durante renderização. Engolimos silenciosamente porque o cache
+        // será eventualmente consistente via outras tags.
+    }
 }
 
 /**

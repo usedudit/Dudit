@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { Button, FormSection, Accordion, IconPlaceholder, DefaultModal } from "@/components/reusable"
+import { Button, FormSection, Accordion, IconPlaceholder, DefaultModal, AlertModal } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -181,9 +181,8 @@ export default function AttachmentsTab({
                                 handleDownloadDoc(doc.file_key, doc.file_name || "Documento")
                             }
                         }}
-                        className={`flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative ${
-                            !doc.file && doc.file_key ? "cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors" : ""
-                        }`}
+                        className={`flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative ${!doc.file && doc.file_key ? "cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors" : ""
+                            }`}
                     >
                         <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
                             <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -432,34 +431,15 @@ export default function AttachmentsTab({
             )}
 
             {deleteModalOpen && (
-                <DefaultModal
+                <AlertModal
                     isOpen={deleteModalOpen}
                     onClose={() => setDeleteModalOpen(false)}
                     title="Excluir Anexo"
-                    maxWidth="sm"
-                >
-                    <div className="space-y-4">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita.
-                        </p>
-                        <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setDeleteModalOpen(false)}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                onClick={confirmDeleteDoc}
-                            >
-                                Confirmar Exclusão
-                            </Button>
-                        </div>
-                    </div>
-                </DefaultModal>
+                    message="Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita."
+                    confirmText="Excluir"
+                    variant="danger"
+                    onConfirm={confirmDeleteDoc}
+                />
             )}
         </>
     )

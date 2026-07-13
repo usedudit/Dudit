@@ -311,17 +311,18 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
         if (!variants || variants.length === 0) return null
         const activeVariants = variants.filter((v: any) => v.is_active !== false)
         if (activeVariants.length === 0) return null
-        const prices = activeVariants.map((v: any) => Number(v.price_adjustment)).filter((p: number) => p > 0)
-        return prices.length > 0 ? Math.min(...prices) : null
-    }, [(product as any).product_variants, (product as any).variants])
+        const basePrice = Number(product.originalPrice) || Number(product.price) || 0
+        const prices = activeVariants.map((v: any) => basePrice + Number(v.price_adjustment || 0))
+        return Math.min(...prices)
+    }, [(product as any).product_variants, (product as any).variants, product.price, product.originalPrice])
 
     const pricing = useMemo(() => {
         const hasVariants = !!(product as any).product_variants?.length || !!(product as any).variants?.length
-        const effectivePrice = hasVariants && variantLowestPrice ? variantLowestPrice : (Number(product.originalPrice) || Number(product.price) || 0)
-        const basePrice = hasVariants ? effectivePrice : (Number(product.originalPrice) || Number(product.price) || 0)
+        const basePrice = Number(product.originalPrice) || Number(product.price) || 0
+        const effectivePrice = hasVariants && variantLowestPrice !== null ? variantLowestPrice : basePrice
         const individualPromo = hasVariants ? null : (product.originalPrice ? Number(product.price) : null)
         return computeItemDisplayPrice(
-            basePrice,
+            effectivePrice,
             individualPromo,
             activePromotions,
             { productId: itemType === "produto" ? product.id : undefined, serviceId: itemType === "servico" ? product.id : undefined, categoryId: (product as any).category_id || undefined },

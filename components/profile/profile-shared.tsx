@@ -99,15 +99,15 @@ export const PageHeader = ({
     const handleBack = () => onBack()
     return (
         <div className="hidden lg:flex mb-8 items-center gap-4">
-        <div className="hidden md:flex">
-            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
-                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-            </Button>
-        </div>
-        <div>
-            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">{title}</h1>
-            <p className="text-md text-brand-inactive-text mt-1">{subtitle}</p>
-        </div>
+            <div className="hidden md:flex">
+                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                </Button>
+            </div>
+            <div>
+                <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">{title}</h1>
+                <p className="text-md text-brand-inactive-text mt-1">{subtitle}</p>
+            </div>
         </div>
     )
 }

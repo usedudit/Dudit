@@ -555,7 +555,7 @@ export default function PromotionsPage({
                 <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
                   <IconPlaceholder
                     placeholderType="image"
-                    imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                    imageSrc="https://img.dudit.com.br/static/mascots/Campanhas.png"
                     imageAlt="Recurso bloqueado"
                     title="Campanhas e Promoções"
                     subtitle="Crie campanhas de marketing e promoções para aumentar suas vendas. Disponível nos planos Crescer e Escalar."

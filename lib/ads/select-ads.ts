@@ -57,145 +57,72 @@ function toSponsoredAd(row: Advertisement, matchTier: AdTargetMode): SponsoredAd
     }
 }
 
-async function fetchCityAds(citySlug: string): Promise<Advertisement[]> {
-    const supabase = getAdminClient()
-    const now = new Date().toISOString()
-
-    const { data, error } = await supabase
-        .from("advertisements")
-        .select(AD_SELECT_COLUMNS)
-        .eq("status", "active")
-        .eq("target_mode", "cities")
-        .lte("starts_at", now)
-        .gte("ends_at", now)
-        .contains("cities", [citySlug.toLowerCase()])
-        .order("priority", { ascending: false })
-        .limit(QUERY_LIMIT_PER_TIER)
-
-    if (error) {
-        console.error("[ads] city query failed:", error.message)
-        return []
-    }
-    return (data || []) as Advertisement[]
+function getRoundedNowString(): string {
+    const d = new Date()
+    const ms = 10 * 60 * 1000 // 10 minutes
+    const rounded = new Date(Math.round(d.getTime() / ms) * ms)
+    return rounded.toISOString()
 }
 
-async function fetchRadiusAds(context: UserAdLocationContext): Promise<Advertisement[]> {
-    if (context.lat == null || context.lng == null) return []
+const getCachedActiveAds = (roundedNow: string) => unstable_cache(
+    async () => {
+        const supabase = getAdminClient()
+        const { data, error } = await supabase
+            .from("advertisements")
+            .select(AD_SELECT_COLUMNS)
+            .eq("status", "active")
+            .lte("starts_at", roundedNow)
+            .gte("ends_at", roundedNow)
+            .order("priority", { ascending: false })
 
-    const supabase = getAdminClient()
-    const now = new Date().toISOString()
-    const userPoint = { lat: context.lat, lng: context.lng }
-    const lookupBox = buildBoundingBox(userPoint, MAX_RADIUS_LOOKUP_KM)
-    if (!lookupBox) return []
-
-    const { data, error } = await supabase
-        .from("advertisements")
-        .select(AD_SELECT_COLUMNS)
-        .eq("status", "active")
-        .eq("target_mode", "radius")
-        .lte("starts_at", now)
-        .gte("ends_at", now)
-        .gte("center_lat", lookupBox.minLat)
-        .lte("center_lat", lookupBox.maxLat)
-        .gte("center_lng", lookupBox.minLng)
-        .lte("center_lng", lookupBox.maxLng)
-        .order("priority", { ascending: false })
-        .limit(QUERY_LIMIT_PER_TIER)
-
-    if (error) {
-        console.error("[ads] radius query failed:", error.message)
-        return []
+        if (error) {
+            console.error("[ads] fetch active ads failed:", error.message)
+            return []
+        }
+        return (data || []) as Advertisement[]
+    },
+    [`active-advertisements-${roundedNow}`],
+    {
+        tags: [TAGS.advertisements],
+        revalidate: 300 // 5 minutes TTL
     }
-
-    return ((data || []) as Advertisement[]).filter((ad) => {
-        if (ad.center_lat == null || ad.center_lng == null || !ad.radius_km) return false
-        const distance = calculateDistance(userPoint, { lat: ad.center_lat, lng: ad.center_lng })
-        return distance <= ad.radius_km
-    })
-}
-
-async function fetchStateAds(state: string): Promise<Advertisement[]> {
-    const supabase = getAdminClient()
-    const now = new Date().toISOString()
-
-    const { data, error } = await supabase
-        .from("advertisements")
-        .select(AD_SELECT_COLUMNS)
-        .eq("status", "active")
-        .eq("target_mode", "state")
-        .eq("state", state.toUpperCase())
-        .lte("starts_at", now)
-        .gte("ends_at", now)
-        .order("priority", { ascending: false })
-        .limit(QUERY_LIMIT_PER_TIER)
-
-    if (error) {
-        console.error("[ads] state query failed:", error.message)
-        return []
-    }
-    return (data || []) as Advertisement[]
-}
-
-async function fetchCountryAds(country: string): Promise<Advertisement[]> {
-    const supabase = getAdminClient()
-    const now = new Date().toISOString()
-
-    const { data, error } = await supabase
-        .from("advertisements")
-        .select(AD_SELECT_COLUMNS)
-        .eq("status", "active")
-        .eq("target_mode", "country")
-        .eq("country", country.toUpperCase())
-        .lte("starts_at", now)
-        .gte("ends_at", now)
-        .order("priority", { ascending: false })
-        .limit(QUERY_LIMIT_PER_TIER)
-
-    if (error) {
-        console.error("[ads] country query failed:", error.message)
-        return []
-    }
-    return (data || []) as Advertisement[]
-}
+)
 
 async function selectAdsUncached(context: UserAdLocationContext, limit: number): Promise<SponsoredAd[]> {
-    const tierResults: Partial<Record<AdTargetMode, Advertisement[]>> = {}
+    const roundedNow = getRoundedNowString()
+    const activeAds = await getCachedActiveAds(roundedNow)()
 
-    const tasks: Promise<void>[] = []
-
-    if (context.citySlug) {
-        tasks.push(
-            fetchCityAds(context.citySlug).then((rows) => {
-                tierResults.cities = rows
-            }),
-        )
+    const tierResults: Record<AdTargetMode, Advertisement[]> = {
+        cities: [],
+        radius: [],
+        state: [],
+        country: [],
     }
 
-    if (context.lat != null && context.lng != null) {
-        tasks.push(
-            fetchRadiusAds(context).then((rows) => {
-                tierResults.radius = rows
-            }),
-        )
-    }
+    const userPoint = context.lat != null && context.lng != null
+        ? { lat: context.lat, lng: context.lng }
+        : null
 
-    if (context.state) {
-        tasks.push(
-            fetchStateAds(context.state).then((rows) => {
-                tierResults.state = rows
-            }),
-        )
+    for (const ad of activeAds) {
+        if (ad.target_mode === "cities" && context.citySlug && Array.isArray(ad.cities)) {
+            if (ad.cities.some(c => c.toLowerCase() === context.citySlug!.toLowerCase())) {
+                tierResults.cities.push(ad)
+            }
+        } else if (ad.target_mode === "radius" && userPoint && ad.center_lat != null && ad.center_lng != null && ad.radius_km) {
+            const distance = calculateDistance(userPoint, { lat: ad.center_lat, lng: ad.center_lng })
+            if (distance <= ad.radius_km) {
+                tierResults.radius.push(ad)
+            }
+        } else if (ad.target_mode === "state" && context.state && ad.state) {
+            if (ad.state.toUpperCase() === context.state.toUpperCase()) {
+                tierResults.state.push(ad)
+            }
+        } else if (ad.target_mode === "country" && context.country && ad.country) {
+            if (ad.country.toUpperCase() === context.country.toUpperCase()) {
+                tierResults.country.push(ad)
+            }
+        }
     }
-
-    if (context.country) {
-        tasks.push(
-            fetchCountryAds(context.country).then((rows) => {
-                tierResults.country = rows
-            }),
-        )
-    }
-
-    await Promise.all(tasks)
 
     const selected: SponsoredAd[] = []
     const seen = new Set<string>()

@@ -1229,38 +1229,38 @@ export const AppointmentSheet = ({
 
         fetchProductsByIdsAction(productIds, partnerId).then((products: any[]) => {
             if (!cancelled) {
-                // Remove from in-flight Set upon completion
                 productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
 
-                if (products.length > 0) {
-                    const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
-                    setSelectedItems(prevItems => prevItems.map((item: any) => {
-                        const product = item.productId ? productsMap[item.productId] : null
-                        if (product && (item.stock == null || !item.image)) {
-                            let stock = product.stock
-                            if (item.variantId && product.variants) {
-                                const variant = product.variants.find((v: any) => v.id === item.variantId)
-                                if (variant) {
-                                    stock = variant.stock
-                                }
-                            }
-                            return {
-                                ...item,
-                                image: item.image || product.image,
-                                stock: item.stock != null ? item.stock : stock,
-                                minStock: product.minStock,
-                                sku: item.sku || product.sku,
-                            }
+                const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
+                setSelectedItems(prevItems => prevItems.map((item: any) => {
+                    const product = item.productId ? productsMap[item.productId] : null
+                    if (product) {
+                        let stock = product.stock
+                        if (item.variantId && product.variants) {
+                            const variant = product.variants.find((v: any) => v.id === item.variantId)
+                            if (variant) stock = variant.stock
                         }
-                        return item
-                    }))
-                }
+                        return {
+                            ...item,
+                            image: item.image || product.image,
+                            stock: stock,
+                            minStock: product.minStock,
+                            sku: item.sku || product.sku,
+                        }
+                    }
+                    if (item.stock == null) {
+                        return { ...item, stock: 0 }
+                    }
+                    return item
+                }))
             }
             if (!cancelled) setIsEnrichingItems(false)
         }).catch(() => {
             if (!cancelled) {
-                // Remove all from in-flight Set on error
                 productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
+                setSelectedItems(prevItems => prevItems.map((item: any) =>
+                    item.stock == null ? { ...item, stock: 0 } : item
+                ))
                 setIsEnrichingItems(false)
             }
         })

@@ -223,7 +223,7 @@ export function XmlImportPageContent({ partnerId, initialImports, planGate }: Xm
                 <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
                     <IconPlaceholder
                         placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                        imageSrc="https://img.dudit.com.br/static/mascots/NotasFiscais.png"
                         imageAlt="Recurso bloqueado"
                         title="Importação XML (NF-e)"
                         subtitle="Importe produtos de notas fiscais eletrônicas. Disponível nos planos Crescer e Escalar."

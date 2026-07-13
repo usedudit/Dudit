@@ -950,13 +950,17 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     try {
       const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
       for (const row of createdRows) {
-        await handleAppointmentItemsStockMovement({
-          appointmentId: row.id,
-          partnerId,
-          oldStatus: null,
-          newStatus: row.status,
-          userId: user.id,
-        })
+        try {
+          await handleAppointmentItemsStockMovement({
+            appointmentId: row.id,
+            partnerId,
+            oldStatus: null,
+            newStatus: row.status,
+            userId: user.id,
+          })
+        } catch (stockRowErr) {
+          console.error(`[appointment_stock_create] failed for row ${row.id}:`, stockRowErr)
+        }
       }
     } catch (stockErr) {
       console.error("[appointment_stock_create] failed to process movement:", stockErr)
@@ -1267,120 +1271,6 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
   }
 }
 
-/**
- * Handle stock movements (reservation, consumption, release) during appointment lifecycle.
- * Mirrors the logic used in Orders but adapted for service resources.
- */
-async function handleAppointmentStockMovement(params: {
-  supabase: any
-  partnerId: string
-  appointment: any
-  oldStatus: string | null
-  newStatus: string
-  userId: string
-}) {
-  const { supabase, partnerId, appointment, oldStatus, newStatus, userId } = params
-
-  // 1. Movement Classification
-  const isStarted = (s: string | null) => s === 'Iniciado'
-  const isCompleted = (s: string | null) => ['Concluído', 'Pago', 'Pago Parcialmente', 'Partially Paid'].includes(s || "")
-  const isCancelled = (s: string | null) => ['Cancelado', 'Ausência'].includes(s || "")
-  const isWaiting = (s: string | null) => ['Reservado', 'Confirmado', 'Aguardando'].includes(s || "")
-
-  let action: 'reserve' | 'finalize' | 'release' | null = null
-
-  if (isWaiting(oldStatus) && isStarted(newStatus)) {
-    action = 'reserve'
-  } else if (isStarted(oldStatus) && isCompleted(newStatus)) {
-    action = 'finalize'
-  } else if (isStarted(oldStatus) && isCancelled(newStatus)) {
-    action = 'release'
-  } else if (isWaiting(oldStatus) && isCompleted(newStatus)) {
-    // Direct Jump from waiting to completed
-    action = 'finalize'
-  }
-
-  if (!action) return
-
-  // 2. Resolve Resources from Services
-  const serviceNames = String(appointment.service_name || "").split(',').map(s => s.trim()).filter(Boolean)
-  if (serviceNames.length === 0) return
-
-  const { data: services } = await supabase
-    .from("services")
-    .select("resources")
-    .eq("partner_id", partnerId)
-    .in("name", serviceNames)
-
-  if (!services || services.length === 0) return
-
-  const items: any[] = []
-  for (const s of services) {
-    if (s.resources && Array.isArray(s.resources)) {
-      for (const res of s.resources) {
-        if (res.productId && res.quantity) {
-          items.push({
-            product_id: res.productId,
-            variant_id: res.variantId || null,
-            quantity: Number(res.quantity),
-            returnable: res.returnable === true
-          })
-        }
-      }
-    }
-  }
-
-  if (items.length === 0) return
-
-  // 3. Execute Movements using core inventory library
-  // We use appointment.id as the reference ID for the inventory RPCs
-  const stockItems = items.map(i => ({
-    product_id: i.product_id,
-    variant_id: i.variant_id,
-    quantity: i.quantity
-  }))
-
-  if (action === 'reserve') {
-    await reserveOrderInventory({ client: supabase, partnerId, orderId: appointment.id, items: stockItems })
-  } else if (action === 'finalize') {
-    // Consumable items are deducted from reserved stock
-    const consumableItems = items.filter(i => !i.returnable).map(i => ({
-      product_id: i.product_id,
-      variant_id: i.variant_id,
-      quantity: i.quantity
-    }))
-    // Returnable items (equipment) are just released back to stock
-    const returnableItems = items.filter(i => i.returnable).map(i => ({
-      product_id: i.product_id,
-      variant_id: i.variant_id,
-      quantity: i.quantity
-    }))
-
-    if (consumableItems.length > 0) {
-      await finalizeOrderInventory({
-        client: supabase,
-        partnerId,
-        orderId: appointment.id,
-        items: consumableItems,
-        createdBy: userId,
-        reason: `Agendamento Concluído: ${appointment.service_name}`
-      })
-    }
-    if (returnableItems.length > 0) {
-      await releaseOrderInventory({ client: supabase, partnerId, orderId: appointment.id, items: returnableItems })
-    }
-  } else if (action === 'release') {
-    await releaseOrderInventory({ client: supabase, partnerId, orderId: appointment.id, items: stockItems })
-  }
-
-  // 4. Invalidate Caches
-  const productIds = Array.from(new Set(items.map(i => i.product_id)))
-  for (const pid of productIds) {
-    await invalidateProductCache(pid, partnerId, 'update', { silent: true })
-  }
-  revalidateStockMovements(partnerId)
-}
-
 export async function deleteAppointmentAction(appointmentId: string, notifyClient: boolean = true, cancellationNote?: string) {
   try {
     if (!appointmentId) return { success: false, error: "Agendamento inválido" }
@@ -1663,7 +1553,7 @@ export async function getAppointmentDetailsDataAction(params: {
             usage_type, 
             created_at, 
             updated_at,
-            products(name, sku, stock_quantity, stock_available, images),
+            products(name, sku, stock_available, images),
             services(name)
         `)
         .eq("appointment_id", appointmentId)
@@ -1727,7 +1617,7 @@ export async function getAppointmentDetailsDataAction(params: {
               name: p.name,
               sku: p.sku || 'N/A',
               image: p.images?.[0] || null,
-              stock: p.stock_available ?? p.stock_quantity ?? 0,
+              stock: p.stock_available ?? 0,
           } : null,
           serviceName: s?.name || null,
         }
