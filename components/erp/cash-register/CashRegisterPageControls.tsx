@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
     SearchIcon,
     FilterIcon,
@@ -42,6 +43,7 @@ interface CashRegisterPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    tabCounts?: { all: number; open: number; closed: number }
 }
 
 const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
@@ -54,6 +56,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
     viewMode,
     onViewModeChange,
     hasActiveFilters,
+    tabCounts,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -132,13 +135,13 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                     }
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="all" icon={ArrowUpDownIcon}>
+                        <TabsTrigger value="all" icon={ArrowUpDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="open" icon={ArrowUpIcon}>
+                        <TabsTrigger value="open" icon={ArrowUpIcon} badge={tabCounts && <TabCountBadge count={tabCounts.open} variant="green" />}>
                             Abertos
                         </TabsTrigger>
-                        <TabsTrigger value="closed" icon={ArrowDownIcon}>
+                        <TabsTrigger value="closed" icon={ArrowDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.closed} variant="red" />}>
                             Fechados
                         </TabsTrigger>
                     </TabsList>

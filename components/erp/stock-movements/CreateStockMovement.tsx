@@ -25,7 +25,8 @@ import {
     AlertModal,
     IconPlaceholder,
     ThreeDotsLoader,
-    FormTextarea
+    FormTextarea,
+    FormSection
 } from '@/components/reusable';
 import { searchProductByBarcodeAction } from '@/app/actions/erp/products';
 import { playBeepSound, vibrateMobile } from '@/lib/utils/barcode';
@@ -481,8 +482,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                             <motion.div key="Geral" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
 
                                                 {/* Tipo de Movimentação */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Tipo de Movimentação</h3>
+                                                <FormSection title="Tipo de Movimentação">
                                                     <div className="flex flex-col md:flex-row gap-4">
                                                         <motion.button
                                                             onClick={() => { setType('in'); handleReasonChange('Selecione um motivo...'); }}
@@ -522,13 +522,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             </div>
                                                         </motion.button>
                                                     </div>
-                                                </section>
-
-                                                <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+                                                </FormSection>
 
                                                 {/* Itens da Movimentação */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Itens da Movimentação</h3>
+                                                <FormSection title="Itens da Movimentação" hasSeparator>
                                                     <div className="space-y-6">
 
                                                         {/* Product Search */}
@@ -791,7 +788,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             )}
                                                         </div>
                                                     </div>
-                                                </section>
+                                                </FormSection>
                                             </motion.div>
                                         </TabsContent>
 
@@ -809,22 +806,18 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                         <TabsContent value="Anexos" className="mt-0">
                                             <motion.div key="Anexos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                <div className="p-6 border-b border-brand-border dark:border-dark-border flex justify-between items-center bg-gray-50/50 dark:bg-dark-surface">
-                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Gerenciar Anexos</h3>
-                                                    <Button variant="outline" className="h-9">
-                                                        <PlusIcon size={14} className="mr-2" />
-                                                        Adicionar Arquivo
-                                                    </Button>
-                                                </div>
-                                                <div className="p-16 flex flex-col items-center justify-center text-center">
-                                                    <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center text-brand-inactive-text mb-5 shadow-inner">
-                                                        <FileIcon size={28} />
-                                                    </div>
-                                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading mb-2">Nenhum documento anexado</h4>
-                                                    <p className="text-sm text-brand-inactive-text max-w-xs leading-relaxed">
-                                                        Adicione digitalizações de notas, fotos de itens avariados ou comprovantes de recebimento.
-                                                    </p>
-                                                </div>
+                                                <FormSection title="Gerenciar Anexos">
+                                                    <IconPlaceholder
+                                                        icon={FileIcon}
+                                                        title="Documentos e Anexos"
+                                                        subtitle="Selecione e envie os arquivos desejados para esta movimentação"
+                                                        itemButton={{
+                                                            text: "Adicionar anexo",
+                                                            action: () => { },
+                                                            variant: "outline",
+                                                        }}
+                                                    />
+                                                </FormSection>
                                             </motion.div>
                                         </TabsContent>
                                     </AnimatePresence>
@@ -925,30 +918,34 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                 </Tabs>
 
                 {/* Modals */}
-                {unsavedChangesDialogOpen && (
-                    <AlertModal
-                        isOpen={unsavedChangesDialogOpen}
-                        onClose={handleUnsavedChangesDialogClose}
-                        onConfirm={handleUnsavedChangesConfirm}
-                        title="Sair sem salvar?"
-                        description="Você tem alterações na movimentação que ainda não foram salvas."
-                        confirmText="Sair sem salvar"
-                        cancelText="Continuar editando"
-                        variant="warning"
-                    />
-                )}
-                {showAlertModal && (
-                    <AlertModal
-                        isOpen
-                        onClose={() => setShowAlertModal(false)}
-                        onConfirm={confirmNavigation}
-                        title="Sair sem salvar?"
-                        description="Você tem alterações na movimentação que ainda não foram salvas."
-                        confirmText="Sair sem salvar"
-                        cancelText="Continuar editando"
-                        variant="warning"
-                    />
-                )}
+                {
+                    unsavedChangesDialogOpen && (
+                        <AlertModal
+                            isOpen={unsavedChangesDialogOpen}
+                            onClose={handleUnsavedChangesDialogClose}
+                            onConfirm={handleUnsavedChangesConfirm}
+                            title="Sair sem salvar?"
+                            description="Você tem alterações na movimentação que ainda não foram salvas."
+                            confirmText="Sair sem salvar"
+                            cancelText="Continuar editando"
+                            variant="warning"
+                        />
+                    )
+                }
+                {
+                    showAlertModal && (
+                        <AlertModal
+                            isOpen
+                            onClose={() => setShowAlertModal(false)}
+                            onConfirm={confirmNavigation}
+                            title="Sair sem salvar?"
+                            description="Você tem alterações na movimentação que ainda não foram salvas."
+                            confirmText="Sair sem salvar"
+                            cancelText="Continuar editando"
+                            variant="warning"
+                        />
+                    )
+                }
 
                 <SavingStatusModal isOpen={isSaving} text="Salvando movimentação de estoque..." />
 
@@ -958,16 +955,18 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                     onScan={handleScanBarcode}
                 />
 
-                {selectedProductForVariants && (
-                    <SelectProductVariantSheet
-                        isOpen={!!selectedProductForVariants}
-                        product={selectedProductForVariants}
-                        onClose={() => setSelectedProductForVariants(null)}
-                        onConfirm={handleConfirmVariants}
-                    />
-                )}
-            </div>
-        </FadeIn>
+                {
+                    selectedProductForVariants && (
+                        <SelectProductVariantSheet
+                            isOpen={!!selectedProductForVariants}
+                            product={selectedProductForVariants}
+                            onClose={() => setSelectedProductForVariants(null)}
+                            onConfirm={handleConfirmVariants}
+                        />
+                    )
+                }
+            </div >
+        </FadeIn >
     );
 };
 

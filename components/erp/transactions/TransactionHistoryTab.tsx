@@ -20,11 +20,10 @@ export function TransactionHistoryTab({ entries, loading = false }: TransactionH
 
     return (
         <FadeIn>
-            <HistoryTimeline 
+            <HistoryTimeline
                 entries={entries}
                 title="Histórico da Transação"
-                subtitle="Acompanhe todas as movimentações e alterações realizadas nesta transação."
-                emptyMessage="Nenhum histórico encontrado para esta transação."
+                emptyMessage="Não foram encontrados eventos para esta transação."
             />
         </FadeIn>
     )

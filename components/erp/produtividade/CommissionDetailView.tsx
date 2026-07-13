@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
-import { XIcon, MoneyIcon } from "@/lib/icons"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, SkeletonLoader, ListItem } from "@/components/reusable"
+import { XIcon, MoneyIcon, ClockIcon } from "@/lib/icons"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, SkeletonLoader, ListItem, IconPlaceholder } from "@/components/reusable"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatCurrency } from "@/lib/utils"
 import { getSellerCommissionHistoryAction } from "@/app/actions/erp/produtividade"
@@ -43,7 +43,11 @@ function HistoryTab({ partnerUserId, partnerId }: { partnerUserId: string; partn
   if (!history || history.length === 0) {
     return (
       <div className="p-8 text-center">
-        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum histórico de comissão encontrado.</p>
+        <IconPlaceholder
+          icon={ClockIcon}
+          title="Nenhum histórico encontrado"
+          subtitle="Não foram encontrados eventos para este vendedor."
+        />
       </div>
     )
   }

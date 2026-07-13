@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/reusable/Checkbox';
 import BottomSheet from '@/components/BottomSheet';
 import Portal from "@/components/Portal";
 import { useMediaQuery } from '@/hooks';
+import IconPlaceholder from '../reusable/IconPlaceholder';
 
 const SubscriptionList = () => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -443,9 +444,12 @@ function SubscriptionDetailsSheet({ item, isOpen, onClose }: SubscriptionDetails
                                 </div>
                             </div>
                         )) : (
-                            <div className="flex flex-col items-center justify-center p-8 bg-brand-gray/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text">
-                                <ClockIcon size={32} className="mb-2 opacity-20" />
-                                <span className="text-sm font-medium italic">Nenhum histórico disponível</span>
+                            <div className="flex flex-col items-center justify-center text-center py-8">
+                                <IconPlaceholder
+                                    icon={ClockIcon}
+                                    title="Nenhum histórico encontrado"
+                                    subtitle="Não foram encontradas eventos para esta assinatura."
+                                />
                             </div>
                         )}
                     </div>

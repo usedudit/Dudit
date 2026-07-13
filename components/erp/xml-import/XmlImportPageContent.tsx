@@ -18,7 +18,8 @@ import {
     UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
     SearchIcon, PlusIcon, ClockIcon, GridIcon, ListIcon,
     PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon,
-    ReloadIcon, ExportFileIcon
+    ReloadIcon, ExportFileIcon,
+    FileIcon
 } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
@@ -643,29 +644,27 @@ function XmlUploadForm({ partnerId, storeId, onSuccess, onCancel }: { partnerId:
 
     return (
         <div className="space-y-4">
-            <p className="text-sm text-brand-inactive-text">Selecione o arquivo XML da NF-e. O sistema vai analisar os produtos e mostrar um preview para revisão.</p>
             <div
                 className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center min-h-[180px] transition-colors cursor-pointer ${file ? "border-brand-green bg-brand-green-light/50 dark:bg-emerald-900/20" : "border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-background/50"}`}
                 onClick={() => document.getElementById("xml-upload-input")?.click()}
             >
                 <input id="xml-upload-input" type="file" accept=".xml" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f) }} />
                 {!file ? (
-                    <>
-                        <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-emerald-900/30 flex items-center justify-center mb-3">
-                            <UploadIcon className="w-5 h-5 text-brand-green" />
-                        </div>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Clique para selecionar</p>
-                        <p className="text-xs text-brand-inactive-text mt-1">XML da NF-e</p>
-                    </>
+                    <IconPlaceholder
+                        icon={FileIcon}
+                        title="Envie o XML da NF-e"
+                        subtitle="Selecione o arquivo XML da Nota Fiscal Eletrônica para importação"
+                    />
                 ) : (
-                    <>
-                        <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-emerald-900/30 flex items-center justify-center mb-3">
-                            <FileTextIcon className="w-5 h-5 text-brand-green" />
-                        </div>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{file.name}</p>
-                        <p className="text-xs text-brand-inactive-text mt-1">{(file.size / 1024).toFixed(1)} KB</p>
-                        <Button variant="ghost" size="sm" className="mt-2" onClick={(e) => { e.stopPropagation(); setFile(null) }}>Remover</Button>
-                    </>
+                    <IconPlaceholder
+                        icon={CheckCircleIcon}
+                        title={file.name}
+                        subtitle={`${(file.size / 1024).toFixed(1)} KB`}
+                        itemButton={{
+                            text: "Remover",
+                            action: () => { setFile(null) }
+                        }}
+                    />
                 )}
             </div>
             {error && <InfoCard color="red" message={error} />}

@@ -48,13 +48,16 @@ interface StockMovement {
     notes?: string;
 }
 
+import { GenericAttachmentsTab } from '@/components/erp/shared/GenericAttachmentsTab';
+
 interface StockMovementDetailProps {
     onBack: () => void;
     movement: StockMovement | null;
     isLoading?: boolean;
+    partnerId: string;
 }
 
-const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementDetailProps) => {
+const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: StockMovementDetailProps) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -315,6 +318,17 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     />
                                 </div>
                             )}
+
+                            {/* Attachments Section */}
+                            <div className="pt-2">
+                                <GenericAttachmentsTab
+                                    entityId={movement.id}
+                                    partnerId={partnerId}
+                                    entityType="stock_movement"
+                                    title="Anexos da Movimentação"
+                                    subtitle="Gerencie comprovantes, fotos ou notas fiscais desta movimentação."
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

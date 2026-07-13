@@ -202,7 +202,6 @@ export async function revalidateTransactions(partnerId: string) {
         await safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
     }
     await safeRevalidateTag("transactions")
-    revalidatePath("/erp/resumo-financeiro")
     revalidatePath("/erp/dashboard")
     revalidatePath("/erp/transactions")
     revalidatePath("/erp/contas-a-pagar")

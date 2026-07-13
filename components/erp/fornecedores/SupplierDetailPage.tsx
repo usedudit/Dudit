@@ -269,7 +269,6 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-1 text-sm text-brand-inactive-text dark:text-dark-body">
                                                                 <span>Fornecedor desde {supplier.created_at ? formatDate(supplier.created_at) : '-'}</span>
-                                                                <span className="text-gray-300 dark:text-gray-600">•</span>
                                                                 <span>{isPJ ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
                                                             </div>
                                                         </div>
@@ -421,7 +420,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         </div>
 
                                                         {isPJ ? (
-                                                            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/50 space-y-2.5">
+                                                            <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border space-y-2.5">
                                                                 {supplier.cnpj && (
                                                                     <div className="flex justify-between items-center">
                                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
@@ -621,11 +620,11 @@ const ImportsContent = ({
                             <div
                                 ref={tableContainerRef}
                                 onScroll={handleTableScroll}
-                                className="w-full overflow-x-auto select-none rounded-2xl border border-brand-border dark:border-dark-border hide-scrollbar"
+                                className="w-full overflow-x-auto custom-scrollbar"
                             >
-                                <table className="w-full min-w-[700px] border-collapse text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                <table className="w-full border-separate border-spacing-0 min-w-[700px]">
                                     <thead>
-                                        <tr className="bg-brand-gray/50 dark:bg-dark-surface/50">
+                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
                                             {COLUMNS.map((col) => {
                                                 const isSorted = sortConfig?.key === (col.id === "date" ? "date" : col.id)
                                                 return (
@@ -643,7 +642,7 @@ const ImportsContent = ({
                                                                 return { key, direction: "desc" }
                                                             })
                                                         }}
-                                                        className={`p-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-inactive-text dark:text-dark-body text-left cursor-pointer hover:bg-gray-100/50 dark:hover:bg-dark-border/20 transition-colors`}
+                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
                                                     >
                                                         <div className="flex items-center gap-1.5">
                                                             {col.label}

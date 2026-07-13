@@ -269,6 +269,16 @@ export default function SuppliersPage({
     const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
     const hasSuppliers = (rawSuppliers?.length || 0) > 0
 
+    const tabCounts = useMemo(() => {
+        if (!rawSuppliers) return { Todos: 0, Ativo: 0, Inativo: 0 }
+        let Todos = rawSuppliers.length, Ativo = 0, Inativo = 0
+        for (const s of rawSuppliers) {
+            if ((s as any).status === "ativo") Ativo++
+            else Inativo++
+        }
+        return { Todos, Ativo, Inativo }
+    }, [rawSuppliers])
+
     const handleAddSupplier = () => entityPage.openEntity("create")
     const handleEditSupplier = (supplier: any) => entityPage.openEntity("edit", supplier.originalId || supplier.id)
     const handleDetailsSupplier = (supplier: any) => entityPage.openEntity("view", supplier.originalId || supplier.id)
@@ -444,6 +454,7 @@ export default function SuppliersPage({
                                     viewMode={viewMode}
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
+                                    tabCounts={tabCounts}
                                 />
                             )}
 

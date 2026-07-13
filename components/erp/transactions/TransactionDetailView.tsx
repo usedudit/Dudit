@@ -8,6 +8,7 @@ import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
 import { TransactionGoalCard } from "./TransactionGoalCard"
 import { useNotification } from "@/hooks/use-notification"
+import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -181,6 +182,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="summary">Resumo</TabsTrigger>
+                                        <TabsTrigger value="attachments">Anexos</TabsTrigger>
                                         <TabsTrigger value="history">Histórico</TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -560,6 +562,16 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                         </div>
                                     </div>
                                 </TabsContent>
+
+                                 <TabsContent value="attachments" className="mt-0">
+                                     <GenericAttachmentsTab
+                                         entityId={transactionId}
+                                         partnerId={partnerId}
+                                         entityType="transaction"
+                                         title="Comprovantes e Anexos"
+                                         subtitle="Gerencie faturas, comprovantes ou contratos desta transação."
+                                     />
+                                 </TabsContent>
 
                                 <TabsContent value="history" className="mt-0">
                                     <TransactionHistoryTab entries={historyEntries} loading={historyLoading} />

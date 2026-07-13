@@ -434,6 +434,7 @@ const PaymentModal = ({
     const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
     const [selectedMethodType, setSelectedMethodType] = useState<string | null>(null);
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
+    const [splitSelectedType, setSplitSelectedType] = useState<string | null>(null);
     const [paymentCalculation, setPaymentCalculation] = useState<any | null>(null);
     const [installmentOptions, setInstallmentOptions] = useState<any[]>([]);
     const [feeBearerOverride, setFeeBearerOverride] = useState<"merchant" | "customer" | null>(null);
@@ -487,6 +488,7 @@ const PaymentModal = ({
         setFeeBearerOverride(null);
         setWantsChange(false);
         setPayWithAmount(0);
+        setSplitSelectedType(null);
         if (options?.clearType) {
             setSelectedMethodType(null);
         }
@@ -1157,7 +1159,9 @@ const PaymentModal = ({
 
     // Compara o valor base que o operador digitou contra o valor total com a precificação do método aplicado
     const isAllocationUnderpaid = paymentBaseAmount < finalTotalWithMethodPricing - 0.005;
-    const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.005 : isAllocationUnderpaid;
+    const isUnderpaid = view === 'split'
+        ? ((splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : splitBaseSum) < chargeTarget - 0.005)
+        : isAllocationUnderpaid;
 
     const isOverpaid = !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
     const changeAmount = isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0;
@@ -1186,7 +1190,10 @@ const PaymentModal = ({
 
     const { compactAlertPaid, compactAlertNeed } = useMemo(() => {
         if (view === 'split') {
-            return { compactAlertPaid: splitBaseSum, compactAlertNeed: chargeTarget };
+            const paid = splitPreview && 'success' in splitPreview && splitPreview.success
+                ? splitPreview.finalTotal
+                : splitBaseSum;
+            return { compactAlertPaid: paid, compactAlertNeed: chargeTarget };
         }
         if (editingPaymentIndex !== null) {
             return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
@@ -1195,7 +1202,7 @@ const PaymentModal = ({
         const need = finalTotalWithMethodPricing;
         const paid = isAllocationUnderpaid ? paymentBaseAmount : need;
         return { compactAlertPaid: paid, compactAlertNeed: need };
-    }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalTotalWithMethodPricing, isAllocationUnderpaid]);
+    }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalTotalWithMethodPricing, isAllocationUnderpaid, splitPreview]);
 
     const currentPricingTotals = useMemo(() => {
         if (view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success) {
@@ -1235,8 +1242,8 @@ const PaymentModal = ({
 
     const displayTransactionTotal = paymentStatus === "success" && successSnapshot
         ? successSnapshot.displayOrderTotal
-        : view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
-            ? splitPreview.finalTotal
+        : view === 'split'
+            ? chargeTarget
             : (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit')
                 ? finalTotalWithMethodPricing
                 : total;
@@ -1451,8 +1458,12 @@ const PaymentModal = ({
             }
         } else if (view === 'split_method_select') {
             resetSelectedMethodPricing({ resetInstallments: false });
-            setView('split');
-            setEditingPaymentIndex(null);
+            if (splitSelectedType) {
+                setSplitSelectedType(null);
+            } else {
+                setView('split');
+                setEditingPaymentIndex(null);
+            }
         } else if (view === 'method_type_select') {
             resetSelectedMethodPricing({ clearType: true });
             setView('methods');
@@ -1863,11 +1874,18 @@ const PaymentModal = ({
     );
 
     const getIconForMethod = (method: string | null, paymentMethodId?: string | null) => {
-        const resolvedType = normalizeMethodType(activeMethods.find((m: any) => m.id === paymentMethodId)?.type || method);
+        const methodObj = paymentMethodId ? activeMethods.find((m: any) => m.id === paymentMethodId) : null;
+        const typeFromId = methodObj?.type;
+        const resolvedType = typeFromId || (method ? normalizeMethodType(method) : 'other');
         if (resolvedType === 'cash') return MoneyIcon;
         if (resolvedType === 'pix') return QRCodeIcon;
         if (['credit_card', 'debit_card'].includes(resolvedType)) return CreditCardIcon;
         if (resolvedType === 'bank_transfer') return FileIcon;
+        const label = (method || '').toLowerCase();
+        if (label.includes('pix')) return QRCodeIcon;
+        if (label.includes('dinheiro')) return MoneyIcon;
+        if (label.includes('credito') || label.includes('cartão') || label.includes('cartao') || label.includes('débito') || label.includes('debito')) return CreditCardIcon;
+        if (label.includes('transferência') || label.includes('transferencia') || label.includes('ted') || label.includes('doc')) return FileIcon;
         return TagIcon;
     }
 
@@ -2484,7 +2502,7 @@ const PaymentModal = ({
                                                         const adjPct = Number(pr?.adjustmentPercent || 0)
                                                         const showAdjustment = adjType !== 'none' && adjAmt > 0.005
                                                         return (
-                                                            <div key={p.id} onClick={() => { if (isMarketplaceOrder || existingPaidAmount > 0.009) return; setEditingPaymentIndex(idx); setView('split_method_select'); }}
+                                                            <div key={p.id} onClick={() => { if (isMarketplaceOrder || existingPaidAmount > 0.009) return; setEditingPaymentIndex(idx); setSplitSelectedType(null); setView('split_method_select'); }}
                                                                 className="border border-brand-border dark:border-dark-border rounded-lg p-4 cursor-pointer hover:bg-brand-light-bg dark:hover:bg-dark-card-bg transition-colors">
                                                                 <div className="flex items-center gap-2 mb-2">
                                                                     {getIconForMethod(p.method, p.paymentMethodId)({})}
@@ -2558,29 +2576,97 @@ const PaymentModal = ({
 
                                     {view === 'split_method_select' && (
                                         <motion.div key="split_method_select" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full">
-                                            <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione o método</h3>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                {activeMethods.map((method: any) => {
-                                                    const normalizedType = normalizeMethodType(method.type);
-                                                    const MethodIcon = normalizedType === "cash"
-                                                        ? MoneyIcon
-                                                        : normalizedType === "pix"
-                                                            ? QRCodeIcon
-                                                            : normalizedType === "bank_transfer"
-                                                                ? FileIcon
-                                                                : ["credit_card", "debit_card"].includes(normalizedType)
-                                                                    ? CreditCardIcon
-                                                                    : TagIcon;
-                                                    return (
-                                                        <PaymentMethodCard
-                                                            key={`split-${method.id}`}
-                                                            icon={MethodIcon}
-                                                            label={method.name}
-                                                            onClick={() => handleMethodSelectionInSplit(method)}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
+                                            {!splitSelectedType ? (
+                                                <>
+                                                    <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione o tipo</h3>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        {availableMethodTypes.has("cash") && (
+                                                            <PaymentMethodCard
+                                                                icon={MoneyIcon}
+                                                                label="Dinheiro"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => setSplitSelectedType("cash")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("pix") && (
+                                                            <PaymentMethodCard
+                                                                icon={QRCodeIcon}
+                                                                label="Pix"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => setSplitSelectedType("pix")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("credit_card") && (
+                                                            <PaymentMethodCard
+                                                                icon={CreditCardIcon}
+                                                                label="Cartão de Crédito"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => setSplitSelectedType("credit_card")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("debit_card") && (
+                                                            <PaymentMethodCard
+                                                                icon={CreditCardIcon}
+                                                                label="Cartão de Débito"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => setSplitSelectedType("debit_card")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("bank_transfer") && (
+                                                            <PaymentMethodCard
+                                                                icon={FileIcon}
+                                                                label="Transferência"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => setSplitSelectedType("bank_transfer")}
+                                                            />
+                                                        )}
+                                                        {availableMethodTypes.has("other") && (
+                                                            <PaymentMethodCard
+                                                                icon={TagIcon}
+                                                                label="Outros"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => setSplitSelectedType("other")}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center gap-2 mb-4">
+                                                        <button
+                                                            onClick={() => setSplitSelectedType(null)}
+                                                            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors shrink-0"
+                                                        >
+                                                            <ChevronLeftIcon size={16} />
+                                                        </button>
+                                                        <h3 className="text-sm font-bold text-brand-inactive-text tracking-wide uppercase">Selecione o método</h3>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        {activeMethods
+                                                            .filter((method: any) => normalizeMethodType(method.type) === splitSelectedType)
+                                                            .map((method: any) => {
+                                                                const normalizedType = normalizeMethodType(method.type);
+                                                                const MethodIcon = normalizedType === "cash"
+                                                                    ? MoneyIcon
+                                                                    : normalizedType === "pix"
+                                                                        ? QRCodeIcon
+                                                                        : normalizedType === "bank_transfer"
+                                                                            ? FileIcon
+                                                                            : ["credit_card", "debit_card"].includes(normalizedType)
+                                                                                ? CreditCardIcon
+                                                                                : TagIcon;
+                                                                return (
+                                                                    <PaymentMethodCard
+                                                                        key={`split-${method.id}`}
+                                                                        icon={MethodIcon}
+                                                                        label={method.name}
+                                                                        onClick={() => handleMethodSelectionInSplit(method)}
+                                                                    />
+                                                                );
+                                                            })}
+                                                    </div>
+                                                </>
+                                            )}
                                         </motion.div>
                                     )}
 

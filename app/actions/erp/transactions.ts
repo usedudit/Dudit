@@ -20,6 +20,8 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
+import { requireUser } from "@/lib/auth/authorization"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { sanitizeInput } from "@/lib/input-validator"
 
 type DbTransaction = {
@@ -3209,5 +3211,228 @@ export async function searchCustomersForTransaction(query?: string) {
     } catch {
         return []
     }
+}
+
+export async function getTransactionPresignedUploadUrlAction(
+  partnerId: string,
+  fileName: string,
+  fileType: string,
+  fileSize: number
+): Promise<
+  | { success: true; uploadUrl: string; publicUrl: string; key: string }
+  | { success: false; error: string }
+> {
+  try {
+    const user = await requireUser()
+    await requirePermission(partnerId, "financial", "edit")
+
+    const plan = await getPartnerPlan(partnerId)
+    if (plan.slug.toLowerCase() !== "crescer" && plan.slug.toLowerCase() !== "escalar") {
+      return { success: false, error: "Upload de documentos não permitido no seu plano. Faça um upgrade!" }
+    }
+
+    const { validateUploadRequest } = await import("@/lib/security/file-validator")
+    const validation = validateUploadRequest(fileName, fileType, fileSize)
+    if (!validation.success) {
+      return { success: false, error: validation.error || "Arquivo inválido" }
+    }
+
+    const { R2_PREFIXES } = await import("@/lib/r2/config")
+    const { generateSignedUploadUrl } = await import("@/lib/r2/server")
+
+    const uploadRes = await generateSignedUploadUrl({
+      fileName,
+      fileType,
+      userId: user.id,
+      prefix: R2_PREFIXES.orderAttachments,
+      kind: "document",
+    })
+
+    return {
+      success: true,
+      uploadUrl: uploadRes.uploadUrl,
+      publicUrl: uploadRes.publicUrl,
+      key: uploadRes.key,
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao gerar URL de upload" }
+  }
+}
+
+export async function saveTransactionAttachmentAction(
+  partnerId: string,
+  transactionId: string,
+  fileKey: string,
+  fileName: string,
+  fileType: string,
+  fileSize: number,
+  fileHash?: string
+): Promise<{ success: true; data: any } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "financial", "edit")
+    const user = await requireUser()
+
+    const plan = await getPartnerPlan(partnerId)
+    if (plan.slug.toLowerCase() !== "crescer" && plan.slug.toLowerCase() !== "escalar") {
+      return { success: false, error: "Upload de documentos não permitido no seu plano. Faça um upgrade!" }
+    }
+
+    const maxCount = plan.slug.toLowerCase() === "crescer" ? 2 : 5
+    const admin = createAdminClient()
+
+    const { count, error: countErr } = await admin
+      .from("transaction_attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("transaction_id", transactionId)
+
+    if (countErr) throw countErr
+
+    if ((count || 0) >= maxCount) {
+      return {
+        success: false,
+        error: `Limite de anexos excedido para o seu plano (${maxCount}). Remova algum para adicionar.`,
+      }
+    }
+
+    let finalHash = fileHash || ""
+    if (!finalHash && fileSize < 5 * 1024 * 1024) {
+      try {
+        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+        const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
+        const serverConfig = getR2ServerConfig()
+        const s3 = new S3Client({
+          region: "auto",
+          credentials: {
+            accessKeyId: serverConfig.accessKeyId,
+            secretAccessKey: serverConfig.secretAccessKey,
+          },
+          endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+        })
+        const obj = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+        if (obj.Body) {
+          const bytes = await obj.Body.transformToByteArray()
+          const crypto = await import("crypto")
+          finalHash = crypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex")
+        }
+        s3.destroy()
+      } catch (e) {
+        console.error("Erro ao calcular hash do R2 no fallback:", e)
+      }
+    }
+
+    const { data, error } = await admin
+      .from("transaction_attachments")
+      .insert({
+        transaction_id: transactionId,
+        file_key: fileKey,
+        file_name: fileName,
+        file_type: fileType,
+        file_size: fileSize,
+        uploaded_by: user.id,
+        file_hash: finalHash,
+      })
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "transaction",
+      entityId: transactionId,
+      actionType: "attachment_created",
+      source: "manual",
+      changeLines: [`Anexo adicionado: ${fileName}`],
+    })
+
+    return { success: true, data }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao salvar anexo" }
+  }
+}
+
+export async function deleteTransactionAttachmentAction(
+  partnerId: string,
+  attachmentId: string,
+  transactionId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "financial", "edit")
+    const user = await requireUser()
+    const admin = createAdminClient()
+
+    const { data: attachment } = await admin
+      .from("transaction_attachments")
+      .select("file_key, file_name")
+      .eq("id", attachmentId)
+      .eq("transaction_id", transactionId)
+      .maybeSingle()
+
+    if (!attachment) {
+      return { success: false, error: "Anexo não encontrado" }
+    }
+
+    const { deleteFileFromR2 } = await import("@/lib/r2/server")
+    await deleteFileFromR2(attachment.file_key)
+
+    await admin.from("transaction_attachments").delete().eq("id", attachmentId)
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "transaction",
+      entityId: transactionId,
+      actionType: "attachment_deleted",
+      source: "manual",
+      changeLines: [`Anexo removido: ${attachment.file_name || "Documento"}`],
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao deletar anexo" }
+  }
+}
+
+export async function getTransactionAttachmentsAction(
+  transactionId: string
+): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
+  try {
+    await requireUser()
+    const supabase = await getSupabaseServerClient()
+
+    const { data, error } = await supabase
+      .from("transaction_attachments")
+      .select("*")
+      .eq("transaction_id", transactionId)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao listar anexos" }
+  }
+}
+
+export async function getTransactionAttachmentUrlAction(
+  transactionId: string,
+  fileKey: string,
+  partnerId?: string
+): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
+  try {
+    await requireUser()
+    if (partnerId) {
+      await requirePermission(partnerId, "financial", "view")
+    }
+
+    const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+    const downloadUrl = await generateSignedDownloadUrl(fileKey)
+    return { success: true, downloadUrl }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao obter URL de download" }
+  }
 }
 

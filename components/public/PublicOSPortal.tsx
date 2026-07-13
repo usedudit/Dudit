@@ -17,7 +17,8 @@ import {
     FormSection,
     DefaultModal,
     Input,
-    InfoCard
+    InfoCard,
+    IconPlaceholder
 } from "@/components/reusable"
 import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -26,6 +27,7 @@ import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useSupabase } from "@/providers/supabase-provider"
+import { ClockIcon } from "lucide-react"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
@@ -561,8 +563,12 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                     {activeTab === "Histórico" && (
                                         <div className="space-y-4 text-left">
                                             {history.length === 0 ? (
-                                                <div className="text-center py-8 text-xs text-brand-inactive-text italic">
-                                                    Nenhum histórico operacional disponível.
+                                                <div className="flex flex-col items-center justify-center text-center py-8">
+                                                    <IconPlaceholder
+                                                        icon={ClockIcon}
+                                                        title="Nenhum histórico encontrado"
+                                                        subtitle="Não foram encontrados eventos para esta OS."
+                                                    />
                                                 </div>
                                             ) : (
                                                 <HistoryTimeline

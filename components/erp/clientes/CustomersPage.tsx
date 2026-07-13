@@ -316,6 +316,18 @@ export default function CustomersPage({
     const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
     const hasCustomers = (rawCustomers?.length || 0) > 0
 
+    const tabCounts = useMemo(() => {
+        if (!rawCustomers) return { Todos: 0, Ativo: 0, Inativo: 0, Bloqueado: 0 }
+        let Todos = rawCustomers.length, Ativo = 0, Inativo = 0, Bloqueado = 0
+        for (const c of rawCustomers) {
+            const status = (c as any).status
+            if (status === "bloqueado") Bloqueado++
+            else if (status === "inativo") Inativo++
+            else Ativo++
+        }
+        return { Todos, Ativo, Inativo, Bloqueado }
+    }, [rawCustomers])
+
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
@@ -486,6 +498,7 @@ export default function CustomersPage({
                                     viewMode={viewMode}
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
+                                    tabCounts={tabCounts}
                                 />
                             )}
 

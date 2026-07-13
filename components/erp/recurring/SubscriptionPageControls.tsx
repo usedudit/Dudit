@@ -2,6 +2,7 @@
 
 import React from "react"
 import { Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
   SearchIcon,
   GridIcon,
@@ -19,6 +20,7 @@ interface SubscriptionPageControlsProps {
   onSearchChange: (value: string) => void
   viewMode: "list" | "grid"
   onViewModeChange: (mode: "list" | "grid") => void
+  tabCounts?: { all: number; active: number; paused: number; awaiting_restock: number; cancelled: number }
 }
 
 export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> = ({
@@ -27,7 +29,8 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
   search,
   onSearchChange,
   viewMode,
-  onViewModeChange
+  onViewModeChange,
+  tabCounts
 }) => {
   return (
     <>
@@ -35,19 +38,19 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
       <div className="mb-6 px-4 md:px-8">
         <Tabs value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)}>
           <TabsList className="px-0">
-            <TabsTrigger value="all" icon={Users}>
+            <TabsTrigger value="all" icon={Users} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
               Todas
             </TabsTrigger>
-            <TabsTrigger value="active" icon={CheckCircleIcon}>
+            <TabsTrigger value="active" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.active} variant="green" />}>
               Ativas
             </TabsTrigger>
-            <TabsTrigger value="paused" icon={CancelCircleIcon}>
+            <TabsTrigger value="paused" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.paused} variant="yellow" />}>
               Pausadas
             </TabsTrigger>
-            <TabsTrigger value="awaiting_restock" icon={BlockedIcon}>
+            <TabsTrigger value="awaiting_restock" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.awaiting_restock} variant="orange" />}>
               Sem Estoque
             </TabsTrigger>
-            <TabsTrigger value="cancelled" icon={BlockedIcon}>
+            <TabsTrigger value="cancelled" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.cancelled} variant="red" />}>
               Canceladas
             </TabsTrigger>
           </TabsList>

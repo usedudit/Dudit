@@ -106,7 +106,6 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "cash_register", path: "/erp/cash-register", label: "Caixa (PDV)", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_open_cash", "can_close_cash", "can_manage_cash"],
     },
-    financial_dashboard: { key: "financial_dashboard", path: "/erp/resumo-financeiro", label: "Visão Geral", category: "Financeiro", legacyCategory: "financial" },
     financial_dre: {
         key: "financial_dre", path: "/erp/financial/dre", label: "DRE Gerencial", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_view_dre"],
@@ -239,7 +238,6 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     // Financeiro
     financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
-    financial_dashboard: full,
     financial_dre: withSpecific(full, { can_view_dre: true }),
     cadastros_financeiro: full,
     reports: full,
@@ -318,7 +316,6 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     // Financeiro - pode visualizar e gerenciar pagamentos
     financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
-    financial_dashboard: viewOnly,
     financial_dre: withSpecific(viewOnly, { can_view_dre: true }),
     cadastros_financeiro: full,
     reports: full,
@@ -383,7 +380,6 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     // Financeiro - full access
     financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
-    financial_dashboard: viewOnly,
     financial_dre: viewOnly,
     cadastros_financeiro: full,
     reports: full,
@@ -444,7 +440,6 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     // Financeiro - no access
     financial_transactions: noAccess,
     cash_register: noAccess,
-    financial_dashboard: noAccess,
     financial_dre: noAccess,
     cadastros_financeiro: noAccess,
     reports: noAccess,
@@ -609,7 +604,7 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
         coupons: mapRoute("marketing_coupons"), // both coupons and promotions map to legacy coupons for compatibility
         goals: mapRoute("goals"),
         reports: {
-            view_basic: mapRoute("financial_dashboard").view,
+            view_basic: mapRoute("reports").view,
             view_advanced: mapRoute("financial_dre").view,
         },
         delivery: {
@@ -843,7 +838,6 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
     if (legacy.cadastros_categories) apply("cadastros_produtos", mapLegacy(legacy.cadastros_categories))
 
     if (legacy.reports) {
-        apply("financial_dashboard", { access: legacy.reports.view_basic })
         apply("financial_dre", { access: legacy.reports.view_advanced, specific: { can_view_dre: legacy.reports.view_advanced } })
         apply("reports", { access: legacy.reports.view_basic || legacy.reports.view_advanced })
     }

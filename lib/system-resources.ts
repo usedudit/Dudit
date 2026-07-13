@@ -132,7 +132,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "financial",
     label: "Financeiro",
-    description: "Resumo financeiro, contas a pagar/receber, caixa e cadastros financeiros.",
+    description: "Contas a pagar/receber, caixa e cadastros financeiros.",
     module: "management",
     minimumPlan: "crescer",
   },

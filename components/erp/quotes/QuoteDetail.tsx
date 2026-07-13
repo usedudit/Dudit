@@ -13,7 +13,7 @@ import {
     CheckCircleIcon,
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable';
-import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction, submitSellerCommentAction, getQuoteInteractionsAction } from '@/app/actions/erp/quotes';
+import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
 import { type HistoryEntry as QuoteHistoryEntryRow } from "@/components/erp/shared/HistoryTimeline"
@@ -107,9 +107,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     const [loading, setLoading] = useState(!initialQuote);
     const [isLoadingQuoteItems, setIsLoadingQuoteItems] = useState(Boolean(initialQuote));
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-    const [interactions, setInteractions] = useState<any[]>([]);
-    const [newComment, setNewComment] = useState("");
-    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [isRegeneratingCode, setIsRegeneratingCode] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
     const lastLoadedQuoteId = useRef<string | null>(null);
@@ -207,10 +204,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             setIsLoadingQuoteItems(true);
             if (!quote) setLoading(true);
 
-            const [detailsRes, interactionsRes] = await Promise.all([
-                getQuoteDetailsAction(quoteId, partnerId),
-                getQuoteInteractionsAction(quoteId, partnerId)
-            ]);
+            const detailsRes = await getQuoteDetailsAction(quoteId, partnerId);
 
             if (detailsRes.success) {
                 setQuote(detailsRes.data);
@@ -219,10 +213,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             } else if (!initialQuote) {
                 notifyError("Erro", detailsRes.error);
                 onBack();
-            }
-
-            if (interactionsRes.success) {
-                setInteractions(interactionsRes.data);
             }
 
             setLoading(false);
@@ -355,34 +345,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             notifyError("Erro", "Erro ao conectar ao servidor.");
         } finally {
             setIsRegeneratingCode(false);
-        }
-    };
-
-    const handleSendComment = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newComment.trim() || isSubmittingComment || !quote) return;
-        setIsSubmittingComment(true);
-        try {
-            const res = await submitSellerCommentAction(quoteId, partnerId, newComment);
-            if (res.success) {
-                setNewComment("");
-                notifySuccess("Mensagem enviada", "Mensagem adicionada com sucesso.");
-
-                // Reload interactions
-                const intRes = await getQuoteInteractionsAction(quoteId, partnerId);
-                if (intRes.success) {
-                    setInteractions(intRes.data);
-                }
-
-                lastLoadedHistoryQuoteId.current = null;
-                debouncedRefresh();
-            } else {
-                notifyError("Erro", res.error || "Não foi possível enviar a mensagem.");
-            }
-        } catch {
-            notifyError("Erro", "Erro ao conectar ao servidor.");
-        } finally {
-            setIsSubmittingComment(false);
         }
     };
 
@@ -838,76 +800,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                     )}
                                                 </div>
                                             </div>
-
-                                            {/* Canal de Negociação */}
-                                            {hasMinimumPlan(planSlug, "crescer") ? (
-                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex justify-between items-center">
-                                                        <span>Canal de Negociação</span>
-                                                        <Badge variant="gray">{interactions.length}</Badge>
-                                                    </h3>
-
-                                                    <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-2">
-                                                        {interactions.length === 0 ? (
-                                                            <div className="text-center py-6 text-xs text-brand-inactive-text">
-                                                                Nenhuma mensagem trocada ainda.
-                                                            </div>
-                                                        ) : (
-                                                            interactions.map((msg: any) => (
-                                                                <div
-                                                                    key={msg.id}
-                                                                    className={`p-3 rounded-2xl text-xs max-w-[85%] ${msg.author_role === "seller"
-                                                                        ? "bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-body align-self-start self-start"
-                                                                        : "bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/20 text-emerald-900 dark:text-emerald-300 align-self-end self-end text-right ml-auto"
-                                                                        }`}
-                                                                >
-                                                                    <div className="font-bold mb-1">
-                                                                        {msg.author_role === "seller" ? "Você (Vendedor)" : msg.author_name}
-                                                                    </div>
-                                                                    <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
-                                                                    <span className="text-[10px] text-brand-inactive-text dark:text-dark-body/50 block mt-1">
-                                                                        {formatDate(msg.created_at)} {formatTime(new Date(msg.created_at))}
-                                                                    </span>
-                                                                </div>
-                                                            ))
-                                                        )}
-                                                    </div>
-
-                                                    {quote.status !== "expired" && quote.status !== "cancelled" && !quote.converted && (
-                                                        <form onSubmit={handleSendComment} className="flex gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
-                                                            <input
-                                                                type="text"
-                                                                value={newComment}
-                                                                onChange={(e) => setNewComment(e.target.value)}
-                                                                placeholder="Envie uma mensagem..."
-                                                                className="flex-1 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-dark dark:text-dark-body"
-                                                                disabled={isSubmittingComment}
-                                                            />
-                                                            <Button
-                                                                type="submit"
-                                                                disabled={!newComment.trim() || isSubmittingComment}
-                                                                className="px-3 py-2 text-xs shrink-0 rounded-xl"
-                                                            >
-                                                                {isSubmittingComment ? "..." : "Enviar"}
-                                                            </Button>
-                                                        </form>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex justify-between items-center">
-                                                        <span>Canal de Negociação</span>
-                                                    </h3>
-                                                    <div className="flex flex-col items-center text-center py-4">
-                                                        <img src={PLAN_UPGRADE_MASCOTS.crescer} alt="Crescer" className="w-16 h-16 mb-3 opacity-60" />
-                                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível nos planos Crescer e Escalar</p>
-                                                        <p className="text-xs text-brand-inactive-text mb-4">Negocie diretamente com o cliente pelo orçamento online.</p>
-                                                        <Button onClick={() => openPlanUpgrade("crescer")} className="text-xs h-9">
-                                                            Fazer upgrade
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            )}
 
                                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6">
                                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4">Informações Adicionais</h3>

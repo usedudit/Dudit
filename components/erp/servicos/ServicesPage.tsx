@@ -281,6 +281,16 @@ export default function ServicesPage({
 
     const isFiltered = search.length > 0 || hasActiveFilters
 
+    const tabCounts = useMemo(() => {
+        const all = services.length
+        let active = 0, inactive = 0
+        for (const s of services) {
+            if (s.is_active) active++
+            else inactive++
+        }
+        return { all, active, inactive }
+    }, [services])
+
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
@@ -655,6 +665,7 @@ export default function ServicesPage({
                                     viewMode={viewMode}
                                     onViewModeChange={(mode) => setViewModeState(mode)}
                                     hasActiveFilters={hasActiveFilters}
+                                    tabCounts={tabCounts}
                                 />
                             )}
 

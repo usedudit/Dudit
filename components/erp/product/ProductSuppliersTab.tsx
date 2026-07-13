@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Checkbox, Button, IconPlaceholder, Input, Spinner } from "@/components/reusable"
-import { PlusIcon, TrashIcon, TagIcon, EditIcon, CheckIcon, XIcon, Package } from "@/lib/icons"
+import { PlusIcon, TrashIcon, TagIcon, EditIcon, CheckIcon, XIcon, Package, ClockIcon } from "@/lib/icons"
 import { getProductSuppliersAction, linkProductSupplierAction, unlinkProductSupplierAction, updateProductSupplierAction, getProductPurchaseHistoryAction, getProductCostHistoryAction } from "@/app/actions/erp/products"
 import SelectSupplierSheet from "../fornecedores/SelectSupplierSheet"
 import { useNotification } from "@/hooks/use-notification"
@@ -549,7 +549,13 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                         {costHistoryLoading ? (
                             <div className="flex justify-center py-4"><Spinner size={20} /></div>
                         ) : costHistory.length === 0 ? (
-                            <p className="text-sm text-brand-inactive-text text-center py-4">Nenhum histórico disponível</p>
+                            <div className="flex flex-col items-center justify-center text-center py-8">
+                                <IconPlaceholder
+                                    icon={ClockIcon}
+                                    title="Nenhum histórico encontrado"
+                                    subtitle="Não foram encontrados eventos para este produto."
+                                />
+                            </div>
                         ) : (
                             <div className="space-y-6 relative">
                                 {costHistory.length > 1 && (

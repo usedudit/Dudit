@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 
 import {
     SearchIcon,
@@ -34,6 +35,7 @@ interface CustomerPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    tabCounts?: { Todos: number; Ativo: number; Inativo: number; Bloqueado: number }
 }
 
 const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
@@ -90,16 +92,16 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as any)}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="Todos" icon={Users}>
+                        <TabsTrigger value="Todos" icon={Users} badge={tabCounts && <TabCountBadge count={tabCounts.Todos} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="Ativo" icon={CheckCircleIcon}>
+                        <TabsTrigger value="Ativo" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Ativo} variant="green" />}>
                             Ativos
                         </TabsTrigger>
-                        <TabsTrigger value="Inativo" icon={CancelCircleIcon}>
+                        <TabsTrigger value="Inativo" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Inativo} variant="gray" />}>
                             Inativos
                         </TabsTrigger>
-                        <TabsTrigger value="Bloqueado" icon={BlockedIcon}>
+                        <TabsTrigger value="Bloqueado" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Bloqueado} variant="red" />}>
                             Bloqueados
                         </TabsTrigger>
                     </TabsList>

@@ -3,6 +3,7 @@
 import React from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input, Tabs, TabsList, TabsTrigger, FormDropdown } from "@/components/reusable"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import FilterChip from "@/components/reusable/FilterChip"
 import { SearchIcon, PlusIcon, GridIcon, AwardIcon, RankingIcon, FilterIcon, CheckCircleIcon } from "@/lib/icons"
 
@@ -33,15 +34,16 @@ export default function GoalsPageControls(props: {
     onRankingEndDateChange?: (val: string) => void
     onApplyRankingFilter?: () => void
     rankingLoading?: boolean
+    tabCounts?: { Metas: number; Ranking: number; Resumo: number }
 }) {
     return (
         <>
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={props.activeTab} onValueChange={(val) => props.onTabChange(val as Tab)}>
                     <TabsList className="px-0">
-                        <TabsTrigger value="Metas" icon={AwardIcon}>Metas</TabsTrigger>
-                        <TabsTrigger value="Ranking" icon={RankingIcon}>Ranking</TabsTrigger>
-                        <TabsTrigger value="Resumo" icon={GridIcon}>Resumo</TabsTrigger>
+                        <TabsTrigger value="Metas" icon={AwardIcon} badge={props.tabCounts && <TabCountBadge count={props.tabCounts.Metas} variant="gray" />}>Metas</TabsTrigger>
+                        <TabsTrigger value="Ranking" icon={RankingIcon} badge={props.tabCounts && <TabCountBadge count={props.tabCounts.Ranking} variant="gray" />}>Ranking</TabsTrigger>
+                        <TabsTrigger value="Resumo" icon={GridIcon} badge={props.tabCounts && <TabCountBadge count={props.tabCounts.Resumo} variant="gray" />}>Resumo</TabsTrigger>
                     </TabsList>
                 </Tabs>
             </div>

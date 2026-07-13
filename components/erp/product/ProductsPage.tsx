@@ -343,6 +343,19 @@ export default function ProductsPage({
 
     const isFiltered = search.length > 0 || hasActiveFilters
 
+    const tabCounts = useMemo(() => {
+        const all = products.length
+        let normal = 0, low = 0, out_of_stock = 0
+        for (const p of products) {
+            const stock = p.stock_quantity ?? (p as any).stock ?? 0
+            const label = getStockStatus(stock, p.min_stock ?? undefined).label
+            if (label === "Normal") normal++
+            else if (label === "Baixo") low++
+            else if (label === "Esgotado") out_of_stock++
+        }
+        return { all, normal, low, out_of_stock }
+    }, [products])
+
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
@@ -876,6 +889,7 @@ export default function ProductsPage({
                                         else openPlanUpgrade("escalar")
                                     }}
                                     hasEscalarPlan={hasMinimumPlan(planSlug, "escalar")}
+                                    tabCounts={tabCounts}
                                 />
                             )}
 

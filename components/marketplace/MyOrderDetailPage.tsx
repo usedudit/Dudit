@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
@@ -1637,8 +1637,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <HistoryTimeline
                                     entries={combinedHistoryEntries}
                                     title="Status do Acompanhamento"
-                                    subtitle="Acompanhe todas as movimentações e alterações de status detalhadas realizadas neste pedido."
-                                    emptyMessage="Nenhum histórico encontrado para este pedido."
+                                    emptyMessage="Não foram encontrados eventos para este pedido."
                                 />
                             </div>
                         </TabsContent>
@@ -1650,7 +1649,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         <ThreeDotsLoader />
                                     </div>
                                 ) : attachments.length === 0 ? (
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum anexo encontrado para este pedido.</p>
+                                    <IconPlaceholder
+                                        icon={FileIcon}
+                                        title="Nenhum anexo encontrado"
+                                        subtitle="Não foram encontrados anexos para este pedido."
+                                    />
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {attachments.map((att) => (

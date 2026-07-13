@@ -136,7 +136,9 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
                 "is_default, is_online_default, " +
                 "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
                 "max_installments, card_brand, priority, " +
-                "percentage_rate, fixed_amount, created_at"
+                "percentage_rate, fixed_amount, created_at, " +
+                "default_finance_account_id, " +
+                "finance_accounts!default_finance_account_id(name)"
             )
             .eq("partner_id", partnerId)
             .order("is_default", { ascending: false })
@@ -153,6 +155,7 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
             fee_percent: method.fee_percent ?? method.percentage_rate ?? null,
             fee_fixed: method.fee_fixed ?? method.fixed_amount ?? null,
             fee_bearer: method.fee_bearer || "merchant",
+            finance_account_name: method.finance_accounts?.name || null,
         }))
     },
     [`payment-methods-${partnerId}`],

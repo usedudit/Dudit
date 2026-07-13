@@ -39,7 +39,7 @@ function mapReturnEventToHistoryEntry(event: ReturnEvent): HistoryEntry {
 
     // Enrich from metadata
     const metadata = (event as any).metadata || {}
-    
+
     // 1. Items listed during creation or edits
     if (metadata.items && Array.isArray(metadata.items) && metadata.items.length > 0) {
         changeLines.push("Itens na solicitação:")
@@ -101,8 +101,7 @@ export function ReturnHistoryTab({ events, loading = false }: ReturnHistoryTabPr
             <HistoryTimeline
                 entries={entries}
                 title="Histórico da Devolução"
-                subtitle="Acompanhe todas as movimentações e alterações realizadas nesta solicitação."
-                emptyMessage="Nenhum histórico encontrado para esta devolução."
+                emptyMessage="Não foram encontrados eventos para esta devolução."
             />
         </FadeIn>
     )

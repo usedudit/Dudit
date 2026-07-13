@@ -731,6 +731,16 @@ export default function TransactionsPage({
         isDatePeriodFilterActive(filters.datePeriod)
     const hasTransactions = loadedTransactions.length > 0
 
+    const tabCounts = useMemo(() => {
+        const Transacoes = loadedTransactions.length
+        let pagar = 0, receber = 0
+        for (const t of loadedTransactions) {
+            if ((t as any).ledgerDirection === "out") pagar++
+            else if ((t as any).ledgerDirection === "in") receber++
+        }
+        return { "Transações": Transacoes, "A pagar": pagar, "A receber": receber }
+    }, [loadedTransactions])
+
     // ── Summary cards for Recebimentos / Pagamentos pages ──────────────
     const summaryCards = useMemo(() => {
         if (!forcedTab || forcedTab === "Transações") return null
@@ -2037,6 +2047,7 @@ export default function TransactionsPage({
                     hasActiveFilters={hasActiveFilters}
                     addDisabled={false}
                     hideTabs={!!forcedTab}
+                    tabCounts={tabCounts}
                 />
 
                 {/* ── Summary cards (Recebimentos / Pagamentos only) ── */}

@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 
 import {
     SearchIcon,
@@ -41,6 +42,7 @@ interface StockMovementPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    tabCounts?: { all: number; in: number; out: number }
 }
 
 const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
@@ -107,13 +109,13 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as "all" | "in" | "out")}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="all" icon={ArrowUpDownIcon}>
+                        <TabsTrigger value="all" icon={ArrowUpDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
                             Todas
                         </TabsTrigger>
-                        <TabsTrigger value="in" icon={ArrowUpIcon}>
+                        <TabsTrigger value="in" icon={ArrowUpIcon} badge={tabCounts && <TabCountBadge count={tabCounts.in} variant="green" />}>
                             Entradas
                         </TabsTrigger>
-                        <TabsTrigger value="out" icon={ArrowDownIcon}>
+                        <TabsTrigger value="out" icon={ArrowDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.out} variant="red" />}>
                             Saídas
                         </TabsTrigger>
                     </TabsList>

@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 
 import {
     SearchIcon,
@@ -31,6 +32,7 @@ interface VideoPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters?: boolean
+    tabCounts?: { Todos: number; Pendentes: number; Aprovados: number; Rejeitados: number }
 }
 
 const VideoPageControls: React.FC<VideoPageControlsProps> = ({
@@ -45,6 +47,7 @@ const VideoPageControls: React.FC<VideoPageControlsProps> = ({
     viewMode,
     onViewModeChange,
     hasActiveFilters = false,
+    tabCounts,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -86,16 +89,16 @@ const VideoPageControls: React.FC<VideoPageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as any)}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="Todos" icon={PlayIcon}>
+                        <TabsTrigger value="Todos" icon={PlayIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Todos} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="Pendentes" icon={InfoIcon}>
+                        <TabsTrigger value="Pendentes" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Pendentes} variant="yellow" />}>
                             Pendentes
                         </TabsTrigger>
-                        <TabsTrigger value="Aprovados" icon={CheckCircleIcon}>
+                        <TabsTrigger value="Aprovados" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Aprovados} variant="green" />}>
                             Aprovados
                         </TabsTrigger>
-                        <TabsTrigger value="Rejeitados" icon={CancelCircleIcon}>
+                        <TabsTrigger value="Rejeitados" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Rejeitados} variant="red" />}>
                             Rejeitados
                         </TabsTrigger>
                     </TabsList>

@@ -6,7 +6,8 @@ import {
     CheckCircleIcon,
     AlertCircleIcon,
     XIcon,
-    ClockIcon
+    ClockIcon,
+    MoneyIcon
 } from "@/lib/icons"
 import {
     Button,
@@ -654,7 +655,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     {paymentStatus.label}
                                                 </Badge>
                                                 {order.is_refunded && (
-                                                    <Badge variant="purple">
+                                                    <Badge variant="purple" icon={<MoneyIcon />}>
                                                         Reembolsado
                                                     </Badge>
                                                 )}

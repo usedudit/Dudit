@@ -460,72 +460,9 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
     const renderListContent = () => {
         if (paginatedMethods.length === 0) return renderEmptyState()
 
-        if (isMobile) {
-            return (
-                <div className="flex flex-col">
-                    {paginatedMethods.map((method, idx) => (
-                        <motion.div
-                            key={method.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: idx * 0.05, duration: 0.2 }}
-                        >
-                            <div
-                                className="py-6 flex items-center gap-5 cursor-pointer active:scale-[0.98] transition-transform"
-                                onClick={() => onEdit(method.id)}
-                            >
-                                <div className="w-14 h-14 rounded-2xl bg-brand-gray/50 dark:bg-dark-border/30 shrink-0 flex items-center justify-center border border-brand-border/50 dark:border-dark-border/20 shadow-sm">
-                                    {getPaymentIcon(method)}
-                                </div>
-
-                                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex flex-col min-w-0 pr-1">
-                                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate">
-                                                {method.name || "Sem nome"}
-                                            </h3>
-                                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase mt-0.5">
-                                                ID: {method.id.slice(0, 5).toUpperCase()}
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-1 shrink-0">
-                                            <Badge variant={method.is_active ? "green" : "red"} className="text-[10px] h-5 px-2">
-                                                {method.is_active ? "Ativo" : "Inativo"}
-                                            </Badge>
-                                            {method.is_online_default && (
-                                                <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5">
-                                                    Padrão
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center mt-2">
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="gray" icon={null} className="text-[10px] h-5 px-2 uppercase">
-                                                {getPaymentTypeLabel(method)}
-                                            </Badge>
-                                            {method.discount_percent ? (
-                                                <Badge variant="orange" icon={null} className="text-[10px] h-5 px-2">
-                                                    -{method.discount_percent}%
-                                                </Badge>
-                                            ) : null}
-                                        </div>
-                                        <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                                            <Checkbox checked={selection.ids.has(method.id)} onChange={() => handleSelectRow(method.id)} />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {idx < paginatedMethods.length - 1 && <Separator className="opacity-30" />}
-                        </motion.div>
-                    ))}
-                </div>
-            )
-        }
-
         if (viewMode === "grid") {
             return (
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                     {paginatedMethods.map((method) => (
                         <PaymentMethodGridCard
                             key={method.id}

@@ -191,7 +191,6 @@ export type RouteKey =
     // Financeiro
     | "financial_transactions"
     | "cash_register"
-    | "financial_dashboard"
     | "financial_dre"
     | "cadastros_financeiro"
     | "reports"

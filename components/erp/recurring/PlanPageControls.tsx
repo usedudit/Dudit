@@ -2,6 +2,7 @@
 
 import React from "react"
 import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
   SearchIcon,
   GridIcon,
@@ -22,6 +23,7 @@ interface PlanPageControlsProps {
   viewMode: "list" | "grid"
   onViewModeChange: (mode: "list" | "grid") => void
   canManage: boolean
+  tabCounts?: { Todos: number; Ativo: number; Inativo: number; Arquivado: number }
 }
 
 export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
@@ -32,7 +34,8 @@ export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
   onAddPlan,
   viewMode,
   onViewModeChange,
-  canManage
+  canManage,
+  tabCounts
 }) => {
   return (
     <>
@@ -40,16 +43,16 @@ export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
       <div className="mb-6 px-4 md:px-8">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)}>
           <TabsList className="px-0">
-            <TabsTrigger value="Todos" icon={Users}>
+            <TabsTrigger value="Todos" icon={Users} badge={tabCounts && <TabCountBadge count={tabCounts.Todos} variant="gray" />}>
               Todos
             </TabsTrigger>
-            <TabsTrigger value="Ativo" icon={CheckCircleIcon}>
+            <TabsTrigger value="Ativo" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Ativo} variant="green" />}>
               Ativos
             </TabsTrigger>
-            <TabsTrigger value="Inativo" icon={CancelCircleIcon}>
+            <TabsTrigger value="Inativo" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Inativo} variant="gray" />}>
               Inativos
             </TabsTrigger>
-            <TabsTrigger value="Arquivado" icon={BlockedIcon}>
+            <TabsTrigger value="Arquivado" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Arquivado} variant="orange" />}>
               Arquivados
             </TabsTrigger>
           </TabsList>

@@ -23,6 +23,7 @@ import {
     InfoCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
@@ -336,7 +337,7 @@ export default function CreateReturnPage({
                 condition: mapToLegacyCondition(item.condition || "aberto"),
             }))
             setReturnItems(items)
-            
+
             const itemsTotal = calculateReturnNetTotal(
                 items.map(item => ({
                     netItemValue: item.netItemValue,
@@ -384,11 +385,11 @@ export default function CreateReturnPage({
             setReturnDate(new Date(returnRequest.returnDate || returnRequest.createdAt))
             setReturnStatus(returnRequest.status)
             setResolutionType((returnRequest.approvedResolution || returnRequest.desiredResolution || "refund") as any)
-            
+
             const isCancellation = returnRequest.requestType === "cancellation" || (returnRequest as any).request_type === "cancellation"
             const loadedRefundValue = returnRequest.refundValue || (returnRequest.desiredResolution === "refund" ? itemsTotal : 0)
             const isFullRefund = isCancellation || (loadedRefundValue > 0 && returnRequest.orderPaidAmount && Math.abs(loadedRefundValue - returnRequest.orderPaidAmount) < 0.01)
-            
+
             setRefundType(isCancellation ? "full" : (returnRequest.refundType || (isFullRefund ? "full" : (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))))
             setRefundValue(isCancellation ? (returnRequest.orderPaidAmount || loadedRefundValue) : loadedRefundValue)
             setRefundPaymentMethod(returnRequest.refundPaymentMethod || "")
@@ -1813,40 +1814,52 @@ export default function CreateReturnPage({
 
                                     <TabsContent value="evidence" className="mt-0">
                                         <FadeIn key="evidence" className="space-y-6">
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Evidências de Retorno</h3>
-                                            <ProductImagesSection
-                                                images={evidenceImages}
-                                                onImageUpload={handleImageUpload}
-                                                onRemoveImage={handleRemoveImage}
-                                                onSetPrimaryImage={handleSetPrimaryImage}
-                                                isEditing={!isViewOnly && !isMarketplaceRequest}
-                                                uploadingImages={uploadingImages}
-                                                isSaving={isSaving || isUploading}
-                                            />
+                                            <FormSection title="Evidências de Retorno">
+                                                <ProductImagesSection
+                                                    images={evidenceImages}
+                                                    onImageUpload={handleImageUpload}
+                                                    onRemoveImage={handleRemoveImage}
+                                                    onSetPrimaryImage={handleSetPrimaryImage}
+                                                    isEditing={!isViewOnly && !isMarketplaceRequest}
+                                                    uploadingImages={uploadingImages}
+                                                    isSaving={isSaving || isUploading}
+                                                />
+                                            </FormSection>
+
+                                            {returnRequest?.id && (
+                                                <GenericAttachmentsTab
+                                                    entityId={returnRequest.id}
+                                                    partnerId={partnerId}
+                                                    entityType="return"
+                                                    title="Documentos de Evidência"
+                                                    subtitle="Gerencie documentos adicionais anexados como evidência desta devolução."
+                                                />
+                                            )}
                                         </FadeIn>
                                     </TabsContent>
 
                                     <TabsContent value="observations" className="mt-0">
                                         <FadeIn key="observations" className="space-y-6">
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Observações da Devolução</h3>
-                                            {returnRequest?.customerMessage && (
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Observações do Cliente</label>
-                                                    <div className="p-3.5 bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap border border-brand-border/40 dark:border-dark-border/40">
-                                                        {returnRequest.customerMessage}
+                                            <FormSection title="Observações da Devolução">
+                                                {returnRequest?.customerMessage && (
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Observações do Cliente</label>
+                                                        <div className="p-3.5 bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap border border-brand-border/40 dark:border-dark-border/40">
+                                                            {returnRequest.customerMessage}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
-                                            <FormTextarea
-                                                name="observations"
-                                                label="Observações Internas (Vendedor)"
-                                                placeholder="Adicione observações internas sobre a troca/devolução. O cliente também poderá visualizar essas observações."
-                                                disabled={isViewOnly}
-                                                value={observations}
-                                                onChange={(e) => setObservations(e.target.value)}
-                                                maxLength={1000}
-                                                showCharacterCount={true}
-                                            />
+                                                )}
+                                                <FormTextarea
+                                                    name="observations"
+                                                    label="Observações Internas (Vendedor)"
+                                                    placeholder="Adicione observações internas sobre a troca/devolução. O cliente também poderá visualizar essas observações."
+                                                    disabled={isViewOnly}
+                                                    value={observations}
+                                                    onChange={(e) => setObservations(e.target.value)}
+                                                    maxLength={1000}
+                                                    showCharacterCount={true}
+                                                />
+                                            </FormSection>
                                         </FadeIn>
                                     </TabsContent>
 

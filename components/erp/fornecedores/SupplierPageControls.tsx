@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 
 import {
   SearchIcon,
@@ -32,6 +33,7 @@ interface SupplierPageControlsProps {
   viewMode: "list" | "grid"
   onViewModeChange: (mode: "list" | "grid") => void
   hasActiveFilters: boolean
+  tabCounts?: { Todos: number; Ativo: number; Inativo: number }
 }
 
 const SupplierPageControls: React.FC<SupplierPageControlsProps> = ({
@@ -83,9 +85,9 @@ const SupplierPageControls: React.FC<SupplierPageControlsProps> = ({
       <div className="mb-6 px-4 md:px-8">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)}>
           <TabsList className="px-0">
-            <TabsTrigger value="Todos" icon={Users}>Todos</TabsTrigger>
-            <TabsTrigger value="Ativo" icon={CheckCircleIcon}>Ativos</TabsTrigger>
-            <TabsTrigger value="Inativo" icon={CancelCircleIcon}>Inativos</TabsTrigger>
+            <TabsTrigger value="Todos" icon={Users} badge={tabCounts && <TabCountBadge count={tabCounts.Todos} variant="gray" />}>Todos</TabsTrigger>
+            <TabsTrigger value="Ativo" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Ativo} variant="green" />}>Ativos</TabsTrigger>
+            <TabsTrigger value="Inativo" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Inativo} variant="gray" />}>Inativos</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

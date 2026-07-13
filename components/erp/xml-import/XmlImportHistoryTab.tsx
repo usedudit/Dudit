@@ -22,8 +22,7 @@ export function XmlImportHistoryTab({ events, loading = false }: XmlImportHistor
             <HistoryTimeline
                 entries={events}
                 title="Histórico da Importação"
-                subtitle="Acompanhe todas as etapas do processamento desta NF-e, desde o upload até a importação e possíveis reversões."
-                emptyMessage="Nenhum histórico encontrado para esta importação."
+                emptyMessage="Não foram encontrados eventos para esta importação."
             />
         </FadeIn>
     )

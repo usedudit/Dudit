@@ -459,6 +459,19 @@ export default function OrdersPage({
         isDatePeriodFilterActive(filters.datePeriod)
     const hasOrders = (effectiveOrders?.length || 0) > 0
 
+    const tabCounts = useMemo(() => {
+        if (!effectiveOrders) return { Todos: 0, Pendente: 0, Pago: 0, Enviado: 0, Cancelado: 0 }
+        let Todos = effectiveOrders.length, Pendente = 0, Pago = 0, Enviado = 0, Cancelado = 0
+        for (const o of effectiveOrders) {
+            const s = (o as any).situation
+            if (s === "pending" || s === "in_process") Pendente++
+            else if (s === "paid" || s === "delivered") Pago++
+            else if (s === "shipped") Enviado++
+            else if (s === "cancelled") Cancelado++
+        }
+        return { Todos, Pendente, Pago, Enviado, Cancelado }
+    }, [effectiveOrders])
+
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
@@ -912,6 +925,7 @@ export default function OrdersPage({
                                     viewMode={viewMode}
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
+                                    tabCounts={tabCounts}
                                 />
                             )}
 

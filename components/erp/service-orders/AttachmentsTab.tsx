@@ -217,48 +217,54 @@ export default function AttachmentsTab({
         const { images, docs } = getImagesAndDocs(grouped[category])
         const imagesForSection = images.map(img => img.file || img.file_key)
 
+        const isNormal = category === "normal"
+
         return (
             <div className="space-y-4">
-                <ProductImagesSection
-                    images={imagesForSection}
-                    onImageUpload={(e) => handleImageUpload(category, e)}
-                    onRemoveImage={(idx) => handleRemoveImage(category, idx)}
-                    onSetPrimaryImage={() => { }}
-                    isEditing={isEditing}
-                />
+                {!isNormal && (
+                    <ProductImagesSection
+                        images={imagesForSection}
+                        onImageUpload={(e) => handleImageUpload(category, e)}
+                        onRemoveImage={(idx) => handleRemoveImage(category, idx)}
+                        onSetPrimaryImage={() => { }}
+                        isEditing={isEditing}
+                    />
+                )}
 
-                {docs.length === 0 ? (
-                    isEditing && (
-                        <div className="py-6 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/10 dark:bg-dark-border/5">
-                            <IconPlaceholder
-                                icon={FileIcon}
-                                title="Nenhum documento adicionado"
-                                subtitle="Adicione documentos em PDF, Word, Excel, etc. para esta OS."
-                                itemButton={{
-                                    text: "Adicionar Documento",
-                                    action: () => handleDocUploadClick(category),
-                                    variant: "outline",
-                                }}
-                            />
-                        </div>
-                    )
-                ) : (
-                    <>
-                        {renderDocsGrid(docs)}
-                        {isEditing && (
-                            <div className="flex justify-end pt-2">
-                                <Button
-                                    type="button"
-                                    variant="link"
-                                    onClick={() => handleDocUploadClick(category)}
-                                    className="text-xs gap-1.5"
-                                >
-                                    <UploadIcon className="w-4 h-4" />
-                                    Adicionar Documento (PDF, etc.)
-                                </Button>
+                {isNormal && (
+                    docs.length === 0 ? (
+                        isEditing && (
+                            <div className="flex flex-col items-center justify-center text-center py-8">
+                                <IconPlaceholder
+                                    icon={FileIcon}
+                                    title="Nenhum documento adicionado"
+                                    subtitle="Adicione documentos em PDF, Word, Excel, etc. para esta OS."
+                                    itemButton={{
+                                        text: "Adicionar Documento",
+                                        action: () => handleDocUploadClick(category),
+                                        variant: "outline",
+                                    }}
+                                />
                             </div>
-                        )}
-                    </>
+                        )
+                    ) : (
+                        <>
+                            {renderDocsGrid(docs)}
+                            {isEditing && (
+                                <div className="flex justify-end pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        onClick={() => handleDocUploadClick(category)}
+                                        className="text-xs gap-1.5"
+                                    >
+                                        <UploadIcon className="w-4 h-4" />
+                                        Adicionar Documento (PDF, etc.)
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    )
                 )}
             </div>
         )
@@ -271,7 +277,7 @@ export default function AttachmentsTab({
             <div className="space-y-6">
                 {/* Normal Section */}
                 {(isEditing || grouped.normal.length > 0) && (
-                    <FormSection title={isEditing ? "Anexos Gerais" : "Normais"}>
+                    <FormSection title="Anexos">
                         {renderCategoryContent("normal")}
                     </FormSection>
                 )}

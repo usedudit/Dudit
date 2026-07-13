@@ -23,8 +23,7 @@ export function OrderHistoryTab({ entries, loading = false }: OrderHistoryTabPro
             <HistoryTimeline
                 entries={entries}
                 title="Histórico do Pedido"
-                subtitle="Acompanhe todas as movimentações e alterações realizadas neste pedido."
-                emptyMessage="Nenhum histórico encontrado para este pedido."
+                emptyMessage="Não foram encontrados eventos para este pedido."
             />
         </FadeIn>
     )

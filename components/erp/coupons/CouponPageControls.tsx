@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
     SearchIcon,
     FilterIcon,
@@ -36,6 +37,7 @@ interface CouponPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     onAddCoupon?: () => void
+    tabCounts?: { Todos: number; Ativos: number; Inativos: number; Automaticos: number }
 }
 
 const CouponPageControls: React.FC<CouponPageControlsProps> = ({
@@ -50,6 +52,7 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     onAddCoupon,
+    tabCounts,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -110,16 +113,16 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
                     <TabsList className="px-0">
-                        <TabsTrigger value="Todos" icon={TagIcon}>
+                        <TabsTrigger value="Todos" icon={TagIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Todos} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="Ativos" icon={CheckCircleIcon}>
+                        <TabsTrigger value="Ativos" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Ativos} variant="green" />}>
                             Ativos
                         </TabsTrigger>
-                        <TabsTrigger value="Inativos" icon={CancelCircleIcon}>
+                        <TabsTrigger value="Inativos" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Inativos} variant="gray" />}>
                             Inativos
                         </TabsTrigger>
-                        <TabsTrigger value="Automaticos" icon={SparklesIcon}>
+                        <TabsTrigger value="Automaticos" icon={SparklesIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Automaticos} variant="blue" />}>
                             Automaticos
                         </TabsTrigger>
                     </TabsList>

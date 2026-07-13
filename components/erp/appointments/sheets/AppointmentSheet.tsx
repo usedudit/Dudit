@@ -2832,10 +2832,8 @@ export const AppointmentSheet = ({
                 cancelText="Continuar editando"
                 variant="warning"
             />
-            <AnimatePresence>
-                {isCancelConfirmOpen && (
                     isMobile ? (
-                        <BottomSheet isOpen={true} onClose={() => setIsCancelConfirmOpen(false)}>
+                        <BottomSheet isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)}>
                             <div className="p-6 space-y-5">
                                 <div className="text-center">
                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento</h3>
@@ -2876,7 +2874,7 @@ export const AppointmentSheet = ({
                             </div>
                         </BottomSheet>
                     ) : (
-                        <DefaultModal isOpen={true} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
+                        <DefaultModal isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
                             <div className="text-center sm:text-left">
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
                                     Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
@@ -2913,9 +2911,6 @@ export const AppointmentSheet = ({
                                 }}>Cancelar agendamento</Button>
                             </div>
                         </DefaultModal>
-                    )
-                )}
-            </AnimatePresence>
             <AlertModal
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
@@ -2928,10 +2923,8 @@ export const AppointmentSheet = ({
             />
 
             {/* Stock Check Modal */}
-            <AnimatePresence>
-                {isStockCheckOpen && (
                     <DefaultModal
-                        isOpen={true}
+                        isOpen={isStockCheckOpen}
                         onClose={() => {
                             setIsStockCheckOpen(false)
                             setPendingNextStep(null)
@@ -2997,8 +2990,6 @@ export const AppointmentSheet = ({
                             </div>
                         </div>
                     </DefaultModal>
-                )}
-            </AnimatePresence>
 
             {isMobile ? (
                 <BottomSheet isOpen={true} onClose={handleCloseAttempt}>

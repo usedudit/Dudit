@@ -3364,9 +3364,8 @@ export function CheckoutPageClient() {
                 />
             )}
 
-            {showDepositChoiceModal && checkoutContext?.deposit && (
                 <DefaultModal
-                    isOpen={showDepositChoiceModal}
+                    isOpen={showDepositChoiceModal && !!checkoutContext?.deposit}
                     onClose={() => setShowDepositChoiceModal(false)}
                     title="Escolha como deseja pagar"
                     maxWidth="md"
@@ -3441,7 +3440,6 @@ export function CheckoutPageClient() {
                         </div>
                     </div>
                 </DefaultModal>
-            )}
 
             <DefaultModal
                 isOpen={showAddressModal}

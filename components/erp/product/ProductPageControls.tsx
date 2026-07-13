@@ -4,7 +4,8 @@ import { Button, Input } from "@/components/reusable"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
-import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs" // Importando o componente Tabs atualizado
+import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 
 import {
     SearchIcon,
@@ -55,6 +56,7 @@ interface ProductPageControlsProps {
     onOpenCamera?: () => void
     onOpenReplenishment?: () => void
     hasEscalarPlan?: boolean
+    tabCounts?: { all: number; normal: number; low: number; out_of_stock: number }
 }
 
 const ProductPageControls: React.FC<ProductPageControlsProps> = ({
@@ -177,16 +179,16 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as "all" | "normal" | "low" | "out_of_stock")}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="all" icon={PackageIcon}>
+                        <TabsTrigger value="all" icon={PackageIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="normal" icon={NormalProductsIcon}>
+                        <TabsTrigger value="normal" icon={NormalProductsIcon} badge={tabCounts && <TabCountBadge count={tabCounts.normal} variant="green" />}>
                             Normal
                         </TabsTrigger>
-                        <TabsTrigger value="low" icon={LowProductsIcon}>
+                        <TabsTrigger value="low" icon={LowProductsIcon} badge={tabCounts && <TabCountBadge count={tabCounts.low} variant="yellow" />}>
                             Baixo
                         </TabsTrigger>
-                        <TabsTrigger value="out_of_stock" icon={OutProductsIcon}>
+                        <TabsTrigger value="out_of_stock" icon={OutProductsIcon} badge={tabCounts && <TabCountBadge count={tabCounts.out_of_stock} variant="red" />}>
                             Esgotado
                         </TabsTrigger>
                     </TabsList>

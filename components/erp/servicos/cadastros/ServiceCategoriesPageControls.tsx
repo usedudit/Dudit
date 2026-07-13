@@ -1,6 +1,7 @@
 import React from "react"
 import { Button, Input } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
     SearchIcon,
     PlusIcon,
@@ -15,6 +16,7 @@ interface ServiceCategoriesPageControlsProps {
     onSearchChange: (value: string) => void
     onAdd: () => void
     addDisabled?: boolean
+    tabCounts?: { categories: number; subcategories: number }
 }
 
 const ServiceCategoriesPageControls: React.FC<ServiceCategoriesPageControlsProps> = ({
@@ -24,6 +26,7 @@ const ServiceCategoriesPageControls: React.FC<ServiceCategoriesPageControlsProps
     onSearchChange,
     onAdd,
     addDisabled = false,
+    tabCounts,
 }) => {
     return (
         <>
@@ -34,10 +37,10 @@ const ServiceCategoriesPageControls: React.FC<ServiceCategoriesPageControlsProps
                     onValueChange={(val) => setActiveTab(val as any)}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="categories" icon={Package}>
+                        <TabsTrigger value="categories" icon={Package} badge={tabCounts && <TabCountBadge count={tabCounts.categories} variant="gray" />}>
                             Categorias
                         </TabsTrigger>
-                        <TabsTrigger value="subcategories" icon={SubcategoryIcon}>
+                        <TabsTrigger value="subcategories" icon={SubcategoryIcon} badge={tabCounts && <TabCountBadge count={tabCounts.subcategories} variant="gray" />}>
                             Subcategorias
                         </TabsTrigger>
                     </TabsList>

@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
     SearchIcon,
     FilterIcon,
@@ -51,6 +52,7 @@ interface TransactionPageControlsProps {
     addDisabled?: boolean
     /** When true, hides the tab selector (used when the tab is forced by the route) */
     hideTabs?: boolean
+    tabCounts?: { "Transações": number; "A pagar": number; "A receber": number }
 }
 
 const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
@@ -147,13 +149,13 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                 <div className="mb-6 px-4 md:px-8">
                     <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as TransactionTab)}>
                         <TabsList className="px-0">
-                            <TabsTrigger value="Transações" icon={ListIcon}>
+                            <TabsTrigger value="Transações" icon={ListIcon} badge={tabCounts && <TabCountBadge count={tabCounts["Transações"]} variant="gray" />}>
                                 Transações
                             </TabsTrigger>
-                            <TabsTrigger value="A pagar" icon={ArrowDownIcon}>
+                            <TabsTrigger value="A pagar" icon={ArrowDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts["A pagar"]} variant="red" />}>
                                 A pagar
                             </TabsTrigger>
-                            <TabsTrigger value="A receber" icon={ArrowUpIcon}>
+                            <TabsTrigger value="A receber" icon={ArrowUpIcon} badge={tabCounts && <TabCountBadge count={tabCounts["A receber"]} variant="green" />}>
                                 A receber
                             </TabsTrigger>
                         </TabsList>

@@ -890,11 +890,13 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 </table>
                                             </div>
                                         ) : (
-                                            <IconPlaceholder
-                                                icon={WrenchIcon}
-                                                title="Nenhuma mão de obra adicionada"
-                                                subtitle="Tente adicionar serviços ou mão de obra."
-                                            />
+                                            <div className="flex flex-col items-center justify-center text-center py-8">
+                                                <IconPlaceholder
+                                                    icon={WrenchIcon}
+                                                    title="Nenhuma mão de obra adicionada"
+                                                    subtitle="Tente adicionar serviços ou mão de obra."
+                                                />
+                                            </div>
                                         )}
                                     </FadeIn>
                                 </TabsContent>
@@ -996,7 +998,13 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 entry_type: h.action_type,
                                             }))} />
                                         ) : (
-                                            <div className="p-8 text-center text-sm text-brand-inactive-text">Nenhum histórico</div>
+                                            <div className="flex flex-col items-center justify-center text-center py-8">
+                                                <IconPlaceholder
+                                                    icon={ClockIcon}
+                                                    title="Nenhum histórico encontrado"
+                                                    subtitle="Não foram encontrados eventos para esta OS."
+                                                />
+                                            </div>
                                         )}
                                     </FadeIn>
                                 </TabsContent>

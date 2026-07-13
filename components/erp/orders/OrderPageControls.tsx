@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 
 import {
     SearchIcon,
@@ -45,6 +46,7 @@ interface OrderPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    tabCounts?: { Todos: number; Pendente: number; Pago: number; Enviado: number; Cancelado: number }
 }
 
 const OrderPageControls: React.FC<OrderPageControlsProps> = ({
@@ -119,19 +121,19 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as any)}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="Todos" icon={ShoppingCartIcon}>
+                        <TabsTrigger value="Todos" icon={ShoppingCartIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Todos} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="Pendente" icon={ClockIcon}>
+                        <TabsTrigger value="Pendente" icon={ClockIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Pendente} variant="yellow" />}>
                             Pendentes
                         </TabsTrigger>
-                        <TabsTrigger value="Pago" icon={CheckCircleIcon}>
+                        <TabsTrigger value="Pago" icon={CheckCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Pago} variant="green" />}>
                             Pagos
                         </TabsTrigger>
-                        <TabsTrigger value="Enviado" icon={TruckIcon}>
+                        <TabsTrigger value="Enviado" icon={TruckIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Enviado} variant="blue" />}>
                             Enviados
                         </TabsTrigger>
-                        <TabsTrigger value="Cancelado" icon={CancelCircleIcon}>
+                        <TabsTrigger value="Cancelado" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Cancelado} variant="red" />}>
                             Cancelados
                         </TabsTrigger>
                     </TabsList>

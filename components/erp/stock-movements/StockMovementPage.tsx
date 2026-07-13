@@ -160,6 +160,17 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         filters.movement_type.length > 0 || isDatePeriodFilterActive(filters.datePeriod);
     const isFiltered = searchTerm !== "" || hasActiveFilters;
 
+    const tabCounts = useMemo(() => {
+        if (!loadedMovements) return { all: 0, in: 0, out: 0 }
+        const all = loadedMovements.length
+        let inCount = 0, outCount = 0
+        for (const mov of loadedMovements) {
+            if ((mov as any).movement_type === "in") inCount++
+            else outCount++
+        }
+        return { all, in: inCount, out: outCount }
+    }, [loadedMovements])
+
     // ── Entity Navigation (instant via cache) ───────────────────────
     const handleViewDetails = useCallback((id: string) => {
         openEntity('view', id);
@@ -430,6 +441,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                         movement={currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null}
                         isLoading={isLoadingDetail}
                         onBack={closeEntity}
+                        partnerId={partnerId}
                     />
                 )
             ) : (
@@ -482,6 +494,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                             viewMode={viewMode}
                             onViewModeChange={setViewModeState}
                             hasActiveFilters={hasActiveFilters}
+                            tabCounts={tabCounts}
                         />
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">

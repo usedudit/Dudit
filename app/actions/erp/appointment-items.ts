@@ -343,7 +343,7 @@ export async function fetchProductsByIdsAction(productIds: string[], partnerId?:
         const supabase = createAdminClient()
         const { data } = await supabase
             .from("products")
-            .select("id, name, sku, stock_available, min_stock_quantity, images, product_variants(id, stock_quantity)")
+            .select("id, name, sku, stock_quantity, stock_available, min_stock_quantity, images, product_variants(id, stock_available)")
             .eq("partner_id", resolvedPartnerId)
             .in("id", productIds)
         return (data || []).map((p: any) => ({
@@ -355,7 +355,7 @@ export async function fetchProductsByIdsAction(productIds: string[], partnerId?:
             image: p.images?.[0] || null,
             variants: (p.product_variants || []).map((v: any) => ({
                 id: v.id,
-                stock: v.stock_quantity ?? 0,
+                stock: v.stock_available ?? 0,
             })),
         }))
     } catch (err) {
@@ -405,7 +405,7 @@ export async function searchProductsForAppointmentItems(query: string) {
 
         const { data, error } = await supabase
             .from("products")
-            .select("id, name, sku, price, promotional_price, category_id, stock_available, images, product_variants(id, variant_name, sku, price_adjustment, stock_quantity)")
+            .select("id, name, sku, price, promotional_price, category_id, stock_available, images, product_variants(id, variant_name, sku, price_adjustment, stock_available)")
             .eq("partner_id", ctx.partnerId)
             .eq("is_active", true)
             .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
@@ -429,7 +429,7 @@ export async function searchProductsForAppointmentItems(query: string) {
                 id: variant.id,
                 name: variant.variant_name,
                 sku: variant.sku,
-                stock: variant.stock_quantity ?? 0,
+                stock: variant.stock_available ?? 0,
                 price: (p.price || 0) + (variant.price_adjustment || 0),
             })),
         }))

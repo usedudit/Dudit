@@ -2129,13 +2129,6 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 await revalidateQuotes(quote.partner_id, quote.id)
             }
 
-            // 4. Fetch interactions using admin client to bypass RLS for public guests
-            const { data: interactions } = await admin
-                .from("quote_interactions")
-                .select("*")
-                .eq("quote_id", quote.id)
-                .order("created_at", { ascending: true })
-
             // Fetch store details to resolve partner name/logo override
             const { data: store } = await admin
                 .from("stores")
@@ -2325,98 +2318,11 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     quote_subtitle: previewMeta.quoteSubtitle || null,
                     seller_name: sellerName,
                 },
-                snapshot: resolvedSnapshot,
-                interactions: interactions || []
+                snapshot: resolvedSnapshot
             })
         } catch (err: any) {
             console.error("[getPublicQuoteAction] Error:", err)
             return errorResponse("Erro ao carregar orçamento público")
-        }
-    })
-}
-
-export async function submitPublicCommentAction(publicToken: string, authorName: string, message: string, ip?: string) {
-    return withTelemetry("submitPublicCommentAction", async () => {
-        try {
-            // 1. Basic sanitization
-            const cleanAuthorName = String(authorName || "").replace(/<[^>]*>/g, "").trim().substring(0, 100)
-            const cleanMessage = String(message || "").replace(/<[^>]*>/g, "").trim().substring(0, 1000)
-
-            if (!cleanAuthorName) return errorResponse("Nome do autor é obrigatório")
-            if (!cleanMessage) return errorResponse("Mensagem não pode estar vazia")
-
-            const supabase = await getSupabaseServerClient()
-
-            // 2. Fetch quote to check it exists and status
-            const { data: quote, error: quoteErr } = await supabase
-                .from("quotes")
-                .select("id, partner_id, status")
-                .eq("public_token", publicToken)
-                .maybeSingle()
-
-            if (quoteErr || !quote) {
-                return errorResponse("Orçamento não encontrado")
-            }
-
-            if (quote.status === "expired" || quote.status === "cancelled" || quote.status === "converted_to_order") {
-                return errorResponse("Não é possível enviar mensagens para um orçamento finalizado ou expirado.")
-            }
-
-            // 3. Enforce rate limit (max 5 comments per 5 minutes per quote/IP)
-            const admin = getAdminClient()
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-            const { count, error: countErr } = await admin
-                .from("quote_interactions")
-                .select("id", { count: "exact", head: true })
-                .eq("quote_id", quote.id)
-                .eq("author_name", cleanAuthorName)
-                .gte("created_at", fiveMinutesAgo)
-
-            if (countErr) {
-                console.error("[submitPublicCommentAction] count check error:", countErr)
-            } else if (count && count >= 5) {
-                return errorResponse("Limite de envio de mensagens excedido. Tente novamente em alguns minutos.")
-            }
-
-            // 4. Insert message
-            const { error: insertErr } = await admin
-                .from("quote_interactions")
-                .insert({
-                    quote_id: quote.id,
-                    partner_id: quote.partner_id,
-                    author_name: cleanAuthorName,
-                    author_role: "customer",
-                    message: cleanMessage
-                })
-
-            if (insertErr) {
-                console.error("[submitPublicCommentAction] insert error:", insertErr)
-                return errorResponse("Erro ao enviar mensagem.")
-            }
-
-            // 5. Audit log
-            await logAuditEvent({
-                partnerId: quote.partner_id,
-                actorUserId: null,
-                entityType: "quote",
-                entityId: quote.id,
-                actionType: "quote_comment_added",
-                changeLines: [`Cliente (${cleanAuthorName}) enviou uma mensagem: "${cleanMessage.substring(0, 60)}${cleanMessage.length > 60 ? "..." : ""}"`],
-                source: "system",
-                metadata: {
-                    ipAddress: ip,
-                    authorName: cleanAuthorName,
-                    timestamp: new Date().toISOString()
-                }
-            })
-
-            // Revalidate
-            await revalidateQuotes(quote.partner_id, quote.id)
-
-            return successResponse({ success: true })
-        } catch (err: any) {
-            console.error("[submitPublicCommentAction] Error:", err)
-            return errorResponse("Erro ao enviar comentário")
         }
     })
 }
@@ -2608,79 +2514,4 @@ export async function rejectPublicQuoteAction(
             return errorResponse(err.message || "Erro interno ao recusar orçamento")
         }
     })
-}
-
-export async function submitSellerCommentAction(quoteId: string, partnerId: string, message: string) {
-    return withTelemetry("submitSellerCommentAction", async () => {
-        try {
-            const user = await requireUser()
-            await requirePermission(partnerId, "quotes", "edit", user)
-
-            const cleanMessage = String(message || "").replace(/<[^>]*>/g, "").trim().substring(0, 1000)
-            if (!cleanMessage) return errorResponse("Mensagem não pode estar vazia")
-
-            const supabase = await getSupabaseServerClient()
-
-            const { data: profile } = await supabase
-                .from("user_profiles")
-                .select("full_name")
-                .eq("user_id", user.id)
-                .maybeSingle()
-
-            const authorName = profile?.full_name || "Vendedor"
-
-            const { error: insertErr } = await supabase
-                .from("quote_interactions")
-                .insert({
-                    quote_id: quoteId,
-                    partner_id: partnerId,
-                    author_name: authorName,
-                    author_role: "seller",
-                    user_id: user.id,
-                    message: cleanMessage
-                })
-
-            if (insertErr) {
-                console.error("[submitSellerCommentAction] insert error:", insertErr)
-                return errorResponse("Erro ao enviar mensagem.")
-            }
-
-            await logAuditEvent({
-                partnerId,
-                actorUserId: user.id,
-                entityType: "quote",
-                entityId: quoteId,
-                actionType: "quote_comment_added",
-                changeLines: [`Vendedor (${authorName}) enviou uma mensagem: "${cleanMessage.substring(0, 60)}${cleanMessage.length > 60 ? "..." : ""}"`],
-                source: "manual"
-            })
-
-            await revalidateQuotes(partnerId, quoteId)
-
-            return successResponse({ success: true })
-        } catch (err: any) {
-            console.error("[submitSellerCommentAction] Error:", err)
-            return errorResponse("Erro ao enviar comentário")
-        }
-    })
-}
-
-export async function getQuoteInteractionsAction(quoteId: string, partnerId: string) {
-    try {
-        const user = await requireUser()
-        await requirePermission(partnerId, "quotes", "view", user)
-
-        const supabase = await getSupabaseServerClient()
-        const { data, error } = await supabase
-            .from("quote_interactions")
-            .select("*")
-            .eq("quote_id", quoteId)
-            .order("created_at", { ascending: true })
-
-        if (error) throw error
-        return successResponse(data || [])
-    } catch (err: any) {
-        console.error("[getQuoteInteractionsAction] Error:", err)
-        return errorResponse(err.message || "Erro ao carregar mensagens")
-    }
 }

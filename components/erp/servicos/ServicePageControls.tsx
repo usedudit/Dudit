@@ -5,6 +5,7 @@ import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 
 import {
     SearchIcon,
@@ -41,6 +42,7 @@ interface ServicePageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    tabCounts?: { all: number; active: number; inactive: number }
 }
 
 const ServicePageControls: React.FC<ServicePageControlsProps> = ({
@@ -124,13 +126,13 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as "all" | "active" | "inactive")}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="all" icon={PackageIcon}>
+                        <TabsTrigger value="all" icon={PackageIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger value="active" icon={InfoIcon}>
+                        <TabsTrigger value="active" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.active} variant="green" />}>
                             Ativos
                         </TabsTrigger>
-                        <TabsTrigger value="inactive" icon={InfoIcon}>
+                        <TabsTrigger value="inactive" icon={InfoIcon} badge={tabCounts && <TabCountBadge count={tabCounts.inactive} variant="gray" />}>
                             Inativos
                         </TabsTrigger>
                     </TabsList>

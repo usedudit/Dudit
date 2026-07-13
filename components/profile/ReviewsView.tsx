@@ -265,14 +265,13 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
             )}
 
             {/* Edit Review Modal */}
-            {editingReview && (
                 <DefaultModal
                     isOpen={!!editingReview}
                     onClose={handleCloseEdit}
                     title="Editar sua avaliação"
                     description={
-                        editingReview.products?.name ||
-                        editingReview.services?.name ||
+                        editingReview?.products?.name ||
+                        editingReview?.services?.name ||
                         "Item avaliado"
                     }
                     maxWidth="md"
@@ -345,7 +344,6 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                         </div>
                     </form>
                 </DefaultModal>
-            )}
         </motion.div>
     )
 }

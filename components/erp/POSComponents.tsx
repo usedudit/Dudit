@@ -52,25 +52,25 @@ export const Numpad = ({ onInput, onDelete, disabled }: { onInput: (key: string)
     );
 };
 
-export const PaymentMethodCard = ({ icon, label, selected, onClick, disabled }: any) => (
+export const PaymentMethodCard = ({ icon: Icon, label, selected, onClick, disabled }: any) => (
     <button disabled={disabled}
         onClick={onClick}
         className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
     >
-        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors overflow-hidden">
-            {icon}
+        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center group-hover:bg-gray-200 dark:hover:bg-dark-border/90 transition-colors overflow-hidden">
+            <Icon size={22} />
         </div>
         <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">{label}</span>
     </button>
 );
 
-export const SplitPaymentCard = ({ icon, label, selected, onClick, disabled }: any) => (
+export const SplitPaymentCard = ({ icon: Icon, label, selected, onClick, disabled }: any) => (
     <button disabled={disabled}
         onClick={onClick}
         className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
     >
-        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors overflow-hidden">
-            {icon}
+        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center group-hover:bg-gray-200 dark:hover:bg-dark-border/90 transition-colors overflow-hidden">
+            <Icon size={22} />
         </div>
         <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">{label}</span>
     </button>
@@ -84,7 +84,6 @@ export const ReceiptContent = ({
     discountAmount = 0,
     total,
     itemCount,
-    customerName,
     pricingDetails = [],
 }: any) => (
     <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
@@ -92,14 +91,6 @@ export const ReceiptContent = ({
         <div className="mb-6 flex justify-between items-center">
             <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Detalhes da Transação</h3>
         </div>
-
-        {/* Customer Info in Receipt (Optional, but looks good) */}
-        {customerName && (
-            <div className="mb-6 pb-4 border-b border-dashed border-brand-border dark:border-dark-border">
-                <span className="text-sm text-brand-inactive-text font-bold block mb-1">Cliente</span>
-                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customerName}</span>
-            </div>
-        )}
 
         {/* Items List - Scrollable */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 space-y-4">

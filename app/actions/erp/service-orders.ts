@@ -2031,3 +2031,24 @@ export async function signPublicServiceOrderAction(
     return { success: false, error: err.message || "Erro interno ao assinar ordem de serviço" }
   }
 }
+
+export async function getServiceOrderAttachmentsAction(
+  serviceOrderId: string
+): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
+  try {
+    await requireUser()
+    const supabase = await getSupabaseServerClient()
+
+    const { data, error } = await supabase
+      .from("service_order_attachments")
+      .select("*")
+      .eq("service_order_id", serviceOrderId)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao listar anexos" }
+  }
+}

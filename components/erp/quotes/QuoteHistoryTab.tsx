@@ -23,8 +23,7 @@ export function QuoteHistoryTab({ entries, loading = false }: QuoteHistoryTabPro
             <HistoryTimeline
                 entries={entries}
                 title="Histórico do Orçamento"
-                subtitle="Acompanhe todas as movimentações e alterações realizadas neste orçamento."
-                emptyMessage="Nenhum histórico encontrado para este orçamento."
+                emptyMessage="Não foram encontrados eventos para este orçamento."
             />
         </FadeIn>
     )

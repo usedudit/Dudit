@@ -1,9 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import {
     getPublicQuoteAction,
-    submitPublicCommentAction,
     approvePublicQuoteAction,
     rejectPublicQuoteAction
 } from "@/app/actions/erp/quotes"
@@ -31,7 +30,6 @@ interface PublicQuotePortalProps {
     initialData: {
         quote: any
         snapshot: any
-        interactions: any[]
     }
     ip: string
     userAgent: string
@@ -63,11 +61,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     // ─── STATE MANAGEMENT ────────────────────────────────────────────────────
     const [quote, setQuote] = useState(initialData.quote)
     const [snapshot, setSnapshot] = useState(initialData.snapshot)
-    const [interactions, setInteractions] = useState(initialData.interactions)
     const [activeTab, setActiveTab] = useState("Dados Gerais")
-
-    const [newComment, setNewComment] = useState("")
-    const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
     // Approval Modals
     const [showApproveModal, setShowApproveModal] = useState(false)
@@ -82,8 +76,6 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     // Notifications & Messages
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
-
-    const commentEndRef = useRef<HTMLDivElement>(null)
 
     const { supabase } = useSupabase()
     const [currentUser, setCurrentUser] = useState<any>(null)
@@ -119,7 +111,6 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                 if (res.success && res.data) {
                     setQuote(res.data.quote)
                     setSnapshot(res.data.snapshot)
-                    setInteractions(res.data.interactions)
                 }
             } catch (err) {
                 console.error("Erro no polling do orçamento público:", err)
@@ -128,44 +119,6 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
         return () => clearInterval(interval)
     }, [token, ip, userAgent])
-
-    // Scroll to comments end
-    useEffect(() => {
-        commentEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, [interactions])
-
-    // ─── ACTIONS ─────────────────────────────────────────────────────────────
-    const handleSendComment = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!newComment.trim() || isSubmittingComment) return
-
-        setIsSubmittingComment(true)
-        setErrorMessage(null)
-
-        let guestName = "Cliente"
-        if (typeof window !== "undefined") {
-            const savedName = localStorage.getItem("dudit_guest_name")
-            if (savedName) guestName = savedName
-        }
-
-        try {
-            const res = await submitPublicCommentAction(token, guestName, newComment, ip)
-            if (res.success) {
-                setNewComment("")
-                // Sync comments instantly
-                const refreshRes = await getPublicQuoteAction(token, ip, userAgent)
-                if (refreshRes.success && refreshRes.data) {
-                    setInteractions(refreshRes.data.interactions)
-                }
-            } else {
-                setErrorMessage(res.error || "Erro ao enviar mensagem.")
-            }
-        } catch {
-            setErrorMessage("Erro de conexão ao enviar comentário.")
-        } finally {
-            setIsSubmittingComment(false)
-        }
-    }
 
     const handleApprove = async () => {
         setIsProcessingAction(true)
@@ -331,7 +284,6 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                     <div className="w-full mt-4">
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
-                                            <TabsTrigger value="Canal de Negociação">Canal de Negociação</TabsTrigger>
                                             <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
                                         </TabsList>
                                     </div>
@@ -430,68 +382,6 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                         Aprovar proposta
                                                     </Button>
                                                 </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* ─── TAB: CANAL DE NEGOCIAÇÃO ─── */}
-                                    {activeTab === "Canal de Negociação" && (
-                                        <div className="space-y-4 text-left h-full flex flex-col">
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-brand-gray/5 dark:bg-dark-surface/5">
-                                                <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading tracking-wide">Mensagens</h3>
-                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">Dúvidas, pedidos de desconto ou prazos diferenciados? Negocie diretamente com o vendedor.</p>
-                                            </div>
-
-                                            {/* Chat stream */}
-                                            <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-2 border border-brand-border dark:border-dark-border rounded-2xl p-4 flex-1">
-                                                {interactions.length === 0 ? (
-                                                    <div className="text-center py-8 text-xs text-brand-inactive-text italic my-auto">
-                                                        Nenhuma mensagem trocada ainda.
-                                                    </div>
-                                                ) : (
-                                                    interactions.map((msg: any) => {
-                                                        const isCustomer = msg.author_role === "customer"
-                                                        return (
-                                                            <div
-                                                                key={msg.id}
-                                                                className={`p-3 rounded-2xl text-xs max-w-[85%] ${isCustomer
-                                                                    ? "bg-brand-gray/20 dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading align-self-start self-start"
-                                                                    : "bg-green-50 border border-green-100 text-green-900 align-self-end self-end text-right ml-auto"
-                                                                    }`}
-                                                            >
-                                                                <div className="font-bold mb-1">
-                                                                    {isCustomer ? `${msg.author_name} (Cliente)` : `${msg.author_name} (Vendedor)`}
-                                                                </div>
-                                                                <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
-                                                                <span className="text-[9px] text-brand-inactive-text dark:text-dark-body block mt-1">
-                                                                    {formatDateTime(msg.created_at)}
-                                                                </span>
-                                                            </div>
-                                                        )
-                                                    })
-                                                )}
-                                                <div ref={commentEndRef}></div>
-                                            </div>
-
-                                            {/* Chat Input Form */}
-                                            {!isFinalized && (
-                                                <form onSubmit={handleSendComment} className="flex gap-2 pt-2">
-                                                    <input
-                                                        type="text"
-                                                        value={newComment}
-                                                        onChange={(e) => setNewComment(e.target.value)}
-                                                        placeholder="Digite sua dúvida ou contraproposta..."
-                                                        className="flex-1 text-xs bg-brand-gray/10 dark:bg-dark-surface/20 p-3 rounded-2xl border border-brand-border dark:border-dark-border outline-none focus:border-brand-inactive-text text-brand-dark dark:text-dark-heading"
-                                                        disabled={isSubmittingComment}
-                                                    />
-                                                    <Button
-                                                        type="submit"
-                                                        disabled={!newComment.trim() || isSubmittingComment}
-                                                        className="bg-brand-dark text-white hover:bg-brand-dark/90 font-semibold text-xs px-4 h-11 shrink-0 rounded-2xl"
-                                                    >
-                                                        {isSubmittingComment ? "..." : "Enviar"}
-                                                    </Button>
-                                                </form>
                                             )}
                                         </div>
                                     )}

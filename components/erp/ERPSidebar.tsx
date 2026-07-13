@@ -95,9 +95,8 @@ const navItems: NavItem[] = [
     {
         icon: MoneyIcon,
         label: "Financeiro",
-        href: "/erp/resumo-financeiro",
+        href: "/erp/transactions",
         submenu: [
-            { label: "Visão Geral", href: "/erp/resumo-financeiro" },
             { label: "Movimentações", href: "/erp/transactions" },
             { label: "Contas a Pagar", href: "/erp/contas-a-pagar" },
             { label: "Contas a Receber", href: "/erp/contas-a-receber" },
@@ -139,7 +138,6 @@ const navItems: NavItem[] = [
 
 const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/logistics": "crescer",
-    "/erp/resumo-financeiro": "crescer",
     "/erp/transactions": "crescer",
     "/erp/contas-a-pagar": "crescer",
     "/erp/contas-a-receber": "crescer",
@@ -303,7 +301,7 @@ export function ERPSidebar() {
                 if (item.href === "/erp/orders" && !salesGroupActive) return null;
                 if (item.href === "/erp/products" && !productsResourceActive) return null;
                 if (item.href === "/erp/servicos" && !servicesGroupActive) return null;
-                if (item.href === "/erp/resumo-financeiro" && !financialResourceActive) return null;
+                if (item.label === "Financeiro" && !financialResourceActive) return null;
                 if (item.href === "/erp/customers" && !customersResourceActive) return null;
                 if (item.href === "/erp/reports" && !reportsResourceActive) return null;
                 if (item.label === "Marketing" && !marketingResourceActive) return null;
@@ -351,7 +349,6 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/servicos/cadastros") return serviceCadastrosResourceActive
                             return servicesResourceActive
                         }
-                        if (item.href === "/erp/resumo-financeiro") return financialResourceActive
                         if (item.label === "Marketing") {
                             if (sub.href === "/erp/coupons") return couponsResourceActive
                             if (sub.href === "/erp/promotions") return campaignsResourceActive
