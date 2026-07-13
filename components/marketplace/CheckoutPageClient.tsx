@@ -1385,48 +1385,50 @@ export function CheckoutPageClient() {
                 )}
             </div>
 
-            <div className="mb-4 space-y-2">
-                <ListItem
-                    icon={TagIcon}
-                    title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
-                    titleClassName="text-sm"
-                    description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(displayableCoupons.length))}
-                    className="px-0 py-4 gap-4 border-y border-x-0 border-brand-border dark:border-dark-border !bg-transparent !rounded-none shadow-none hover:border-brand-border dark:hover:border-dark-border"
-                    onClick={() => {
-                        if (!couponListLoading && displayableCoupons.length > 0) {
-                            setSelectedCouponId(appliedCoupon?.id || "")
-                            setShowCouponModal(true)
+            {(displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
+                <div className="mb-4 space-y-2">
+                    <ListItem
+                        icon={TagIcon}
+                        title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
+                        titleClassName="text-sm"
+                        description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(displayableCoupons.length))}
+                        className="px-0 py-4 gap-4 border-y border-x-0 border-brand-border dark:border-dark-border !bg-transparent !rounded-none shadow-none hover:border-brand-border dark:hover:border-dark-border"
+                        onClick={() => {
+                            if (!couponListLoading && displayableCoupons.length > 0) {
+                                setSelectedCouponId(appliedCoupon?.id || "")
+                                setShowCouponModal(true)
+                            }
+                        }}
+                        showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
+                        right={
+                            appliedCoupon ? (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleRemoveCoupon()
+                                    }}
+                                    className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
+                                >
+                                    <XIcon size={12} /> Remover
+                                </button>
+                            ) : couponListLoading ? (
+                                <Spinner size={18} />
+                            ) : undefined
                         }
-                    }}
-                    showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
-                    right={
-                        appliedCoupon ? (
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleRemoveCoupon()
-                                }}
-                                className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
-                            >
-                                <XIcon size={12} /> Remover
-                            </button>
-                        ) : couponListLoading ? (
-                            <Spinner size={18} />
-                        ) : undefined
-                    }
-                />
-                {couponError && (
-                    <p className="text-xs text-red-500">{couponError}</p>
-                )}
-                {couponPartialWarning && appliedCoupon && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                        {appliedCoupon.eligibleItemsCount !== undefined && appliedCoupon.totalItemsCount !== undefined
-                            ? `Desconto aplicado a ${appliedCoupon.eligibleItemsCount} de ${appliedCoupon.totalItemsCount} itens.`
-                            : "Este cupom não se aplica a alguns itens da sacola. O desconto foi calculado apenas sobre os itens elegíveis."}
-                    </p>
-                )}
-            </div>
+                    />
+                    {couponError && (
+                        <p className="text-xs text-red-500">{couponError}</p>
+                    )}
+                    {couponPartialWarning && appliedCoupon && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                            {appliedCoupon.eligibleItemsCount !== undefined && appliedCoupon.totalItemsCount !== undefined
+                                ? `Desconto aplicado a ${appliedCoupon.eligibleItemsCount} de ${appliedCoupon.totalItemsCount} itens.`
+                                : "Este cupom não se aplica a alguns itens da sacola. O desconto foi calculado apenas sobre os itens elegíveis."}
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="space-y-3 mb-4">
                 <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
@@ -2880,7 +2882,7 @@ export function CheckoutPageClient() {
                                 </FormSection>
 
                                 {/* Coupon Selector */}
-                                {displayableCoupons.length > 0 && (
+                                {(displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
                                     <FormSection title="Cupom de Desconto" hasSeparator>
                                         <ListItem
                                             icon={TagIcon}

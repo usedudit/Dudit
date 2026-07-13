@@ -379,11 +379,11 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                             {/* Back button - desktop only */}
-                            <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                 <Button variant="filled" onClick={() => step === "upload" ? router.push("/erp/products") : setStep("upload")} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
@@ -431,217 +431,217 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            {/* Content Area */}
-            <div className="max-w-[1300px] mx-auto w-full px-4 md:px-6 py-6 min-h-[400px]">
-                {step === "upload" && (
-                    <div className="max-w-[800px] mx-auto w-full pt-8">
-                        <div
-                            {...getRootProps()}
-                            className={`cursor-pointer transition-opacity ${uploading ? "opacity-60 pointer-events-none" : ""}`}
-                            onClick={open}
-                        >
-                            <input {...getInputProps()} />
-                            {uploading ? (
-                                <IconPlaceholder
-                                    placeholderType="default"
-                                    icon={Spinner}
-                                    title="Lendo Planilha..."
-                                    subtitle="Processando os dados da sua planilha de produtos. Aguarde um instante."
-                                />
-                            ) : (
-                                <IconPlaceholder
-                                    placeholderType="default"
-                                    icon={UploadIcon}
-                                    title={isDragActive ? "Solte a planilha aqui..." : "Importar Planilha de Produtos"}
-                                    subtitle="Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls ou .csv (até 10 MB e 2.000 linhas)."
-                                    itemButton={{
-                                        text: "Selecionar Planilha",
-                                        type: "button",
-                                        action: open,
-                                        variant: "default"
-                                    }}
-                                />
-                            )}
-                        </div>
-                    </div>
-                )}
+                    {/* Content Area */}
+                    <div className="max-w-[1300px] mx-auto w-full px-4 md:px-6 py-6 min-h-[400px]">
+                        {step === "upload" && (
+                            <div className="max-w-[800px] mx-auto w-full pt-8">
+                                <div
+                                    {...getRootProps()}
+                                    className={`cursor-pointer transition-opacity ${uploading ? "opacity-60 pointer-events-none" : ""}`}
+                                    onClick={open}
+                                >
+                                    <input {...getInputProps()} />
+                                    {uploading ? (
+                                        <IconPlaceholder
+                                            placeholderType="default"
+                                            icon={Spinner}
+                                            title="Lendo Planilha..."
+                                            subtitle="Processando os dados da sua planilha de produtos. Aguarde um instante."
+                                        />
+                                    ) : (
+                                        <IconPlaceholder
+                                            placeholderType="default"
+                                            icon={UploadIcon}
+                                            title={isDragActive ? "Solte a planilha aqui..." : "Importar Planilha de Produtos"}
+                                            subtitle="Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls ou .csv (até 10 MB e 2.000 linhas)."
+                                            itemButton={{
+                                                text: "Selecionar Planilha",
+                                                type: "button",
+                                                action: open,
+                                                variant: "default"
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
-                {step === "mapping" && (
-                    <div>
-                        {/* Desktop Table View */}
-                        <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface">
-                            <table className="w-full text-left border-separate border-spacing-0">
-                                <thead>
-                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                        <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-l-lg bg-brand-gray dark:bg-dark-border/50">Coluna da Planilha</th>
-                                        <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50">Campo no Sistema</th>
-                                        <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-r-lg bg-brand-gray dark:bg-dark-border/50">Confiança</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        {step === "mapping" && (
+                            <div>
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface">
+                                    <table className="w-full text-left border-separate border-spacing-0">
+                                        <thead>
+                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-l-lg bg-brand-gray dark:bg-dark-border/50">Coluna da Planilha</th>
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50">Campo no Sistema</th>
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading rounded-r-lg bg-brand-gray dark:bg-dark-border/50">Confiança</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {mapping.map((col) => (
+                                                <MappingRow
+                                                    key={col.headerIndex}
+                                                    col={col}
+                                                    availableFields={availableFields}
+                                                    onMappingChange={updateMapping}
+                                                />
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Mobile Card List View */}
+                                <div className="md:hidden bg-white dark:bg-dark-surface">
                                     {mapping.map((col) => (
-                                        <MappingRow
+                                        <MappingMobileItem
                                             key={col.headerIndex}
                                             col={col}
                                             availableFields={availableFields}
                                             onMappingChange={updateMapping}
                                         />
                                     ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Mobile Card List View */}
-                        <div className="md:hidden bg-white dark:bg-dark-surface">
-                            {mapping.map((col) => (
-                                <MappingMobileItem
-                                    key={col.headerIndex}
-                                    col={col}
-                                    availableFields={availableFields}
-                                    onMappingChange={updateMapping}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {step === "preview" && (
-                    <div className="flex flex-col overflow-hidden">
-                        <div className="flex-none mb-6">
-                            <ProductPageControls
-                                activeTab={activeTab}
-                                setActiveTab={setActiveTab}
-                                search={search}
-                                onSearchChange={setSearch}
-                                viewMode={viewMode}
-                                onViewModeChange={setViewMode}
-                                onOpenFilter={() => { }}
-                                onOpenImport={() => { }}
-                                onOpenExport={() => { }}
-                                onAddProduct={() => { }}
-                                filters={{ categories: [], brands: [], units: [], stocks: [], status: [], priceRange: { min: "", max: "" } }}
-                                setFilters={() => { }}
-                                hasActiveFilters={false}
-                            />
-                        </div>
-
-                        {filteredProducts.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-brand-inactive-text dark:text-dark-body text-sm py-12">
-                                Nenhum produto encontrado
-                            </div>
-                        ) : (
-                            <div className="flex-1">
-                                <SelectionBanner
-                                    selectedCount={selection.size}
-                                    totalCount={filteredProducts.length}
-                                    onSelectAll={() => setSelection(new Set(filteredProducts.map((p: any) => p.id)))}
-                                    onClearSelection={() => setSelection(new Set())}
-                                    itemName="produtos"
-                                    singularItemName="produto"
-                                />
-
-                                {viewMode === "grid" ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((product: any) => (
-                                            <ProductGridCard
-                                                key={product.id}
-                                                product={product}
-                                                selected={selection.has(product.id)}
-                                                onSelect={() => setSelection((prev) => {
-                                                    const next = new Set(prev)
-                                                    next.has(product.id) ? next.delete(product.id) : next.add(product.id)
-                                                    return next
-                                                })}
-                                                onEdit={() => { }}
-                                                onDetails={() => { }}
-                                                onDelete={() => { }}
-                                                onDuplicate={() => { }}
-                                                onShare={() => { }}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="w-full overflow-hidden rounded-xl relative">
-                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
-                                                            <Checkbox
-                                                                checked={selection.size === paginated.length && paginated.length > 0}
-                                                                onCheckedChange={(checked) => {
-                                                                    if (checked) {
-                                                                        setSelection((prev) => {
-                                                                            const next = new Set(prev)
-                                                                            paginated.forEach((p: any) => next.add(p.id))
-                                                                            return next
-                                                                        })
-                                                                    } else {
-                                                                        setSelection((prev) => {
-                                                                            const next = new Set(prev)
-                                                                            paginated.forEach((p: any) => next.delete(p.id))
-                                                                            return next
-                                                                        })
-                                                                    }
-                                                                }}
-                                                                className="bg-white dark:bg-dark-background"
-                                                            />
-                                                        </th>
-                                                        {FIXED_COLUMNS.map((col) => (
-                                                            <th
-                                                                key={col.id}
-                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                                                                    } ${col.id === "actions" ? "rounded-r-lg" : ""}`}
-                                                                style={{ width: col.width, minWidth: col.minWidth }}
-                                                            >
-                                                                <span>{col.label}</span>
-                                                            </th>
-                                                        ))}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginated.map((product: any) => (
-                                                        <ProductListItem
-                                                            key={product.id}
-                                                            product={product}
-                                                            columns={FIXED_COLUMNS}
-                                                            selected={selection.has(product.id)}
-                                                            onSelect={(id) => setSelection((prev) => {
-                                                                const next = new Set(prev)
-                                                                next.has(id) ? next.delete(id) : next.add(id)
-                                                                return next
-                                                            })}
-                                                            onEdit={() => { }}
-                                                            onDetails={() => { }}
-                                                            onDelete={() => { }}
-                                                            onDuplicate={() => { }}
-                                                            onShare={() => { }}
-                                                            suppliers={[]}
-                                                        />
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex justify-center py-4">
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
-                                    />
                                 </div>
                             </div>
                         )}
+
+                        {step === "preview" && (
+                            <div className="flex flex-col overflow-hidden">
+                                <div className="flex-none mb-6">
+                                    <ProductPageControls
+                                        activeTab={activeTab}
+                                        setActiveTab={setActiveTab}
+                                        search={search}
+                                        onSearchChange={setSearch}
+                                        viewMode={viewMode}
+                                        onViewModeChange={setViewMode}
+                                        onOpenFilter={() => { }}
+                                        onOpenImport={() => { }}
+                                        onOpenExport={() => { }}
+                                        onAddProduct={() => { }}
+                                        filters={{ categories: [], brands: [], units: [], stocks: [], status: [], priceRange: { min: "", max: "" } }}
+                                        setFilters={() => { }}
+                                        hasActiveFilters={false}
+                                    />
+                                </div>
+
+                                {filteredProducts.length === 0 ? (
+                                    <div className="flex-1 flex items-center justify-center text-brand-inactive-text dark:text-dark-body text-sm py-12">
+                                        Nenhum produto encontrado
+                                    </div>
+                                ) : (
+                                    <div className="flex-1">
+                                        <SelectionBanner
+                                            selectedCount={selection.size}
+                                            totalCount={filteredProducts.length}
+                                            onSelectAll={() => setSelection(new Set(filteredProducts.map((p: any) => p.id)))}
+                                            onClearSelection={() => setSelection(new Set())}
+                                            itemName="produtos"
+                                            singularItemName="produto"
+                                        />
+
+                                        {viewMode === "grid" ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                {paginated.map((product: any) => (
+                                                    <ProductGridCard
+                                                        key={product.id}
+                                                        product={product}
+                                                        selected={selection.has(product.id)}
+                                                        onSelect={() => setSelection((prev) => {
+                                                            const next = new Set(prev)
+                                                            next.has(product.id) ? next.delete(product.id) : next.add(product.id)
+                                                            return next
+                                                        })}
+                                                        onEdit={() => { }}
+                                                        onDetails={() => { }}
+                                                        onDelete={() => { }}
+                                                        onDuplicate={() => { }}
+                                                        onShare={() => { }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full overflow-hidden rounded-xl relative">
+                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                        <thead>
+                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                                                    <Checkbox
+                                                                        checked={selection.size === paginated.length && paginated.length > 0}
+                                                                        onCheckedChange={(checked) => {
+                                                                            if (checked) {
+                                                                                setSelection((prev) => {
+                                                                                    const next = new Set(prev)
+                                                                                    paginated.forEach((p: any) => next.add(p.id))
+                                                                                    return next
+                                                                                })
+                                                                            } else {
+                                                                                setSelection((prev) => {
+                                                                                    const next = new Set(prev)
+                                                                                    paginated.forEach((p: any) => next.delete(p.id))
+                                                                                    return next
+                                                                                })
+                                                                            }
+                                                                        }}
+                                                                        className="bg-white dark:bg-dark-background"
+                                                                    />
+                                                                </th>
+                                                                {FIXED_COLUMNS.map((col) => (
+                                                                    <th
+                                                                        key={col.id}
+                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                                                            } ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                                                        style={{ width: col.width, minWidth: col.minWidth }}
+                                                                    >
+                                                                        <span>{col.label}</span>
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {paginated.map((product: any) => (
+                                                                <ProductListItem
+                                                                    key={product.id}
+                                                                    product={product}
+                                                                    columns={FIXED_COLUMNS}
+                                                                    selected={selection.has(product.id)}
+                                                                    onSelect={(id) => setSelection((prev) => {
+                                                                        const next = new Set(prev)
+                                                                        next.has(id) ? next.delete(id) : next.add(id)
+                                                                        return next
+                                                                    })}
+                                                                    onEdit={() => { }}
+                                                                    onDetails={() => { }}
+                                                                    onDelete={() => { }}
+                                                                    onDuplicate={() => { }}
+                                                                    onShare={() => { }}
+                                                                    suppliers={[]}
+                                                                />
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-center py-4">
+                                            <Pagination
+                                                currentPage={page}
+                                                totalPages={totalPages}
+                                                onPageChange={setPage}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Mobile Bottom Action Bar */}

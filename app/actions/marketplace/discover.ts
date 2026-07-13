@@ -789,11 +789,6 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     }
 
     const recentMapper = (item: any) => {
-        const isRecent = item.created_at
-            ? Date.now() - new Date(item.created_at).getTime() < 48 * 60 * 60 * 1000
-            : false
-        const badge = { _badgeLabel: isRecent ? "Saiu do forno" : "Novo na Dudit", _badgeVariant: "green" as const }
-
         if (item._itemType === "servico") {
             const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
             const partner = rawPartner ? {
@@ -814,11 +809,10 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
                 rating: item.rating,
                 partners: partner,
                 itemType: "servico" as const,
-                ...badge,
             }
         }
 
-        return processProduct(item as RawProduct, badge)
+        return processProduct(item as RawProduct)
     }
 
     const items = scoped.slice(0, 20).map(recentMapper)

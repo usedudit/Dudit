@@ -54,6 +54,21 @@ export async function validateCouponRow(
     manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
   }
 ): Promise<CouponValidationResult> {
+  let resolvedCustomerId = input.customerId
+  if (input.customerId && input.partnerId) {
+    const { data: customerMapping } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("partner_id", input.partnerId)
+      .eq("marketplace_user_id", input.customerId)
+      .limit(1)
+      .maybeSingle()
+
+    if (customerMapping?.id) {
+      resolvedCustomerId = customerMapping.id
+    }
+  }
+
   // Date validation
   const now = Date.now()
   if (coupon.starts_at && now < new Date(coupon.starts_at).getTime()) {
@@ -74,12 +89,12 @@ export async function validateCouponRow(
   }
 
   // Per-customer usage limit
-  if (input.customerId && coupon.usage_per_customer !== null) {
+  if (resolvedCustomerId && coupon.usage_per_customer !== null) {
     const { count: customerUsageCount } = await supabase
       .from("coupon_usages")
       .select("id", { count: "exact", head: true })
       .eq("coupon_id", coupon.id)
-      .eq("customer_id", input.customerId)
+      .eq("customer_id", resolvedCustomerId)
 
     if (Number(customerUsageCount || 0) >= Number(coupon.usage_per_customer || 0)) {
       return { valid: false, discountAmount: 0, errorMessage: "Este cliente já atingiu o limite de uso." }
@@ -92,7 +107,7 @@ export async function validateCouponRow(
       .from("orders")
       .select("id", { count: "exact", head: true })
       .eq("partner_id", input.partnerId)
-      .eq("buyer_id", input.customerId)
+      .or(`buyer_id.eq.${input.customerId},customer_id.eq.${resolvedCustomerId}`)
 
     if (Number(ordersCount || 0) > 0) {
       return { valid: false, discountAmount: 0, errorMessage: "Cupom válido apenas para primeira compra." }
@@ -101,14 +116,14 @@ export async function validateCouponRow(
 
   // ── Customer scope check ────────────────────────────────────────────
   if (coupon.customer_scope === "specific") {
-    if (!input.customerId) {
+    if (!resolvedCustomerId) {
       return { valid: false, discountAmount: 0, errorMessage: "Este cupom é exclusivo para clientes específicos." }
     }
     const { data: assignment } = await supabase
       .from("coupon_customers")
       .select("id")
       .eq("coupon_id", coupon.id)
-      .eq("customer_id", input.customerId)
+      .eq("customer_id", resolvedCustomerId)
       .limit(1)
       .maybeSingle()
 
