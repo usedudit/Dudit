@@ -98,7 +98,7 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
     return (
         <div className="animate-fade-in">
             <div>
-                <FormSection title="Itens e recursos necessários" description="Cadastre os materiais ou equipamentos utilizados na execução deste serviço." hasSeparator>
+                <FormSection title="Itens e recursos necessários" description="Cadastre os materiais ou equipamentos utilizados na execução deste serviço.">
                     <div ref={searchRef} className="relative mb-6">
                         {isEditing && (
                             <Input

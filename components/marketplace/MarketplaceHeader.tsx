@@ -701,7 +701,7 @@ const Header: React.FC<HeaderProps> = ({
                                     {user && (
                                         <NotificationBell variant="marketplace" className="shrink-0" />
                                     )}
-                                    <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
+                                    <Link href="/cart" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
                                         <ShoppingBagIcon size={24} strokeWidth={2} />
                                         {cartCount > 0 && (
                                             <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
@@ -765,7 +765,7 @@ const Header: React.FC<HeaderProps> = ({
                         ] as any[]).map((item, idx) => {
                             const ItemWrapper: any = item.href ? Link : "div";
                             const wrapProps = item.href
-                                ? { href: item.href, prefetch: true }
+                                ? { href: item.href, prefetch: false }
                                 : { onClick: item.action };
 
                             return (
@@ -951,7 +951,7 @@ const Header: React.FC<HeaderProps> = ({
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";
                                             const wrapProps = item.href
-                                                ? { href: item.href, prefetch: true }
+                                                ? { href: item.href, prefetch: false }
                                                 : { onClick: item.action };
 
                                             return (
@@ -1019,7 +1019,7 @@ const Header: React.FC<HeaderProps> = ({
 
                     <Link
                         href="/auth/login?mode=partner"
-                        prefetch={true}
+                        prefetch={false}
                         className="ml-auto font-bold text-brand-orange hover:text-brand-orange/70 cursor-pointer text-[13px] flex items-center gap-1 py-1"
                     >
                         <span>Anunciar grátis</span>

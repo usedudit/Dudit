@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button, Spinner } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
-import { PlusIcon, DiceIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon, SparklesIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
@@ -78,11 +78,13 @@ interface ProductGeneralTabProps {
     mode?: "add" | "edit" | "details" | "duplicate"
     isQuickMode?: boolean
     onGenerateBarcode?: () => void
+    isGeneratingDetails?: boolean
+    onGenerateDetails?: () => void
 }
 
 
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
-    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode
+    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode, isGeneratingDetails = false, onGenerateDetails
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
@@ -140,10 +142,32 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     name="name"
                                     value={productData.name}
                                     onChange={handleFieldChange}
-                                    disabled={!isEditing}
+                                    disabled={!isEditing || isGeneratingDetails}
                                     required
                                     error={fieldErrors?.has("name")}
                                     errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
+                                    labelAddon={
+                                        isEditing && onGenerateDetails && (
+                                            <button
+                                                type="button"
+                                                onClick={onGenerateDetails}
+                                                disabled={isGeneratingDetails || !productData.name?.trim()}
+                                                className="flex items-center gap-1.5 text-xs text-brand-primary font-medium hover:opacity-80 transition-opacity disabled:opacity-50 cursor-pointer"
+                                            >
+                                                {isGeneratingDetails ? (
+                                                    <>
+                                                        <Spinner size={12} className="text-brand-primary animate-spin" />
+                                                        <span>Gerando...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <SparklesIcon className="w-3.5 h-3.5" />
+                                                        <span>Gerar com IA</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        )
+                                    }
                                 />
                             </div>
 

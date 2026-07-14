@@ -32,6 +32,7 @@ interface SecurityViewProps {
     handleChangePassword: () => void
     handleSavePhone: (field: "phone" | "secPhone") => void
     clearMessages: () => void
+    onDeleteClick?: () => void
 }
 
 export const SecurityView = ({
@@ -61,6 +62,7 @@ export const SecurityView = ({
     handleChangePassword,
     handleSavePhone,
     clearMessages,
+    onDeleteClick,
 }: SecurityViewProps) => (
     <motion.div key="password" {...fade} className="max-w-[800px] mx-auto space-y-6">
         <PageHeader title="Segurança" subtitle="Gerencie seu acesso e segurança da conta." onBack={() => navigate("main")} />
@@ -181,5 +183,30 @@ export const SecurityView = ({
                 </AnimatePresence>
             </div>
         </SectionCard>
+
+        {onDeleteClick && (
+            <SectionCard title="Exclusão de conta">
+                <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                            <span className="block text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                Encerrar minha conta definitivamente
+                            </span>
+                            <span className="block text-xs text-brand-inactive-text dark:text-dark-body">
+                                Ao excluir sua conta, você perderá o acesso à plataforma e todos os dados associados serão apagados permanentemente após o prazo de carência de 48 horas.
+                            </span>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-600 hover:text-white dark:border-red-900 dark:hover:bg-red-950 text-xs font-bold shrink-0 self-start sm:self-center"
+                            onClick={onDeleteClick}
+                        >
+                            Excluir conta
+                        </Button>
+                    </div>
+                </div>
+            </SectionCard>
+        )}
     </motion.div>
 )

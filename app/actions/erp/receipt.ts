@@ -1,6 +1,6 @@
 "use server"
 
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { successResponse, errorResponse } from "@/lib/utils/action-helpers"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
@@ -13,7 +13,7 @@ import {
 
 const getCachedPartnerReceiptHeader = (partnerId: string) => unstable_cache(
     async () => {
-        const supabase = await getSupabaseServerClient()
+        const supabase = getAdminClient()
 
         const [{ data: partner, error: partnerError }, { data: address, error: addressError }] =
             await Promise.all([

@@ -9,6 +9,9 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { MarketplaceHeader } from "../marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
+import { createClient } from "@/lib/supabase/client"
+import { DefaultModal, RadioButton, Button } from "@/components/reusable"
+import { Calendar, Users as UsersIcon, FileText, AlertOctagon, CheckCircle } from "lucide-react"
 
 import { View, EditField } from "./profile-shared"
 import { MainView } from "./MainView"
@@ -61,6 +64,35 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
 
     const [isLoading, setIsLoading] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
+
+    // Account deletion states
+    const [deleteStep, setDeleteStep] = useState<"none" | "reason" | "confirm" | "success">("none")
+    const [reasonOption, setReasonOption] = useState("")
+    const [customReason, setCustomReason] = useState("")
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const handleDeleteAccount = async () => {
+        setIsDeleting(true)
+        try {
+            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
+            const token = await getCSRFToken()
+            const finalReason = reasonOption === "Outro" ? customReason : reasonOption
+
+            const { deleteAccountAction } = await import("@/app/actions/shared/account")
+            const res = await deleteAccountAction(userId, finalReason, token)
+
+            if (res.error) {
+                notifyError("Erro ao excluir", res.error)
+                return
+            }
+
+            setDeleteStep("success")
+        } catch (e: any) {
+            notifyError("Erro", "Ocorreu um erro ao excluir a conta.")
+        } finally {
+            setIsDeleting(false)
+        }
+    }
     const [userAddresses, setUserAddresses] = useState<any[]>(initialAddresses || [])
     const [error, setError] = useState<string | null>(null)
     const [editing, setEditing] = useState<Record<EditField, boolean>>({
@@ -435,6 +467,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 handleChangePassword={handleChangePassword}
                                 handleSavePhone={handleSavePhone}
                                 clearMessages={clearMessages}
+                                onDeleteClick={() => setDeleteStep("reason")}
                             />
                         )}
                         {currentView === "two-factor" && <TwoFactorView key="2fa" navigate={navigate} />}
@@ -444,6 +477,183 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                 </div>
                 <MarketplaceFooter />
             </div>
+
+            {/* Account Deletion Flow Modal */}
+            <DefaultModal
+                isOpen={deleteStep !== "none" && deleteStep !== "success"}
+                onClose={() => {
+                    if (!isDeleting) {
+                        setDeleteStep("none")
+                        setReasonOption("")
+                        setCustomReason("")
+                    }
+                }}
+                title={deleteStep === "confirm" ? "Confirmar exclusão da conta" : "Por que você deseja excluir sua conta?"}
+            >
+                {deleteStep === "reason" && (
+                    <div className="space-y-6 pt-2 pb-4">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/20 text-red-500 mb-2">
+                            <AlertOctagon size={24} />
+                        </div>
+                        
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Sua resposta nos ajuda a melhorar o Dudit.
+                        </p>
+
+                        <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-white dark:bg-dark-surface space-y-4">
+                            {[
+                                "Não atendeu às minhas necessidades",
+                                "Não uso mais a plataforma",
+                                "Dificuldade de uso",
+                                "Custo/valor não compensou",
+                                "Outro"
+                            ].map((option) => (
+                                <div key={option} className="flex items-center gap-3">
+                                    <RadioButton
+                                        name="reason"
+                                        value={option}
+                                        checked={reasonOption === option}
+                                        onChange={() => setReasonOption(option)}
+                                        label={
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                {option}
+                                            </span>
+                                        }
+                                    />
+                                </div>
+                            ))}
+                        </div>
+
+                        {reasonOption === "Outro" && (
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                    Motivo do cancelamento<span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Digite o motivo"
+                                    value={customReason}
+                                    onChange={(e) => setCustomReason(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-brand-border dark:border-dark-border focus:ring-1 focus:ring-brand-green bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading"
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
+                            <Button
+                                variant="outline"
+                                onClick={() => setDeleteStep("none")}
+                                className="px-6 py-2.5 rounded-xl text-sm font-bold"
+                            >
+                                Fechar
+                            </Button>
+                            <Button
+                                variant="default"
+                                disabled={!reasonOption || (reasonOption === "Outro" && !customReason.trim())}
+                                onClick={() => setDeleteStep("confirm")}
+                                className="px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-green text-white hover:bg-brand-green/90"
+                            >
+                                Continuar
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {deleteStep === "confirm" && (
+                    <div className="space-y-6 pt-2 pb-4">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/20 text-red-500 mb-2">
+                            <AlertOctagon size={24} />
+                        </div>
+                        
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Ao excluir sua conta, você perderá acesso aos seguintes dados:
+                        </p>
+
+                        <div className="border border-brand-border dark:border-dark-border rounded-2xl p-6 bg-white dark:bg-dark-surface space-y-4">
+                            <div className="flex items-start gap-4 text-sm text-brand-dark/80 dark:text-dark-body">
+                                <Calendar className="w-5 h-5 text-brand-inactive-text mt-0.5 shrink-0" />
+                                <div>
+                                    <strong className="text-brand-dark dark:text-dark-heading">Agenda e histórico de consultas</strong>
+                                    <p className="text-xs text-brand-inactive-text mt-0.5">Todos os seus compromissos e horários agendados serão deletados.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-4 text-sm text-brand-dark/80 dark:text-dark-body">
+                                <UsersIcon className="w-5 h-5 text-brand-inactive-text mt-0.5 shrink-0" />
+                                <div>
+                                    <strong className="text-brand-dark dark:text-dark-heading">Dados de pacientes</strong>
+                                    <p className="text-xs text-brand-inactive-text mt-0.5">As informações dos seus clientes e membros de equipe cadastrados serão apagadas.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-4 text-sm text-brand-dark/80 dark:text-dark-body">
+                                <FileText className="w-5 h-5 text-brand-inactive-text mt-0.5 shrink-0" />
+                                <div>
+                                    <strong className="text-brand-dark dark:text-dark-heading">Relatórios e informações financeiras</strong>
+                                    <p className="text-xs text-brand-inactive-text mt-0.5">Os relatórios de faturamento, orçamentos, vendas e contas a pagar/receber serão apagados.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/50">
+                            <p className="text-sm text-red-600 dark:text-red-400 font-semibold text-center">
+                                Essa ação é permanente e não pode ser desfeita.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
+                            <Button
+                                variant="outline"
+                                onClick={() => setDeleteStep("none")}
+                                disabled={isDeleting}
+                                className="flex-1 h-12 font-bold"
+                            >
+                                Continuar com minha conta
+                            </Button>
+                            <Button
+                                variant="default"
+                                onClick={handleDeleteAccount}
+                                disabled={isDeleting}
+                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold"
+                            >
+                                {isDeleting ? "Excluindo..." : "Excluir minha conta"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </DefaultModal>
+
+            {/* Deletion Scheduled Success Modal */}
+            <DefaultModal
+                isOpen={deleteStep === "success"}
+                onClose={() => {
+                    setDeleteStep("none")
+                    window.location.reload()
+                }}
+                title="Solicitação Recebida"
+            >
+                <div className="space-y-6 pt-2 pb-4 text-center">
+                    <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 mb-2">
+                        <CheckCircle size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                        Exclusão Agendada com Sucesso
+                    </h3>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body px-4">
+                        A sua conta foi agendada para exclusão definitiva e entrará no período de carência de <strong>48 horas</strong>. Você pode cancelar o encerramento da conta a qualquer momento na página de assinaturas ou através do aviso flutuante no topo.
+                    </p>
+                    <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setDeleteStep("none")
+                                window.location.reload()
+                            }}
+                            className="w-full h-12 font-bold bg-brand-green text-white hover:bg-brand-green/90"
+                        >
+                            Entendi
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
         </>
     )
 }

@@ -1809,7 +1809,7 @@ export async function getProducts(partnerId: string) {
 export const getMarketplaceCategoriesAction = async (parentId: string | null = null) => {
     return unstable_cache(
         async () => {
-            const supabase = await getSupabaseServerClient()
+            const supabase = getAdminClient()
 
             // 1. Query Simples e Direta
             let query = supabase

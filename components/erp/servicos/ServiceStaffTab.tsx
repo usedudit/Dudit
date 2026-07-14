@@ -67,7 +67,7 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
             <div>
                 <FormSection title="Profissionais habilitados" description="Selecione quais membros da equipe estão aptos a realizar este serviço. Isso refletirá na disponibilidade da agenda.">
                     <div className="space-y-6">
-                        <div className="pb-6 border-b border-brand-border dark:border-dark-border">
+                        <div className="pb-6">
                             <Checkbox
                                 label="Todos os membros da equipe podem realizar este serviço"
                                 checked={assignedStaff.all}
@@ -79,39 +79,39 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
 
                         {!assignedStaff.all && (
                             <div className="space-y-4">
-                                <h4 className="font-semibold text-brand-dark dark:text-dark-heading mb-4">Selecione os profissionais:</h4>
-
-                                {isLoading ? (
-                                    <p className="text-brand-inactive-text text-sm">Carregando equipe...</p>
-                                ) : staffList.length === 0 ? (
-                                    <p className="text-brand-inactive-text text-sm">Nenhum profissional encontrado.</p>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {staffList.map((staff) => (
-                                            <ListItem
-                                                key={staff.id}
-                                                title={staff.fullName || staff.email || "Sem Nome"}
-                                                description={staff.isOwner ? "Proprietário" : "Membro da equipe"}
-                                                className="p-4"
-                                                left={
-                                                    <UserProfileImage
-                                                        fullName={staff.fullName || staff.email || "S N"}
-                                                        imageUrl={staff.avatar_url}
-                                                        className="w-10 h-10 border border-brand-border dark:border-dark-border"
-                                                    />
-                                                }
-                                                right={
-                                                    <Checkbox
-                                                        checked={assignedStaff.staff_ids.includes(staff.id)}
-                                                        onChange={(c) => handleToggleStaff(staff.id, c)}
-                                                        disabled={!isEditing}
-                                                        name={`staff_${staff.id}`}
-                                                    />
-                                                }
-                                            />
-                                        ))}
-                                    </div>
-                                )}
+                                <FormSection title="Selecione os profissionais:" hasSeparator>
+                                    {isLoading ? (
+                                        <p className="text-brand-inactive-text text-sm">Carregando equipe...</p>
+                                    ) : staffList.length === 0 ? (
+                                        <p className="text-brand-inactive-text text-sm">Nenhum profissional encontrado.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {staffList.map((staff) => (
+                                                <ListItem
+                                                    key={staff.id}
+                                                    title={staff.fullName || staff.email || "Sem Nome"}
+                                                    description={staff.isOwner ? "Proprietário" : "Membro da equipe"}
+                                                    className="p-4"
+                                                    left={
+                                                        <UserProfileImage
+                                                            fullName={staff.fullName || staff.email || "S N"}
+                                                            imageUrl={staff.avatar_url}
+                                                            className="w-10 h-10 border border-brand-border dark:border-dark-border"
+                                                        />
+                                                    }
+                                                    right={
+                                                        <Checkbox
+                                                            checked={assignedStaff.staff_ids.includes(staff.id)}
+                                                            onChange={(c) => handleToggleStaff(staff.id, c)}
+                                                            disabled={!isEditing}
+                                                            name={`staff_${staff.id}`}
+                                                        />
+                                                    }
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </FormSection>
                             </div>
                         )}
                     </div>

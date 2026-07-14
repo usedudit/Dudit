@@ -8,12 +8,12 @@
  */
 
 import "server-only"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 
 import { unstable_cache } from "next/cache"
 
 export async function checkAndClearExpiredBan(userId: string): Promise<boolean> {
-    const supabase = await getSupabaseServerClient()
+    const supabase = getAdminClient()
 
     const { data: profile, error } = await supabase
         .from("user_profiles")

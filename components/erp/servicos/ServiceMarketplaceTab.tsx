@@ -53,7 +53,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
             {/* --- COLUNA ESQUERDA (Principal) --- */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                <FormSection title="Vitrine e Marketplace">
+                <FormSection title="Dados Básicos">
                     <div className="space-y-6">
                         <RichTextEditor
                             label="Descrição Detalhada"
@@ -68,7 +68,10 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
                 <div className="mt-8">
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <Accordion title="Especificações" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left">
+                    <Accordion title={
+                        <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                            Especificações
+                        </span>} defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left">
                         <div className="pt-2">
                             {technicalDetails.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center text-center py-8">

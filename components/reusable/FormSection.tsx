@@ -29,7 +29,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
                 </div>
             )}
             {description && (
-                <p className="text-sm text-brand-inactive-text mb-6">{description}</p>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">{description}</p>
             )}
             <div className="space-y-6">{children}</div>
         </div>

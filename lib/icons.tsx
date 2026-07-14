@@ -121,6 +121,14 @@ import {
     Link02Icon,
     PrinterIcon as Printer,
     TextUnderlineIcon,
+    TextAlignLeftIcon,
+    TextAlignCenterIcon,
+    TextAlignRightIcon,
+    TextAlignJustifyCenterIcon,
+    Table01Icon,
+    TextColorIcon,
+    TextClearIcon,
+    TextNumberSignIcon,
     MinusSignIcon,
     ReloadIcon as ReloadIcon01,
     CheckmarkCircle01Icon,
@@ -339,6 +347,14 @@ export const EyeOffIcon = CreateIcon(ViewOffSlashIcon)
 export const MailIcon = CreateIcon(Mail01Icon)
 export const PrinterIcon = CreateIcon(Printer)
 export const UnderlineIcon = CreateIcon(TextUnderlineIcon)
+export const AlignLeftIcon = CreateIcon(TextAlignLeftIcon)
+export const AlignCenterIcon = CreateIcon(TextAlignCenterIcon)
+export const AlignRightIcon = CreateIcon(TextAlignRightIcon)
+export const AlignJustifyIcon = CreateIcon(TextAlignJustifyCenterIcon)
+export const TableIcon = CreateIcon(Table01Icon)
+export const ColorIcon = CreateIcon(TextColorIcon)
+export const ClearFormatIcon = CreateIcon(TextClearIcon)
+export const OrderedListIcon = CreateIcon(TextNumberSignIcon)
 export const MonitorIcon = CreateIcon(ComputerIcon01)
 export const TerminalIcon = CreateIcon(ComputerTerminal01Icon)
 export const DatabaseIcon = CreateIcon(DatabaseIcon01)

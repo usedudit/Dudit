@@ -1,6 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath, revalidateTag, unstable_cache } from "next/cache"
 import { encrypt, decrypt } from "@/lib/cryptoService"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
@@ -75,7 +76,7 @@ export async function disconnectMercadoPagoAction() {
 
 const getCachedMercadoPagoStatus = (partnerId: string) => unstable_cache(
   async () => {
-    const supabase = await getSupabaseServerClient()
+    const supabase = getAdminClient()
     const { data: partner } = await supabase
       .from("partners")
       .select("mp_user_id, mp_connected_at, mp_public_key, mp_accepted_payment_methods")

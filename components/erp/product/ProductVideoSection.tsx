@@ -301,7 +301,7 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
 
     if (videoPlanBlocked) {
         return (
-            <div className="mt-6 border-t border-brand-border dark:border-dark-border pt-6">
+            <div className="mt-8 pt-8">
                 <div className="flex flex-col items-center">
                     <IconPlaceholder
                         icon={LockIcon}
@@ -319,14 +319,13 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
     }
 
     return (
-        <div className="mt-6 border-t border-brand-border dark:border-dark-border pt-6">
+        <div className="mt-8 pt-8">
             <div className="flex items-center justify-between gap-4 mb-4">
-                <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">Vídeo opcional</h3>
                 {(hasVideo || localPreview) && isEditing && (
-                    <button type="button" onClick={handleRemoveVideo} className="text-sm text-brand-red-dark hover:underline inline-flex items-center gap-1">
+                    <Button variant="outlinered" onClick={handleRemoveVideo}>
                         <TrashIcon className="w-4 h-4" />
                         Remover vídeo
-                    </button>
+                    </Button>
                 )}
             </div>
 

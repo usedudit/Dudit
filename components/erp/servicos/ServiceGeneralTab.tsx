@@ -2,13 +2,13 @@
 
 import type React from "react"
 import { useMemo } from "react"
-import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection, Spinner } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 import FormTextarea from "@/components/reusable/FormTextarea"
 import { formatCurrency } from "@/lib/utils"
-import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon, SparklesIcon } from "@/lib/icons"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { RichTextEditor } from "@/components/reusable"
@@ -58,10 +58,12 @@ interface ServiceGeneralTabProps {
     isSaving?: boolean
     mode?: "add" | "edit" | "details"
     isQuickMode?: boolean
+    isGeneratingDetails?: boolean
+    onGenerateDetails?: () => void
 }
 
 export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
-    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
+    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isGeneratingDetails = false, onGenerateDetails
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
@@ -99,7 +101,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                <FormSection title="Informações básicas">
+                <FormSection title="Informações básicas" className="mb-8">
                     <div className="mb-10">
                         <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
                     </div>
@@ -112,10 +114,32 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     name="name"
                                     value={serviceData.name}
                                     onChange={handleFieldChange}
-                                    disabled={!isEditing}
+                                    disabled={!isEditing || isGeneratingDetails}
                                     required
                                     error={fieldErrors?.has("name")}
                                     errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
+                                    labelAddon={
+                                        isEditing && onGenerateDetails && (
+                                            <button
+                                                type="button"
+                                                onClick={onGenerateDetails}
+                                                disabled={isGeneratingDetails || !serviceData.name?.trim()}
+                                                className="flex items-center gap-1.5 text-xs text-brand-primary font-medium hover:opacity-80 transition-opacity disabled:opacity-50 cursor-pointer"
+                                            >
+                                                {isGeneratingDetails ? (
+                                                    <>
+                                                        <Spinner size={12} className="text-brand-primary animate-spin" />
+                                                        <span>Gerando...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <SparklesIcon className="w-3.5 h-3.5" />
+                                                        <span>Gerar com IA</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        )
+                                    }
                                 />
                             </div>
 

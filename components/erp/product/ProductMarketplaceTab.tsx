@@ -114,7 +114,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 </FormSection> */}
 
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
-                <div className="mt-8">
+                <div className="mt-8 mb-8">
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                     <Accordion title={
                         <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">

@@ -224,14 +224,74 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
         [cacheMap, cacheKey, getDetailFn, staleTime],
     )
 
+    // ── List Cache Updaters ────────────────────────────────────────────────
+    
+    const updateItemInListCache = useCallback(
+        (id: string, data: any) => {
+            if (!listQueryKey) return
+            queryClient.setQueryData<any>(
+                listQueryKey as unknown[],
+                (old: any) => {
+                    if (!old || !old.pages) return old
+                    return {
+                        ...old,
+                        pages: old.pages.map((page: any) => ({
+                            ...page,
+                            items: page.items.map((item: any) =>
+                                String(item.id) === String(id)
+                                    ? { ...item, ...data }
+                                    : item
+                            ),
+                        })),
+                    }
+                }
+            )
+        },
+        [queryClient, listQueryKey]
+    )
+
+    const removeItemFromListCache = useCallback(
+        (id: string) => {
+            if (!listQueryKey) return
+            queryClient.setQueryData<any>(
+                listQueryKey as unknown[],
+                (old: any) => {
+                    if (!old || !old.pages) return old
+                    return {
+                        ...old,
+                        pages: old.pages.map((page: any) => ({
+                            ...page,
+                            items: page.items.filter((item: any) => String(item.id) !== String(id)),
+                        })),
+                    }
+                }
+            )
+        },
+        [queryClient, listQueryKey]
+    )
+
     // ── Invalidation ─────────────────────────────────────────────────────
 
     const invalidateEntity = useCallback(
         (id: string) => {
             cacheMap.delete(id)
             notifySubscribers(cacheKey)
+
+            getDetailFn(id)
+                .then((detail) => {
+                    if (detail) {
+                        cacheMap.set(id, { data: detail, timestamp: Date.now(), partial: false })
+                        notifySubscribers(cacheKey)
+                        updateItemInListCache(id, detail as any)
+                    } else {
+                        removeItemFromListCache(id)
+                    }
+                })
+                .catch(() => {
+                    // Fail silently, preserving existing state or letting query cache stay as is.
+                })
         },
-        [cacheMap, cacheKey],
+        [cacheMap, cacheKey, getDetailFn, updateItemInListCache, removeItemFromListCache],
     )
 
     const invalidateList = useCallback(() => {
@@ -252,10 +312,12 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
         (id: string, updater: (prev: TDetail) => TDetail) => {
             const entry = cacheMap.get(id)
             if (!entry) return
-            cacheMap.set(id, { data: updater(entry.data), timestamp: Date.now(), partial: false })
+            const nextData = updater(entry.data)
+            cacheMap.set(id, { data: nextData, timestamp: Date.now(), partial: false })
             notifySubscribers(cacheKey)
+            updateItemInListCache(id, nextData as any)
         },
-        [cacheMap, cacheKey],
+        [cacheMap, cacheKey, updateItemInListCache],
     )
 
     // ── Set entity directly (after create/update response) ───────────────
@@ -264,8 +326,9 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
         (id: string, data: TDetail) => {
             cacheMap.set(id, { data, timestamp: Date.now(), partial: false })
             notifySubscribers(cacheKey)
+            updateItemInListCache(id, data as any)
         },
-        [cacheMap, cacheKey],
+        [cacheMap, cacheKey, updateItemInListCache],
     )
 
     return {

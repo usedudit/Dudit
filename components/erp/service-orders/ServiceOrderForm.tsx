@@ -1226,674 +1226,672 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
                                 {activeTab === "services" && (
                                     <FadeIn key="services" className="space-y-6 w-full">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Serviços da OS</h2>
-                                        </div>
+                                        <FormSection title="Serviços da OS">
 
-                                        <div ref={serviceSearchRef} className="relative mb-6">
-                                            <Input
-                                                label=""
-                                                name="serviceSearch"
-                                                placeholder={isLocked ? "OS bloqueada para edições" : "Buscar serviços para adicionar..."}
-                                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                                disabled={isLocked}
-                                                value={servicesBucket.searchQuery}
-                                                onChange={(e) => {
-                                                    servicesBucket.setSearchQuery(e.target.value)
-                                                    setIsServiceSearchOpen(true)
-                                                }}
-                                                onFocus={() => {
-                                                    setIsServiceSearchOpen(true)
-                                                    servicesBucket.loadBucket()
-                                                }}
-                                                variant="full-rounded"
-                                            />
-
-                                            <AnimatePresence>
-                                                {isServiceSearchOpen && servicesBucket.searchQuery && (
-                                                    <motion.div
-                                                        initial={{ opacity: 0, y: 5 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        exit={{ opacity: 0, y: 5 }}
-                                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
-                                                        onScroll={(e) => {
-                                                            const target = e.currentTarget
-                                                            if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
-                                                                servicesBucket.loadMore()
-                                                            }
-                                                        }}
-                                                    >
-                                                        {servicesBucket.isLoading ? (
-                                                            <ThreeDotsLoader />
-                                                        ) : servicesBucket.filteredResults.length > 0 ? (
-                                                            servicesBucket.filteredResults.map(svc => (
-                                                                <div
-                                                                    key={svc.id}
-                                                                    onClick={() => {
-                                                                        handleAddService(svc)
-                                                                        servicesBucket.setSearchQuery("")
-                                                                        setIsServiceSearchOpen(false)
-                                                                    }}
-                                                                    className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                                >
-                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                        {svc.image ? (
-                                                                            <img
-                                                                                src={getR2ImageUrl(svc.image, "thumbnail")}
-                                                                                alt=""
-                                                                                className="w-full h-full object-cover"
-                                                                            />
-                                                                        ) : (
-                                                                            <div className="w-full h-full flex items-center justify-center">
-                                                                                <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{svc.name}</div>
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, activePromotions, { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
-                                                                    </div>
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum serviço encontrado.</div>
-                                                        )}
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                        </div>
-
-                                        {services.length === 0 ? (
-                                            <div className="w-full flex-col flex items-center justify-center py-12">
-                                                <IconPlaceholder
-                                                    icon={WrenchIcon}
-                                                    title="Nenhum serviço adicionado"
-                                                    subtitle="Busque serviços no campo acima ou adicione um serviço avulso manualmente."
-                                                    itemButton={isLocked ? undefined : {
-                                                        text: "Adicionar serviço manual",
-                                                        action: addBlankService,
-                                                        variant: "outline",
+                                            <div ref={serviceSearchRef} className="relative mb-6">
+                                                <Input
+                                                    label=""
+                                                    name="serviceSearch"
+                                                    placeholder={isLocked ? "OS bloqueada para edições" : "Buscar serviços para adicionar..."}
+                                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                                    disabled={isLocked}
+                                                    value={servicesBucket.searchQuery}
+                                                    onChange={(e) => {
+                                                        servicesBucket.setSearchQuery(e.target.value)
+                                                        setIsServiceSearchOpen(true)
                                                     }}
+                                                    onFocus={() => {
+                                                        setIsServiceSearchOpen(true)
+                                                        servicesBucket.loadBucket()
+                                                    }}
+                                                    variant="full-rounded"
                                                 />
+
+                                                <AnimatePresence>
+                                                    {isServiceSearchOpen && servicesBucket.searchQuery && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 5 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 5 }}
+                                                            className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
+                                                            onScroll={(e) => {
+                                                                const target = e.currentTarget
+                                                                if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                                    servicesBucket.loadMore()
+                                                                }
+                                                            }}
+                                                        >
+                                                            {servicesBucket.isLoading ? (
+                                                                <ThreeDotsLoader />
+                                                            ) : servicesBucket.filteredResults.length > 0 ? (
+                                                                servicesBucket.filteredResults.map(svc => (
+                                                                    <div
+                                                                        key={svc.id}
+                                                                        onClick={() => {
+                                                                            handleAddService(svc)
+                                                                            servicesBucket.setSearchQuery("")
+                                                                            setIsServiceSearchOpen(false)
+                                                                        }}
+                                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
+                                                                    >
+                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                            {svc.image ? (
+                                                                                <img
+                                                                                    src={getR2ImageUrl(svc.image, "thumbnail")}
+                                                                                    alt=""
+                                                                                    className="w-full h-full object-cover"
+                                                                                />
+                                                                            ) : (
+                                                                                <div className="w-full h-full flex items-center justify-center">
+                                                                                    <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{svc.name}</div>
+                                                                        </div>
+                                                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, activePromotions, { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum serviço encontrado.</div>
+                                                            )}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
-                                        ) : (
-                                            <>
-                                                {/* --- SERVICES TABLE (Desktop) --- */}
-                                                <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
-                                                    <table className="w-full text-left border-separate border-spacing-0">
-                                                        <thead>
-                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Serviço</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {paginatedServices.map((svc: any, paginatedIdx: number) => {
-                                                                const index = (servicesPage - 1) * servicesItemsPerPage + paginatedIdx
-                                                                const unitPrice = svc.service_price !== undefined ? svc.service_price : (svc.price || 0)
-                                                                const qty = svc.quantity || 1
-                                                                const hasNameError = !svc.service_name || svc.service_name.trim() === ""
-                                                                return (
-                                                                    <tr key={svc.service_id || svc.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                                                        <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                                            <div className="flex items-center gap-3">
-                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                                                    {svc.image ? (
-                                                                                        <img
-                                                                                            src={getR2ImageUrl(svc.image, "thumbnail")}
-                                                                                            alt=""
-                                                                                            className="w-full h-full object-cover"
-                                                                                        />
+
+                                            {services.length === 0 ? (
+                                                <div className="w-full flex-col flex items-center justify-center py-12">
+                                                    <IconPlaceholder
+                                                        icon={WrenchIcon}
+                                                        title="Nenhum serviço adicionado"
+                                                        subtitle="Busque serviços no campo acima ou adicione um serviço avulso manualmente."
+                                                        itemButton={isLocked ? undefined : {
+                                                            text: "Adicionar serviço manual",
+                                                            action: addBlankService,
+                                                            variant: "outline",
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* --- SERVICES TABLE (Desktop) --- */}
+                                                    <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
+                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Serviço</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginatedServices.map((svc: any, paginatedIdx: number) => {
+                                                                    const index = (servicesPage - 1) * servicesItemsPerPage + paginatedIdx
+                                                                    const unitPrice = svc.service_price !== undefined ? svc.service_price : (svc.price || 0)
+                                                                    const qty = svc.quantity || 1
+                                                                    const hasNameError = !svc.service_name || svc.service_name.trim() === ""
+                                                                    return (
+                                                                        <tr key={svc.service_id || svc.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                                        {svc.image ? (
+                                                                                            <img
+                                                                                                src={getR2ImageUrl(svc.image, "thumbnail")}
+                                                                                                alt=""
+                                                                                                className="w-full h-full object-cover"
+                                                                                            />
+                                                                                        ) : (
+                                                                                            <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                        )}
+                                                                                    </div>
+                                                                                    {svc.isEditing ? (
+                                                                                        <div className="mb-0 flex-1">
+                                                                                            <Input
+                                                                                                value={svc.service_name || ""}
+                                                                                                onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
+                                                                                                placeholder="Nome do serviço manual..."
+                                                                                                className="mb-0"
+                                                                                                error={hasNameError}
+                                                                                                errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                            />
+                                                                                        </div>
                                                                                     ) : (
-                                                                                        <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                                                                            {svc.service_name || "Serviço sem nome"}
+                                                                                        </span>
                                                                                     )}
                                                                                 </div>
-                                                                                {svc.isEditing ? (
-                                                                                    <div className="mb-0 flex-1">
-                                                                                        <Input
-                                                                                            value={svc.service_name || ""}
-                                                                                            onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
-                                                                                            placeholder="Nome do serviço manual..."
-                                                                                            className="mb-0"
-                                                                                            error={hasNameError}
-                                                                                            errorMessage={hasNameError ? "Nome obrigatório" : undefined}
-                                                                                        />
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                                                                        {svc.service_name || "Serviço sem nome"}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            <div className="w-[120px]">
-                                                                                <MoneyInput
-                                                                                    value={unitPrice}
-                                                                                    onChange={(val) => updateServiceField(index, "service_price", val)}
-                                                                                    className="mb-0"
-                                                                                    disabled={isLocked}
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-left font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                <div className="w-[120px]">
+                                                                                    <MoneyInput
+                                                                                        value={unitPrice}
+                                                                                        onChange={(val) => updateServiceField(index, "service_price", val)}
+                                                                                        className="mb-0"
+                                                                                        disabled={isLocked}
+                                                                                    />
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                <div className="flex justify-center">
+                                                                                    <QuantitySelector
+                                                                                        value={qty}
+                                                                                        onChange={(val) => updateServiceField(index, "quantity", val)}
+                                                                                        size="md"
+                                                                                        disabled={isLocked}
+                                                                                    />
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                {formatCurrency(unitPrice * qty)}
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                <div className="flex justify-center gap-2">
+                                                                                    {svc.isEditing ? (
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                if (svc.service_name && svc.service_name.trim() !== '') {
+                                                                                                    updateServiceField(index, "isEditing", false)
+                                                                                                }
+                                                                                            }}
+                                                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
+                                                                                            title="Confirmar"
+                                                                                        >
+                                                                                            <CheckCircleIcon size={18} />
+                                                                                        </button>
+                                                                                    ) : svc.isManual ? (
+                                                                                        <button
+                                                                                            onClick={isLocked ? undefined : () => updateServiceField(index, "isEditing", true)}
+                                                                                            disabled={isLocked}
+                                                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                                                            title="Editar"
+                                                                                        >
+                                                                                            <EditIcon size={18} />
+                                                                                        </button>
+                                                                                    ) : null}
+                                                                                    <button
+                                                                                        onClick={isLocked ? undefined : () => handleRemoveService(svc.service_id || svc.id)}
+                                                                                        disabled={isLocked}
+                                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                                                        title="Remover"
+                                                                                    >
+                                                                                        <TrashIcon size={18} />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    {/* --- SERVICES LIST (Mobile) --- */}
+                                                    <div className="md:hidden flex flex-col gap-4 mb-4">
+                                                        {paginatedServices.map((svc: any, paginatedIdx: number) => {
+                                                            const index = (servicesPage - 1) * servicesItemsPerPage + paginatedIdx
+                                                            const unitPrice = svc.service_price !== undefined ? svc.service_price : (svc.price || 0)
+                                                            const qty = svc.quantity || 1
+                                                            const hasNameError = !svc.service_name || svc.service_name.trim() === ""
+                                                            return (
+                                                                <div key={svc.service_id || svc.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                                                                    <div className="flex items-start gap-4">
+                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                            {svc.image ? (
+                                                                                <img
+                                                                                    src={getR2ImageUrl(svc.image, "thumbnail")}
+                                                                                    alt=""
+                                                                                    className="w-full h-full object-cover"
                                                                                 />
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            <div className="flex justify-center">
+                                                                            ) : (
+                                                                                <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0 text-left space-y-2">
+                                                                            {svc.isEditing ? (
+                                                                                <div className="mb-0 flex-1">
+                                                                                    <Input
+                                                                                        value={svc.service_name || ""}
+                                                                                        onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
+                                                                                        placeholder="Nome do serviço manual..."
+                                                                                        className="mb-0"
+                                                                                        error={hasNameError}
+                                                                                        errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                    />
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                                                                    {svc.service_name || "Serviço sem nome"}
+                                                                                </div>
+                                                                            )}
+                                                                            <div className="flex items-center gap-4 mt-2">
                                                                                 <QuantitySelector
                                                                                     value={qty}
                                                                                     onChange={(val) => updateServiceField(index, "quantity", val)}
-                                                                                    size="md"
-                                                                                    disabled={isLocked}
+                                                                                    size="sm"
                                                                                 />
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(unitPrice * qty)}
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                            <div className="flex justify-center gap-2">
-                                                                                {svc.isEditing ? (
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            if (svc.service_name && svc.service_name.trim() !== '') {
-                                                                                                updateServiceField(index, "isEditing", false)
-                                                                                            }
-                                                                                        }}
-                                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
-                                                                                        title="Confirmar"
-                                                                                    >
-                                                                                        <CheckCircleIcon size={18} />
-                                                                                    </button>
-                                                                                ) : svc.isManual ? (
-                                                                                    <button
-                                                                                        onClick={isLocked ? undefined : () => updateServiceField(index, "isEditing", true)}
+                                                                                <div className="flex-1 max-w-[140px]">
+                                                                                    <MoneyInput
+                                                                                        value={unitPrice}
+                                                                                        onChange={(val) => updateServiceField(index, "service_price", val)}
+                                                                                        className="mb-0"
                                                                                         disabled={isLocked}
-                                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                                                        title="Editar"
-                                                                                    >
-                                                                                        <EditIcon size={18} />
-                                                                                    </button>
-                                                                                ) : null}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading pt-1">
+                                                                                Total: {formatCurrency(unitPrice * qty)}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-2">
+                                                                            {svc.isEditing ? (
                                                                                 <button
-                                                                                    onClick={isLocked ? undefined : () => handleRemoveService(svc.service_id || svc.id)}
-                                                                                    disabled={isLocked}
-                                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
-                                                                                    title="Remover"
+                                                                                    onClick={() => {
+                                                                                        if (svc.service_name && svc.service_name.trim() !== '') {
+                                                                                            updateServiceField(index, "isEditing", false)
+                                                                                        }
+                                                                                    }}
+                                                                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
                                                                                 >
-                                                                                    <TrashIcon size={18} />
+                                                                                    <CheckCircleIcon size={14} />
                                                                                 </button>
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                )
-                                                            })}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-
-                                                {/* --- SERVICES LIST (Mobile) --- */}
-                                                <div className="md:hidden flex flex-col gap-4 mb-4">
-                                                    {paginatedServices.map((svc: any, paginatedIdx: number) => {
-                                                        const index = (servicesPage - 1) * servicesItemsPerPage + paginatedIdx
-                                                        const unitPrice = svc.service_price !== undefined ? svc.service_price : (svc.price || 0)
-                                                        const qty = svc.quantity || 1
-                                                        const hasNameError = !svc.service_name || svc.service_name.trim() === ""
-                                                        return (
-                                                            <div key={svc.service_id || svc.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                                                                <div className="flex items-start gap-4">
-                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                                        {svc.image ? (
-                                                                            <img
-                                                                                src={getR2ImageUrl(svc.image, "thumbnail")}
-                                                                                alt=""
-                                                                                className="w-full h-full object-cover"
-                                                                            />
-                                                                        ) : (
-                                                                            <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0 text-left space-y-2">
-                                                                        {svc.isEditing ? (
-                                                                            <div className="mb-0 flex-1">
-                                                                                <Input
-                                                                                    value={svc.service_name || ""}
-                                                                                    onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
-                                                                                    placeholder="Nome do serviço manual..."
-                                                                                    className="mb-0"
-                                                                                    error={hasNameError}
-                                                                                    errorMessage={hasNameError ? "Nome obrigatório" : undefined}
-                                                                                />
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                                                                {svc.service_name || "Serviço sem nome"}
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="flex items-center gap-4 mt-2">
-                                                                            <QuantitySelector
-                                                                                value={qty}
-                                                                                onChange={(val) => updateServiceField(index, "quantity", val)}
-                                                                                size="sm"
-                                                                            />
-                                                                            <div className="flex-1 max-w-[140px]">
-                                                                                <MoneyInput
-                                                                                    value={unitPrice}
-                                                                                    onChange={(val) => updateServiceField(index, "service_price", val)}
-                                                                                    className="mb-0"
+                                                                            ) : svc.isManual ? (
+                                                                                <button
+                                                                                    onClick={isLocked ? undefined : () => updateServiceField(index, "isEditing", true)}
                                                                                     disabled={isLocked}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading pt-1">
-                                                                            Total: {formatCurrency(unitPrice * qty)}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex flex-col gap-2">
-                                                                        {svc.isEditing ? (
+                                                                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
+                                                                                >
+                                                                                    <EditIcon size={14} />
+                                                                                </button>
+                                                                            ) : null}
                                                                             <button
-                                                                                onClick={() => {
-                                                                                    if (svc.service_name && svc.service_name.trim() !== '') {
-                                                                                        updateServiceField(index, "isEditing", false)
-                                                                                    }
-                                                                                }}
-                                                                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
-                                                                            >
-                                                                                <CheckCircleIcon size={14} />
-                                                                            </button>
-                                                                        ) : svc.isManual ? (
-                                                                            <button
-                                                                                onClick={isLocked ? undefined : () => updateServiceField(index, "isEditing", true)}
+                                                                                onClick={isLocked ? undefined : () => handleRemoveService(svc.service_id || svc.id)}
                                                                                 disabled={isLocked}
-                                                                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
+                                                                                className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
                                                                             >
-                                                                                <EditIcon size={14} />
+                                                                                <TrashIcon size={14} />
                                                                             </button>
-                                                                        ) : null}
-                                                                        <button
-                                                                            onClick={isLocked ? undefined : () => handleRemoveService(svc.service_id || svc.id)}
-                                                                            disabled={isLocked}
-                                                                            className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
-                                                                        >
-                                                                            <TrashIcon size={14} />
-                                                                        </button>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
 
-                                                {/* Add Item Link at the bottom of the list */}
-                                                <Button
-                                                    type="button"
-                                                    variant="link"
-                                                    onClick={addBlankService}
-                                                    className="pl-0 mt-2"
-                                                    disabled={isLocked}
-                                                >
-                                                    <PlusIcon size={14} strokeWidth={3} />
-                                                    Adicionar serviço manual
-                                                </Button>
+                                                    {/* Add Item Link at the bottom of the list */}
+                                                    <Button
+                                                        type="button"
+                                                        variant="link"
+                                                        onClick={addBlankService}
+                                                        className="pl-0 mt-2"
+                                                        disabled={isLocked}
+                                                    >
+                                                        <PlusIcon size={14} strokeWidth={3} />
+                                                        Adicionar serviço manual
+                                                    </Button>
 
-                                                {/* Pagination */}
-                                                <Pagination
-                                                    currentPage={servicesPage}
-                                                    totalPages={totalServicesPages}
-                                                    onPageChange={setServicesPage}
-                                                />
-                                            </>
-                                        )}
+                                                    {/* Pagination */}
+                                                    <Pagination
+                                                        currentPage={servicesPage}
+                                                        totalPages={totalServicesPages}
+                                                        onPageChange={setServicesPage}
+                                                    />
+                                                </>
+                                            )}
+                                        </FormSection>
                                     </FadeIn>
                                 )}
 
                                 {activeTab === "products" && (
                                     <FadeIn key="products" className="space-y-6 w-full">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Produtos da OS</h2>
-                                        </div>
+                                        <FormSection title="Produtos da OS">
 
-                                        <div ref={productSearchRef} className="relative mb-6">
-                                            <Input
-                                                label=""
-                                                name="productSearch"
-                                                placeholder={isLocked ? "OS bloqueada para edições" : "Buscar produtos para adicionar..."}
-                                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                                disabled={isLocked}
-                                                value={productsBucket.searchQuery}
-                                                onChange={(e) => {
-                                                    productsBucket.setSearchQuery(e.target.value)
-                                                    setIsProductSearchOpen(true)
-                                                }}
-                                                onFocus={() => {
-                                                    setIsProductSearchOpen(true)
-                                                    productsBucket.loadBucket()
-                                                }}
-                                                variant="full-rounded"
-                                            />
-
-                                            <AnimatePresence>
-                                                {isProductSearchOpen && productsBucket.searchQuery && (
-                                                    <motion.div
-                                                        initial={{ opacity: 0, y: 5 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        exit={{ opacity: 0, y: 5 }}
-                                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
-                                                        onScroll={(e) => {
-                                                            const target = e.currentTarget
-                                                            if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
-                                                                productsBucket.loadMore()
-                                                            }
-                                                        }}
-                                                    >
-                                                        {productsBucket.isLoading ? (
-                                                            <ThreeDotsLoader />
-                                                        ) : productsBucket.filteredResults.length > 0 ? (
-                                                            productsBucket.filteredResults.map(prod => (
-                                                                <div
-                                                                    key={prod.id}
-                                                                    onClick={() => {
-                                                                        handleAddProduct(prod)
-                                                                        productsBucket.setSearchQuery("")
-                                                                        setIsProductSearchOpen(false)
-                                                                    }}
-                                                                    className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                                >
-                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                        <img src={getR2ImageUrl(prod.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={prod.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{prod.name}</div>
-                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{prod.sku}</div>
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), (prod as any).promotional_price && Number((prod as any).promotional_price) < Number(prod.price || 0) ? Number((prod as any).promotional_price) : null, activePromotions, { productId: prod.id, categoryId: (prod as any).category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
-                                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                            {prod.stock} em estoque
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>
-                                                        )}
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                        </div>
-
-                                        {products.length === 0 ? (
-                                            <div className="w-full flex-col flex items-center justify-center py-12">
-                                                <IconPlaceholder
-                                                    icon={PackageIcon}
-                                                    title="Nenhum produto adicionado"
-                                                    subtitle="Busque produtos no campo acima ou adicione um produto avulso manualmente."
-                                                    itemButton={isLocked ? undefined : {
-                                                        text: "Adicionar produto manual",
-                                                        action: addBlankProduct,
-                                                        variant: "outline",
+                                            <div ref={productSearchRef} className="relative mb-6">
+                                                <Input
+                                                    label=""
+                                                    name="productSearch"
+                                                    placeholder={isLocked ? "OS bloqueada para edições" : "Buscar produtos para adicionar..."}
+                                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                                    disabled={isLocked}
+                                                    value={productsBucket.searchQuery}
+                                                    onChange={(e) => {
+                                                        productsBucket.setSearchQuery(e.target.value)
+                                                        setIsProductSearchOpen(true)
                                                     }}
+                                                    onFocus={() => {
+                                                        setIsProductSearchOpen(true)
+                                                        productsBucket.loadBucket()
+                                                    }}
+                                                    variant="full-rounded"
                                                 />
-                                            </div>
-                                        ) : (
-                                            <>
-                                                {/* --- PRODUCTS TABLE (Desktop) --- */}
-                                                <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
-                                                    <table className="w-full text-left border-separate border-spacing-0">
-                                                        <thead>
-                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
-                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {paginatedProducts.map((prod: any, paginatedIdx: number) => {
-                                                                const index = (productsPage - 1) * productsItemsPerPage + paginatedIdx
-                                                                const unitPrice = prod.unit_price !== undefined ? prod.unit_price : (prod.price || 0)
-                                                                const qty = prod.quantity || 1
-                                                                const hasNameError = !prod.product_name || prod.product_name.trim() === ""
-                                                                return (
-                                                                    <tr key={prod.product_id || prod.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                                                        <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                                            <div className="flex items-center gap-3">
-                                                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                                                    {(() => {
-                                                                                        const img = prod.image || (prod.images && prod.images.length > 0 ? prod.images[0] : null)
-                                                                                        if (img) {
-                                                                                            return (
-                                                                                                <img
-                                                                                                    src={getR2ImageUrl(img, "thumbnail")}
-                                                                                                    alt=""
-                                                                                                    className="w-full h-full object-cover"
-                                                                                                />
-                                                                                            )
-                                                                                        }
-                                                                                        return <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                                    })()}
-                                                                                </div>
-                                                                                {prod.isEditing ? (
-                                                                                    <div className="mb-0 flex-1">
-                                                                                        <Input
-                                                                                            value={prod.product_name || ""}
-                                                                                            onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
-                                                                                            placeholder="Nome do produto manual..."
-                                                                                            className="mb-0"
-                                                                                            error={hasNameError}
-                                                                                            errorMessage={hasNameError ? "Nome obrigatório" : undefined}
-                                                                                        />
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                                                                        {prod.product_name || "Produto sem nome"}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                            <div className="w-[140px]">
-                                                                                <MoneyInput
-                                                                                    value={unitPrice}
-                                                                                    onChange={(val) => updateProductField(index, "unit_price", val)}
-                                                                                    className="mb-0"
-                                                                                    disabled={isLocked}
-                                                                                />
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            <div className="flex justify-center items-center gap-1.5">
-                                                                                <QuantitySelector
-                                                                                    value={qty}
-                                                                                    onChange={(val) => updateProductField(index, "quantity", val)}
-                                                                                    size="md"
-                                                                                    disabled={isLocked}
-                                                                                />
-                                                                                {!prod.isManual && Number(prod.stock || 0) <= 0 && (
-                                                                                    <Tooltip text="Produto sem estoque disponível no momento">
-                                                                                        <Badge
-                                                                                            variant="orange"
-                                                                                            icon={<Package size={14} />}
-                                                                                            className="shrink-0"
-                                                                                        />
-                                                                                    </Tooltip>
-                                                                                )}
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(unitPrice * qty)}
-                                                                        </td>
-                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                            <div className="flex justify-center gap-2">
-                                                                                {prod.isEditing ? (
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            if (prod.product_name && prod.product_name.trim() !== '') {
-                                                                                                updateProductField(index, "isEditing", false)
-                                                                                            }
-                                                                                        }}
-                                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
-                                                                                        title="Confirmar"
-                                                                                    >
-                                                                                        <CheckCircleIcon size={18} />
-                                                                                    </button>
-                                                                                ) : prod.isManual ? (
-                                                                                    <button
-                                                                                        onClick={isLocked ? undefined : () => updateProductField(index, "isEditing", true)}
-                                                                                        disabled={isLocked}
-                                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                                                        title="Editar"
-                                                                                    >
-                                                                                        <EditIcon size={18} />
-                                                                                    </button>
-                                                                                ) : null}
-                                                                                <button
-                                                                                    onClick={isLocked ? undefined : () => handleRemoveProduct(prod.product_id || prod.id)}
-                                                                                    disabled={isLocked}
-                                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
-                                                                                    title="Remover"
-                                                                                >
-                                                                                    <TrashIcon size={18} />
-                                                                                </button>
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                )
-                                                            })}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
 
-                                                {/* --- PRODUCTS LIST (Mobile) --- */}
-                                                <div className="md:hidden flex flex-col gap-4 mb-4">
-                                                    {paginatedProducts.map((prod: any, paginatedIdx: number) => {
-                                                        const index = (productsPage - 1) * productsItemsPerPage + paginatedIdx
-                                                        const unitPrice = prod.unit_price !== undefined ? prod.unit_price : (prod.price || 0)
-                                                        const qty = prod.quantity || 1
-                                                        const hasNameError = !prod.product_name || prod.product_name.trim() === ""
-                                                        return (
-                                                            <div key={prod.product_id || prod.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                                                                <div className="flex items-start gap-4">
-                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                                        {(() => {
-                                                                            const img = prod.image || (prod.images && prod.images.length > 0 ? prod.images[0] : null)
-                                                                            if (img) {
-                                                                                return (
-                                                                                    <img
-                                                                                        src={getR2ImageUrl(img, "thumbnail")}
-                                                                                        alt=""
-                                                                                        className="w-full h-full object-cover"
+                                                <AnimatePresence>
+                                                    {isProductSearchOpen && productsBucket.searchQuery && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 5 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 5 }}
+                                                            className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
+                                                            onScroll={(e) => {
+                                                                const target = e.currentTarget
+                                                                if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                                    productsBucket.loadMore()
+                                                                }
+                                                            }}
+                                                        >
+                                                            {productsBucket.isLoading ? (
+                                                                <ThreeDotsLoader />
+                                                            ) : productsBucket.filteredResults.length > 0 ? (
+                                                                productsBucket.filteredResults.map(prod => (
+                                                                    <div
+                                                                        key={prod.id}
+                                                                        onClick={() => {
+                                                                            handleAddProduct(prod)
+                                                                            productsBucket.setSearchQuery("")
+                                                                            setIsProductSearchOpen(false)
+                                                                        }}
+                                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
+                                                                    >
+                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                            <img src={getR2ImageUrl(prod.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={prod.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{prod.name}</div>
+                                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{prod.sku}</div>
+                                                                        </div>
+                                                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), (prod as any).promotional_price && Number((prod as any).promotional_price) < Number(prod.price || 0) ? Number((prod as any).promotional_price) : null, activePromotions, { productId: prod.id, categoryId: (prod as any).category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
+                                                                            <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                                                {prod.stock} em estoque
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>
+                                                            )}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+
+                                            {products.length === 0 ? (
+                                                <div className="w-full flex-col flex items-center justify-center py-12">
+                                                    <IconPlaceholder
+                                                        icon={PackageIcon}
+                                                        title="Nenhum produto adicionado"
+                                                        subtitle="Busque produtos no campo acima ou adicione um produto avulso manualmente."
+                                                        itemButton={isLocked ? undefined : {
+                                                            text: "Adicionar produto manual",
+                                                            action: addBlankProduct,
+                                                            variant: "outline",
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* --- PRODUCTS TABLE (Desktop) --- */}
+                                                    <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
+                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
+                                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginatedProducts.map((prod: any, paginatedIdx: number) => {
+                                                                    const index = (productsPage - 1) * productsItemsPerPage + paginatedIdx
+                                                                    const unitPrice = prod.unit_price !== undefined ? prod.unit_price : (prod.price || 0)
+                                                                    const qty = prod.quantity || 1
+                                                                    const hasNameError = !prod.product_name || prod.product_name.trim() === ""
+                                                                    return (
+                                                                        <tr key={prod.product_id || prod.id || index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                                        {(() => {
+                                                                                            const img = prod.image || (prod.images && prod.images.length > 0 ? prod.images[0] : null)
+                                                                                            if (img) {
+                                                                                                return (
+                                                                                                    <img
+                                                                                                        src={getR2ImageUrl(img, "thumbnail")}
+                                                                                                        alt=""
+                                                                                                        className="w-full h-full object-cover"
+                                                                                                    />
+                                                                                                )
+                                                                                            }
+                                                                                            return <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                                        })()}
+                                                                                    </div>
+                                                                                    {prod.isEditing ? (
+                                                                                        <div className="mb-0 flex-1">
+                                                                                            <Input
+                                                                                                value={prod.product_name || ""}
+                                                                                                onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
+                                                                                                placeholder="Nome do produto manual..."
+                                                                                                className="mb-0"
+                                                                                                error={hasNameError}
+                                                                                                errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                            />
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                                                                            {prod.product_name || "Produto sem nome"}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                <div className="w-[140px]">
+                                                                                    <MoneyInput
+                                                                                        value={unitPrice}
+                                                                                        onChange={(val) => updateProductField(index, "unit_price", val)}
+                                                                                        className="mb-0"
+                                                                                        disabled={isLocked}
                                                                                     />
-                                                                                )
-                                                                            }
-                                                                            return <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                        })()}
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0 text-left space-y-2">
-                                                                        {prod.isEditing ? (
-                                                                            <div className="mb-0 flex-1">
-                                                                                <Input
-                                                                                    value={prod.product_name || ""}
-                                                                                    onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
-                                                                                    placeholder="Nome do produto manual..."
-                                                                                    className="mb-0"
-                                                                                    error={hasNameError}
-                                                                                    errorMessage={hasNameError ? "Nome obrigatório" : undefined}
-                                                                                />
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                                                                                {prod.product_name || "Produto sem nome"}
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="flex items-center gap-4 mt-2">
-                                                                            <div className="flex items-center gap-1.5 shrink-0">
-                                                                                <QuantitySelector
-                                                                                    value={qty}
-                                                                                    onChange={(val) => updateProductField(index, "quantity", val)}
-                                                                                    size="sm"
-                                                                                />
-                                                                                {!prod.isManual && Number(prod.stock || 0) <= 0 && (
-                                                                                    <Tooltip text="Produto sem estoque disponível no momento">
-                                                                                        <Badge
-                                                                                            variant="orange"
-                                                                                            icon={<Package size={12} />}
-                                                                                            className="shrink-0"
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                <div className="flex justify-center items-center gap-1.5">
+                                                                                    <QuantitySelector
+                                                                                        value={qty}
+                                                                                        onChange={(val) => updateProductField(index, "quantity", val)}
+                                                                                        size="md"
+                                                                                        disabled={isLocked}
+                                                                                    />
+                                                                                    {!prod.isManual && Number(prod.stock || 0) <= 0 && (
+                                                                                        <Tooltip text="Produto sem estoque disponível no momento">
+                                                                                            <Badge
+                                                                                                variant="orange"
+                                                                                                icon={<Package size={14} />}
+                                                                                                className="shrink-0"
+                                                                                            />
+                                                                                        </Tooltip>
+                                                                                    )}
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                {formatCurrency(unitPrice * qty)}
+                                                                            </td>
+                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                <div className="flex justify-center gap-2">
+                                                                                    {prod.isEditing ? (
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                if (prod.product_name && prod.product_name.trim() !== '') {
+                                                                                                    updateProductField(index, "isEditing", false)
+                                                                                                }
+                                                                                            }}
+                                                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
+                                                                                            title="Confirmar"
+                                                                                        >
+                                                                                            <CheckCircleIcon size={18} />
+                                                                                        </button>
+                                                                                    ) : prod.isManual ? (
+                                                                                        <button
+                                                                                            onClick={isLocked ? undefined : () => updateProductField(index, "isEditing", true)}
+                                                                                            disabled={isLocked}
+                                                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                                                            title="Editar"
+                                                                                        >
+                                                                                            <EditIcon size={18} />
+                                                                                        </button>
+                                                                                    ) : null}
+                                                                                    <button
+                                                                                        onClick={isLocked ? undefined : () => handleRemoveProduct(prod.product_id || prod.id)}
+                                                                                        disabled={isLocked}
+                                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                                                        title="Remover"
+                                                                                    >
+                                                                                        <TrashIcon size={18} />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    {/* --- PRODUCTS LIST (Mobile) --- */}
+                                                    <div className="md:hidden flex flex-col gap-4 mb-4">
+                                                        {paginatedProducts.map((prod: any, paginatedIdx: number) => {
+                                                            const index = (productsPage - 1) * productsItemsPerPage + paginatedIdx
+                                                            const unitPrice = prod.unit_price !== undefined ? prod.unit_price : (prod.price || 0)
+                                                            const qty = prod.quantity || 1
+                                                            const hasNameError = !prod.product_name || prod.product_name.trim() === ""
+                                                            return (
+                                                                <div key={prod.product_id || prod.id || index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                                                                    <div className="flex items-start gap-4">
+                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                                            {(() => {
+                                                                                const img = prod.image || (prod.images && prod.images.length > 0 ? prod.images[0] : null)
+                                                                                if (img) {
+                                                                                    return (
+                                                                                        <img
+                                                                                            src={getR2ImageUrl(img, "thumbnail")}
+                                                                                            alt=""
+                                                                                            className="w-full h-full object-cover"
                                                                                         />
-                                                                                    </Tooltip>
-                                                                                )}
+                                                                                    )
+                                                                                }
+                                                                                return <PackageIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                            })()}
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0 text-left space-y-2">
+                                                                            {prod.isEditing ? (
+                                                                                <div className="mb-0 flex-1">
+                                                                                    <Input
+                                                                                        value={prod.product_name || ""}
+                                                                                        onChange={(e: any) => updateProductField(index, "product_name", e.target.value)}
+                                                                                        placeholder="Nome do produto manual..."
+                                                                                        className="mb-0"
+                                                                                        error={hasNameError}
+                                                                                        errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                    />
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                                                                    {prod.product_name || "Produto sem nome"}
+                                                                                </div>
+                                                                            )}
+                                                                            <div className="flex items-center gap-4 mt-2">
+                                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                                    <QuantitySelector
+                                                                                        value={qty}
+                                                                                        onChange={(val) => updateProductField(index, "quantity", val)}
+                                                                                        size="sm"
+                                                                                    />
+                                                                                    {!prod.isManual && Number(prod.stock || 0) <= 0 && (
+                                                                                        <Tooltip text="Produto sem estoque disponível no momento">
+                                                                                            <Badge
+                                                                                                variant="orange"
+                                                                                                icon={<Package size={12} />}
+                                                                                                className="shrink-0"
+                                                                                            />
+                                                                                        </Tooltip>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="flex-1 max-w-[140px]">
+                                                                                    <MoneyInput
+                                                                                        value={unitPrice}
+                                                                                        onChange={(val) => updateProductField(index, "unit_price", val)}
+                                                                                        className="mb-0"
+                                                                                        disabled={isLocked}
+                                                                                    />
+                                                                                </div>
                                                                             </div>
-                                                                            <div className="flex-1 max-w-[140px]">
-                                                                                <MoneyInput
-                                                                                    value={unitPrice}
-                                                                                    onChange={(val) => updateProductField(index, "unit_price", val)}
-                                                                                    className="mb-0"
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading pt-1">
+                                                                                Total: {formatCurrency(unitPrice * qty)}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-2">
+                                                                            {prod.isEditing ? (
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        if (prod.product_name && prod.product_name.trim() !== '') {
+                                                                                            updateProductField(index, "isEditing", false)
+                                                                                        }
+                                                                                    }}
+                                                                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
+                                                                                >
+                                                                                    <CheckCircleIcon size={14} />
+                                                                                </button>
+                                                                            ) : prod.isManual ? (
+                                                                                <button
+                                                                                    onClick={isLocked ? undefined : () => updateProductField(index, "isEditing", true)}
                                                                                     disabled={isLocked}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading pt-1">
-                                                                            Total: {formatCurrency(unitPrice * qty)}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex flex-col gap-2">
-                                                                        {prod.isEditing ? (
+                                                                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
+                                                                                >
+                                                                                    <EditIcon size={14} />
+                                                                                </button>
+                                                                            ) : null}
                                                                             <button
-                                                                                onClick={() => {
-                                                                                    if (prod.product_name && prod.product_name.trim() !== '') {
-                                                                                        updateProductField(index, "isEditing", false)
-                                                                                    }
-                                                                                }}
-                                                                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
-                                                                            >
-                                                                                <CheckCircleIcon size={14} />
-                                                                            </button>
-                                                                        ) : prod.isManual ? (
-                                                                            <button
-                                                                                onClick={isLocked ? undefined : () => updateProductField(index, "isEditing", true)}
+                                                                                onClick={isLocked ? undefined : () => handleRemoveProduct(prod.product_id || prod.id)}
                                                                                 disabled={isLocked}
-                                                                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
+                                                                                className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
                                                                             >
-                                                                                <EditIcon size={14} />
+                                                                                <TrashIcon size={14} />
                                                                             </button>
-                                                                        ) : null}
-                                                                        <button
-                                                                            onClick={isLocked ? undefined : () => handleRemoveProduct(prod.product_id || prod.id)}
-                                                                            disabled={isLocked}
-                                                                            className="w-8 h-8 flex items-center justify-center rounded-full text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
-                                                                        >
-                                                                            <TrashIcon size={14} />
-                                                                        </button>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
 
-                                                {/* Add Item Link at the bottom of the list */}
-                                                <Button
-                                                    type="button"
-                                                    variant="link"
-                                                    onClick={addBlankProduct}
-                                                    className="pl-0 mt-2"
-                                                >
-                                                    <PlusIcon size={14} strokeWidth={3} />
-                                                    Adicionar produto manual
-                                                </Button>
+                                                    {/* Add Item Link at the bottom of the list */}
+                                                    <Button
+                                                        type="button"
+                                                        variant="link"
+                                                        onClick={addBlankProduct}
+                                                        className="pl-0 mt-2"
+                                                    >
+                                                        <PlusIcon size={14} strokeWidth={3} />
+                                                        Adicionar produto manual
+                                                    </Button>
 
-                                                {/* Pagination */}
-                                                <Pagination
-                                                    currentPage={productsPage}
-                                                    totalPages={totalProductsPages}
-                                                    onPageChange={setProductsPage}
-                                                />
-                                            </>
-                                        )}
+                                                    {/* Pagination */}
+                                                    <Pagination
+                                                        currentPage={productsPage}
+                                                        totalPages={totalProductsPages}
+                                                        onPageChange={setProductsPage}
+                                                    />
+                                                </>
+                                            )}
+                                        </FormSection>
                                     </FadeIn>
                                 )}
 

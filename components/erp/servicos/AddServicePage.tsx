@@ -15,7 +15,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
-import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
+import { fetchWithCSRF, fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getServiceUrl } from "@/lib/utils/url-generator"
@@ -226,6 +226,48 @@ export const AddServicePage: FC<AddServicePageProps> = ({
             return { ...prev, [name]: value }
         })
     }, [])
+
+    const [isGeneratingDetails, setIsGeneratingDetails] = useState(false)
+
+    const handleGenerateAiDetails = useCallback(async () => {
+        const serviceName = serviceData.name?.trim()
+        if (!serviceName) return notifyError("Atenção", "Digite o nome do serviço primeiro")
+        setIsGeneratingDetails(true)
+        try {
+            const data = await fetchJSONWithCSRF<{ data: any; error?: string }>("/api/ai/generate-product-details", {
+                method: "POST",
+                body: { title: serviceName, partnerId, itemType: "service" },
+            })
+            if (data.error) {
+                notifyError("Erro", data.error)
+                return
+            }
+
+            const aiData = data.data
+            setServiceData((prev: any) => {
+                // Mapear especificações (specs) para technical_details
+                const newSpecs = Object.entries(aiData.specs || {}).map(([name, value], idx) => ({
+                    id: Date.now() + idx,
+                    name,
+                    value: String(value)
+                }))
+
+                return {
+                    ...prev,
+                    description: aiData.description || prev.description,
+                    tags: aiData.tags || prev.tags,
+                    technical_details: newSpecs,
+                    marketplace_category_id: aiData.category?.id || prev.marketplace_category_id,
+                }
+            })
+
+            notifySuccess("Sucesso", "Campos preenchidos com IA!")
+        } catch {
+            notifyError("Erro", "Falha ao conectar com o servidor.")
+        } finally {
+            setIsGeneratingDetails(false)
+        }
+    }, [serviceData.name, partnerId, notifyError, notifySuccess])
 
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
 
@@ -560,6 +602,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                             metadataPlanBlocked={metadataPlanBlocked}
+                                            isGeneratingDetails={isGeneratingDetails}
+                                            onGenerateDetails={handleGenerateAiDetails}
                                         />
                                     </FadeIn>
                                 )}

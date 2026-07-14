@@ -374,6 +374,57 @@ const AddProductPage: FC<AddProductPageProps> = ({
         finally { setIsLoadingNcmSuggestion(false) }
     }, [productData.name, notifyError, ncmSuggestions.length])
 
+    const [isGeneratingDetails, setIsGeneratingDetails] = useState(false)
+
+    const handleGenerateAiDetails = useCallback(async () => {
+        const productName = productData.name?.trim()
+        if (!productName) return notifyWarning("Atenção", "Digite o nome do produto primeiro")
+        setIsGeneratingDetails(true)
+        try {
+            const data = await fetchJSONWithCSRF<{ data: any; error?: string }>("/api/ai/generate-product-details", {
+                method: "POST",
+                body: { title: productName, partnerId, itemType: "product" },
+            })
+            if (data.error) {
+                notifyError("Erro", data.error)
+                return
+            }
+
+            const aiData = data.data
+            setProductData((prev: any) => {
+                let brandId = prev.brand_id
+                if (aiData.brand) {
+                    const matchedBrand = brandOptions.find(
+                        (b: any) => b.label.toLowerCase() === aiData.brand.toLowerCase()
+                    )
+                    brandId = matchedBrand ? matchedBrand.value : ""
+                }
+
+                // Mapear especificações (specs) para attributes
+                const newAttrs = Object.entries(aiData.specs || {}).map(([name, value], idx) => ({
+                    id: Date.now() + idx,
+                    name,
+                    value: String(value)
+                }))
+
+                return {
+                    ...prev,
+                    description: aiData.description || prev.description,
+                    brand_id: brandId,
+                    tags: aiData.tags || prev.tags,
+                    attributes: newAttrs,
+                    marketplace_category_id: aiData.category?.id || prev.marketplace_category_id,
+                }
+            })
+
+            notifySuccess("Sucesso", "Campos preenchidos com IA!")
+        } catch {
+            notifyError("Erro", "Falha ao conectar com o servidor.")
+        } finally {
+            setIsGeneratingDetails(false)
+        }
+    }, [productData.name, partnerId, brandOptions, notifyError, notifySuccess, notifyWarning])
+
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [showImageCropper, setShowImageCropper] = useState(false)
     const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
@@ -859,7 +910,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             onGenerateBarcode={handleGenerateBarcode}
                                             openAddItemModal={handleOpenMetadataModal}
                                             metadataPlanBlocked={metadataPlanBlocked}
-
+                                            isGeneratingDetails={isGeneratingDetails}
+                                            onGenerateDetails={handleGenerateAiDetails}
                                         />
                                     </FadeIn>
                                 )}
