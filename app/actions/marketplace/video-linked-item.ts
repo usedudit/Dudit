@@ -1,0 +1,145 @@
+"use server"
+
+import { getAdminClient } from "@/lib/supabase/admin"
+import { cache } from "react"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+
+export interface LinkedItemData {
+  type: "product" | "service" | "collection"
+  id: string
+  name: string
+  imageUrl: string
+  url: string
+
+  displayPrice?: number
+  referencePrice?: number | null
+  discountPercent?: number
+  hasDiscount?: boolean
+  badgeVariant?: "blue" | "orange" | null
+  rating?: number
+  showPrice?: boolean
+
+  itemsCount?: number
+}
+
+async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemData | null> {
+  const supabase = getAdminClient()
+
+  if (type === "product") {
+    const { data: product } = await supabase
+      .from("products")
+      .select(`
+        id, name, price, promotional_price, images, rating, show_price_in_store,
+        partner_id,
+        partners!partner_id(id, store_name, store_image_url)
+      `)
+      .eq("id", id)
+      .maybeSingle()
+
+    if (!product) return null
+
+    let p: any = product.partners
+    if (Array.isArray(p)) p = p[0]
+
+    const partnerId = p?.id || product.partner_id
+    const promotions = partnerId ? await listActivePromotionsForMarketplaceAction(partnerId) : []
+    const unitPrice = Number(product.price) || 0
+    const individualPromo = product.promotional_price ? Number(product.promotional_price) : null
+    const pricing = computeItemDisplayPrice(unitPrice, individualPromo, promotions, { productId: product.id })
+
+    const imageUrl = getPrimaryProductDisplayImage(product)
+
+    return {
+      type: "product",
+      id: product.id,
+      name: product.name,
+      imageUrl,
+      url: getProductUrl(product, p || { id: partnerId }),
+      displayPrice: pricing.bestPrice,
+      referencePrice: pricing.referencePrice || null,
+      discountPercent: pricing.discountPercent,
+      hasDiscount: pricing.hasDiscount,
+      badgeVariant: pricing.badgeVariant,
+      rating: product.rating || 0,
+      showPrice: product.show_price_in_store !== false,
+    }
+  }
+
+  if (type === "service") {
+    const { data: service } = await supabase
+      .from("services")
+      .select(`
+        id, name, price, promotional_price, images, rating, show_price_in_store,
+        partner_id,
+        partners!partner_id(id, store_name, store_image_url)
+      `)
+      .eq("id", id)
+      .maybeSingle()
+
+    if (!service) return null
+
+    let p: any = service.partners
+    if (Array.isArray(p)) p = p[0]
+
+    const partnerId = p?.id || service.partner_id
+    const promotions = partnerId ? await listActivePromotionsForMarketplaceAction(partnerId) : []
+    const unitPrice = Number(service.price) || 0
+    const individualPromo = service.promotional_price ? Number(service.promotional_price) : null
+    const pricing = computeItemDisplayPrice(unitPrice, individualPromo, promotions, { serviceId: service.id })
+
+    const rawImages = service.images
+    let imageUrl = "https://img.dudit.com.br/static/Placeholder.png"
+    if (rawImages && Array.isArray(rawImages) && rawImages.length > 0) {
+      imageUrl = getR2ImageUrl(rawImages[0])
+    }
+
+    return {
+      type: "service",
+      id: service.id,
+      name: service.name,
+      imageUrl,
+      url: getServiceUrl(service, p || { id: partnerId }),
+      displayPrice: pricing.bestPrice,
+      referencePrice: pricing.referencePrice || null,
+      discountPercent: pricing.discountPercent,
+      hasDiscount: pricing.hasDiscount,
+      badgeVariant: pricing.badgeVariant,
+      rating: service.rating || 0,
+      showPrice: service.show_price_in_store !== false,
+    }
+  }
+
+  if (type === "collection") {
+    const { data: collection } = await supabase
+      .from("collections")
+      .select("id, name, cover_url, items_count")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (!collection) return null
+
+    let imageUrl = "https://img.dudit.com.br/static/Placeholder.png"
+    if (collection.cover_url) {
+      imageUrl = collection.cover_url.startsWith("http")
+        ? collection.cover_url
+        : getR2ImageUrl(collection.cover_url)
+    }
+
+    return {
+      type: "collection",
+      id: collection.id,
+      name: collection.name,
+      imageUrl,
+      url: `/colecoes/${collection.id}`,
+      itemsCount: collection.items_count || 0,
+    }
+  }
+
+  return null
+}
+
+export const getLinkedItemData = cache(_getLinkedItemData)

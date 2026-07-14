@@ -77,6 +77,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
     onOpenCamera,
     onOpenReplenishment,
     hasEscalarPlan,
+    tabCounts,
 }) => {
     // Estado local para o scroll dos filtros (badges)
     const filtersContainerRef = useRef<HTMLDivElement>(null)

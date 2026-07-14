@@ -31,7 +31,12 @@ export async function buildExportFile(params: {
     key: c.key,
     width: c.width ?? 18,
   }))
-  sheet.getRow(1).font = { bold: true }
+  const headerRow = sheet.getRow(1)
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } }
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E824C" } }
+    cell.alignment = { horizontal: "center", vertical: "middle" }
+  })
 
   for (const row of params.rows) {
     sheet.addRow(row)

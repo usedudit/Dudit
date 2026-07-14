@@ -21,9 +21,11 @@ export async function exportXLSX(filename: string, sheets: { name: string; heade
   for (const sheetDef of sheets) {
     const sheet = workbook.addWorksheet(sheetDef.name)
     const headerRow = sheet.addRow(sheetDef.headers)
-    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } }
-    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E824C" } }
-    headerRow.alignment = { horizontal: "center", vertical: "middle" }
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } }
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E824C" } }
+      cell.alignment = { horizontal: "center", vertical: "middle" }
+    })
 
     for (const rowData of sheetDef.rows) {
       sheet.addRow(rowData)

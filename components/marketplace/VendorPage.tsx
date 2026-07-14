@@ -1581,6 +1581,7 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
     const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
     const [slideDirection, setSlideDirection] = useState<1 | -1>(1)
     const lightboxJustOpened = useRef(false)
+    const touchStartX = useRef(0)
     const [isMounted, setIsMounted] = useState(false)
 
     useEffect(() => {
@@ -1862,7 +1863,15 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
                             </div>
 
                             {/* ── Mobile image area ── */}
-                            <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
+                            <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center"
+                                onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
+                                onTouchEnd={(e) => {
+                                    const diff = e.changedTouches[0].clientX - touchStartX.current
+                                    if (Math.abs(diff) > 50) {
+                                        lightboxNav(diff > 0 ? -1 : 1)
+                                    }
+                                }}
+                            >
                                 <AnimatePresence mode="wait" custom={slideDirection}
                                     onExitComplete={() => { lightboxJustOpened.current = false }}>
                                     <motion.img

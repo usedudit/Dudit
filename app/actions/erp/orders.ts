@@ -3027,7 +3027,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         if (processingWarnings.length > 0) {
             return { success: true, warning: processingWarnings.join(" | ") }
         }
-    return { success: true, orderNumber: currentOrder.order_number }
+        return { success: true, orderNumber: currentOrders?.[0]?.order_number }
 }
 
     const paymentStatusMap: Record<string, ERPOrderPayload["paymentStatus"]> = {

@@ -69,6 +69,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
     hasActiveFilters,
     addDisabled = false,
     hideTabs = false,
+    tabCounts,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })

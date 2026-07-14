@@ -112,11 +112,9 @@ export function GlobalPeriodFilter() {
         </>
       )}
 
-      {exportHandler && (
-        <Button variant="outline" size="icon" onClick={() => exportHandler("csv")}>
-          <DownloadIcon size={14} />
-        </Button>
-      )}
+      <Button variant="outline" size="icon" onClick={() => exportHandler?.("csv")} disabled={!exportHandler}>
+        <DownloadIcon size={14} />
+      </Button>
 
       <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full overflow-hidden">
         <Dropdown

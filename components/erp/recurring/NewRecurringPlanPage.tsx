@@ -17,6 +17,7 @@ import {
     UnsavedChangesDialog,
     IconPlaceholder,
     SelectionBanner,
+    DatePicker,
 } from "@/components/reusable"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIcon, ClockIcon, SearchIcon } from "@/lib/icons"
@@ -659,8 +660,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         errorMessage={fieldErrors.has("frequencyInterval") ? "Intervalo inválido" : undefined}
                                                     />
 
-                                                    <Input
-                                                        type="date"
+                                                    <DatePicker
                                                         label="Data de Início"
                                                         value={startDate}
                                                         onChange={(e) => {
@@ -676,8 +676,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         errorMessage={fieldErrors.has("startDate") ? "Data de início é obrigatória" : undefined}
                                                     />
 
-                                                    <Input
-                                                        type="date"
+                                                    <DatePicker
                                                         label="Data de Fim (Opcional)"
                                                         value={endDate}
                                                         onChange={(e) => setEndDate(e.target.value)}

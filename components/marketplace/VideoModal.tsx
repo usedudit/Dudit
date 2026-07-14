@@ -2,11 +2,11 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { recordVideoClick } from "@/app/actions/marketplace/community-videos"
-import { getProductUrl, getServiceUrl, getPartnerUrl } from "@/lib/utils/url-generator"
+import { getLinkedItemData, type LinkedItemData } from "@/app/actions/marketplace/video-linked-item"
 import Link from "next/link"
-import { XIcon } from "@/lib/icons"
+import { XIcon, StarIcon, ChevronDownIcon } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 
 interface VideoData {
   id: string
@@ -28,8 +28,13 @@ interface VideoModalProps {
   onClose: () => void
 }
 
+const MAX_DESC_LENGTH = 120
+
 export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [linkedItem, setLinkedItem] = useState<LinkedItemData | null>(null)
+  const [linkedItemLoading, setLinkedItemLoading] = useState(false)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
   useEffect(() => {
     if (isOpen && videoRef.current) {
@@ -37,25 +42,27 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
     }
   }, [isOpen, video?.video_url])
 
+  useEffect(() => {
+    setDescriptionExpanded(false)
+    if (!video?.linked_item_type || !video?.linked_item_id) {
+      setLinkedItem(null)
+      return
+    }
+    setLinkedItemLoading(true)
+    getLinkedItemData(video.linked_item_type, video.linked_item_id)
+      .then(setLinkedItem)
+      .catch(() => setLinkedItem(null))
+      .finally(() => setLinkedItemLoading(false))
+  }, [video?.id, video?.linked_item_type, video?.linked_item_id])
+
   const handleLinkedClick = useCallback(() => {
     if (video) {
       recordVideoClick(video.id).catch(() => {})
     }
   }, [video])
 
-  const getLinkedUrl = () => {
-    if (!video?.linked_item_type || !video?.linked_item_id) return null
-    if (video.linked_item_type === "product") return getProductUrl({ id: video.linked_item_id }, { id: video.partner_id })
-    if (video.linked_item_type === "service") return getServiceUrl({ id: video.linked_item_id }, { id: video.partner_id })
-    if (video.linked_item_type === "collection") return `/colecoes/${video.linked_item_id}`
-    return null
-  }
-
-  const linkedUrl = getLinkedUrl()
-  const typeLabel = video?.linked_item_type === "product" ? "Ver Produto"
-    : video?.linked_item_type === "service" ? "Ver Serviço"
-    : video?.linked_item_type === "collection" ? "Ver Coleção"
-    : null
+  const description = video?.description || ""
+  const shouldTruncate = description.length > MAX_DESC_LENGTH
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -83,7 +90,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 max-h-[40vh] overflow-y-auto">
           {video?.title && (
             <h3 className="font-bold text-brand-dark text-base">{video.title}</h3>
           )}
@@ -94,19 +101,88 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
             </p>
           )}
 
-          {video?.description && (
-            <p className="text-sm text-gray-600 leading-relaxed">{video.description}</p>
+          {description && (
+            <div>
+              <p className={`text-sm text-gray-600 leading-relaxed whitespace-pre-wrap ${!descriptionExpanded ? "line-clamp-2" : ""}`}>
+                {description}
+              </p>
+              {shouldTruncate && (
+                <button
+                  onClick={() => setDescriptionExpanded(!descriptionExpanded)}
+                  className="flex items-center gap-1 text-brand-green font-bold text-xs mt-1 hover:underline"
+                >
+                  {descriptionExpanded ? "Ver menos" : "Ver mais"}
+                  <ChevronDownIcon size={14} className={`transition-transform ${descriptionExpanded ? "rotate-180" : ""}`} />
+                </button>
+              )}
+            </div>
           )}
 
-          {linkedUrl && typeLabel && (
+          {linkedItemLoading && (
+            <div className="flex items-center gap-3 p-3 rounded-[12px] border border-gray-100 animate-pulse">
+              <div className="w-16 h-16 rounded-[8px] bg-gray-200 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-3/4" />
+                <div className="h-3 bg-gray-200 rounded w-1/2" />
+              </div>
+            </div>
+          )}
+
+          {linkedItem && !linkedItemLoading && (
             <Link
-              href={linkedUrl}
+              href={linkedItem.url}
               onClick={handleLinkedClick}
-              className="block"
+              className="block hover:no-underline"
             >
-              <Button className="w-full bg-brand-green text-white hover:bg-[#047857] font-bold">
-                {typeLabel}
-              </Button>
+              <div className="p-3 rounded-[12px] border border-gray-100 hover:border-gray-200 transition-colors bg-white">
+                <div className="flex gap-3">
+                  <div className="w-16 h-16 rounded-[8px] overflow-hidden bg-brand-gray shrink-0">
+                    <img
+                      src={linkedItem.imageUrl}
+                      alt={linkedItem.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <h4 className="font-bold text-brand-dark text-sm leading-snug line-clamp-2">{linkedItem.name}</h4>
+                    {linkedItem.type === "collection" ? (
+                      <p className="text-[12px] text-brand-inactive-text mt-0.5">
+                        {linkedItem.itemsCount} {linkedItem.itemsCount === 1 ? "item" : "itens"}
+                      </p>
+                    ) : (
+                      <div className="flex items-end justify-between mt-1">
+                        <div className="flex flex-col">
+                          {linkedItem.showPrice !== false ? (
+                            <>
+                              {linkedItem.referencePrice && linkedItem.hasDiscount && (
+                                <span className="text-[11px] text-brand-inactive-text line-through leading-tight">
+                                  {formatCurrency(linkedItem.referencePrice)}
+                                </span>
+                              )}
+                              <span className="text-sm font-bold text-brand-dark leading-tight">
+                                {formatCurrency(linkedItem.displayPrice!)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-bold text-brand-dark">Preço sob consulta</span>
+                          )}
+                        </div>
+                        {(linkedItem.rating ?? 0) > 0 && (
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                            <span className="text-[11px] font-bold text-brand-dark">{linkedItem.rating}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <span className="block w-full text-center text-[13px] font-bold text-white bg-brand-green rounded-full py-2 hover:bg-[#047857] transition-colors">
+                    {linkedItem.type === "product" ? "Ver Produto" : linkedItem.type === "service" ? "Ver Serviço" : "Ver Coleção"}
+                  </span>
+                </div>
+              </div>
             </Link>
           )}
         </div>

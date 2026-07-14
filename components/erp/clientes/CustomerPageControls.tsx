@@ -51,6 +51,7 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
     viewMode,
     onViewModeChange,
     hasActiveFilters,
+    tabCounts,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
