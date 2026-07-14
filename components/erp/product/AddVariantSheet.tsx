@@ -1073,7 +1073,6 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                         onSaveSuccess?.()
                     }}
                 />
-            </QuickStockMovementSheet>
 
             <SavingStatusModal isOpen={isSaving} text="Salvando variações..." />
         </div>
