@@ -386,8 +386,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                         <TabsContent value="general" className="mt-0">
                                             <FadeIn key="general" className="space-y-10">
                                                 {/* Identificação */}
-                                                <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
+                                                <FormSection title="Dados Gerais">
                                                     <div className="grid grid-cols-12 gap-5">
                                                         <div className="col-span-12 md:col-span-6">
                                                             <Input
@@ -419,7 +418,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                             />
                                                         </div>
                                                     </div>
-                                                </section>
+                                                </FormSection>
 
                                                 {/* Dados Tributários */}
                                                 <FormSection title="Dados tributários" hasSeparator>

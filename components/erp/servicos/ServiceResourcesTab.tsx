@@ -3,7 +3,7 @@
 import React from "react"
 import { useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Input, FormDropdown, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Input, FormDropdown, IconPlaceholder, ThreeDotsLoader, FormSection } from "@/components/reusable"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { PlusIcon, TrashIcon, SearchIcon, CheckCircleIcon, EditIcon, AlertTriangleIcon } from "@/lib/icons"
 import { useProductBucket } from "../hooks"
@@ -96,15 +96,9 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
     }
 
     return (
-        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
-            {/* ESQUERDA (Principal) */}
-            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                <div className="mb-8">
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Itens e Recursos Necessários</h3>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-sm mb-6">
-                        Cadastre os materiais ou equipamentos utilizados na execução deste serviço.
-                    </p>
-
+        <div className="animate-fade-in">
+            <div>
+                <FormSection title="Itens e recursos necessários" description="Cadastre os materiais ou equipamentos utilizados na execução deste serviço." hasSeparator>
                     <div ref={searchRef} className="relative mb-6">
                         {isEditing && (
                             <Input
@@ -281,11 +275,7 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
                             Adicionar item manual
                         </Button>
                     )}
-                </div>
-            </div>
-
-            {/* DIREITA (Vazio para manter layout) */}
-            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                </FormSection>
             </div>
 
             <AlertModal
@@ -298,6 +288,6 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
                 cancelText="Cancelar"
                 variant="warning"
             />
-        </div>
+        </div >
     )
 }

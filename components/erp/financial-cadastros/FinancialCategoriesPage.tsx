@@ -580,7 +580,7 @@ export default function FinancialCategoriesPage({
                                             ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
                                             : debouncedSearch.trim().length > 0
                                                 ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                : "https://img.dudit.com.br/static/mascots/CadastrosFinanceiro.png"
+                                                : "https://img.dudit.com.br/static/mascots/CadastrosFinanceiros.png"
                                     }
                                     title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhum cadastro realizado")}
                                     subtitle={

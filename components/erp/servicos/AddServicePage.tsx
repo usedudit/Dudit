@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, Button, Badge, ActionsDropdown } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, Button, Badge, ActionsDropdown, DefaultModal, Input } from "@/components/reusable"
 import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -27,11 +27,12 @@ import { ServiceGeneralTab } from "./ServiceGeneralTab"
 import { ServiceResourcesTab } from "./ServiceResourcesTab"
 import { ServiceStaffTab } from "./ServiceStaffTab"
 import { ServiceMarketplaceTab } from "./ServiceMarketplaceTab"
+import { ServiceMetricsTab } from "./ServiceMetricsTab"
 
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 
-const NUMERIC_FIELDS = new Set(["price", "cost_price", "duration_minutes", "buffer_minutes"])
-const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service", "scheduling_enabled", "show_price_in_store"])
+const NUMERIC_FIELDS = new Set(["price", "cost_price", "duration_minutes", "buffer_minutes", "recurrence_interval_value"])
+const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service", "show_price_in_store"])
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
@@ -45,9 +46,10 @@ const getEmptyService = () => ({
     duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
     images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
     is_active: true, show_in_marketplace: true, highlight_service: false, show_price_in_store: true,
-    scheduling_enabled: true, fulfillment_modes: ["on_site"],
+    fulfillment_modes: ["on_site"],
     warranty: "", technical_details: null,
     tags: [], resources: [], assigned_staff: { all: true, staff_ids: [] },
+    recurrence_interval_value: null as unknown as number, recurrence_interval_unit: "Meses",
     notes: ""
 })
 
@@ -86,6 +88,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
     const metadataPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+    const metricsPlanBlocked = !hasMinimumPlan(planSlug, "escalar")
     const videoPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
     const isQuick = isQuickMode(businessInfo)
@@ -382,8 +385,9 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 show_in_marketplace: !!serviceData.show_in_marketplace,
                 highlight_service: !!serviceData.highlight_service,
                 show_price_in_store: serviceData.show_price_in_store !== false,
-                scheduling_enabled: serviceData.scheduling_enabled !== false,
                 fulfillment_modes: serviceData.fulfillment_modes || ["on_site"],
+                recurrence_interval_value: serviceData.recurrence_interval_value ? Number(serviceData.recurrence_interval_value) : null,
+                recurrence_interval_unit: serviceData.recurrence_interval_unit || "Meses",
                 payment_requirement: serviceData.payment_requirement || "full_payment",
                 tags: serviceData.tags || [],
                 notes: serviceData.notes,
@@ -451,7 +455,10 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                <Tabs value={activeTab} onValueChange={(v) => {
+                    if (v === "metrics" && metricsPlanBlocked) { openPlanUpgrade("escalar"); return }
+                    setActiveTab(v)
+                }} className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
@@ -520,6 +527,16 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
                                                 Marketplace
                                             </TabsTrigger>
+                                            {serviceData.show_in_marketplace && internalMode === "details" && (
+                                                <TabsTrigger value="metrics" disabled={isLoadingDetails}>
+                                                    <span className="inline-flex items-center gap-2">
+                                                        Métricas
+                                                        {metricsPlanBlocked ? (
+                                                            <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                        ) : null}
+                                                    </span>
+                                                </TabsTrigger>
+                                            )}
                                         </TabsList>
                                     )}
                                 </div>
@@ -578,6 +595,25 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             onVideoChange={(video) => setServiceData((prev: any) => ({ ...prev, ...video }))}
                                             videoPlanBlocked={videoPlanBlocked}
                                         />
+                                    </FadeIn>
+                                )}
+                                {activeTab === "metrics" && serviceData.show_in_marketplace && internalMode === "details" && (
+                                    <FadeIn key="metrics" className="block">
+                                        {metricsPlanBlocked ? (
+                                            <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                                <p className="text-[15px] text-brand-inactive-text dark:text-dark-body font-medium">
+                                                    Faça upgrade para o plano <strong>Escalar</strong> para acessar métricas detalhadas.
+                                                </p>
+                                                <button
+                                                    onClick={() => openPlanUpgrade("escalar")}
+                                                    className="mt-4 px-6 py-2 bg-brand-primary text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+                                                >
+                                                    Ver planos
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <ServiceMetricsTab serviceData={serviceData} />
+                                        )}
                                     </FadeIn>
                                 )}
                             </AnimatePresence>
@@ -691,6 +727,39 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                     onCropComplete={handleImageCropComplete}
                 />
             )}
+
+            <DefaultModal
+                isOpen={metadataModal.isOpen}
+                onClose={() => setMetadataModal({ isOpen: false, type: null, name: "", parentId: null, isSaving: false })}
+                title={metadataModal.type === "category" ? "Nova categoria" : "Nova subcategoria"}
+                maxWidth="sm"
+            >
+                <div className="space-y-5">
+                    <Input
+                        label="Nome"
+                        value={metadataModal.name}
+                        onChange={(e) => setMetadataModal(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder={metadataModal.type === "category" ? "Ex: Beleza, Saúde..." : "Ex: Corte de cabelo, Manutenção..."}
+                        disabled={metadataModal.isSaving}
+                        className="w-full"
+                    />
+                    <div className="flex gap-3 justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => setMetadataModal({ isOpen: false, type: null, name: "", parentId: null, isSaving: false })}
+                            disabled={metadataModal.isSaving}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleSaveMetadata}
+                            disabled={!metadataModal.name.trim() || metadataModal.isSaving}
+                        >
+                            {metadataModal.isSaving ? "Salvando..." : "Salvar"}
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
         </FadeIn>
     )
 }

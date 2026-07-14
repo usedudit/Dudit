@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useMemo } from "react"
-import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
@@ -99,79 +99,61 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Informações básicas</h3>
-
-                <div className="mb-10">
-                    <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
-                </div>
-
-                <div className="space-y-6">
-                    <div className="grid grid-cols-12 gap-6">
-                        <div className="col-span-12">
-                            <Input
-                                label="Nome do Serviço"
-                                name="name"
-                                value={serviceData.name}
-                                onChange={handleFieldChange}
-                                disabled={!isEditing}
-                                required
-                                error={fieldErrors?.has("name")}
-                                errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
-                            />
-                        </div>
-
-                        <div className="col-span-12 lg:col-span-6">
-                            <FormDropdown
-                                label="Status"
-                                options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
-                                value={String(serviceData.is_active)}
-                                setValue={(v) => handleFieldChange({ target: { name: "is_active", value: v === "true" } })}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                        </div>
-
-                        <div className="col-span-12 lg:col-span-6">
-                            <FormDropdown
-                                label="Exibir na Vitrine"
-                                options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
-                                value={String(serviceData.show_in_marketplace)}
-                                setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                            <FormDropdown
-                                label="Agendamento na vitrine"
-                                options={[{ value: "true", label: "Com horários" }, { value: "false", label: "Compra direta" }]}
-                                value={String(serviceData.scheduling_enabled !== false)}
-                                setValue={(v) => handleFieldChange({ target: { name: "scheduling_enabled", value: v === "true" } })}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                        </div>
-
-                        {serviceData.id && serviceData.show_in_marketplace && (
-                            <div className="col-span-12">
-                                <MarketplaceMetricsReadOnly entityType="service" metrics={serviceData} />
-                            </div>
-                        )}
-
-                        <FulfillmentModesEditor
-                            label="Formas de atendimento (vitrine)"
-                            allowedModes={["on_site", "customer_location"]}
-                            value={(serviceData.fulfillment_modes || ["on_site"]) as FulfillmentMode[]}
-                            onChange={(modes) => manualChange("fulfillment_modes", modes)}
-                            disabled={!isEditing}
-                        />
-
+                <FormSection title="Informações básicas">
+                    <div className="mb-10">
+                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
                     </div>
-                </div>
+
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-12 gap-6">
+                            <div className="col-span-12">
+                                <Input
+                                    label="Nome do Serviço"
+                                    name="name"
+                                    value={serviceData.name}
+                                    onChange={handleFieldChange}
+                                    disabled={!isEditing}
+                                    required
+                                    error={fieldErrors?.has("name")}
+                                    errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
+                                />
+                            </div>
+
+                            <div className="col-span-12 lg:col-span-6">
+                                <FormDropdown
+                                    label="Status"
+                                    options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
+                                    value={String(serviceData.is_active)}
+                                    setValue={(v) => handleFieldChange({ target: { name: "is_active", value: v === "true" } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+
+                            <div className="col-span-12 lg:col-span-6">
+                                <FormDropdown
+                                    label="Exibir na Vitrine"
+                                    options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
+                                    value={String(serviceData.show_in_marketplace)}
+                                    setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+
+                            <FulfillmentModesEditor
+                                label="Formas de atendimento (vitrine)"
+                                allowedModes={["on_site", "customer_location"]}
+                                value={(serviceData.fulfillment_modes || ["on_site"]) as FulfillmentMode[]}
+                                onChange={(modes) => manualChange("fulfillment_modes", modes)}
+                                disabled={!isEditing}
+                            />
+                        </div>
+                    </div>
+                </FormSection>
 
                 {/* PREÇO */}
-                <div className="mt-8">
-                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Preço e Cobrança</h3>
-
+                <FormSection title="Preço e Cobrança" hasSeparator>
                     <div className={`grid ${isQuickMode ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'} gap-4 sm:gap-6 mb-6`}>
                         <FormDropdown
                             label="Modelo de Preço"
@@ -274,16 +256,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         </div>
                     )}
 
-                    {showPrice && !isFree && !isQuickMode && (
-                        <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 md:p-6 mb-6 bg-white dark:bg-dark-surface">
-                            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-brand-border dark:divide-dark-border gap-6 sm:gap-0">
-                                <div className="flex-1 px-4 first:pl-0"><span className="block text-sm text-brand-inactive-text mb-1">Preço do serviço</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(salesPrice)}</span></div>
-                                <div className="flex-1 px-4"><span className="block text-sm text-brand-inactive-text mb-1">Lucro estimado</span><span className="text-xl font-bold text-emerald-600">{formatCurrency(profit)}</span></div>
-                                <div className="flex-1 px-4 last:pr-0"><span className="block text-sm text-brand-inactive-text mb-1">Margem</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{margin}%</span></div>
-                            </div>
-                        </div>
-                    )}
-
                     {!isFree && (
                         <div className="flex items-center gap-2 cursor-pointer w-fit mt-2 mb-6">
                             <Checkbox
@@ -301,13 +273,11 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         </div>
                     )}
-                </div>
+                </FormSection>
 
                 {/* TEMPO */}
                 {(!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
-                    <div className="mt-8">
-                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Duração e Agendamento</h3>
+                    <FormSection title="Duração e agendamento" hasSeparator>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
                             <Input
                                 label="Duração do Serviço (minutos)"
@@ -332,7 +302,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 />
                             )}
                         </div>
-                    </div>
+                    </FormSection>
                 )}
 
                 {isQuickMode && (

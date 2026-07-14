@@ -250,6 +250,21 @@ async function processSubscriptionWebhook(
 
     console.log(`[SUB_WEBHOOK] Found subscription ${sub.id}, current status: ${sub.status}`)
 
+    // Check if partner is undergoing account deletion
+    if (sub.partner_id) {
+      const { data: deletion } = await supabase
+        .from("account_deletions")
+        .select("status")
+        .eq("partner_id", sub.partner_id)
+        .not("status", "eq", "completed")
+        .maybeSingle()
+
+      if (deletion) {
+        console.log(`[SUB_WEBHOOK] Partner ${sub.partner_id} is in deletion phase (${deletion.status}) - ignoring webhook event`)
+        return
+      }
+    }
+
     // ── CRITICAL: Verify actual status with Mercado Pago API ──
     // NEVER trust the webhook action alone
     const { verified, mpStatus, mpData } = await verifySubscriptionWithMpApi(resourceId)

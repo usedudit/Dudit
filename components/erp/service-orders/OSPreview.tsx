@@ -19,6 +19,7 @@ interface OSPreviewProps {
     totalProductAmount: number;
     totalAmount: number;
     description?: string;
+    diagnosis?: string;
     signatureImageKey?: string | null;
     signedAt?: string | null;
     primaryColor?: string;
@@ -46,6 +47,7 @@ const OSPreview = ({
     totalProductAmount,
     totalAmount,
     description,
+    diagnosis,
     signatureImageKey,
     signedAt,
     primaryColor = DEFAULT_PRIMARY,
@@ -148,7 +150,7 @@ const OSPreview = ({
     const pages = useMemo(() => {
         const ROW_HEIGHT = 40;
         const TOTALS_SECTION_HEIGHT = 150;
-        const NOTES_SECTION_HEIGHT = (description || signatureImageKey) ? 120 : 0;
+        const NOTES_SECTION_HEIGHT = (description || diagnosis || signatureImageKey) ? 120 : 0;
 
         const P1_FIXED_CONTENT_HEIGHT = 420;
         const P1_TOTAL_AVAILABLE_HEIGHT = 1050;
@@ -195,7 +197,7 @@ const OSPreview = ({
         }
 
         return chunks;
-    }, [items, description, signatureImageKey]);
+    }, [items, description, diagnosis, signatureImageKey]);
 
     return (
         <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "quote-a4-print" : "border-l border-brand-border dark:border-dark-border"}`}>
@@ -374,13 +376,27 @@ const OSPreview = ({
                                             </div>
                                         </div>
 
-                                        {description && (
+                                        {(description || diagnosis) && (
                                             <div className="px-8 pb-6">
                                                 <div className="w-full border-t border-brand-border pt-6">
-                                                    <h4 className="font-bold text-xs mb-1.5 text-black">Observações</h4>
-                                                    <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
-                                                        {description}
-                                                    </p>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        {description && (
+                                                            <div>
+                                                                <h4 className="font-bold text-xs mb-1.5 text-black">Observações</h4>
+                                                                <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
+                                                                    {description}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {diagnosis && (
+                                                            <div>
+                                                                <h4 className="font-bold text-xs mb-1.5 text-black">Diagnóstico</h4>
+                                                                <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
+                                                                    {diagnosis}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -405,7 +421,7 @@ const OSPreview = ({
                                             </div>
                                         )}
 
-                                        {!description && !signatureImageKey && (
+                                        {!description && !diagnosis && !signatureImageKey && (
                                             <div className="px-8 pb-12">
                                                 <div className="w-full border-t border-brand-border pt-6">
                                                     <div className="flex items-center justify-center text-gray-400 text-xs italic">

@@ -209,6 +209,14 @@ export async function acceptInvitation(
             return { success: false, error: GENERIC_INVALID_TOKEN_MSG }
         }
 
+        // Enforce account deletion write locks for target partner
+        const { AccountDeletionService } = await import("@/lib/services/account-deletion.service")
+        try {
+            await AccountDeletionService.assertNotLocked(invitation.partner_id)
+        } catch (lockErr) {
+            return { success: false, error: "A conta deste parceiro está em processo de exclusão e não aceita novos membros." }
+        }
+
         // 3. Constant-time verify hash match
         if (!safeCompare(invitation.token_hash, tokenHash)) {
             await antiTimingJitter()

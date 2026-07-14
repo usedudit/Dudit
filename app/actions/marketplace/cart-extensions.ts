@@ -214,15 +214,13 @@ export async function addPurchasableServiceToCartAction(
   const admin = getAdminClient()
   const { data: service } = await admin
     .from("services")
-    .select("id, name, price, is_active, scheduling_enabled")
+    .select("id, name, price, is_active")
     .eq("id", input.serviceId)
     .eq("partner_id", input.partnerId)
     .maybeSingle()
 
   if (!service?.is_active) return { error: "Serviço indisponível." }
-  if (service.scheduling_enabled !== false) {
-    return { error: "Este serviço requer agendamento. Selecione data e horário." }
-  }
+  return { error: "Este serviço requer agendamento. Selecione data e horário." }
 
   const booking: ServiceBookingMetadata = {
     staffId: "",

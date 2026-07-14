@@ -134,8 +134,8 @@ export function ExplorarFiltersBottomSheet({
                                     key={option.value}
                                     onClick={() => onTypeChange(option.value)}
                                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${currentType === option.value
-                                            ? "bg-[#ecfdf5] text-brand-green"
-                                            : "text-brand-dark hover:bg-gray-50"
+                                        ? "bg-[#ecfdf5] text-brand-green"
+                                        : "text-brand-dark hover:bg-gray-50"
                                         }`}
                                 >
                                     <span>{option.label}</span>
@@ -162,14 +162,14 @@ export function ExplorarFiltersBottomSheet({
                                         key={cat.name}
                                         onClick={() => onToggleCategory(cat.name)}
                                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
-                                                ? "bg-[#ecfdf5] text-brand-green"
-                                                : "text-brand-dark hover:bg-gray-50"
+                                            ? "bg-[#ecfdf5] text-brand-green"
+                                            : "text-brand-dark hover:bg-gray-50"
                                             }`}
                                     >
                                         <span
                                             className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${isSelected
-                                                    ? "border-brand-green bg-brand-green"
-                                                    : "border-gray-200 bg-white"
+                                                ? "border-brand-green bg-brand-green"
+                                                : "border-gray-200 bg-white"
                                                 }`}
                                         >
                                             {isSelected && (
@@ -222,14 +222,14 @@ export function ExplorarFiltersBottomSheet({
                         <button
                             onClick={onPromoToggle}
                             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${promoOn
-                                    ? "bg-[#ecfdf5] text-brand-green"
-                                    : "text-brand-dark hover:bg-gray-50"
+                                ? "bg-[#ecfdf5] text-brand-green"
+                                : "text-brand-dark hover:bg-gray-50"
                                 }`}
                         >
                             <span
                                 className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${promoOn
-                                        ? "border-brand-green bg-brand-green"
-                                        : "border-gray-200 bg-white"
+                                    ? "border-brand-green bg-brand-green"
+                                    : "border-gray-200 bg-white"
                                     }`}
                             >
                                 {promoOn && (

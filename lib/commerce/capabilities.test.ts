@@ -18,7 +18,6 @@ describe("capabilities", () => {
   it("derives address requirement for customer_location services", () => {
     const caps = serviceCatalogCapabilities({
       fulfillment_modes: ["on_site", "customer_location"],
-      scheduling_enabled: true,
     })
     const flags = deriveLineFlags(caps, "customer_location", { schedulingMetadataComplete: true })
     expect(flags.requiresCustomerAddress).toBe(true)
@@ -38,7 +37,6 @@ describe("capabilities", () => {
   it("service-only checkout hides product delivery and pay on delivery", () => {
     const caps = serviceCatalogCapabilities({
       fulfillment_modes: ["on_site"],
-      scheduling_enabled: true,
     })
     const requirements = aggregateCheckoutRequirements([
       {
@@ -62,7 +60,6 @@ describe("capabilities", () => {
     const productCaps = productCatalogCapabilities({ product_type: "Físico" })
     const serviceCaps = serviceCatalogCapabilities({
       fulfillment_modes: ["on_site"],
-      scheduling_enabled: true,
     })
     const requirements = aggregateCheckoutRequirements([
       {
@@ -98,7 +95,6 @@ describe("capabilities", () => {
   it("does not flag incompatible restrictions for service-only carts", () => {
     const caps = serviceCatalogCapabilities({
       fulfillment_modes: ["on_site"],
-      scheduling_enabled: true,
     })
     const requirements = aggregateCheckoutRequirements([
       {

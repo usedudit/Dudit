@@ -399,8 +399,8 @@ export async function middleware(request: NextRequest) {
           const activePartnerId = request.cookies.get("active_partner_id")?.value
           const needsPartnerCheck = pathname.startsWith("/erp") && !!activePartnerId
 
-          // Launch both queries in parallel
-          const [profileResult, partnerResult] = await Promise.all([
+          // Launch all queries in parallel
+          const [profileResult, partnerResult, deletionResult, partnerDeletionResult] = await Promise.all([
             needsBanCheck
               ? supabase
                 .from("user_profiles")
@@ -415,7 +415,62 @@ export async function middleware(request: NextRequest) {
                 .eq("id", activePartnerId!)
                 .maybeSingle()
               : Promise.resolve({ data: null }),
+            supabase
+              .from("account_deletions")
+              .select("status, grace_period_ends_at")
+              .eq("user_id", user.id)
+              .not("status", "eq", "completed")
+              .maybeSingle(),
+            needsPartnerCheck
+              ? supabase
+                .from("account_deletions")
+                .select("status, grace_period_ends_at")
+                .eq("partner_id", activePartnerId!)
+                .not("status", "eq", "completed")
+                .maybeSingle()
+              : Promise.resolve({ data: null }),
           ])
+
+          // Process account deletion check result
+          const userDeletion = deletionResult.data
+          const partnerDeletion = partnerDeletionResult?.data
+
+          // Check if user is pending deletion (grace period) or past grace period (deleting)
+          if (userDeletion) {
+            const isPastGrace = new Date() > new Date(userDeletion.grace_period_ends_at)
+            const isDeleting = userDeletion.status !== "waiting_grace_period" && userDeletion.status !== "pending_deletion"
+            
+            if (isPastGrace || isDeleting) {
+              console.log(`[MIDDLEWARE] User ${user.id} account deletion is active - redirecting to sign-out/login`)
+              const logoutUrl = new URL("/auth/login?error=account_deleting", request.url)
+              const responseRedirect = NextResponse.redirect(logoutUrl)
+              request.cookies.getAll().forEach(c => {
+                if (c.name.startsWith("sb-")) {
+                  responseRedirect.cookies.delete(c.name)
+                }
+              })
+              responseRedirect.cookies.delete("active_partner_id")
+              return responseRedirect
+            } else {
+              requestHeaders.set("x-account-pending-deletion", "true")
+            }
+          }
+
+          // Check if active partner is pending deletion (e.g. for invited members accessing)
+          if (partnerDeletion) {
+            const isPastGrace = new Date() > new Date(partnerDeletion.grace_period_ends_at)
+            const isDeleting = partnerDeletion.status !== "waiting_grace_period" && partnerDeletion.status !== "pending_deletion"
+
+            if (isPastGrace || isDeleting) {
+              console.log(`[MIDDLEWARE] Partner ${activePartnerId} deletion is active - blocking access`)
+              const selectErpUrl = new URL("/select-erp?error=partner_deleting", request.url)
+              const responseRedirect = NextResponse.redirect(selectErpUrl)
+              responseRedirect.cookies.delete("active_partner_id")
+              return responseRedirect
+            } else {
+              requestHeaders.set("x-account-pending-deletion", "true")
+            }
+          }
 
           // Process ban check result
           const profile = profileResult.data

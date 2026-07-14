@@ -367,20 +367,18 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                             <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24">
                                 {/* Success and Error Banners */}
                                 {successMessage && (
-                                    <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-2xl flex items-center gap-3">
-                                        <span className="text-xs font-semibold">{successMessage}</span>
-                                        <button onClick={() => setSuccessMessage(null)} className="ml-auto text-green-500 hover:text-green-700">✕</button>
+                                    <div className="mb-8">
+                                        <InfoCard message={successMessage} color='green' rightElement={<Button variant="link" className="text-brand-green" onClick={() => setSuccessMessage(null)} />} />
                                     </div>
                                 )}
 
                                 {errorMessage && (
-                                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center gap-3">
-                                        <span className="text-xs font-semibold">{errorMessage}</span>
-                                        <button onClick={() => setErrorMessage(null)} className="ml-auto text-red-500 hover:text-red-700">✕</button>
+                                    <div className="mb-8">
+                                        <InfoCard message={errorMessage} color='red' rightElement={<Button variant="link" className="text-brand-red" onClick={() => setErrorMessage(null)} />} />
                                     </div>
                                 )}
 
-                                <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
+                                <div className={`mb-8 ${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
                                     {/* Messages */}
                                     {isFinalized && (
                                         <div>
@@ -438,11 +436,18 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 )}
                                             </FormSection>
 
-                                            {order.description && (
-                                                <FormSection title="Observações" hasSeparator>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.description}</p>
-                                                </FormSection>
-                                            )}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {order.description && (
+                                                    <FormSection title="Observações" hasSeparator>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.description}</p>
+                                                    </FormSection>
+                                                )}
+                                                {order.diagnosis && (
+                                                    <FormSection title="Diagnóstico" hasSeparator>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.diagnosis}</p>
+                                                    </FormSection>
+                                                )}
+                                            </div>
 
                                             {/* Specifications if any */}
                                             {order.specifications && order.specifications.length > 0 && (
@@ -616,6 +621,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 totalProductAmount={Number(order.total_product_amount || 0)}
                                                 totalAmount={Number(order.total_amount || 0)}
                                                 description={order.description}
+                                                diagnosis={order.diagnosis}
                                                 signatureImageKey={order.signature_image_key}
                                                 signedAt={order.signed_at}
                                                 partnerName={partnerName}
@@ -661,6 +667,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                 totalProductAmount={Number(order.total_product_amount || 0)}
                                 totalAmount={Number(order.total_amount || 0)}
                                 description={order.description}
+                                diagnosis={order.diagnosis}
                                 signatureImageKey={order.signature_image_key}
                                 signedAt={order.signed_at}
                                 partnerName={partnerName}
@@ -674,16 +681,17 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
                     </div>
                 </div>
-            </Tabs>
+            </Tabs >
 
             {/* ─── MODAL: SIGN SERVICE ORDER ─────────────────────────────────────── */}
-            <DefaultModal
+            < DefaultModal
                 isOpen={showSignModal}
-                onClose={() => setShowSignModal(false)}
+                onClose={() => setShowSignModal(false)
+                }
                 title="Assinar Ordem de Serviço"
                 maxWidth="md"
                 footer={
-                    <div className="flex gap-3 w-full">
+                    < div className="flex gap-3 w-full" >
                         <Button
                             variant="outline"
                             onClick={() => setShowSignModal(false)}
@@ -698,7 +706,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                         >
                             {isProcessingSignature ? "Assinando..." : "Confirmar Assinatura"}
                         </Button>
-                    </div>
+                    </div >
                 }
             >
                 <div className="space-y-4 text-left">
@@ -746,7 +754,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                         </div>
                     </div>
                 </div>
-            </DefaultModal>
-        </div>
+            </DefaultModal >
+        </div >
     )
 }

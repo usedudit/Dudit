@@ -90,13 +90,13 @@ export async function resolveCheckoutCartLines(
       recurring_plan_id, quantity, booking_metadata, pay_deposit_only, fulfillment_mode,
       products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images, cost_price),
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),
-      services(id, name, price, promotional_price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes, images, category_id, cost_price),
+      services(id, name, price, promotional_price, is_active, fulfillment_modes, payment_requirement, buffer_minutes, images, category_id, cost_price),
       recurring_plans(
         id, name, status, show_in_marketplace,
         recurring_plan_items(
           unit_price, quantity, item_type, product_id, service_id,
           products(fulfillment_modes, product_type),
-          services(fulfillment_modes, scheduling_enabled)
+          services(fulfillment_modes)
         )
       )
     `)

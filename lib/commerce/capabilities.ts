@@ -1,6 +1,6 @@
 /**
  * Minimal commerce capability model.
- * Catalog fields: fulfillment_modes, payment_requirement (services), scheduling_enabled.
+ * Catalog fields: fulfillment_modes, payment_requirement (services).
  * Checkout behavior is derived - avoid item_type branching outside resolution.
  */
 
@@ -50,7 +50,6 @@ export function defaultServiceFulfillmentModes(): FulfillmentMode[] {
 export function serviceCatalogCapabilities(row: {
   fulfillment_modes?: string[] | null
   payment_requirement?: string | null
-  scheduling_enabled?: boolean | null
 }): CatalogCapabilities {
   return {
     fulfillmentModes: normalizeFulfillmentModes(
@@ -62,7 +61,7 @@ export function serviceCatalogCapabilities(row: {
     )
       ? (row.payment_requirement as PaymentRequirement)
       : "full_payment",
-    schedulingEnabled: row.scheduling_enabled !== false,
+    schedulingEnabled: true,
   }
 }
 

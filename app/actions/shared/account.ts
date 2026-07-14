@@ -1,17 +1,17 @@
 "use server"
 
-import { getSupabaseServerClient } from "@/lib/supabase/request-client" // Cliente para pegar a sessão atual
-// Removed createSupabaseAdmin
 import { revalidatePath } from "next/cache"
-import ExcelJS from "exceljs"
-import { sendAccountDeletionEmail } from "@/lib/email"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { headers } from "next/headers"
+import { AccountDeletionService } from "@/lib/services/account-deletion.service"
 
-import { getAdminClient } from "@/lib/supabase/admin"
-
-export async function deleteAccountAction(userId: string, isPartner: boolean, csrf_token?: string) {
+export async function deleteAccountAction(
+  userId: string,
+  reason: string | null,
+  csrf_token?: string
+) {
   await requireRateLimit(RateLimitCategory.ACCOUNT_DELETE)
 
   // Validate CSRF token
@@ -21,87 +21,58 @@ export async function deleteAccountAction(userId: string, isPartner: boolean, cs
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  const supabase = await getSupabaseServerClient()
-  const adminSupabase = getAdminClient()
-
   try {
-    // 1. Verificar se o usuário solicitante é o dono da conta (Segurança)
+    // 1. Verify that the requesting user is the owner of the account (Security check)
     const user = await requireUser()
     if (user.id !== userId) {
       return { error: "Não autorizado." }
     }
 
-    const userEmail = user.email
+    // 2. Fetch IP, User-Agent, and Country from headers
+    const reqHeaders = await headers()
+    const userAgent = reqHeaders.get("user-agent")
+    const forwarded = reqHeaders.get("x-forwarded-for")
+    const ip = forwarded ? forwarded.split(",")[0].trim() : reqHeaders.get("x-real-ip") || "unknown"
+    const country = reqHeaders.get("cf-ipcountry") || "BR"
 
-    // 2. Gerar Backup (Apenas se for Parceiro e tiver Email)
-    if (isPartner && userEmail) {
-      try {
-        const { data: partner } = await adminSupabase
-          .from("partners")
-          .select("id")
-          .eq("user_id", userId)
-          .single()
+    // 3. Delegate execution to AccountDeletionService
+    const result = await AccountDeletionService.requestDeletion(
+      userId,
+      reason,
+      ip,
+      userAgent,
+      country
+    )
 
-        if (partner) {
-          const workbook = new ExcelJS.Workbook()
-          workbook.creator = "Dudit ERP"
-          workbook.created = new Date()
-
-          // Buscas em paralelo (Otimizado)
-          const [products, orders, customers, suppliers, finPayable, finReceivable] = await Promise.all([
-            adminSupabase.from("products").select("*").eq("partner_id", partner.id),
-            adminSupabase.from("orders").select("*").eq("partner_id", partner.id),
-            adminSupabase.from("customers").select("*").eq("partner_id", partner.id),
-            adminSupabase.from("suppliers").select("*").eq("partner_id", partner.id),
-            adminSupabase.from("accounts_payable").select("*").eq("partner_id", partner.id),
-            adminSupabase.from("accounts_receivable").select("*").eq("partner_id", partner.id),
-          ])
-
-          // Helper para criar abas
-          const addSheet = (name: string, data: any[]) => {
-            if (data && data.length > 0) {
-              const sheet = workbook.addWorksheet(name)
-              sheet.columns = Object.keys(data[0]).map((key) => ({ header: key, key, width: 20 }))
-              data.forEach((row) => sheet.addRow(row))
-            }
-          }
-
-          addSheet("Produtos", products.data || [])
-          addSheet("Pedidos", orders.data || [])
-          addSheet("Clientes", customers.data || [])
-          addSheet("Fornecedores", suppliers.data || [])
-          addSheet("Contas a Pagar", finPayable.data || [])
-          addSheet("Contas a Receber", finReceivable.data || [])
-
-          // Gera buffer apenas se tiver dados
-          if (products.data?.length || orders.data?.length) {
-            const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer
-            // Tenta enviar email (não bloqueante se falhar)
-            await sendAccountDeletionEmail(userEmail, buffer).catch(err =>
-              console.error("Erro ao enviar email de backup:", err)
-            )
-          }
-        }
-      } catch (backupError) {
-        console.error("Falha ao gerar backup, prosseguindo com exclusão:", backupError)
-        // Decisão de negócio: Se o backup falhar, deletamos mesmo assim ou avisamos?
-        // Aqui optei por seguir com a deleção para não travar o usuário.
-      }
+    if (!result.success) {
+      return { error: result.error || "Erro ao registrar solicitação de exclusão." }
     }
 
-    // 3. Deletar Usuário (Usando Admin Client)
-    // Isso remove da tabela auth.users. O Supabase deve estar configurado com 
-    // "ON DELETE CASCADE" nas tabelas partners/profiles para limpar o resto.
-    const { error: deleteError } = await adminSupabase.auth.admin.deleteUser(userId)
-
-    if (deleteError) {
-      console.error("Erro fatal ao deletar usuário:", deleteError)
-      return { error: "Erro ao excluir conta. Entre em contato com o suporte." }
-    }
-
-    return { success: true }
+    revalidatePath("/erp/settings/subscription")
+    return { success: true, gracePeriodEndsAt: result.gracePeriodEndsAt }
   } catch (error: any) {
-    console.error("Erro geral na action deleteAccount:", error)
+    console.error("General error in deleteAccountAction:", error)
+    return { error: "Ocorreu um erro inesperado." }
+  }
+}
+
+export async function getAccountDeletionDryRunAction(csrf_token?: string) {
+  // Validate CSRF token
+  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+  const csrfValidation = await requireCSRF(csrf_token)
+  if (!csrfValidation.valid) {
+    return { error: csrfValidation.error || "Token CSRF inválido" }
+  }
+
+  try {
+    const user = await requireUser()
+    const result = await AccountDeletionService.executeDryRun(user.id)
+    if (!result.success) {
+      return { error: result.error || "Erro ao gerar simulação." }
+    }
+    return { success: true, report: result.report }
+  } catch (error: any) {
+    console.error("General error in getAccountDeletionDryRunAction:", error)
     return { error: "Ocorreu um erro inesperado." }
   }
 }

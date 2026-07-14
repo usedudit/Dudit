@@ -41,7 +41,6 @@ import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
 import {
     prepareServiceBookingCheckoutAction,
     addServiceBookingToCartAction,
-    addPurchasableServiceToCartAction,
 } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
@@ -593,7 +592,7 @@ export function ServiceDetailsPageClient({
     const durationMinutes = Number(service.duration_minutes || 60)
     const bufferMinutes = Number(service.buffer_minutes || 0)
     const price = Number(service.price || 0)
-    const schedulingEnabled = service.scheduling_enabled !== false
+    const schedulingEnabled = true
     const categoryName = (service as any).service_categories?.name || "Serviço"
     const isStartingAt = service.price_type === "starting_at"
     const isFree = service.price_type === "free"
@@ -786,7 +785,7 @@ export function ServiceDetailsPageClient({
             router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
             return
         }
-        if (schedulingEnabled && (!selectedDate || !selectedTime || !selectedStaffId)) {
+        if (!selectedDate || !selectedTime || !selectedStaffId) {
             notifyError("Erro", "Selecione data, horário e profissional.")
             return
         }
@@ -796,32 +795,18 @@ export function ServiceDetailsPageClient({
             const token = await fetchCSRFTokenSingleton() || ""
 
             let cartItemId: string | undefined
-            if (!schedulingEnabled) {
-                const cartResult = await addPurchasableServiceToCartAction({
-                    serviceId: service.id,
-                    partnerId: partner.id,
-                    csrf_token: token,
-                })
-                if (cartResult.error) {
-                    notifyError("Erro", cartResult.error)
-                    return
-                }
-                cartItemId = cartResult.cartItemId
-                invalidateCartCache()
-            } else {
-                const result = await prepareServiceBookingCheckoutAction({
-                    ...buildBookingPayload(),
-                    csrf_token: token,
-                })
-                if ("error" in result) {
-                    notifyError("Erro", result.error || "Não foi possível iniciar o checkout.")
-                    return
-                }
-                cartItemId = result.cartItemId
-                invalidateCartCache()
+            const result = await prepareServiceBookingCheckoutAction({
+                ...buildBookingPayload(),
+                csrf_token: token,
+            })
+            if ("error" in result) {
+                notifyError("Erro", result.error || "Não foi possível iniciar o checkout.")
+                return
             }
+            cartItemId = result.cartItemId
+            invalidateCartCache()
 
-            const lineLabel = schedulingEnabled && selectedDate && selectedTime
+            const lineLabel = selectedDate && selectedTime
                 ? `${service.name} - ${selectedDate} ${selectedTime}`
                 : service.name
 
@@ -863,14 +848,14 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, schedulingEnabled, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, price, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, price, notifyError])
 
     const handleAddBookingToCart = useCallback(async () => {
         if (!userId) {
             router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
             return
         }
-        if (schedulingEnabled && (!selectedDate || !selectedTime || !selectedStaffId)) {
+        if (!selectedDate || !selectedTime || !selectedStaffId) {
             notifyError("Erro", "Selecione data, horário e profissional.")
             return
         }
@@ -878,19 +863,10 @@ export function ServiceDetailsPageClient({
         setIsBooking(true)
         try {
             const token = await fetchCSRFTokenSingleton() || ""
-            let result
-            if (schedulingEnabled) {
-                result = await addServiceBookingToCartAction({
-                    ...buildBookingPayload(),
-                    csrf_token: token,
-                })
-            } else {
-                result = await addPurchasableServiceToCartAction({
-                    serviceId: service.id,
-                    partnerId: partner.id,
-                    csrf_token: token,
-                })
-            }
+            const result = await addServiceBookingToCartAction({
+                ...buildBookingPayload(),
+                csrf_token: token,
+            })
             if (result.success) {
                 invalidateCartCache()
                 notifySuccess("Adicionado à sacola", "O serviço foi adicionado à sacola.")
@@ -902,7 +878,7 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, schedulingEnabled, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service.id, partner.id, notifySuccess, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service.id, partner.id, notifySuccess, notifyError])
 
     // ─── Booking Panel ────────────────────────────────────────────────────────
 
@@ -915,7 +891,7 @@ export function ServiceDetailsPageClient({
                 </span>
                 <span className="text-gray-300 text-xs">|</span>
                 <span className="text-[13px] font-semibold text-brand-inactive-text">
-                    {schedulingEnabled ? "Agendamento necessário" : "Compra direta"}
+                    Agendamento necessário
                 </span>
             </div>
 
@@ -1146,7 +1122,7 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── Staff Selection ── */}
-            {showPrice && schedulingEnabled && staff.length > 0 && (
+            {showPrice && staff.length > 0 && (
                 <div className="mb-6">
                     <label className="block text-sm font-bold text-brand-dark mb-3">Profissional</label>
                     <div className="flex flex-wrap gap-2">
@@ -1169,7 +1145,7 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── Date Selection ── */}
-            {showPrice && schedulingEnabled && (
+            {showPrice && (
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
                         <label className="text-sm font-bold text-brand-dark capitalize">{currentMonth}</label>
@@ -1216,7 +1192,7 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── Time Slots ── */}
-            {showPrice && schedulingEnabled && (
+            {showPrice && (
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
                         <label className="text-sm font-bold text-brand-dark">Horários disponíveis</label>
@@ -1271,7 +1247,7 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── Selected Summary ── */}
-            {showPrice && schedulingEnabled && (
+            {showPrice && (
                 <AnimatePresence>
                     {selectedTime && (
                         <motion.div
@@ -1340,71 +1316,31 @@ export function ServiceDetailsPageClient({
                 </div>
             ) : (
                 <div className="hidden lg:block space-y-2 mb-4">
-                    {schedulingEnabled ? (
-                        <>
-                            <Button
-                                disabled={(schedulingEnabled && !selectedTime) || isBooking}
-                                onClick={handleBookNowCheckout}
-                                className="w-full h-[46px]"
-                            >
-                                {isBooking ? (
-                                    <span className="flex items-center gap-2">
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Redirecionando...
-                                    </span>
-                                ) : (
-                                    <span className="flex items-center gap-2">
-                                        <CalendarIcon size={18} />
-                                        Reservar agora
-                                    </span>
-                                )}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                disabled={!selectedTime || isBooking}
-                                onClick={handleAddBookingToCart}
-                                className="w-full h-[46px]"
-                            >
-                                Adicionar à sacola
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            <Button
-                                disabled={isBooking}
-                                onClick={handleAddBookingToCart}
-                                className="w-full h-[46px]"
-                            >
-                                {isBooking ? (
-                                    <span className="flex items-center gap-2">
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Adicionando...
-                                    </span>
-                                ) : (
-                                    <span className="flex items-center gap-2">
-                                        Adicionar à sacola
-                                    </span>
-                                )}
-                            </Button>
-                            {(() => {
-                                const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
-                                const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                                const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber mais informações.`)
-                                const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
-                                return (
-                                    <a
-                                        href={whatsappUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-full h-[46px] flex items-center justify-center gap-2 border border-brand-green text-brand-green hover:bg-green-50 font-bold rounded-lg transition-colors text-sm"
-                                    >
-                                        <WhatsappIcon size={18} className="fill-brand-green" />
-                                        Saber mais sobre
-                                    </a>
-                                )
-                            })()}
-                        </>
-                    )}
+                    <Button
+                        disabled={!selectedTime || isBooking}
+                        onClick={handleBookNowCheckout}
+                        className="w-full h-[46px]"
+                    >
+                        {isBooking ? (
+                            <span className="flex items-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Redirecionando...
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-2">
+                                <CalendarIcon size={18} />
+                                Reservar agora
+                            </span>
+                        )}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        disabled={!selectedTime || isBooking}
+                        onClick={handleAddBookingToCart}
+                        className="w-full h-[46px]"
+                    >
+                        Adicionar à sacola
+                    </Button>
                 </div>
             )}
 
@@ -2137,55 +2073,26 @@ export function ServiceDetailsPageClient({
                                         {formatCurrency(pricing.pixDiscountPercent > 0 ? pricing.current * (1 - pricing.pixDiscountPercent / 100) : pricing.current)}
                                     </span>
                                     <span className="text-xs text-brand-inactive-text truncate">
-                                        {pricing.pixDiscountPercent > 0 ? "no Pix" : schedulingEnabled ? formatDuration(durationMinutes) : ""}
+                                        {pricing.pixDiscountPercent > 0 ? "no Pix" : formatDuration(durationMinutes)}
                                     </span>
                                 </div>
-                                {schedulingEnabled ? (
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            className="rounded-full px-3"
-                                            disabled={!selectedTime || isBooking}
-                                            onClick={handleAddBookingToCart}
-                                        >
-                                            Sacola
-                                        </Button>
-                                        <Button
-                                            className="flex-1 rounded-full min-w-[120px]"
-                                            disabled={(schedulingEnabled && !selectedTime) || isBooking}
-                                            onClick={handleBookNowCheckout}
-                                        >
-                                            {isBooking ? "..." : "Reservar"}
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        {(() => {
-                                            const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
-                                            const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                                            const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber mais informações.`)
-                                            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
-                                            return (
-                                                <a
-                                                    href={whatsappUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="w-[44px] h-[44px] flex items-center justify-center border border-brand-green text-brand-green hover:bg-green-50 rounded-full shrink-0"
-                                                    title="Saber mais"
-                                                >
-                                                    <WhatsappIcon size={20} className="fill-brand-green" />
-                                                </a>
-                                            )
-                                        })()}
-                                        <Button
-                                            className="flex-1 rounded-full min-w-[120px]"
-                                            disabled={isBooking}
-                                            onClick={handleAddBookingToCart}
-                                        >
-                                            {isBooking ? "..." : "Adicionar à sacola"}
-                                        </Button>
-                                    </>
-                                )}
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        className="rounded-full px-3"
+                                        disabled={!selectedTime || isBooking}
+                                        onClick={handleAddBookingToCart}
+                                    >
+                                        Sacola
+                                    </Button>
+                                    <Button
+                                        className="flex-1 rounded-full min-w-[120px]"
+                                        disabled={!selectedTime || isBooking}
+                                        onClick={handleBookNowCheckout}
+                                    >
+                                        {isBooking ? "..." : "Reservar"}
+                                    </Button>
+                                </>
                             </>
                         )}
                     </div>

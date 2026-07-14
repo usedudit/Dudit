@@ -188,6 +188,7 @@ export async function createServiceOrderAction(
   input: {
     title: string
     description?: string
+    diagnosis?: string
     internal_notes?: string
     customer_id?: string | null
     expected_completion_date?: string | null
@@ -239,6 +240,7 @@ export async function createServiceOrderAction(
         public_token: publicToken,
         title: input.title,
         description: input.description || null,
+        diagnosis: input.diagnosis || null,
         internal_notes: input.internal_notes || null,
         customer_id: input.customer_id || null,
         customer_snapshot: input.customer_id ? await getCustomerSnapshot(admin, input.customer_id) : null,
@@ -922,7 +924,7 @@ export async function getServiceOrderByTokenAction(
     let { data: row, error } = await admin
       .from("service_orders")
       .select(`
-        id, order_number, status, title, description, expected_completion_date, completed_at,
+        id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
         customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
         public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
@@ -938,7 +940,7 @@ export async function getServiceOrderByTokenAction(
       const { data: byId } = await admin
         .from("service_orders")
         .select(`
-          id, order_number, status, title, description, expected_completion_date, completed_at,
+          id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
           total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
           customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
           public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
@@ -1010,6 +1012,7 @@ export async function getServiceOrderByTokenAction(
       status: row.status,
       title: row.title,
       description: row.description,
+      diagnosis: row.diagnosis,
       expected_completion_date: row.expected_completion_date,
       completed_at: row.completed_at,
       created_at: row.created_at,
@@ -1062,6 +1065,7 @@ export async function updateServiceOrderAction(
   input: {
     title?: string
     description?: string
+    diagnosis?: string
     internal_notes?: string
     customer_id?: string | null
     expected_completion_date?: string | null
@@ -1105,6 +1109,7 @@ export async function updateServiceOrderAction(
     const updateData: any = {}
     if (input.title !== undefined && !isPaid) updateData.title = input.title
     if (input.description !== undefined && !isPaid) updateData.description = input.description
+    if (input.diagnosis !== undefined && !isPaid) updateData.diagnosis = input.diagnosis
     if (input.internal_notes !== undefined) updateData.internal_notes = input.internal_notes
     if (input.customer_id !== undefined && !isPaid) {
       updateData.customer_id = input.customer_id

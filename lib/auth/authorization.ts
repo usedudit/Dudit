@@ -489,6 +489,21 @@ export async function requirePartnerAccessWithPermission(
 }> {
   const user = await requireUser(resolvedUser)
 
+  // Enforce pending deletion write-lock for mutations
+  let isMutation = false
+  try {
+    const { headers } = await import("next/headers")
+    const reqHeaders = await headers()
+    isMutation = reqHeaders.has("Next-Action") || reqHeaders.get("x-request-method") === "POST"
+  } catch (e) {
+    // Safe fallback outside request contexts
+  }
+
+  if (isMutation || (action && action !== "view" && action !== "read" && action !== "list")) {
+    const { AccountDeletionService } = await import("@/lib/services/account-deletion.service")
+    await AccountDeletionService.assertNotLocked(partnerId)
+  }
+
   const access = await checkPartnerAccess(partnerId, user.id)
   if (!access) {
     throw new ForbiddenError("Você não tem acesso a este ERP")

@@ -19,6 +19,7 @@ export interface ServiceOrder {
   status: ServiceOrderStatus
   title: string
   description: string | null
+  diagnosis: string | null
   internal_notes: string | null
   expected_completion_date: string | null
   completed_at: string | null
@@ -79,6 +80,7 @@ export type ServiceOrderListCursor = { createdAt: string; id: string } | null
 export interface ServiceOrderInput {
   title: string
   description?: string
+  diagnosis?: string
   internal_notes?: string
   customer_id?: string
   expected_completion_date?: string

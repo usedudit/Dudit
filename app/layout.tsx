@@ -12,6 +12,8 @@ import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigatio
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
 import { TimezoneProvider } from "@/lib/date"
+import { headers } from "next/headers"
+import { AccountDeletionBanner } from "@/components/shared/AccountDeletionBanner"
 
 export const viewport: Viewport = {
     themeColor: "#003229",
@@ -202,6 +204,8 @@ export default async function RootLayout({
     children: React.ReactNode
 }) {
     const user = await getCurrentUser()
+    const reqHeaders = await headers()
+    const isPendingDeletion = reqHeaders.get("x-account-pending-deletion") === "true"
 
     return (
         <html lang="pt-BR">
@@ -220,6 +224,7 @@ export default async function RootLayout({
                 />
             </head>
             <body className="font-sans">
+                {isPendingDeletion && <AccountDeletionBanner />}
                 <SupabaseProvider initialUser={user} initialSessionData={null}>
                     <QueryProvider>
                         <PreventSamePageNavigation />

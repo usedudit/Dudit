@@ -102,7 +102,7 @@ export async function getCachedCart(userId: string) {
       created_at,
       products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
-      services(id, name, price, promotional_price, duration_minutes, scheduling_enabled),
+      services(id, name, price, promotional_price, duration_minutes),
       recurring_plans(
         id, name, status,
         recurring_plan_items(unit_price, quantity)

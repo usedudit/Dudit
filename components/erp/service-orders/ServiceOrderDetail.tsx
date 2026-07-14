@@ -76,6 +76,9 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [showShareModal, setShowShareModal] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [isRegeneratingCode, setIsRegeneratingCode] = useState(false)
+    const [showStatusModal, setShowStatusModal] = useState(false)
+
+    useEffect(() => { setOrder(data) }, [data])
 
     const handleRegenerateCode = async () => {
         if (isRegeneratingCode || !order) return;
@@ -371,27 +374,11 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown>
                                             <DropdownItem onClick={handleEditClick}>
-                                                Editar OS
+                                                Editar
                                             </DropdownItem>
-                                            {availableTransitions.map((status) => {
-                                                const meta = SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]
-                                                return (
-                                                    <DropdownItem key={status} onClick={() => handleStatusChange(status)} disabled={loading}>
-                                                        Marcar como: {meta?.label}
-                                                    </DropdownItem>
-                                                )
-                                            })}
-                                            {!order.signature_image_key && (
-                                                <DropdownItem onClick={() => {
-                                                    if (!hasMinimumPlan(planSlug, "escalar")) {
-                                                        openPlanUpgrade("escalar");
-                                                    } else {
-                                                        setShowSignature(true);
-                                                    }
-                                                }}>
-                                                    Assinar OS
-                                                </DropdownItem>
-                                            )}
+                                            <DropdownItem onClick={() => setShowStatusModal(true)}>
+                                                Alterar Status
+                                            </DropdownItem>
                                             <DropdownItem onClick={async () => {
                                                 if (!hasMinimumPlan(planSlug, "crescer")) {
                                                     openPlanUpgrade("crescer");
@@ -407,7 +394,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 Compartilhar
                                             </DropdownItem>
                                             <DropdownItem onClick={() => setConfirmDelete(true)} className="text-brand-red">
-                                                Excluir OS
+                                                Excluir
                                             </DropdownItem>
                                         </ActionsDropdown>
                                     </div>
@@ -496,12 +483,20 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Título</label>
                                                             <p className="text-[14px] font-medium text-brand-dark dark:text-dark-heading mt-0.5">{order.title}</p>
                                                         </div>
-                                                        {order.description && (
-                                                            <div>
-                                                                <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Descrição</label>
-                                                                <p className="text-[14px] text-brand-dark dark:text-dark-heading mt-0.5 whitespace-pre-wrap">{order.description}</p>
-                                                            </div>
-                                                        )}
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {order.description && (
+                                                                <div>
+                                                                    <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Descrição</label>
+                                                                    <p className="text-[14px] text-brand-dark dark:text-dark-heading mt-0.5 whitespace-pre-wrap">{order.description}</p>
+                                                                </div>
+                                                            )}
+                                                            {order.diagnosis && (
+                                                                <div>
+                                                                    <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Diagnóstico</label>
+                                                                    <p className="text-[14px] text-brand-dark dark:text-dark-heading mt-0.5 whitespace-pre-wrap">{order.diagnosis}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                         {order.internal_notes && (
                                                             <div>
                                                                 <label className="font-semibold text-[15px] text-brand-dark dark:text-dark-heading">Observações internas</label>
@@ -683,57 +678,64 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                                 </span>
                                                             </div>
                                                             {order.completed_at && (
-                                                                <>
-                                                                    <div className="flex justify-between items-center text-[13px]">
-                                                                        <span className="text-brand-inactive-text">Conclusão</span>
-                                                                        <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
-                                                                            {formatDateTime(order.completed_at)}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
-                                                                        <span className="text-brand-inactive-text">Tempo total</span>
-                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                                            {(() => {
-                                                                                const start = new Date(order.created_at).getTime()
-                                                                                const end = new Date(order.completed_at).getTime()
-                                                                                const diffMs = Math.max(0, end - start)
-                                                                                const diffH = Math.floor(diffMs / 3600000)
-                                                                                const diffM = Math.floor((diffMs % 3600000) / 60000)
-                                                                                if (diffH >= 24) {
-                                                                                    const days = Math.floor(diffH / 24)
-                                                                                    return `${days}d ${diffH % 24}h`
-                                                                                }
-                                                                                return `${diffH}h ${diffM}m`
-                                                                            })()}
-                                                                        </span>
-                                                                    </div>
-                                                                    {order.expected_completion_date && (() => {
-                                                                        const expectedDate = new Date(order.expected_completion_date)
-                                                                        if (order.expected_completion_time) {
-                                                                            const [h, m] = order.expected_completion_time.split(":").map(Number)
-                                                                            expectedDate.setHours(h || 0, m || 0)
-                                                                        }
-                                                                        const completed = new Date(order.completed_at)
-                                                                        const isLate = completed.getTime() > expectedDate.getTime()
-                                                                        const diffLateMs = Math.max(0, completed.getTime() - expectedDate.getTime())
-                                                                        const diffLateH = Math.floor(diffLateMs / 3600000)
-                                                                        const diffLateD = Math.floor(diffLateH / 24)
-                                                                        return isLate ? (
-                                                                            <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
-                                                                                <span className="text-brand-red font-medium">Atraso</span>
-                                                                                <span className="font-bold text-brand-red">
-                                                                                    {diffLateD > 0 ? `${diffLateD}d ${diffLateH % 24}h` : `${diffLateH}h ${Math.floor((diffLateMs % 3600000) / 60000)}m`}
-                                                                                </span>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
-                                                                                <span className="text-brand-green font-medium">Prazo</span>
-                                                                                <span className="font-bold text-brand-green">No prazo</span>
-                                                                            </div>
-                                                                        )
-                                                                    })()}
-                                                                </>
+                                                                <div className="flex justify-between items-center text-[13px]">
+                                                                    <span className="text-brand-inactive-text">Conclusão</span>
+                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
+                                                                        {formatDateTime(order.completed_at)}
+                                                                    </span>
+                                                                </div>
                                                             )}
+                                                            <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                <span className="text-brand-inactive-text">Tempo {order.completed_at ? "total" : "decorrido"}</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                                    {(() => {
+                                                                        const start = new Date(order.created_at).getTime()
+                                                                        const end = order.completed_at ? new Date(order.completed_at).getTime() : Date.now()
+                                                                        const diffMs = Math.max(0, end - start)
+                                                                        const diffH = Math.floor(diffMs / 3600000)
+                                                                        const diffM = Math.floor((diffMs % 3600000) / 60000)
+                                                                        if (diffH >= 24) {
+                                                                            const days = Math.floor(diffH / 24)
+                                                                            return `${days}d ${diffH % 24}h ${diffM}m`
+                                                                        }
+                                                                        return `${diffH}h ${diffM}m`
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                            {order.expected_completion_date && (() => {
+                                                                const expectedDate = new Date(order.expected_completion_date)
+                                                                if (order.expected_completion_time) {
+                                                                    const [h, m] = order.expected_completion_time.split(":").map(Number)
+                                                                    expectedDate.setHours(h || 0, m || 0)
+                                                                }
+                                                                const referenceDate = order.completed_at ? new Date(order.completed_at) : new Date()
+                                                                const isLate = referenceDate.getTime() > expectedDate.getTime()
+                                                                const diffLateMs = Math.max(0, referenceDate.getTime() - expectedDate.getTime())
+                                                                const diffLateH = Math.floor(diffLateMs / 3600000)
+                                                                const diffLateD = Math.floor(diffLateH / 24)
+                                                                const diffLateM = Math.floor((diffLateMs % 3600000) / 60000)
+                                                                const isCompleted = !!order.completed_at
+                                                                if (isLate) {
+                                                                    const label = isCompleted ? "Concluído com atraso" : "Atrasado"
+                                                                    return (
+                                                                        <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                            <span className="text-brand-red font-medium">{label}</span>
+                                                                            <span className="font-bold text-brand-red">
+                                                                                {diffLateD > 0 ? `${diffLateD}d ${diffLateH % 24}h ${diffLateM}m` : `${diffLateH}h ${diffLateM}m`}
+                                                                            </span>
+                                                                        </div>
+                                                                    )
+                                                                }
+                                                                if (isCompleted) {
+                                                                    return (
+                                                                        <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                            <span className="text-brand-green font-medium">Prazo</span>
+                                                                            <span className="font-bold text-brand-green">Concluído no prazo</span>
+                                                                        </div>
+                                                                    )
+                                                                }
+                                                                return null
+                                                            })()}
                                                         </div>
                                                     </SidebarCard>
                                                 )}
@@ -1056,6 +1058,46 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                     />
                 )
             }
+
+            {/* Status Change Modal */}
+            {showStatusModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowStatusModal(false)}>
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Alterar Status</h3>
+                        <p className="text-sm text-brand-inactive-text mb-4">Status atual: <strong className="text-brand-dark dark:text-dark-heading">{SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]?.label || order.status}</strong></p>
+                        <div className="space-y-2">
+                            {availableTransitions.length === 0 ? (
+                                <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
+                            ) : (
+                                availableTransitions.map((status) => {
+                                    const meta = SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]
+                                    return (
+                                        <button
+                                            key={status}
+                                            onClick={async () => {
+                                                await handleStatusChange(status)
+                                                setShowStatusModal(false)
+                                            }}
+                                            disabled={loading}
+                                            className="w-full text-left px-4 py-3 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors disabled:opacity-50"
+                                        >
+                                            <span className="font-medium text-sm text-brand-dark dark:text-dark-heading">{meta?.label || status}</span>
+                                        </button>
+                                    )
+                                })
+                            )}
+                        </div>
+                        <div className="flex justify-end mt-4">
+                            <button
+                                onClick={() => setShowStatusModal(false)}
+                                className="text-sm font-medium text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors px-4 py-2"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <AlertModal
                 isOpen={confirmDelete}

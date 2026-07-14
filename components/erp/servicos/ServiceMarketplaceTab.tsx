@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput, FormSection } from "@/components/reusable"
 import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon } from "@/lib/icons"
 import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
 
@@ -53,14 +53,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
             {/* --- COLUNA ESQUERDA (Principal) --- */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                <div>
-                    <h3 className="text-lg font-bold mb-5 text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                        <StoreIcon className="w-5 h-5" /> Vitrine e Marketplace
-                    </h3>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1 mb-6">
-                        Configure como seu serviço será exibido para seus clientes no seu site/catálogo online.
-                    </p>
-
+                <FormSection title="Vitrine e Marketplace">
                     <div className="space-y-6">
                         <RichTextEditor
                             label="Descrição Detalhada"
@@ -70,7 +63,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         />
                     </div>
                     <ProductVideoSection itemType="service" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
-                </div>
+                </FormSection>
 
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
                 <div className="mt-8">
@@ -229,6 +222,36 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                                 width="w-full"
                             />
                         </div>
+
+                        <div className="border-t border-brand-border dark:border-dark-border pt-5">
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Intervalo para retorno</h4>
+                            <p className="text-xs text-brand-inactive-text mb-3">Defina o tempo recomendado para o cliente repetir este serviço (ex: troca de óleo a cada 1 ano).</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Valor"
+                                    name="recurrence_interval_value"
+                                    value={serviceData?.recurrence_interval_value || ""}
+                                    onChange={handleInputChange}
+                                    disabled={!isEditing}
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                                <FormDropdown
+                                    label="Unidade"
+                                    options={[
+                                        { value: "Dias", label: "Dias" },
+                                        { value: "Semanas", label: "Semanas" },
+                                        { value: "Meses", label: "Meses" },
+                                        { value: "Anos", label: "Anos" },
+                                    ]}
+                                    value={serviceData?.recurrence_interval_unit || "Meses"}
+                                    setValue={(v) => manualChange("recurrence_interval_unit", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -246,6 +269,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     />
                 </div>
             </div>
-        </div>
+        </div >
     )
 }

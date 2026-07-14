@@ -125,6 +125,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     }, [fieldErrors])
     const [title, setTitle] = useState(editData?.title || "")
     const [description, setDescription] = useState(editData?.description || "")
+    const [diagnosis, setDiagnosis] = useState(editData?.diagnosis || "")
     const [internalNotes, setInternalNotes] = useState(editData?.internal_notes || "")
     const [customerId, setCustomerId] = useState(editData?.customer_id || "")
     const [customerName, setCustomerName] = useState(editData?.customer_snapshot?.name || "")
@@ -173,6 +174,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     const initialSnapshot = useMemo(() => JSON.stringify({
         title: editData?.title || "",
         description: editData?.description || "",
+        diagnosis: editData?.diagnosis || "",
         internalNotes: editData?.internal_notes || "",
         customerId: editData?.customer_id || "",
         assignedUserId: editData?.assigned_user_id || "",
@@ -193,6 +195,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
     const currentSnapshot = useMemo(() => JSON.stringify({
         title,
         description,
+        diagnosis,
         internalNotes,
         customerId,
         assignedUserId,
@@ -208,7 +211,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         otherCosts,
         services,
         products,
-    }), [title, description, internalNotes, customerId, assignedUserId, status, priority, estimatedHours, expectedCompletionTime, openingDate, openingTime, discountValue, discountType, couponCode, otherCosts, services, products])
+    }), [title, description, diagnosis, internalNotes, customerId, assignedUserId, status, priority, estimatedHours, expectedCompletionTime, openingDate, openingTime, discountValue, discountType, couponCode, otherCosts, services, products])
 
     const servicesBucket = useProductBucket<PartnerServiceBucketItem>(fetchPartnerServicesBucket, { pageSize: 10 })
     const productsBucket = useProductBucket<ProductBucketItem>(fetchPartnerProductsBucket, { pageSize: 10 })
@@ -522,6 +525,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
 
         if (!isLocked) {
             payload.description = description.trim() || ""
+            payload.diagnosis = diagnosis.trim() || ""
             payload.customer_id = customerId || null
             payload.assigned_user_id = assignedUserId || null
             payload.discount_value = discountValue
@@ -982,18 +986,30 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                 />
                                             </FormSection>
 
-                                            <FormSection title="Descrição">
-                                                <FormTextarea
-                                                    placeholder="Descreva o serviço a ser realizado..."
-                                                    value={description}
-                                                    onChange={(e) => setDescription(e.target.value)}
-                                                    disabled={isLocked}
-                                                    error={fieldErrors.has("description")}
-                                                    errorMessage={fieldErrors.has("description") ? "A descrição é obrigatória" : undefined}
-                                                    label="Descrição"
-                                                    name="description"
-                                                />
-                                            </FormSection>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormSection title="Descrição">
+                                                    <FormTextarea
+                                                        placeholder="Descreva o serviço a ser realizado..."
+                                                        value={description}
+                                                        onChange={(e) => setDescription(e.target.value)}
+                                                        disabled={isLocked}
+                                                        error={fieldErrors.has("description")}
+                                                        errorMessage={fieldErrors.has("description") ? "A descrição é obrigatória" : undefined}
+                                                        label="Descrição"
+                                                        name="description"
+                                                    />
+                                                </FormSection>
+                                                <FormSection title="Diagnóstico">
+                                                    <FormTextarea
+                                                        placeholder="Descreva o diagnóstico do problema..."
+                                                        value={diagnosis}
+                                                        onChange={(e) => setDiagnosis(e.target.value)}
+                                                        disabled={isLocked}
+                                                        label="Diagnóstico"
+                                                        name="diagnosis"
+                                                    />
+                                                </FormSection>
+                                            </div>
 
                                             <FormSection title="Agendamento e Responsabilidade" hasSeparator>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -252,6 +252,19 @@ async function processWebhookWithRetry(
       return
     }
 
+    // Check if partner is undergoing account deletion
+    const { data: deletion } = await supabase
+      .from("account_deletions")
+      .select("status")
+      .eq("partner_id", partnerId)
+      .not("status", "eq", "completed")
+      .maybeSingle()
+
+    if (deletion) {
+      console.log(`[WEBHOOK] Partner ${partnerId} is in deletion phase (${deletion.status}) - ignoring webhook payment processing`)
+      return
+    }
+
     // Intercept subscription preapproval payments
     const preapprovalId = paymentInfo.preapproval_id || paymentInfo.metadata?.preapproval_id
     if (preapprovalId) {
