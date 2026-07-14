@@ -136,7 +136,7 @@ const getReturnRequestStatusConfig = (request: any) => {
         case "ESCALATED":
             return {
                 title: `Em disputa/Moderação`,
-                description: `A solicitação foi escalada para a mediação do Dudit.`,
+                description: `A solicitação foi escalada para a mediação da Dudit.`,
                 color: "bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-900/50 text-purple-800 dark:text-purple-300",
                 icon: AlertCircleIcon
             };

@@ -93,7 +93,7 @@ function isUncacheableRequest(request: Request, url: URL): boolean {
 }
 
 // ============================================================
-// Runtime caching customizado para o Dudit
+// Runtime caching customizado para a Dudit
 // A ordem importa: regras mais específicas primeiro
 // ============================================================
 const networkOnlyErrorHandler = {

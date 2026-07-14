@@ -841,7 +841,7 @@ export async function testEvolutionConnectionAction(phone: string): Promise<Acti
             partnerId: context.partnerId,
             phoneNumber: phone,
             messageType: "text",
-            payload: { body: "✅ Mensagem de teste do Dudit via Evolution API", triggerType: "test_message" },
+            payload: { body: "✅ Mensagem de teste da Dudit via Evolution API", triggerType: "test_message" },
             triggerType: "test_message",
             idempotencyKey: `test:evolution:${context.partnerId}:${phone}:${Date.now()}`,
         })

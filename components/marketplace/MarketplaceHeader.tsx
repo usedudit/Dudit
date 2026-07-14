@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, AlertTriangleIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
-import { Button, DefaultModal, Input } from "@/components/reusable"
+import { Button, DefaultModal, Input, InfoCard } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket, getMarketplaceAutocompleteAction } from "@/app/actions/marketplace/suggestions"
@@ -216,11 +216,16 @@ const Header: React.FC<HeaderProps> = ({
         return () => clearInterval(interval)
     }, [graceEndsAt])
 
+    const [cancellationError, setCancellationError] = useState<string | null>(null)
+
     const handleCancelDeletion = async () => {
         setIsCancelling(true)
+        setCancellationError(null)
         try {
+            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
+            const token = await getCSRFToken()
             const { cancelDeletionAction } = await import("@/app/actions/shared/decelerate-deletion")
-            const res = await cancelDeletionAction()
+            const res = await cancelDeletionAction(token)
             if (res.success) {
                 setCancelModalOpen(false)
                 setPendingDeletion(null)
@@ -228,10 +233,10 @@ const Header: React.FC<HeaderProps> = ({
                 setTimeLeft("")
                 window.location.reload()
             } else {
-                alert(res.error || "Ocorreu um erro ao cancelar o encerramento da conta.")
+                setCancellationError(res.error || "Ocorreu um erro ao cancelar o encerramento da conta.")
             }
         } catch (err) {
-            alert("Erro ao processar requisição.")
+            setCancellationError("Erro ao processar requisição.")
         } finally {
             setIsCancelling(false)
         }
@@ -832,18 +837,12 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
 
                     {pendingDeletion && (
-                        <div
-                            onClick={() => {
-                                setIsMobileUserMenuOpen(false)
-                                setCancelModalOpen(true)
-                            }}
-                            className="mx-6 my-2 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 cursor-pointer hover:bg-red-100/70 transition-colors"
-                        >
-                            <AlertTriangleIcon size={18} className="text-red-500 shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-red-600">Encerramento agendado</p>
-                                <p className="text-xs text-red-500 font-medium">Sua conta será encerrada em {timeLeft}. Clique aqui para gerenciar ou cancelar.</p>
-                            </div>
+                        <div onClick={() => {
+                            setIsMobileUserMenuOpen(false)
+                            setCancelModalOpen(true)
+                        }}
+                            className="cursor-pointer">
+                            <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
                         </div>
                     )}
 
@@ -1039,18 +1038,12 @@ const Header: React.FC<HeaderProps> = ({
                                     </div>
 
                                     {pendingDeletion && (
-                                        <div
-                                            onClick={() => {
-                                                setIsUserMenuOpen(false)
-                                                setCancelModalOpen(true)
-                                            }}
-                                            className="mx-6 my-2 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 cursor-pointer hover:bg-red-100/70 transition-colors"
-                                        >
-                                            <AlertTriangleIcon size={16} className="text-red-500 shrink-0 mt-0.5" />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold text-red-600">Encerramento agendado</p>
-                                                <p className="text-[10px] text-red-500 font-medium">Sua conta será encerrada em {timeLeft}. Clique para cancelar.</p>
-                                            </div>
+                                        <div onClick={() => {
+                                            setIsUserMenuOpen(false)
+                                            setCancelModalOpen(true)
+                                        }}
+                                            className="cursor-pointer">
+                                            <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
                                         </div>
                                     )}
 
@@ -1142,7 +1135,10 @@ const Header: React.FC<HeaderProps> = ({
             </header>
             <DefaultModal
                 isOpen={cancelModalOpen}
-                onClose={() => setCancelModalOpen(false)}
+                onClose={() => {
+                    setCancelModalOpen(false)
+                    setCancellationError(null)
+                }}
                 title="Conta em encerramento"
             >
                 <div className="space-y-6 pt-2 pb-4 text-brand-dark">
@@ -1156,6 +1152,10 @@ const Header: React.FC<HeaderProps> = ({
                             Sua conta está programada para ser encerrada definitivamente em <strong className="text-brand-dark">{timeLeft}</strong>. Ao cancelar, todos os seus dados serão mantidos e sua conta retornará ao estado ativo normalmente.
                         </p>
                     </div>
+
+                    {cancellationError && (
+                        <InfoCard message={cancellationError} color="red" className="mt-4" />
+                    )}
 
                     <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border">
                         <Button

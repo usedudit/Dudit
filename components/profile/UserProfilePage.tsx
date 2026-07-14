@@ -520,7 +520,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                         <div className="space-y-2">
                             <FormTextarea
                                 label="Sua resposta (opcional)"
-                                placeholder="Seu feedback ajuda a melhorar o Dudit."
+                                placeholder="Seu feedback ajuda a melhorar a Dudit."
                                 value={customReason}
                                 onChange={(e: any) => setCustomReason(e.target.value)}
                                 maxLength={512}

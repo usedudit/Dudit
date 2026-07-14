@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
-import { Button, DefaultModal, RadioButton, FormTextarea } from "@/components/reusable"
+import { Button, DefaultModal, RadioButton, FormTextarea, InfoCard } from "@/components/reusable"
 import { Input as FormInput } from "@/components/reusable/Input"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -878,7 +878,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                     <div className="space-y-2">
                                         <FormTextarea
                                             label="Sua resposta (opcional)"
-                                            placeholder="Seu feedback ajuda a melhorar o Dudit."
+                                            placeholder="Seu feedback ajuda a melhorar a Dudit."
                                             value={customReason}
                                             onChange={(e: any) => setCustomReason(e.target.value)}
                                             maxLength={512}
@@ -910,12 +910,13 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
 
                             {deleteStep === "confirm" && (
                                 <div className="space-y-6 pt-2 pb-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
-                                    <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/50">
-                                        <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                                        <div className="text-sm text-red-700 dark:text-red-300 space-y-1">
-                                            <strong>Essa decisão é sua.</strong>
-                                            <p>Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta. Você terá 48 horas para desistir a qualquer momento.</p>
-                                        </div>
+                                    <div className="flex items-start">
+                                        <InfoCard
+                                            title="Essa decisão é sua."
+                                            message="Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta. Você terá 48 horas para desistir a qualquer momento."
+                                            className="flex-1"
+                                            color="red"
+                                        />
                                     </div>
 
                                     {/* SUA CONTA HOJE */}

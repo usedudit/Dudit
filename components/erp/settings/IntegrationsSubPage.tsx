@@ -652,7 +652,7 @@ export const IntegrationsSubPage = ({
                                                 Como configurar?
                                             </h3>
                                             <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                                Clique em <strong>Conectar WhatsApp</strong> e autorize com sua conta Meta. O Dudit configura tudo automaticamente - você não precisa acessar o painel de desenvolvedor nem copiar tokens.
+                                                Clique em <strong>Conectar WhatsApp</strong> e autorize com sua conta Meta. A Dudit configura tudo automaticamente - você não precisa acessar o painel de desenvolvedor nem copiar tokens.
                                             </p>
                                             <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed mt-4">
                                                 Após conectar, sincronize os modelos de mensagem aprovados na sua conta para validar as automações do sistema.

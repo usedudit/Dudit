@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon, AlertTriangleIcon } from "@/lib/icons"
-import { Button, DefaultModal } from "@/components/reusable"
+import { Button, DefaultModal, InfoCard } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
@@ -127,11 +127,16 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
         return () => clearInterval(interval)
     }, [graceEndsAt])
 
+    const [cancellationError, setCancellationError] = useState<string | null>(null)
+
     const handleCancelDeletion = async () => {
         setIsCancelling(true)
+        setCancellationError(null)
         try {
+            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
+            const token = await getCSRFToken()
             const { cancelDeletionAction } = await import("@/app/actions/shared/decelerate-deletion")
-            const res = await cancelDeletionAction()
+            const res = await cancelDeletionAction(token)
             if (res.success) {
                 setCancelModalOpen(false)
                 setPendingDeletion(null)
@@ -139,10 +144,10 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                 setTimeLeft("")
                 window.location.reload()
             } else {
-                alert(res.error || "Ocorreu um erro ao cancelar o encerramento da conta.")
+                setCancellationError(res.error || "Ocorreu um erro ao cancelar o encerramento da conta.")
             }
         } catch (err) {
-            alert("Erro ao processar requisição.")
+            setCancellationError("Erro ao processar requisição.")
         } finally {
             setIsCancelling(false)
         }
@@ -411,15 +416,8 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 </div>
 
                                 {pendingDeletion && (
-                                    <div
-                                        onClick={() => setCancelModalOpen(true)}
-                                        className="mx-4 my-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-xl flex items-start gap-2.5 cursor-pointer hover:bg-red-100/70 dark:hover:bg-red-950/40 transition-colors"
-                                    >
-                                        <AlertTriangleIcon size={16} className="text-red-500 shrink-0 mt-0.5" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold text-red-600 dark:text-red-400">Encerramento agendado</p>
-                                            <p className="text-[10px] text-red-500 dark:text-red-300 font-medium">Sua conta será encerrada em {timeLeft}. Clique para cancelar.</p>
-                                        </div>
+                                    <div onClick={() => setCancelModalOpen(true)} className="cursor-pointer">
+                                        <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
                                     </div>
                                 )}
 
@@ -493,17 +491,13 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
 
                     <nav className="flex flex-col gap-1">
                         {pendingDeletion && (
-                            <div
-                                onClick={() => {
+                            <div>
+                                <div onClick={() => {
                                     setIsProfileOpen(false)
                                     setCancelModalOpen(true)
                                 }}
-                                className="mx-2 my-2 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-2xl flex items-start gap-3 cursor-pointer hover:bg-red-100/70 dark:hover:bg-red-950/40 transition-colors"
-                            >
-                                <AlertTriangleIcon size={18} className="text-red-500 shrink-0 mt-0.5" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-red-600 dark:text-red-400">Encerramento agendado</p>
-                                    <p className="text-xs text-red-500 dark:text-red-300 font-medium">Sua conta será encerrada em {timeLeft}. Clique aqui para gerenciar ou cancelar.</p>
+                                    className="cursor-pointer">
+                                    <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
                                 </div>
                             </div>
                         )}
@@ -572,7 +566,10 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
 
             <DefaultModal
                 isOpen={cancelModalOpen}
-                onClose={() => setCancelModalOpen(false)}
+                onClose={() => {
+                    setCancelModalOpen(false)
+                    setCancellationError(null)
+                }}
                 title="Conta em encerramento"
             >
                 <div className="space-y-6 pt-2 pb-4 text-brand-dark dark:text-dark-heading">
@@ -586,6 +583,10 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             Sua conta está programada para ser encerrada definitivamente em <strong className="text-brand-dark dark:text-dark-heading">{timeLeft}</strong>. Ao cancelar, todos os seus dados serão mantidos e sua conta retornará ao estado ativo normalmente.
                         </p>
                     </div>
+
+                    {cancellationError && (
+                        <InfoCard message={cancellationError} color="red" className="mt-4" />
+                    )}
 
                     <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
                         <Button
