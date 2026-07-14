@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { revalidateOrders } from "@/lib/utils/revalidation"
 import { revalidateQuotes } from "@/lib/utils/revalidation"
@@ -427,8 +428,8 @@ export async function createQuoteAction(data: {
                 p_status: "draft",
                 p_issue_date: data.issueDate || new Date().toISOString().split("T")[0],
                 p_expiration_date: data.expirationDate || null,
-                p_notes: data.notes || null,
-                p_internal_notes: data.internalNotes ?? null,
+                p_notes: sanitizeNotes(data.notes),
+                p_internal_notes: sanitizeNotes(data.internalNotes),
                 p_discount_type: data.discountType || "fixed",
                 p_discount_value: data.discountValue || 0,
                 p_shipping_cost: data.shippingCost || 0,
@@ -567,8 +568,8 @@ export async function updateQuoteAction(data: {
             if (data.customerId !== undefined) updatePayload.customer_id = data.customerId || null
             if (data.issueDate) updatePayload.issue_date = data.issueDate
             if (data.expirationDate !== undefined) updatePayload.expiration_date = data.expirationDate || null
-            if (data.notes !== undefined) updatePayload.notes = data.notes || null
-            if (data.internalNotes !== undefined) updatePayload.internal_notes = data.internalNotes || null
+            if (data.notes !== undefined) updatePayload.notes = sanitizeNotes(data.notes)
+            if (data.internalNotes !== undefined) updatePayload.internal_notes = sanitizeNotes(data.internalNotes)
             if (data.discountType) updatePayload.discount_type = data.discountType
             if (data.discountValue !== undefined) updatePayload.discount_value = data.discountValue
             if (data.shippingCost !== undefined) updatePayload.shipping_cost = data.shippingCost

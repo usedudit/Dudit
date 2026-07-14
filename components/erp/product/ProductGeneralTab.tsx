@@ -599,23 +599,21 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     </SidebarCard>
                 )}
             </div>
-            {isStockAdjustmentOpen && (
-                <QuickStockMovementSheet
-                    isOpen={isStockAdjustmentOpen}
-                    product={{
-                        id: productData.id,
-                        name: productData.name,
-                        sku: productData.sku,
-                        image: typeof images[0] === 'string' ? images[0] : (productData.images?.[0] || productData.image || null),
-                        stock: Number(productData.stock || 0)
-                    }}
-                    onClose={() => setIsStockAdjustmentOpen(false)}
-                    onSaveSuccess={(newStock) => {
-                        handleInputChange({ target: { name: "stock", value: newStock } })
-                        router.refresh()
-                    }}
-                />
-            )}
+            <QuickStockMovementSheet
+                isOpen={isStockAdjustmentOpen}
+                product={{
+                    id: productData.id,
+                    name: productData.name,
+                    sku: productData.sku,
+                    image: typeof images[0] === 'string' ? images[0] : (productData.images?.[0] || productData.image || null),
+                    stock: Number(productData.stock || 0)
+                }}
+                onClose={() => setIsStockAdjustmentOpen(false)}
+                onSaveSuccess={(newStock) => {
+                    handleInputChange({ target: { name: "stock", value: newStock } })
+                    router.refresh()
+                }}
+            />
         </div>
     )
 }

@@ -811,6 +811,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         onChange={(e) => setObservacoes(e.target.value)}
                                                         placeholder="Adicione observações internas sobre este cliente..."
                                                         name="observacoes"
+                                                        maxLength={512}
+                                                        showCharacterCount
                                                     />
                                                 </FormSection>
                                             </FadeIn>

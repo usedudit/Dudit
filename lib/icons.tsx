@@ -129,6 +129,7 @@ import {
     TextColorIcon,
     TextClearIcon,
     TextNumberSignIcon,
+    TextFontIcon,
     MinusSignIcon,
     ReloadIcon as ReloadIcon01,
     CheckmarkCircle01Icon,
@@ -355,6 +356,7 @@ export const TableIcon = CreateIcon(Table01Icon)
 export const ColorIcon = CreateIcon(TextColorIcon)
 export const ClearFormatIcon = CreateIcon(TextClearIcon)
 export const OrderedListIcon = CreateIcon(TextNumberSignIcon)
+export const FontSizeIcon = CreateIcon(TextFontIcon)
 export const MonitorIcon = CreateIcon(ComputerIcon01)
 export const TerminalIcon = CreateIcon(ComputerTerminal01Icon)
 export const DatabaseIcon = CreateIcon(DatabaseIcon01)

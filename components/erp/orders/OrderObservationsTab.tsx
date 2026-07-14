@@ -17,11 +17,13 @@ export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ note
                 <FormTextarea
                     name="notes"
                     label=""
-                    placeholder="Escreve aqui observações internas sobre este pedido..."
+                    placeholder="Escreva aqui observações internas sobre este pedido..."
                     value={notes}
                     onChange={(e: any) => setNotes(e.target.value)}
                     className="min-h-[250px]"
                     disabled={disabled}
+                    maxLength={512}
+                    showCharacterCount
                 />
             </FormSection>
         </FadeIn>

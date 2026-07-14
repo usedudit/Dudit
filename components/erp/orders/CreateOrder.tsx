@@ -927,13 +927,23 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const updateItemQty = (index: number, qty: number) => {
         const newItems = [...items]
         const normalizedQty = Math.max(1, Number(qty || 1))
-        const maxQty = getItemMaxQuantity(newItems[index])
-        if (maxQty !== undefined && normalizedQty > maxQty) {
-            notifyError(`A quantidade de "${newItems[index].name}" está maior que o estoque disponível.`)
-            newItems[index].quantity = Math.max(1, maxQty)
-        } else {
-            newItems[index].quantity = normalizedQty
+        const item = newItems[index]
+        const maxQty = getItemMaxQuantity(item)
+        if (maxQty !== undefined && normalizedQty > maxQty && !item.allowSellWithoutStock) {
+            setPendingZeroStockItem({
+                product: { name: item.name },
+                callback: () => {
+                    setItems(prev => {
+                        const updated = [...prev]
+                        updated[index] = { ...updated[index], quantity: normalizedQty, allowSellWithoutStock: true }
+                        return updated
+                    })
+                }
+            })
+            setShowZeroStockAlert(true)
+            return
         }
+        item.quantity = normalizedQty
         setItems(newItems)
     }
 
@@ -2233,9 +2243,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     pendingZeroStockItem?.callback?.()
                     setPendingZeroStockItem(null)
                 }}
-                title="Produto sem estoque"
-                message={`O produto "${pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
-                confirmText="Adicionar"
+                title="Estoque insuficiente"
+                message={`O produto "${pendingZeroStockItem?.product?.name || ''}" não possui estoque suficiente. Deseja continuar mesmo assim?`}
+                confirmText="Continuar mesmo assim"
+                cancelText="Cancelar"
                 variant="warning"
             />
         </FadeIn>

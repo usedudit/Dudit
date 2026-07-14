@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import {
   buildDefaultPolicyText,
@@ -28,7 +29,7 @@ const policySchema = z.object({
   shippingPayer: z.enum(["customer", "seller", "case_by_case"]),
   commercialDeadlineDays: z.number().int().min(0).max(3650),
   additionalWarrantyDays: z.number().int().min(0).max(3650),
-  commercialNotes: z.string().max(2000).nullable().optional(),
+  commercialNotes: z.string().max(512).nullable().optional(),
   fullPolicyText: z.string().max(20000),
   receiptMessage: z.string().max(1000).nullable().optional(),
   receiptShowPolicyBlock: z.boolean(),
@@ -92,7 +93,7 @@ export async function upsertPartnerReturnPolicyAction(input: z.infer<typeof poli
       shipping_payer: parsed.shippingPayer,
       commercial_deadline_days: parsed.commercialDeadlineDays,
       additional_warranty_days: parsed.additionalWarrantyDays,
-      commercial_notes: parsed.commercialNotes || null,
+      commercial_notes: sanitizeNotes(parsed.commercialNotes),
       full_policy_text: parsed.fullPolicyText.trim(),
       receipt_message: parsed.receiptMessage || null,
       receipt_show_policy_block: parsed.receiptShowPolicyBlock,

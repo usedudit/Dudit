@@ -22,7 +22,7 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { requireUser } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
-import { sanitizeInput } from "@/lib/input-validator"
+import { sanitizeInput, sanitizeNotes } from "@/lib/input-validator"
 
 type DbTransaction = {
     id: string
@@ -783,7 +783,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         if (Math.abs(amount) > 99999999) throw new Error("Valor fora do limite permitido.")
 
         // Sanitize notes
-        const sanitizedNotes = input.notes ? sanitizeInput(String(input.notes), 2000) : null
+        const sanitizedNotes = sanitizeNotes(input.notes)
 
         if (input.transactionType === "adjustment") {
             if (amount === 0) throw new Error("Informe um valor diferente de zero.")

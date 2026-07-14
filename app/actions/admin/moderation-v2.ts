@@ -4,6 +4,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import type { FetchedProduct, FetchedService, FetchedRecurringPlan, FetchedPartner, FetchedReview } from "@/lib/admin/types"
@@ -76,7 +77,7 @@ async function logModerationAction(params: {
             previousValue: params.previousValue,
             newValue: params.newValue,
             riskScoreIncrement: params.riskScoreIncrement,
-            notes: params.notes,
+            notes: sanitizeNotes(params.notes),
         },
     })
 
@@ -93,7 +94,7 @@ async function logModerationAction(params: {
                 previous_value: params.previousValue || null,
                 new_value: params.newValue || null,
                 risk_score_increment: params.riskScoreIncrement,
-                notes: params.notes || null,
+                notes: sanitizeNotes(params.notes),
             })
         } catch (e) {
             console.error("[MODERATION] Failed to log partner_moderation_actions:", e)

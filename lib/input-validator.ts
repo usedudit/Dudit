@@ -134,13 +134,18 @@ export function sanitizeObject(obj: any, allowedKeys: string[]): any {
   return Object.fromEntries(entries)
 }
 
-export function sanitizeHTML(input: string, maxLength = 10000): string {
+export function sanitizeNotes(input: unknown): string | null {
+  if (!input || typeof input !== "string") return null
+  return sanitizeInput(input, 512)
+}
+
+export function sanitizeHTML(input: string, maxLength = 50000): string {
   if (!input || typeof input !== "string") return ""
 
   const trimmed = input.trim().substring(0, maxLength)
 
-  // Allow only safe HTML tags for rich text editing
-  const allowedTags = ["p", "br", "strong", "em", "u", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "a"]
+  // Allow safe HTML tags for rich text editing
+  const allowedTags = ["p", "br", "strong", "em", "u", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "a", "img", "table", "thead", "tbody", "tr", "th", "td", "span", "div", "sub", "sup"]
   return sanitizeHtmlContent(trimmed, allowedTags)
 }
 

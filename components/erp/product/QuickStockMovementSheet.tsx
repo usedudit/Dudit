@@ -268,7 +268,8 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Adicione informações detalhadas sobre este ajuste de estoque..."
-                    maxLength={120}
+                    maxLength={512}
+                    showCharacterCount
                 />
             </div>
 

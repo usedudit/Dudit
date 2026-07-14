@@ -1229,8 +1229,6 @@ export const AppointmentSheet = ({
 
         fetchProductsByIdsAction(productIds, partnerId).then((products: any[]) => {
             if (!cancelled) {
-                productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
-
                 const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
                 setSelectedItems(prevItems => prevItems.map((item: any) => {
                     const product = item.productId ? productsMap[item.productId] : null
@@ -1248,24 +1246,21 @@ export const AppointmentSheet = ({
                             sku: item.sku || product.sku,
                         }
                     }
-                    if (item.stock == null) {
-                        return { ...item, stock: 0 }
-                    }
                     return item
                 }))
             }
             if (!cancelled) setIsEnrichingItems(false)
-        }).catch(() => {
+        }).catch((err) => {
+            console.error("[enrichment] Failed to fetch stock for items:", err)
             if (!cancelled) {
-                productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
-                setSelectedItems(prevItems => prevItems.map((item: any) =>
-                    item.stock == null ? { ...item, stock: 0 } : item
-                ))
                 setIsEnrichingItems(false)
             }
         })
 
-        return () => { cancelled = true }
+        return () => {
+            cancelled = true
+            productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
+        }
     }, [selectedItems, partnerId])
 
     const VIEW_STATUS_OPTIONS = [
@@ -2249,6 +2244,8 @@ export const AppointmentSheet = ({
                                     placeholder="Adicione observações ao agendamento..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
+                                    maxLength={512}
+                                    showCharacterCount
                                 />
                                 <div className="flex justify-end">
                                     <Button variant="default" className="px-6" onClick={() => setCurrentView('summary')}>
@@ -2775,6 +2772,8 @@ export const AppointmentSheet = ({
                     placeholder="Adicione observações ao agendamento..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    maxLength={512}
+                    showCharacterCount
                 />
             </div>
 
@@ -2848,6 +2847,8 @@ export const AppointmentSheet = ({
                                         placeholder="Motivo do cancelamento..."
                                         value={cancelNote}
                                         onChange={(e) => setCancelNote(e.target.value)}
+                                        maxLength={512}
+                                        showCharacterCount
                                     />
                                 </div>
                                 <div className="flex items-center gap-2 justify-center">
@@ -2887,6 +2888,8 @@ export const AppointmentSheet = ({
                                     placeholder="Motivo do cancelamento..."
                                     value={cancelNote}
                                     onChange={(e) => setCancelNote(e.target.value)}
+                                    maxLength={512}
+                                    showCharacterCount
                                 />
                             </div>
                             <div className="flex items-center gap-2 justify-center sm:justify-start">

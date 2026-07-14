@@ -57,7 +57,7 @@ describe("AiGeneratorService", () => {
 
   it("should return cached details if available", async () => {
     vi.mocked(getPartnerPlan).mockResolvedValue({ slug: "crescer" } as any)
-    
+
     const mockDetails = {
       brand: "Samsung",
       description: "Smartphone Samsung Galaxy S24 Ultra",
@@ -65,7 +65,7 @@ describe("AiGeneratorService", () => {
       specs: { Cor: "Preto" },
       category: { id: "cat-123", confidence: 0.95 },
     }
-    
+
     vi.mocked(redis.get)
       .mockResolvedValueOnce(0) // usage
       .mockResolvedValueOnce(mockDetails) // cache hit

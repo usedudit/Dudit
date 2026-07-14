@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { ensureMarketplaceCustomer } from "@/lib/services/marketplace-customer"
 import {
@@ -108,7 +109,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
         next_execution_at: nextExecutionAt,
         delivery_type: input.deliveryType || "pickup",
         delivery_address: input.deliveryAddress || null,
-        notes: input.notes?.trim() || null,
+        notes: sanitizeNotes(input.notes),
       })
       .select("*")
       .single()

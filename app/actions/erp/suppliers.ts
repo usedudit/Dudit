@@ -7,6 +7,7 @@ import { requireUser, requirePartnerAccessWithPermission, requireSupplierOwnersh
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 
 import { generateUniqueSupplierCode } from "@/lib/utils/code-generators"
 import { createAddressAction } from "@/app/actions/shared/addresses"
@@ -80,7 +81,7 @@ export async function createComprehensiveSupplierAction(data: {
     inscricao_estadual: data.inscricaoEstadual || null,
     regime_tributario: data.regimeTributario || null,
     contribuinte_icms: data.contribuinteIcms || null,
-    notes: data.notes || null,
+    notes: sanitizeNotes(data.notes),
     supplier_code: supplierCode,
     image_url: data.image_url || null,
   }).select().single()
@@ -149,7 +150,7 @@ export async function createSupplierAction(data: {
     email: data.email || null,
     phone: data.phone || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
-    notes: data.notes || null,
+    notes: sanitizeNotes(data.notes),
     supplier_code: supplierCode,
   }).select().single()
 
@@ -194,7 +195,7 @@ export async function updateSupplierAction(
       name: data.name,
       email: data.email || null,
       phone: data.phone || null,
-      notes: data.notes || null,
+      notes: sanitizeNotes(data.notes),
       updated_at: new Date().toISOString(),
     })
     .eq("id", supplierId)
@@ -301,7 +302,7 @@ export async function updateComprehensiveSupplierAction(data: {
       city: data.city || null,
       state: data.state || null,
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
-      notes: data.notes || null,
+      notes: sanitizeNotes(data.notes),
       image_url: data.image_url || null,
       updated_at: new Date().toISOString(),
     })

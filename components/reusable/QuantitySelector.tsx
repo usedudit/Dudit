@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { PlusIcon, MinusIcon } from "@/lib/icons"
 
 interface QuantitySelectorProps {
@@ -18,8 +18,60 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
   size = 'md',
   disabled = false
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setInputValue(String(value));
+    }
+  }, [value, isEditing]);
+
+  const commitInput = useCallback(() => {
+    setIsEditing(false);
+    const parsed = parseInt(inputValue, 10);
+    if (!isNaN(parsed) && parsed >= min) {
+      onChange(parsed);
+    } else {
+      setInputValue(String(value));
+    }
+  }, [inputValue, min, onChange, value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (/^\d*$/.test(raw)) {
+      setInputValue(raw);
+    }
+  };
+
+  const handleInputBlur = () => {
+    commitInput();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      commitInput();
+    }
+    if (e.key === 'Escape') {
+      setIsEditing(false);
+      setInputValue(String(value));
+    }
+  };
+
+  const startEditing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (disabled) return;
+    setIsEditing(true);
+    setInputValue(String(value));
+    requestAnimationFrame(() => {
+      inputRef.current?.select();
+    });
+  };
+
   const handleDecrement = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (disabled) return;
     if (value > min) {
       onChange(value - 1);
     }
@@ -27,11 +79,11 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
 
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (disabled) return;
     if (max === undefined || value < max) {
       onChange(value + 1);
     }
   };
-
 
   const heightMap = {
     sm: 'h-8',
@@ -42,7 +94,6 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
     sm: 'w-6 h-6',
     md: 'w-8 h-8'
   };
-
 
   const heightClass = heightMap[size];
   const buttonSizeClass = buttonSizeMap[size];
@@ -63,9 +114,26 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
         <MinusIcon size={iconSize} />
       </button>
 
-      <div className={`flex-1 text-center font-semibold text-brand-dark dark:text-dark-heading ${fontSize} tabular-nums`}>
-        {value < 10 ? `0${value}` : value}
-      </div>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          onKeyDown={handleInputKeyDown}
+          className={`flex-1 text-center font-semibold text-brand-dark dark:text-dark-heading ${fontSize} bg-transparent outline-none tabular-nums w-0`}
+          autoFocus
+        />
+      ) : (
+        <div
+          className={`flex-1 text-center font-semibold text-brand-dark dark:text-dark-heading ${fontSize} tabular-nums cursor-text`}
+          onClick={startEditing}
+        >
+          {value < 10 ? `0${value}` : value}
+        </div>
+      )}
 
       <button
         type="button"

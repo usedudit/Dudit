@@ -9,6 +9,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { revalidateOrders, revalidateOrderHistory, revalidateStockMovements, revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
@@ -132,7 +133,7 @@ const processReturnSchema = z.object({
         unit_price: z.number().nonnegative().max(99999999),
     })).max(100).default([]),
     exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
-    notes: z.string().max(2000).optional().nullable(),
+    notes: z.string().max(512).optional().nullable(),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
     skipMpPaymentCheck: z.boolean().optional().default(false),
 })
@@ -926,7 +927,7 @@ export async function processReturnRequestAction(input: unknown) {
             p_store_credit_amount: data.storeCreditAmount,
             p_exchange_items: data.exchangeItems,
             p_exchange_balance_resolution: data.exchangeBalanceResolution || null,
-            p_notes: data.notes || null,
+            p_notes: sanitizeNotes(data.notes),
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
         })
 

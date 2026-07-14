@@ -238,6 +238,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                         onChange={(e) => setFooterMessage(e.target.value)}
                                         rows={2}
                                         placeholder={DEFAULT_RECEIPT_FOOTER_MESSAGE}
+                                        maxLength={512}
+                                        showCharacterCount
                                     />
 
                                     <div className="hidden lg:flex gap-3 pt-2">

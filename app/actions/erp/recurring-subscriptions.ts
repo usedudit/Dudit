@@ -5,6 +5,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { revalidateTag } from "next/cache"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { processDueRecurringExecutions } from "@/lib/services/recurring-execution.service"
@@ -140,7 +141,7 @@ export async function createRecurringSubscriptionAction(input: {
         delivery_type: input.deliveryType || "pickup",
         delivery_address: input.deliveryAddress || null,
         finance_account_id: input.financeAccountId || null,
-        notes: input.notes?.trim() || null,
+        notes: sanitizeNotes(input.notes),
       })
       .select("*")
       .single()

@@ -437,7 +437,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                     value={item.quantity}
                                                                     disabled={isMarketplaceLocked}
                                                                     onChange={(val) => updateItemQty(index, val)}
-                                                                    max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
                                                                     size="md"
                                                                 />
                                                                 {!item.isService && Number(item.stock || 0) <= 0 && (
@@ -586,7 +585,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 value={item.quantity}
                                                                 disabled={isMarketplaceLocked}
                                                                 onChange={(val) => updateItemQty(index, val)}
-                                                                max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
                                                                 size="sm"
                                                             />
                                                             {!item.isService && Number(item.stock || 0) <= 0 && (
@@ -1214,7 +1212,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 value={item.quantity}
                                                                 disabled={isMarketplaceLocked}
                                                                 onChange={(val) => updateItemQty(index, val)}
-                                                                max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
                                                                 size="sm"
                                                             />
                                                             {!item.isService && Number(item.stock || 0) <= 0 && (

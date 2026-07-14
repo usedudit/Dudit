@@ -7,6 +7,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { requireCSRF } from "@/lib/security/csrf-action-wrapper"
@@ -196,7 +197,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             show_price_in_store: data.show_price_in_store !== false && data.showPriceInStore !== false,
             marketplace_category_id: data.marketplace_category_id || data.marketplaceCategoryId || null,
             tags: data.tags || [],
-            notes: data.notes || null,
+            notes: sanitizeNotes(data.notes),
             video_type: videoMetadata.video_type,
             video_url: videoMetadata.video_url,
             video_thumbnail: videoMetadata.video_thumbnail,
@@ -293,7 +294,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.highlight_service !== undefined) payload.highlight_service = data.highlight_service
         if (data.highlightService !== undefined) payload.highlight_service = data.highlightService
         if (data.tags !== undefined) payload.tags = data.tags
-        if (data.notes !== undefined) payload.notes = data.notes
+        if (data.notes !== undefined) payload.notes = sanitizeNotes(data.notes)
         if (
             data.video_type !== undefined ||
             data.videoType !== undefined ||

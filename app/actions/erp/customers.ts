@@ -12,6 +12,7 @@ import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { createAddressAction } from "@/app/actions/shared/addresses"
 import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 
@@ -197,7 +198,7 @@ export async function createComprehensiveCustomerAction(data: {
     contribuinte_icms: data.contribuinteIcms || null,
     store_credit: data.store_credit ?? 0,
     status: data.status || "ativo",
-    notes: data.notes || null,
+    notes: sanitizeNotes(data.notes),
     birth_date: data.birthDate || null,
     mother_name: data.motherName || null,
     father_name: data.fatherName || null,
@@ -409,7 +410,7 @@ export async function updateComprehensiveCustomerAction(data: {
       contribuinte_icms: data.contribuinteIcms || null,
       store_credit: data.store_credit,
       status: data.status || "ativo",
-      notes: data.notes || null,
+      notes: sanitizeNotes(data.notes),
       birth_date: data.birthDate || null,
       mother_name: data.motherName || null,
       father_name: data.fatherName || null,

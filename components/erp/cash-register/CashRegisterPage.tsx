@@ -829,7 +829,8 @@ export default function CashRegisterPage({
                                 label="Observações de fechamento"
                                 value={closingNotes}
                                 onChange={(e: any) => setClosingNotes(e.target.value)}
-                                maxLength={200}
+                                maxLength={512}
+                                showCharacterCount
                             />
                             <div className="flex justify-end gap-2">
                                 <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>

@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import {
@@ -241,7 +242,7 @@ export async function createServiceOrderAction(
         title: input.title,
         description: input.description || null,
         diagnosis: input.diagnosis || null,
-        internal_notes: input.internal_notes || null,
+        internal_notes: sanitizeNotes(input.internal_notes),
         customer_id: input.customer_id || null,
         customer_snapshot: input.customer_id ? await getCustomerSnapshot(admin, input.customer_id) : null,
         expected_completion_date: input.expected_completion_date || null,
@@ -1110,7 +1111,7 @@ export async function updateServiceOrderAction(
     if (input.title !== undefined && !isPaid) updateData.title = input.title
     if (input.description !== undefined && !isPaid) updateData.description = input.description
     if (input.diagnosis !== undefined && !isPaid) updateData.diagnosis = input.diagnosis
-    if (input.internal_notes !== undefined) updateData.internal_notes = input.internal_notes
+    if (input.internal_notes !== undefined) updateData.internal_notes = sanitizeNotes(input.internal_notes)
     if (input.customer_id !== undefined && !isPaid) {
       updateData.customer_id = input.customer_id
       updateData.customer_snapshot = input.customer_id ? await getCustomerSnapshot(admin, input.customer_id) : null

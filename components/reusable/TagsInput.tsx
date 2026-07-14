@@ -74,7 +74,7 @@ export function TagsInput({
           <div
             key={index}
             className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium animate-fadeIn",
+              "flex items-center gap-1 px-2 rounded-md text-sm font-medium animate-fadeIn",
               tag.length > 30
                 ? "bg-red-100 dark:bg-red-900/30 text-brand-red"
                 : "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"

@@ -10,6 +10,7 @@ import { getActiveCashSessionAction } from "@/app/actions/erp/cash-register"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing, type PricingItem } from "@/lib/services/pricing-engine"
@@ -452,7 +453,7 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
         distance_km: distanceKm,
         delivery_breakdown: deliveryBreakdown,
         additional_costs: otherCosts,
-        notes: sale.notes || null,
+        notes: sanitizeNotes(sale.notes),
         payment_method: formatPaymentMethodLabel(params.defaultPaymentMethod),
         payment_breakdown: params.paymentBreakdown || [],
         payment_provider: params.paymentProvider || null,
@@ -728,7 +729,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
         subtotal,
         discount_amount: discountAmount,
         total_amount: totalAmount,
-        notes: input.notes?.trim() || null,
+        notes: sanitizeNotes(input.notes),
         status: "draft",
         updated_at: new Date().toISOString(),
     }

@@ -80,6 +80,8 @@ export function ReportReturnModal({ open, onClose, returnRequestId, onReported }
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
+          maxLength={512}
+          showCharacterCount
         />
 
         <Checkbox

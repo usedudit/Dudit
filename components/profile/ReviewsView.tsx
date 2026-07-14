@@ -311,6 +311,8 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                 onChange={(e) => setEditComment(e.target.value)}
                                 placeholder="Edite sua opinião para ajudar outros compradores..."
                                 className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
+                                maxLength={512}
+                                showCharacterCount
                             />
                         </div>
 

@@ -6,7 +6,7 @@ export class OpenRouterProvider implements AiProvider {
 
   constructor() {
     this.apiKey = process.env.OPENROUTER_API_KEY || ""
-    this.defaultModel = process.env.AI_PRODUCT_MODEL || "nvidia/llama-3.3-nemotron-super-49b-v1"
+    this.defaultModel = process.env.AI_PRODUCT_MODEL || "nemotron-3-ultra-550b-a55b:free"
   }
 
   async generate(

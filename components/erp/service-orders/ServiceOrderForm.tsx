@@ -898,6 +898,30 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
         })
     }
 
+    const updateProductQty = (indexInAll: number, value: number) => {
+        const normalizedQty = Math.max(1, Number(value || 1))
+        const product = products[indexInAll]
+        if (product && !product.isManual && !product.allowSellWithoutStock && normalizedQty > Number(product.stock ?? 0)) {
+            setPendingZeroStockItem({
+                product: { name: product.product_name },
+                callback: () => {
+                    setProducts(prev => {
+                        const next = [...prev]
+                        next[indexInAll] = { ...next[indexInAll], quantity: normalizedQty, allowSellWithoutStock: true }
+                        return next
+                    })
+                }
+            })
+            setShowZeroStockAlert(true)
+            return
+        }
+        setProducts(prev => {
+            const next = [...prev]
+            next[indexInAll] = { ...next[indexInAll], quantity: normalizedQty }
+            return next
+        })
+    }
+
     const pageTitle = editData ? `Editar OS #${editData.order_number}` : "Nova Ordem de Serviço"
     const dateCreated = editData
         ? new Date(editData.created_at).toLocaleDateString("pt-BR")
@@ -1220,6 +1244,8 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             value={internalNotes}
                                             onChange={(e) => setInternalNotes(e.target.value)}
                                             name="internalNotes"
+                                            maxLength={512}
+                                            showCharacterCount
                                         />
                                     </FadeIn>
                                 )}
@@ -1706,7 +1732,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                 <div className="flex justify-center items-center gap-1.5">
                                                                                     <QuantitySelector
                                                                                         value={qty}
-                                                                                        onChange={(val) => updateProductField(index, "quantity", val)}
+                                                                                        onChange={(val) => updateProductQty(index, val)}
                                                                                         size="md"
                                                                                         disabled={isLocked}
                                                                                     />
@@ -1811,7 +1837,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                                                 <div className="flex items-center gap-1.5 shrink-0">
                                                                                     <QuantitySelector
                                                                                         value={qty}
-                                                                                        onChange={(val) => updateProductField(index, "quantity", val)}
+                                                                                        onChange={(val) => updateProductQty(index, val)}
                                                                                         size="sm"
                                                                                     />
                                                                                     {!prod.isManual && Number(prod.stock || 0) <= 0 && (
@@ -2170,9 +2196,10 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                     pendingZeroStockItem?.callback?.()
                     setPendingZeroStockItem(null)
                 }}
-                title="Produto sem estoque"
-                message={`O produto "${pendingZeroStockItem?.product?.product_name || pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
-                confirmText="Adicionar"
+                title="Estoque insuficiente"
+                message={`O produto "${pendingZeroStockItem?.product?.product_name || pendingZeroStockItem?.product?.name || ''}" não possui estoque suficiente. Deseja continuar mesmo assim?`}
+                confirmText="Continuar mesmo assim"
+                cancelText="Cancelar"
                 variant="warning"
             />
 

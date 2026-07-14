@@ -140,7 +140,7 @@ export function ReportModal({
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={4}
-                        maxLength={1000} name={""} />
+                        maxLength={512} name={""} showCharacterCount />
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-8">

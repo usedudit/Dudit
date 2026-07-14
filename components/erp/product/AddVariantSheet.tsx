@@ -1051,22 +1051,21 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                 icon={<TrashIcon />}
             />
 
-            {selectedVariantForAdjustment && (
-                <QuickStockMovementSheet
-                    isOpen={!!selectedVariantForAdjustment}
-                    product={{
-                        id: product.id,
-                        name: product.name,
-                        sku: product.sku,
-                        image: (typeof product.images?.[0] === 'string' ? product.images[0] : (product.image || null)),
-                        stock: Number(product.stock || 0)
-                    }}
-                    variant={selectedVariantForAdjustment}
-                    onClose={() => setSelectedVariantForAdjustment(null)}
-                    onSaveSuccess={(newStock) => {
-                        updateRow(selectedVariantForAdjustment.rowId, "stock", newStock)
-                        setExistingVariants(prev => prev.map(ev => {
-                            if (ev.id === selectedVariantForAdjustment.id) {
+            <QuickStockMovementSheet
+                isOpen={!!selectedVariantForAdjustment}
+                product={{
+                    id: product.id,
+                    name: product.name,
+                    sku: product.sku,
+                    image: (typeof product.images?.[0] === 'string' ? product.images[0] : (product.image || null)),
+                    stock: Number(product.stock || 0)
+                }}
+                variant={selectedVariantForAdjustment}
+                onClose={() => setSelectedVariantForAdjustment(null)}
+                onSaveSuccess={(newStock) => {
+                    updateRow(selectedVariantForAdjustment.rowId, "stock", newStock)
+                    setExistingVariants(prev => prev.map(ev => {
+                        if (ev.id === selectedVariantForAdjustment.id) {
                                 return { ...ev, stock: newStock }
                             }
                             return ev
@@ -1074,7 +1073,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                         onSaveSuccess?.()
                     }}
                 />
-            )}
+            </QuickStockMovementSheet>
 
             <SavingStatusModal isOpen={isSaving} text="Salvando variações..." />
         </div>

@@ -36,14 +36,13 @@ export const POSPreSaleCard = memo(function POSPreSaleCard({ preSale, index, cus
           {onDelete && (
             <Button
               variant="outlinered"
-              className="h-7"
+              className="w-6 h-6"
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete(e)
               }}
-              leftIcon={<TrashIcon size={14} className="text-brand-red" />}
+              leftIcon={<TrashIcon size={12} className="text-brand-red" />}
             >
-              Excluir
             </Button>
           )}
         </div>

@@ -192,6 +192,8 @@ export function ReviewButton({
                           setComments((prev) => ({ ...prev, [item.id]: e.target.value }))
                         }
                         placeholder={isReviewed ? "" : "Sua opinião ajuda outros compradores..."}
+                        maxLength={512}
+                        showCharacterCount
                         className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
                       />
                     </div>
@@ -282,12 +284,11 @@ export function ReviewButton({
                           value={isReviewed ? "Item já avaliado anteriormente." : itemComment}
                           disabled={isReviewed}
                           onChange={(e) =>
-                            setComments((prev) => ({
-                              ...prev,
-                              [item.id]: e.target.value,
-                            }))
+                            setComments((prev) => ({ ...prev, [item.id]: e.target.value }))
                           }
                           placeholder={isReviewed ? "" : "Sua opinião ajuda outros compradores..."}
+                          maxLength={512}
+                          showCharacterCount
                           className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
                         />
                       </div>

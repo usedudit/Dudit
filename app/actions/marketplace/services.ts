@@ -3,6 +3,7 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { cache } from "react"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
 import { startOfDay } from "@/lib/date"
 
@@ -364,7 +365,7 @@ export async function createPublicAppointment(data: {
         staff_name: data.staffName,
         price: data.price,
         pricing_unit: "Por Serviço",
-        notes: data.notes || null,
+        notes: sanitizeNotes(data.notes),
         status: "Reservado",
         source: "appointment",
         sales_channel: "online_storefront",

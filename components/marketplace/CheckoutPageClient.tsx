@@ -3072,6 +3072,8 @@ export function CheckoutPageClient() {
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                         name="notes"
                         rows={4}
+                        maxLength={512}
+                        showCharacterCount
                     />
                 </div>
             </DefaultModal>

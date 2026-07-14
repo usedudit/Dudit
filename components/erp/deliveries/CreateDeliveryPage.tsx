@@ -687,6 +687,8 @@ export default function CreateDeliveryPage({
                                             value={notes}
                                             onChange={(e) => setNotes(e.target.value)}
                                             name="notes"
+                                            maxLength={512}
+                                            showCharacterCount
                                         />
 
                                         <div className="flex items-center gap-3">

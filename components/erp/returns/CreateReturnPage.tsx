@@ -1856,7 +1856,7 @@ export default function CreateReturnPage({
                                                     disabled={isViewOnly}
                                                     value={observations}
                                                     onChange={(e) => setObservations(e.target.value)}
-                                                    maxLength={1000}
+                                                    maxLength={512}
                                                     showCharacterCount={true}
                                                 />
                                             </FormSection>

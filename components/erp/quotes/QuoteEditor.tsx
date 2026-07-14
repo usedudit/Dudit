@@ -387,7 +387,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex justify-center">
-                                                            <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" disabled={itemsLocked} />
+                                                            <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="md" disabled={itemsLocked} />
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
@@ -520,7 +520,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
                                                 {!itemsLocked && (
                                                     <div className="flex items-center gap-4 mt-2">
-                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="sm" />
+                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
                                                         <div className="flex-1 max-w-[140px]">
                                                             <MoneyInput
                                                                 name={`item-price-mobile-${index}`}
@@ -846,6 +846,8 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 onChange={(e) => props.setInternalNote(e.target.value)}
                                 disabled={proposalNotesLocked}
                                 name="internalNote"
+                                maxLength={512}
+                                showCharacterCount
                             />
                         </div>
                         <div>
@@ -857,6 +859,8 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 onChange={(e) => props.setStaffInternalNotes(e.target.value)}
                                 disabled={internalNotesLocked}
                                 name="staffInternalNotes"
+                                maxLength={512}
+                                showCharacterCount
                             />
                         </div>
                     </div>

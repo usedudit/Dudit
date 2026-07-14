@@ -6,6 +6,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { revalidateEntityTimeline, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
@@ -111,7 +112,7 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
     staff_name: String(input.staffName || "Profissional").trim(),
     price: Number(input.price || 0),
     pricing_unit: input.pricingUnit || "Por Serviço",
-    notes: input.notes || null,
+    notes: sanitizeNotes(input.notes),
     status: sanitizeStatus(input.status),
     source: input.source || "appointment",
     recurrence_rule: input.recurrenceRule || null,

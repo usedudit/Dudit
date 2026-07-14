@@ -5,6 +5,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { ensureMarketplaceCustomer } from "@/lib/services/marketplace-customer"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { mapPlanRow, mapSubscriptionRow, getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 
@@ -627,7 +628,7 @@ export async function updateMySubscriptionDetailsAction(
       changes.push(`endereço de entrega alterado para "${input.deliveryAddress || "Retirada"}".`)
     }
     if (input.notes !== undefined) {
-      updatePayload.notes = input.notes
+      updatePayload.notes = sanitizeNotes(input.notes)
       changes.push(`observações alteradas para "${input.notes || ""}".`)
     }
 

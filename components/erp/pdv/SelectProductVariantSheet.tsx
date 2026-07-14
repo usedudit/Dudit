@@ -238,14 +238,11 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
         return () => obs.disconnect()
     }, [isOpen, hasMore, loadMore, displayedVariants.length])
 
-    if (!product) return null
-
     const canConfirm = selections.length > 0
 
-    const updateVariantQty = (variantId: string, qty: number, stockLimit?: number | null) => {
+    const updateVariantQty = (variantId: string, qty: number) => {
         const parsedQty = Math.max(0, Number(qty || 0))
-        const maxQty = product.allow_sell_without_stock ? parsedQty : Math.min(parsedQty, Math.max(0, Number(stockLimit || 0)))
-        setQtyByVariantId((prev) => ({ ...prev, [variantId]: maxQty }))
+        setQtyByVariantId((prev) => ({ ...prev, [variantId]: parsedQty }))
     }
 
     // Active filter chip renders
@@ -283,7 +280,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
         )
     }
 
-    const content = (
+    const content = !product ? null : (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar variações</h2>
@@ -425,9 +422,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                                         <QuantitySelector
                                             value={currentQty}
                                             min={0}
-                                            max={product.allow_sell_without_stock ? undefined : stock}
-                                            onChange={(value) => updateVariantQty(variant.id, value, stock)}
-                                            disabled={outOfStock}
+                                            onChange={(value) => updateVariantQty(variant.id, value)}
                                             size="sm"
                                         />
                                     </div>

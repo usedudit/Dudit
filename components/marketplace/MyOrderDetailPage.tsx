@@ -1736,7 +1736,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 label="Detalhes"
                                 value={cancelDetails}
                                 onChange={(e) => setCancelDetails(e.target.value)}
-                                maxLength={1000}
+                                maxLength={512}
                                 multiline
                                 rows={4}
                                 showCharacterCount
@@ -1895,7 +1895,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             label="Mensagem opcional"
                             value={returnMessage}
                             onChange={(e) => setReturnMessage(e.target.value)}
-                            maxLength={1000}
+                            maxLength={512}
                             multiline
                             rows={4}
                             showCharacterCount

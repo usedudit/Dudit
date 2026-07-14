@@ -5,6 +5,7 @@ import { revalidateCart, revalidateOrders } from "@/lib/utils/revalidation"
 import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getUserSessionData } from "@/lib/data/user"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
@@ -1090,7 +1091,7 @@ export async function checkoutCartAction(
         }],
       payment_provider: useMercadoPago ? "Mercado Pago" : null,
       situation: paymentMethodName === "Assinatura (Créditos)" ? "paid" : (isPickupPayment && orderDelivery === "pickup" ? "awaiting_pickup_payment" : "pending"),
-      notes,
+      notes: sanitizeNotes(notes),
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
       discount_amount: persistedCouponDiscount,

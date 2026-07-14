@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { getDeliveryStatusLabel, getPaymentStatusLabel } from "@/lib/orders/status"
 import { getOrderHistoryEntries } from "@/lib/services/order-history.service"
@@ -1555,7 +1556,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         coupon_id: couponIdToSave,
         delivery_fee: serverShippingCost,
         additional_costs: data.additionalCosts,
-        notes: data.notes || null,
+        notes: sanitizeNotes(data.notes),
         payment_method: paymentMethodSummary,
         payment_breakdown: adjustedPaymentBreakdown,
         payment_provider: data.paymentProvider || null,
@@ -1700,7 +1701,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             orderId: order.id,
             createdBy: user.id,
             reason: "Venda de Produtos",
-            notes: data.notes?.trim() || undefined,
+            notes: sanitizeNotes(data.notes) || undefined,
             items: stockItems,
         })
 
@@ -2048,7 +2049,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         subtotal_value: subtotalValue,
         payment_method_discount_amount: paymentMethodDiscountAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
-        notes: sale.notes,
+        notes: sanitizeNotes(sale.notes),
         created_at: sale.created_at,
         order_date: sale.created_at,
         order_items: (sale.sale_items || []).map((it: any) => ({
@@ -2359,7 +2360,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         payment_method_extra_amount: updatePaymentMethodExtraAmount,
         delivery_fee: updateServerShipping,
         additional_costs: data.additionalCosts,
-        notes: data.notes || null,
+        notes: sanitizeNotes(data.notes),
         payment_method: paymentMethodSummary,
         payment_breakdown: adjustedPaymentBreakdown,
         finance_account_id: data.financeAccountId,
@@ -2493,7 +2494,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 createdBy: user.id,
                 type: "in",
                 reason: "Edicao de pedido",
-                notes: data.notes?.trim() || undefined,
+                notes: sanitizeNotes(data.notes) || undefined,
                 items: delta.incoming,
             })
 
@@ -2508,7 +2509,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 createdBy: user.id,
                 type: "out",
                 reason: "Edicao de pedido",
-                notes: data.notes?.trim() || undefined,
+                notes: sanitizeNotes(data.notes) || undefined,
                 items: delta.outgoing,
             })
 
@@ -2555,7 +2556,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 orderId,
                 createdBy: user.id,
                 reason: "Venda de Produtos",
-                notes: data.notes?.trim() || undefined,
+                notes: sanitizeNotes(data.notes) || undefined,
                 items: stockItems,
             })
 
@@ -2672,7 +2673,7 @@ export async function updateOrderNotesAction(input: {
         return { success: false as const, error: currentOrderError?.message || "Pedido nÃ£o encontrado." }
     }
 
-    const cleanNotes = String(input.notes || "").trim()
+    const cleanNotes = sanitizeNotes(input.notes) || ""
     const cancelNote = (String(currentOrder.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
     const nextNotes = [cleanNotes, cancelNote].filter(Boolean).join("\n").trim() || null
 
@@ -3881,7 +3882,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         }
 
         if (payload.notes !== undefined) {
-            updatePayload.notes = payload.notes
+            updatePayload.notes = sanitizeNotes(payload.notes)
         }
 
         const { error: updateError } = await supabase

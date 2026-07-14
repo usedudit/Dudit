@@ -13,6 +13,7 @@ import {
 } from "@/lib/services/location.service"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
+import { sanitizeNotes } from "@/lib/input-validator"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -926,7 +927,7 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
     delivered_at: status === "delivered" ? payload.startedAt : null,
     completed_at: status === "delivered" ? payload.startedAt : null,
     created_at: new Date().toISOString(),
-    notes: payload.notes?.trim() || null,
+    notes: sanitizeNotes(payload.notes),
     delivery_number: deliveryNumber,
     created_by: user?.id || null,
   }
@@ -1383,7 +1384,7 @@ export async function updateERPDeliveryAction(payload: {
     .from("deliveries")
     .update({
       delivery_person_id: payload.deliveryPersonId || null,
-      notes: payload.notes?.trim() || null,
+      notes: sanitizeNotes(payload.notes),
     })
     .eq("id", payload.deliveryId)
     .eq("partner_id", payload.partnerId)

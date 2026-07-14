@@ -484,8 +484,21 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 const newItems = [...prevItems];
                 const nextQty = newItems[existingItemIndex].qty + qty;
                 const maxQty = getItemMaxQuantity(newItems[existingItemIndex]);
-                if (maxQty !== undefined && nextQty > maxQty) {
-                    notifyError("Estoque insuficiente", `A quantidade de "${finalName}" está maior que o estoque disponível.`);
+                if (maxQty !== undefined && nextQty > maxQty && !newItems[existingItemIndex].allowSellWithoutStock) {
+                    setPendingZeroStockItem({
+                        product: { name: finalName },
+                        callback: () => {
+                            setQuoteItems(prev => {
+                                const updated = [...prev];
+                                const idx = updated.findIndex(i => i.id === product.id && i.variant === variantName);
+                                if (idx >= 0) {
+                                    updated[idx] = { ...updated[idx], qty: updated[idx].qty + qty, allowSellWithoutStock: true };
+                                }
+                                return updated;
+                            });
+                        }
+                    });
+                    setShowZeroStockAlert(true);
                     return prevItems;
                 }
                 newItems[existingItemIndex] = {
@@ -610,13 +623,23 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const updateItemQty = (index: number, newQty: number) => {
         const normalizedQty = Math.max(1, Number(newQty || 1));
         const newItems = [...quoteItems];
-        const maxQty = getItemMaxQuantity(newItems[index]);
-        if (maxQty !== undefined && normalizedQty > maxQty) {
-            notifyError("Estoque insuficiente", `A quantidade de "${newItems[index].name}" está maior que o estoque disponível.`);
-            newItems[index].qty = Math.max(1, maxQty);
-        } else {
-            newItems[index].qty = normalizedQty;
+        const item = newItems[index];
+        const maxQty = getItemMaxQuantity(item);
+        if (maxQty !== undefined && normalizedQty > maxQty && !item.allowSellWithoutStock) {
+            setPendingZeroStockItem({
+                product: { name: item.name },
+                callback: () => {
+                    setQuoteItems(prev => {
+                        const updated = [...prev];
+                        updated[index] = { ...updated[index], qty: normalizedQty, allowSellWithoutStock: true };
+                        return updated;
+                    });
+                }
+            });
+            setShowZeroStockAlert(true);
+            return;
         }
+        item.qty = normalizedQty;
         setQuoteItems(newItems);
     };
 
@@ -1289,9 +1312,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         pendingZeroStockItem?.callback?.()
                         setPendingZeroStockItem(null)
                     }}
-                    title="Produto sem estoque"
-                    message={`O produto "${pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
-                    confirmText="Adicionar"
+                    title="Estoque insuficiente"
+                    message={`O produto "${pendingZeroStockItem?.product?.name || ''}" não possui estoque suficiente. Deseja continuar mesmo assim?`}
+                    confirmText="Continuar mesmo assim"
+                    cancelText="Cancelar"
                     variant="warning"
                 />
             </div>

@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { revalidatePath } from "next/cache"
 import type { RoleId } from "@/lib/permissions/rbac-types"
@@ -513,7 +514,7 @@ export async function openCashSessionAction(input: {
       opened_by_user_id: user.id,
       initial_amount: initialAmount,
       status: "open",
-      notes: input.notes?.trim() || null,
+      notes: sanitizeNotes(input.notes),
     })
     .select("*")
     .single()

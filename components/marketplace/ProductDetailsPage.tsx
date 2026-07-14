@@ -2093,9 +2093,14 @@ export function ProductDetailsPageClient({
                             <div className="mb-10">
                                 <h3 className="text-xl font-medium text-brand-dark mb-4">Descrição</h3>
                                 <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
-                                    <p className="text-sm md:text-[0.9375rem] text-gray-600 leading-relaxed whitespace-pre-wrap">
-                                        {product.description || "Sem descrição."}
-                                    </p>
+                                    {product.description ? (
+                                        <div
+                                            className="rich-text-content"
+                                            dangerouslySetInnerHTML={{ __html: product.description }}
+                                        />
+                                    ) : (
+                                        <p className="text-sm md:text-[0.9375rem] text-gray-600 leading-relaxed">Sem descrição.</p>
+                                    )}
                                     {!isDescriptionExpanded && product.description?.length > 200 && (
                                         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent" />
                                     )}

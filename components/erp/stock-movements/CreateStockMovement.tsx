@@ -800,6 +800,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     value={notes}
                                                     onChange={(e) => setNotes(e.target.value)}
                                                     name="notes"
+                                                    maxLength={512}
+                                                    showCharacterCount
                                                 />
                                             </motion.div>
                                         </TabsContent>
@@ -955,16 +957,12 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                     onScan={handleScanBarcode}
                 />
 
-                {
-                    selectedProductForVariants && (
-                        <SelectProductVariantSheet
-                            isOpen={!!selectedProductForVariants}
-                            product={selectedProductForVariants}
-                            onClose={() => setSelectedProductForVariants(null)}
-                            onConfirm={handleConfirmVariants}
-                        />
-                    )
-                }
+                <SelectProductVariantSheet
+                    isOpen={!!selectedProductForVariants}
+                    product={selectedProductForVariants}
+                    onClose={() => setSelectedProductForVariants(null)}
+                    onConfirm={handleConfirmVariants}
+                />
             </div >
         </FadeIn >
     );

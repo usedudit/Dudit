@@ -458,7 +458,7 @@ function SaveFooter({ riskScore, onRiskScoreChange, notes, onNotesChange, onSave
             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Ação de Moderação</h3>
             <div className="space-y-5">
                 <FormDropdown label="Risk Score" options={RISK_LEVELS} value={riskScore} setValue={onRiskScoreChange} placeholder="Não alterar" width="w-full" />
-                <FormTextarea label="Observações" name="notes" value={notes} onChange={(e) => onNotesChange(e.target.value)} rows={2} placeholder="Observações sobre a ação (opcional)..." />
+                <FormTextarea label="Observações" name="notes" value={notes} onChange={(e) => onNotesChange(e.target.value)} rows={2} placeholder="Observações sobre a ação (opcional)..." maxLength={512} showCharacterCount />
                 <div className="flex items-center gap-3 flex-wrap pt-2">
                     <Button variant="filled" onClick={onSave} disabled={isPending} isLoading={isPending}><SaveIcon size={16} /> Salvar alterações</Button>
                     {showDelete && (
@@ -971,7 +971,7 @@ function PartnerGallery({ data, isPending, onRefresh }: { data: FetchedPartner; 
                 <SidebarCard title="Ações">
                     <div className="space-y-5">
                         <FormDropdown label="Risk Score" options={RISK_LEVELS} value={riskScore} setValue={setRiskScore} placeholder="Não alterar" width="w-full" />
-                        <FormTextarea label="Observações" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Observações sobre a ação (opcional)..." />
+                        <FormTextarea label="Observações" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Observações sobre a ação (opcional)..." maxLength={512} showCharacterCount />
                     </div>
                 </SidebarCard>
             }

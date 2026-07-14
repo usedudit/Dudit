@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { sanitizeNotes } from "@/lib/input-validator"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
@@ -81,7 +82,7 @@ export async function createStockMovementAction(data: {
             p_movement_type: data.type,
             p_quantity: data.quantity,
             p_reason: data.reason,
-            p_notes: data.notes,
+                p_notes: sanitizeNotes(data.notes),
             p_created_by: userId,
             p_variant_id: data.variantId || null
         })
@@ -178,7 +179,7 @@ export async function createBatchStockMovementAction(data: {
             p_partner_id: partnerId,
             p_movement_type: data.type,
             p_reason: data.reason,
-            p_notes: data.notes,
+                p_notes: sanitizeNotes(data.notes),
             p_created_by: userId,
             p_items: itemsPayload
         })

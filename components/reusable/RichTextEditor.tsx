@@ -7,7 +7,7 @@ import {
   OrderedListIcon, ListIcon,
   AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
   TableIcon, ImageIcon, LinkIcon,
-  ColorIcon, ClearFormatIcon,
+  ColorIcon, ClearFormatIcon, FontSizeIcon,
 } from "@/lib/icons"
 import { Tooltip } from "@/components/reusable/Tooltip"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -27,33 +27,54 @@ interface RichTextEditorProps {
 const COLORS = [
   { label: "Preto", value: "#000000" },
   { label: "Vermelho", value: "#e53e3e" },
-  { label: "Azul", value: "#3182ce" },
-  { label: "Verde", value: "#38a169" },
-  { label: "Amarelo", value: "#d69e2e" },
-  { label: "Roxo", value: "#805ad5" },
-  { label: "Laranja", value: "#dd6b20" },
-  { label: "Rosa", value: "#d53f8c" },
-  { label: "Cinza", value: "#718096" },
-  { label: "Marrom", value: "#8b5a2b" },
-  { label: "Azul Claro", value: "#63b3ed" },
-  { label: "Verde Claro", value: "#68d391" },
+  { label: "Azul", value: "#2563eb" },
+  { label: "Verde", value: "#16a34a" },
+  { label: "Amarelo", value: "#ca8a04" },
+  { label: "Roxo", value: "#7c3aed" },
+  { label: "Laranja", value: "#ea580c" },
+  { label: "Rosa", value: "#db2777" },
+  { label: "Cinza", value: "#6b7280" },
+  { label: "Marrom", value: "#92400e" },
+  { label: "Azul Claro", value: "#60a5fa" },
+  { label: "Verde Claro", value: "#4ade80" },
   { label: "Branco", value: "#ffffff" },
-  { label: "Cinza Escuro", value: "#2d3748" },
+  { label: "Cinza Escuro", value: "#374151" },
+]
+
+const FONT_SIZES = [
+  { tag: "p", label: "Normal", preview: "Aa" },
+  { tag: "h1", label: "Título 1", preview: "Aa" },
+  { tag: "h2", label: "Título 2", preview: "Aa" },
+  { tag: "h3", label: "Título 3", preview: "Aa" },
+  { tag: "h4", label: "Título 4", preview: "Aa" },
+  { tag: "h5", label: "Título 5", preview: "Aa" },
+  { tag: "h6", label: "Título 6", preview: "Aa" },
 ]
 
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, onChange, disabled }) => {
   const editorRef = useRef<HTMLDivElement>(null)
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set())
-  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [showColorModal, setShowColorModal] = useState(false)
+  const [showFontSizeModal, setShowFontSizeModal] = useState(false)
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [linkUrl, setLinkUrl] = useState("")
   const [showTableModal, setShowTableModal] = useState(false)
   const [tableRows, setTableRows] = useState(3)
   const [tableCols, setTableCols] = useState(3)
   const [showImageModal, setShowImageModal] = useState(false)
-  const colorRef = useRef<HTMLDivElement>(null)
 
   const { planSlug } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
   const imageUploadBlocked = !hasMinimumPlan(planSlug, "crescer")
+
+  const exec = useCallback((command: string, value?: string) => {
+    editorRef.current?.focus()
+    document.execCommand(command, false, value ?? undefined)
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML)
+      updateActiveFormats()
+    }
+  }, [onChange])
 
   const updateActiveFormats = useCallback(() => {
     const formats = new Set<string>()
@@ -64,53 +85,51 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
     setActiveFormats(formats)
   }, [])
 
-  const handleFormat = useCallback((command: string, value?: string) => {
-    document.execCommand(command, false, value ?? undefined)
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML)
-      updateActiveFormats()
-    }
-  }, [onChange, updateActiveFormats])
-
   useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
       editorRef.current.innerHTML = value
     }
   }, [value])
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (colorRef.current && !colorRef.current.contains(e.target as Node)) {
-        setShowColorPicker(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [])
-
-  const handleLink = () => {
-    const url = window.prompt("Digite a URL do link:")
-    if (url) handleFormat("createLink", url)
+  const handleLinkSubmit = () => {
+    if (linkUrl) exec("createLink", linkUrl)
+    setShowLinkModal(false)
+    setLinkUrl("")
   }
 
   const handleInsertTable = () => {
     const tableHtml = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${Array(tableCols).fill("").map(() => '<th style="border:1px solid #ccc;padding:8px;background:#f5f5f5;font-weight:bold;text-align:left;">Título</th>').join("")}</tr></thead><tbody>${Array(tableRows).fill("").map(() => `<tr>${Array(tableCols).fill("").map(() => '<td style="border:1px solid #ccc;padding:8px;">&nbsp;</td>').join("")}</tr>`).join("")}</tbody></table><br>`
-    document.execCommand("insertHTML", false, tableHtml)
-    if (editorRef.current) onChange(editorRef.current.innerHTML)
+    editorRef.current?.focus()
+    exec("insertHTML", tableHtml)
     setShowTableModal(false)
     setTableRows(3)
     setTableCols(3)
   }
 
   const handleImageInsert = (imgUrl: string, alt: string, width: string, height: string) => {
+    editorRef.current?.focus()
     const imgHtml = `<img src="${imgUrl}" alt="${alt}" width="${width}"${height ? ` height="${height}"` : ""} style="max-width:100%;height:auto;" />`
-    document.execCommand("insertHTML", false, imgHtml)
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      const range = sel.getRangeAt(0)
+      range.deleteContents()
+      const fragment = range.createContextualFragment(imgHtml)
+      range.insertNode(fragment)
+      range.collapse(false)
+    } else {
+      exec("insertHTML", imgHtml)
+    }
     if (editorRef.current) onChange(editorRef.current.innerHTML)
   }
 
   const countImages = () => {
     if (!editorRef.current) return 0
     return editorRef.current.querySelectorAll("img").length
+  }
+
+  const handleFontSize = (tag: string) => {
+    exec("formatBlock", `<${tag}>`)
+    setShowFontSizeModal(false)
   }
 
   const isActive = (cmd: string) => activeFormats.has(cmd)
@@ -121,7 +140,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
       <Tooltip key={command} text={tooltip}>
         <button
           type="button"
-          onMouseDown={(e) => { e.preventDefault(); handleFormat(command, value) }}
+          onMouseDown={(e) => { e.preventDefault(); exec(command, value) }}
           disabled={disabled}
           className={`p-1.5 rounded transition-colors ${
             isActive(command)
@@ -135,7 +154,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
     )
   }
 
-  const renderIconBtn = (icon: React.FC<{ className?: string }>, tooltip: string, onClick: () => void, active?: boolean) => {
+  const renderIconBtn = (icon: React.FC<{ className?: string }>, tooltip: string, onClick: () => void) => {
     const Icon = icon
     return (
       <Tooltip text={tooltip}>
@@ -143,11 +162,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
           type="button"
           onMouseDown={(e) => { e.preventDefault(); onClick() }}
           disabled={disabled}
-          className={`p-1.5 rounded transition-colors ${
-            active
-              ? "bg-brand-green/20 dark:bg-brand-green/30 text-brand-green"
-              : "hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading"
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
+          className="p-1.5 rounded transition-colors hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Icon className="w-4 h-4" />
         </button>
@@ -182,31 +197,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
 
           {renderIconBtn(TableIcon, "Inserir tabela", () => setShowTableModal(true))}
           {renderIconBtn(ImageIcon, "Inserir imagem", () => setShowImageModal(true))}
-          {renderIconBtn(LinkIcon, "Inserir link", handleLink)}
+          {renderIconBtn(LinkIcon, "Inserir link", () => { setLinkUrl(""); setShowLinkModal(true) })}
 
           <div className="w-px h-5 bg-brand-border dark:bg-dark-border mx-1" />
 
-          <div className="relative" ref={colorRef}>
-            {renderIconBtn(ColorIcon, "Cor do texto", () => setShowColorPicker((p) => !p))}
-            {showColorPicker && (
-              <div className="absolute top-full left-0 mt-1 p-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg shadow-xl z-50 grid grid-cols-7 gap-1.5">
-                {COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); handleFormat("foreColor", c.value); setShowColorPicker(false) }}
-                    className="w-6 h-6 rounded-full border border-brand-border/50 hover:scale-110 transition-transform cursor-pointer"
-                    style={{ backgroundColor: c.value }}
-                    title={c.label}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          {renderIconBtn(ColorIcon, "Cor do texto", () => setShowColorModal(true))}
+          {renderIconBtn(FontSizeIcon, "Tamanho do texto", () => setShowFontSizeModal(true))}
 
           <div className="w-px h-5 bg-brand-border dark:bg-dark-border mx-1" />
 
-          {renderBtn(ClearFormatIcon, "Limpar formatação", "removeFormat")}
+          {renderIconBtn(ClearFormatIcon, "Limpar formatação", () => exec("removeFormat"))}
         </div>
 
         <div
@@ -218,6 +218,68 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
           className="w-full h-[200px] overflow-y-auto bg-white dark:bg-dark-surface rounded-b-lg py-2 px-4 text-sm focus:outline-none text-brand-dark dark:text-dark-heading disabled:bg-brand-gray dark:disabled:bg-dark-border/30 custom-scrollbar"
         />
       </div>
+
+      <DefaultModal isOpen={showColorModal} onClose={() => setShowColorModal(false)} title="Cor do texto" maxWidth="sm">
+        <div className="grid grid-cols-5 sm:grid-cols-7 gap-3 p-2">
+          {COLORS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); exec("foreColor", c.value); setShowColorModal(false) }}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-brand-border/40 hover:scale-110 transition-transform cursor-pointer shadow-sm"
+              style={{ backgroundColor: c.value }}
+              title={c.label}
+            />
+          ))}
+        </div>
+      </DefaultModal>
+
+      <DefaultModal isOpen={showFontSizeModal} onClose={() => setShowFontSizeModal(false)} title="Tamanho do texto" maxWidth="sm">
+        <div className="flex flex-col gap-2">
+          {FONT_SIZES.map((f) => (
+            <button
+              key={f.tag}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); handleFontSize(f.tag) }}
+              className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border transition-colors text-left cursor-pointer"
+            >
+              <span
+                className={`font-bold text-brand-dark dark:text-dark-heading min-w-[60px] ${
+                  f.tag === "h1" ? "text-3xl" :
+                  f.tag === "h2" ? "text-2xl" :
+                  f.tag === "h3" ? "text-xl" :
+                  f.tag === "h4" ? "text-lg" :
+                  f.tag === "h5" ? "text-base" :
+                  f.tag === "h6" ? "text-sm" : "text-base"
+                }`}
+              >
+                {f.preview}
+              </span>
+              <span className="text-sm text-brand-dark/70 dark:text-dark-body/70">{f.label}</span>
+            </button>
+          ))}
+        </div>
+      </DefaultModal>
+
+      <DefaultModal isOpen={showLinkModal} onClose={() => setShowLinkModal(false)} title="Inserir link" maxWidth="sm">
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">URL</label>
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://..."
+              autoFocus
+              className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowLinkModal(false)}>Cancelar</Button>
+            <Button onClick={handleLinkSubmit} disabled={!linkUrl}>Inserir</Button>
+          </div>
+        </div>
+      </DefaultModal>
 
       <DefaultModal isOpen={showTableModal} onClose={() => setShowTableModal(false)} title="Inserir tabela" maxWidth="sm">
         <div className="flex flex-col gap-4">

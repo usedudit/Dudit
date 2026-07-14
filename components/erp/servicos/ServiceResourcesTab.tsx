@@ -53,7 +53,7 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
     }
 
     const handleProductClick = (product: any) => {
-        if (product.stock <= 0 && !product.allow_sell_without_stock) {
+        if (!product.allow_sell_without_stock && Number(product.stock ?? 0) < 1) {
             setPendingProduct(product)
             setIsAlertOpen(true)
             return
@@ -283,7 +283,7 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
                 onClose={() => setIsAlertOpen(false)}
                 onConfirm={() => confirmAddProduct(pendingProduct)}
                 title="Estoque insuficiente"
-                description={`O item "${pendingProduct?.name}" está sem estoque disponível. Deseja adicionar assim mesmo?`}
+                description={`O item "${pendingProduct?.name}" não possui estoque suficiente. Deseja continuar mesmo assim?`}
                 confirmText="Continuar mesmo assim"
                 cancelText="Cancelar"
                 variant="warning"

@@ -511,7 +511,8 @@ function ReportActionModal({
                     required
                     multiline
                     rows={3}
-                    maxLength={1000}
+                    maxLength={512}
+                    showCharacterCount
                 />
 
                 {showRemoveProduct && setRemoveProduct && (

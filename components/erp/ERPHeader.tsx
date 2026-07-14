@@ -4,8 +4,8 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon } from "@/lib/icons"
-import { Button } from "@/components/reusable"
+import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon, AlertTriangleIcon } from "@/lib/icons"
+import { Button, DefaultModal } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
@@ -78,6 +78,75 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const { setIsMobileOpen, headerOverride } = useSidebar()
     const searchParams = useSearchParams()
+
+    const [pendingDeletion, setPendingDeletion] = useState<any>(null)
+    const [graceEndsAt, setGraceEndsAt] = useState<string | null>(null)
+    const [timeLeft, setTimeLeft] = useState("")
+    const [cancelModalOpen, setCancelModalOpen] = useState(false)
+    const [isCancelling, setIsCancelling] = useState(false)
+
+    useEffect(() => {
+        const checkDeletion = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (!user) return
+
+                const { data } = await supabase
+                    .from("account_deletions")
+                    .select("grace_period_ends_at, status")
+                    .eq("user_id", user.id)
+                    .not("status", "eq", "completed")
+                    .maybeSingle()
+
+                if (data?.grace_period_ends_at) {
+                    setPendingDeletion(data)
+                    setGraceEndsAt(data.grace_period_ends_at)
+                }
+            } catch (err) {
+                console.error("Error checking account deletion", err)
+            }
+        }
+        checkDeletion()
+    }, [])
+
+    useEffect(() => {
+        if (!graceEndsAt) return
+
+        const updateTimer = () => {
+            const diff = new Date(graceEndsAt).getTime() - new Date().getTime()
+            if (diff <= 0) {
+                setTimeLeft("0h")
+                return
+            }
+            const hours = Math.ceil(diff / (1000 * 60 * 60))
+            setTimeLeft(`${hours}h`)
+        }
+
+        updateTimer()
+        const interval = setInterval(updateTimer, 60000)
+        return () => clearInterval(interval)
+    }, [graceEndsAt])
+
+    const handleCancelDeletion = async () => {
+        setIsCancelling(true)
+        try {
+            const { cancelDeletionAction } = await import("@/app/actions/shared/decelerate-deletion")
+            const res = await cancelDeletionAction()
+            if (res.success) {
+                setCancelModalOpen(false)
+                setPendingDeletion(null)
+                setGraceEndsAt(null)
+                setTimeLeft("")
+                window.location.reload()
+            } else {
+                alert(res.error || "Ocorreu um erro ao cancelar o encerramento da conta.")
+            }
+        } catch (err) {
+            alert("Erro ao processar requisição.")
+        } finally {
+            setIsCancelling(false)
+        }
+    }
 
     // Update local state when profile data arrives
     useEffect(() => {
@@ -291,9 +360,14 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
 
                         <div className="md:hidden flex items-center" onClick={() => setIsProfileOpen(true)}>
                             <div
-                                className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm cursor-pointer border border-brand-border dark:border-dark-border shadow-sm`}
+                                className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm cursor-pointer border border-brand-border dark:border-dark-border shadow-sm relative`}
                             >
                                 {userInitials || getUserInitials(userName)}
+                                {pendingDeletion && (
+                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-white dark:border-dark-surface animate-pulse z-10">
+                                        !
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -301,9 +375,14 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             trigger={
                                 <div className="hidden md:flex items-center space-x-2 p-1 cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors group">
                                     <div
-                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border group-hover:shadow-sm transition-all`}
+                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border group-hover:shadow-sm transition-all relative`}
                                     >
                                         {userInitials || getUserInitials(userName)}
+                                        {pendingDeletion && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-white dark:border-dark-surface animate-pulse z-10">
+                                                !
+                                            </span>
+                                        )}
                                     </div>
                                     <ChevronDownIcon
                                         className="w-4 h-4 mr-2 text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors"
@@ -330,48 +409,61 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">{userEmail}</p>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
-                                <DropdownItem className="flex items-center gap-3 w-full" onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}>
-                                    <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                    <span className="text-sm font-normal text-brand-inactive-text">Modo escuro</span>
-                                </DropdownItem>
-                            </div>
+                                {pendingDeletion && (
+                                    <div
+                                        onClick={() => setCancelModalOpen(true)}
+                                        className="mx-4 my-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-xl flex items-start gap-2.5 cursor-pointer hover:bg-red-100/70 dark:hover:bg-red-950/40 transition-colors"
+                                    >
+                                        <AlertTriangleIcon size={16} className="text-red-500 shrink-0 mt-0.5" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-red-600 dark:text-red-400">Encerramento agendado</p>
+                                            <p className="text-[10px] text-red-500 dark:text-red-300 font-medium">Sua conta será encerrada em {timeLeft}. Clique para cancelar.</p>
+                                        </div>
+                                    </div>
+                                )}
 
-                            <div className="py-2">
-                                <DropdownItem>
-                                    <Link href="/perfil" prefetch={true} className="flex items-center gap-3 w-full">
-                                        <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                        <span className="text-sm font-normal text-brand-inactive-text">Meu perfil</span>
-                                    </Link>
-                                </DropdownItem>
-                                <DropdownItem>
-                                    <Link href="/erp/settings?tab=assinatura" prefetch={true} className="flex items-center gap-3 w-full">
-                                        <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                        <span className="text-sm font-normal text-brand-inactive-text">Meu plano</span>
-                                    </Link>
-                                </DropdownItem>
-                                <DropdownItem>
-                                    <Link href="/ajuda" prefetch={false} className="flex items-center gap-3 w-full">
-                                        <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                        <span className="text-sm font-normal text-brand-inactive-text">Central de ajuda</span>
-                                    </Link>
-                                </DropdownItem>
-                            </div>
+                                <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                                    <DropdownItem className="flex items-center gap-3 w-full" onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}>
+                                        <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                        <span className="text-sm font-normal text-brand-inactive-text">Modo escuro</span>
+                                    </DropdownItem>
+                                </div>
 
-                            <div className="py-2 border-t border-brand-border dark:border-dark-border mt-1">
-                                <DropdownItem className="flex items-center gap-3 w-full hover:bg-brand-red/10" onClick={handleSignOut}>
-                                    <LogoutIcon className="w-4 h-4 text-brand-red" />
-                                    <span className="text-sm font-normal text-brand-red">Sair da sessão</span>
-                                </DropdownItem>
-                            </div>
+                                <div className="py-2">
+                                    <DropdownItem>
+                                        <Link href="/perfil" prefetch={true} className="flex items-center gap-3 w-full">
+                                            <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-sm font-normal text-brand-inactive-text">Meu perfil</span>
+                                        </Link>
+                                    </DropdownItem>
+                                    <DropdownItem>
+                                        <Link href="/erp/settings?tab=assinatura" prefetch={true} className="flex items-center gap-3 w-full">
+                                            <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-sm font-normal text-brand-inactive-text">Meu plano</span>
+                                        </Link>
+                                    </DropdownItem>
+                                    <DropdownItem>
+                                        <Link href="/ajuda" prefetch={false} className="flex items-center gap-3 w-full">
+                                            <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <span className="text-sm font-normal text-brand-inactive-text">Central de ajuda</span>
+                                        </Link>
+                                    </DropdownItem>
+                                </div>
 
-                            <div className="px-4 py-3 border-t border-brand-border dark:border-dark-border">
-                                <div className="flex items-center justify-between text-[10px] text-brand-inactive-text/60 dark:text-dark-body/60 font-medium">
-                                    <span>v.1.5.69</span>
-                                    <span>•</span>
-                                    <span>Termos e Condições</span>
+                                <div className="py-2 border-t border-brand-border dark:border-dark-border mt-1">
+                                    <DropdownItem className="flex items-center gap-3 w-full hover:bg-brand-red/10" onClick={handleSignOut}>
+                                        <LogoutIcon className="w-4 h-4 text-brand-red" />
+                                        <span className="text-sm font-normal text-brand-red">Sair da sessão</span>
+                                    </DropdownItem>
+                                </div>
+
+                                <div className="px-4 py-3 border-t border-brand-border dark:border-dark-border">
+                                    <div className="flex items-center justify-between text-[10px] text-brand-inactive-text/60 dark:text-dark-body/60 font-medium">
+                                        <span>v.1.5.69</span>
+                                        <span>•</span>
+                                        <span>Termos e Condições</span>
+                                    </div>
                                 </div>
                             </div>
                         </Dropdown>
@@ -400,6 +492,21 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     </div>
 
                     <nav className="flex flex-col gap-1">
+                        {pendingDeletion && (
+                            <div
+                                onClick={() => {
+                                    setIsProfileOpen(false)
+                                    setCancelModalOpen(true)
+                                }}
+                                className="mx-2 my-2 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-2xl flex items-start gap-3 cursor-pointer hover:bg-red-100/70 dark:hover:bg-red-950/40 transition-colors"
+                            >
+                                <AlertTriangleIcon size={18} className="text-red-500 shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-red-600 dark:text-red-400">Encerramento agendado</p>
+                                    <p className="text-xs text-red-500 dark:text-red-300 font-medium">Sua conta será encerrada em {timeLeft}. Clique aqui para gerenciar ou cancelar.</p>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-dark-border/30 border border-transparent hover:border-brand-border/30 dark:hover:border-dark-border/50 transition-all">
                             <div className="flex items-center gap-3">
                                 <MoonIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -462,6 +569,44 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     </div>
                 </div>
             </BottomSheet>
+
+            <DefaultModal
+                isOpen={cancelModalOpen}
+                onClose={() => setCancelModalOpen(false)}
+                title="Conta em encerramento"
+            >
+                <div className="space-y-6 pt-2 pb-4 text-brand-dark dark:text-dark-heading">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/20 text-red-500 mb-2">
+                        <AlertTriangleIcon size={24} />
+                    </div>
+
+                    <div className="space-y-2">
+                        <h3 className="text-lg font-bold">Deseja cancelar o encerramento da sua conta?</h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Sua conta está programada para ser encerrada definitivamente em <strong className="text-brand-dark dark:text-dark-heading">{timeLeft}</strong>. Ao cancelar, todos os seus dados serão mantidos e sua conta retornará ao estado ativo normalmente.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
+                        <Button
+                            variant="outline"
+                            onClick={() => setCancelModalOpen(false)}
+                            disabled={isCancelling}
+                            className="flex-1 h-12 font-bold"
+                        >
+                            Manter encerramento
+                        </Button>
+                        <Button
+                            variant="default"
+                            onClick={handleCancelDeletion}
+                            disabled={isCancelling}
+                            className="flex-1 h-12 bg-brand-green hover:bg-brand-green/90 text-white font-bold"
+                        >
+                            {isCancelling ? "Cancelando..." : "Reativar minha conta"}
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
         </header>
     )
 }

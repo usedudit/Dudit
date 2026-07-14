@@ -75,6 +75,8 @@ export default function NotesSheet({
                 onChange={(e) => onChange(e.target.value)}
                 name="notes"
                 rows={5}
+                maxLength={512}
+                showCharacterCount
             />
             <div className="flex items-center gap-3 md:mt-4 md:border-t md:border-brand-border md:pt-4 dark:md:border-dark-border">
                 <Button variant="outline" className="flex-1" onClick={onClose}>

@@ -541,10 +541,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                     const prodAny = product as any
                     const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
                     const effectiveUnit = computeItemDisplayPrice(listUnit, promoPrice > 0 && promoPrice < listUnit ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category?.id || undefined }).bestPrice
-                    if (!product.allow_sell_without_stock && !forceBypass && normalizedQty > availableStock) {
-                        notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
-                        return prev
-                    }
                     return [
                         ...prev,
                         {
@@ -565,11 +561,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                 }
 
                 const nextQty = found.qty + normalizedQty
-                if (!product.allow_sell_without_stock && !forceBypass && !found.allowSellWithoutStock && nextQty > availableStock) {
-                    notifyError(`Estoque insuficiente para o item ${found.name}${found.variantName ? ` - ${found.variantName}` : ""}`)
-                    return prev
-                }
-
                 return prev.map((item) => (item.id === found.id ? {
                     ...item,
                     qty: nextQty,
@@ -578,17 +569,30 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             })
         }
 
-        if (!force && !product.allow_sell_without_stock && availableStock <= 0) {
-            setPendingZeroStockItem({
-                product: { ...product, name: selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name },
-                callback: () => addToCart(product, variantId, quantity, true)
-            })
-            setShowZeroStockAlert(true)
-            return
+        if (!force && !product.allow_sell_without_stock) {
+            const existingItem = cart.find((item) => item.productId === product.id && item.variantId === (variantId || null))
+            if (existingItem) {
+                const nextQty = existingItem.qty + normalizedQty
+                if (nextQty > availableStock && !existingItem.allowSellWithoutStock) {
+                    setPendingZeroStockItem({
+                        product: { name: existingItem.name },
+                        callback: () => addToCart(product, variantId, quantity, true)
+                    })
+                    setShowZeroStockAlert(true)
+                    return
+                }
+            } else if (normalizedQty > availableStock) {
+                setPendingZeroStockItem({
+                    product: { name: selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name },
+                    callback: () => addToCart(product, variantId, quantity, true)
+                })
+                setShowZeroStockAlert(true)
+                return
+            }
         }
 
         proceedAddToCart(force)
-    }, [notifyError, pdvPromotions])
+    }, [cart, notifyError, pdvPromotions])
 
     const handleScanBarcode = useCallback(async (code: string) => {
         const cleanCode = code.trim()
@@ -759,24 +763,37 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
     }, [partnerId, notifyError, notifySuccess])
 
     const changeQty = useCallback((itemId: string, delta: number) => {
+        const currentItem = cart.find((i) => i.id === itemId)
+        if (currentItem && delta > 0) {
+            const product = products.find((p) => p.id === currentItem.productId)
+            const variant = currentItem.variantId ? product?.product_variants?.find((v) => v.id === currentItem.variantId) : null
+            const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
+            const nextQty = currentItem.qty + delta
+
+            if (product && !product.allow_sell_without_stock && !currentItem.allowSellWithoutStock && nextQty > availableStock) {
+                setPendingZeroStockItem({
+                    product: { name: currentItem.name },
+                    callback: () => {
+                        setCart((prev) => prev.map((i) => {
+                            if (i.id !== itemId) return i
+                            return { ...i, qty: nextQty, allowSellWithoutStock: true }
+                        }).filter((i) => i.qty > 0))
+                    }
+                })
+                setShowZeroStockAlert(true)
+                return
+            }
+        }
+
         setCart((prev) => prev
             .map((item) => {
                 if (item.id !== itemId) return item
                 if (delta < 0 && item.qty <= 1) return item
                 const nextQty = Math.max(0, item.qty + delta)
-                const product = products.find((currentProduct) => currentProduct.id === item.productId)
-                const variant = item.variantId ? product?.product_variants?.find((currentVariant) => currentVariant.id === item.variantId) : null
-                const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
-
-                if (product && !product.allow_sell_without_stock && !item.allowSellWithoutStock && nextQty > availableStock) {
-                    notifyError(`Estoque insuficiente para o item ${item.name}${item.variantName ? ` - ${item.variantName}` : ""}`)
-                    return item
-                }
-
                 return { ...item, qty: nextQty }
             })
             .filter((item) => item.qty > 0))
-    }, [products, notifyError])
+    }, [products, cart, notifyError])
 
 
 
@@ -1217,7 +1234,18 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
         const available = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
 
         if (product && !product.allow_sell_without_stock && editQty > available) {
-            notifyError(`Estoque insuficiente para o item ${editingItem.name}${editingItem.variantName ? ` - ${editingItem.variantName}` : ""}`)
+            setPendingZeroStockItem({
+                product: { name: editingItem.name + (editingItem.variantName ? ` - ${editingItem.variantName}` : "") },
+                callback: () => {
+                    setCart((prev) => prev.map((item) => {
+                        if (item.id !== editingItem.id) return item
+                        return { ...item, qty: editQty, price: editPrice, allowSellWithoutStock: true }
+                    }))
+                    setEditingItem(null)
+                    notifySuccess("Item atualizado.")
+                }
+            })
+            setShowZeroStockAlert(true)
             return
         }
 
@@ -2027,6 +2055,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                                     onChange={(e) => setNotes(e.target.value)}
                                     name="notes"
                                     rows={5}
+                                    maxLength={512}
+                                    showCharacterCount
                                 />
                                 <div className="flex items-center gap-3">
                                     <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
@@ -2054,6 +2084,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                                     onChange={(e) => setNotes(e.target.value)}
                                     name="notes"
                                     rows={6}
+                                    maxLength={512}
+                                    showCharacterCount
                                 />
                                 <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
                                     <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
@@ -2262,9 +2294,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                             pendingZeroStockItem?.callback?.()
                             setPendingZeroStockItem(null)
                         }}
-                        title="Produto sem estoque"
-                        message={`O produto "${pendingZeroStockItem?.product?.name || ''}" está sem estoque. Deseja adicionar mesmo assim?`}
-                        confirmText="Adicionar"
+                        title="Estoque insuficiente"
+                        message={`O produto "${pendingZeroStockItem?.product?.name || ''}" não possui estoque suficiente. Deseja continuar mesmo assim?`}
+                        confirmText="Continuar mesmo assim"
+                        cancelText="Cancelar"
                         variant="warning"
                     />
 
