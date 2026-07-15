@@ -416,7 +416,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 </div>
 
                                 {pendingDeletion && (
-                                    <div onClick={() => setCancelModalOpen(true)} className="cursor-pointer">
+                                    <div onClick={() => setCancelModalOpen(true)} className="cursor-pointer px-4">
                                         <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
                                     </div>
                                 )}
@@ -496,7 +496,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                     setIsProfileOpen(false)
                                     setCancelModalOpen(true)
                                 }}
-                                    className="cursor-pointer">
+                                    className="cursor-pointer px-4">
                                     <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
                                 </div>
                             </div>

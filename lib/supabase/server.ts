@@ -1,4 +1,5 @@
 import "server-only"
+import { SupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { createClient as createServiceRoleClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
@@ -10,7 +11,7 @@ import { cookies } from "next/headers"
  * SECURITY: Throws hard error if env vars are missing.
  * Never returns a mock/fake client.
  */
-export async function createClient(): Promise<any> {
+export async function createClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies()
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:54321"

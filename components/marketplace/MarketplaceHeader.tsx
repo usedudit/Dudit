@@ -750,8 +750,8 @@ const Header: React.FC<HeaderProps> = ({
 
             <BottomSheet isOpen={isMobileUserMenuOpen} onClose={() => setIsMobileUserMenuOpen(false)}>
                 <div className="flex flex-col">
-                    <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full overflow-hidden border border-gray-100 shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
+                    <div className="px-6 py-5 border-b border-brand-border flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full overflow-hidden border border-brand-border shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
                             {getUserInitials(fullName)}
                         </div>
                         <h3 className="text-[16px] font-bold text-brand-dark">{userName}</h3>

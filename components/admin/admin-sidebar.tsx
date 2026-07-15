@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon } from "@/lib/icons"
-import { Home, ShieldAlert, DollarSign, Users, FileText, Building2, Flag, ShoppingCart, Undo2, Megaphone } from "lucide-react"
+import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
@@ -24,27 +23,27 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     {
-        icon: Home,
+        icon: HomeIcon,
         label: "Início",
-        href: "/ddt-admin",
+        href: "/",
     },
     {
-        icon: ShieldAlert,
+        icon: ShieldIcon,
         label: "Moderação",
         href: "/ddt-admin/moderation",
     },
     {
-        icon: ShoppingCart,
+        icon: ShoppingCartIcon,
         label: "Pedidos",
         href: "/ddt-admin/orders",
     },
     {
-        icon: Undo2,
+        icon: ReturnIcon,
         label: "Trocas e devolucoes",
         href: "/ddt-admin/returns",
     },
     {
-        icon: DollarSign,
+        icon: MoneyIcon,
         label: "Faturamento",
         href: "/ddt-admin/billing",
         submenu: [
@@ -56,27 +55,27 @@ const navItems: NavItem[] = [
         ],
     },
     {
-        icon: Users,
+        icon: UserIcon,
         label: "Usuários / Punições",
         href: "/ddt-admin/users",
     },
     {
-        icon: Building2,
+        icon: BriefcaseIcon,
         label: "Parceiros",
         href: "/ddt-admin/partners",
     },
     {
-        icon: Megaphone,
+        icon: MegaphoneIcon,
         label: "Publicidade",
         href: "/ddt-admin/advertising",
     },
     {
-        icon: Flag,
+        icon: FlagIcon,
         label: "Denúncias",
         href: "/ddt-admin/reports",
     },
     {
-        icon: FileText,
+        icon: FileIcon,
         label: "Audit Logs",
         href: "/ddt-admin/audit",
     },
@@ -208,7 +207,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit Logo"
-                                className="h-7 w-auto object-contain brightness-0 invert"
+                                className="h-7 w-auto object-contain"
                             />
                         </div>
                     </Link>

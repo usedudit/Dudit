@@ -112,21 +112,14 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 }
 
 export default async function HomePage() {
-    const tStart = performance.now()
-    console.log(`[SSR] Home (Page) | START at ${new Date().toISOString()}`)
-
     // Fetches required for the header
     const user = await getCurrentUser()
-    const tUser = performance.now()
-    console.log(`[SSR] Home (Page) | User resolved in ${(tUser - tStart).toFixed(2)}ms`)
 
     const sessionDataPromise = user
         ? getUserSessionData(user.id)
         : Promise.resolve(null)
 
     const sessionData = await sessionDataPromise
-    const tSession = performance.now()
-    console.log(`[SSR] Home (Page) | Session resolved in ${(tSession - tUser).toFixed(2)}ms`)
 
     const dbProfile = sessionData?.profile
 
