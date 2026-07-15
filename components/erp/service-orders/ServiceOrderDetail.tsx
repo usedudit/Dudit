@@ -268,7 +268,11 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     // Order Details style steps timeline
     const getTimelineSteps = () => {
         const findHistoryTime = (statusName: string) => {
-            const entry = (order.statusHistory || []).find((h: any) => h.new_status === statusName)
+            const entry = (order.history || []).find((h: any) => {
+                if (h.action_type !== "status_changed") return false
+                const match = (h.change_lines?.[0] || "").match(/→\s*(\w+)/)
+                return match && match[1] === statusName
+            })
             if (entry) {
                 const d = new Date(entry.created_at)
                 return {

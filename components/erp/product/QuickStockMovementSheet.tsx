@@ -159,7 +159,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                 {/* Tipo de Movimentação */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Tipo de Operação</label>
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 mt-1">
                         <button
                             type="button"
                             onClick={() => { setType('in'); handleReasonChange('Selecione um motivo...'); }}

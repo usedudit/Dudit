@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
-import { sanitizeInput, validateEmail, validateCPF, validatePhoneBR } from "@/lib/input-validator"
+import { sanitizeInput, validateCPF, validatePhoneBR } from "@/lib/input-validator"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -226,120 +226,4 @@ export async function updateProfileAction(data: {
   return { success: true }
 }
 
-export async function requestEmailChangeAction(newEmail: string) {
-  await requireRateLimit(RateLimitCategory.AUTH_EMAIL_CHANGE)
 
-  // SECURITY: Use server-verified user identity
-  const user = await requireUser()
-  const userId = user.id
-
-  const supabase = await getSupabaseServerClient()
-
-  if (!validateEmail(newEmail)) {
-    return { error: "Email inválido" }
-  }
-
-  const sanitizedEmail = sanitizeInput(newEmail, 255)
-
-  // SECURITY: Don't reveal whether an email is already in use (user enumeration)
-  const { data: existingProfile } = await supabase
-    .from("user_profiles")
-    .select("id")
-    .eq("email", sanitizedEmail)
-    .maybeSingle()
-
-  // SECURITY: Use cryptographically secure random OTP
-  const { randomInt } = await import("crypto")
-  const otp = randomInt(100000, 999999).toString()
-
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
-
-  const { error: otpError } = await supabase.from("email_change_otps").upsert(
-    {
-      user_id: userId,
-      new_email: sanitizedEmail,
-      otp_code: otp,
-      expires_at: expiresAt,
-      attempts: 0,
-    },
-    {
-      onConflict: "user_id",
-    },
-  )
-
-  if (otpError) {
-    return { error: "Erro ao gerar código de verificação" }
-  }
-
-  // If the email is already in use, silently succeed to prevent enumeration
-  if (existingProfile) {
-    return { success: true }
-  }
-
-  // TODO: Send email with OTP code using email service (Resend, SendGrid, etc)
-  // In production, integrate with your email provider
-
-  return { success: true }
-}
-
-export async function verifyEmailChangeAction(newEmail: string, otpCode: string) {
-  await requireRateLimit(RateLimitCategory.AUTH_EMAIL_CHANGE)
-
-  // SECURITY: Use server-verified user identity
-  const user = await requireUser()
-  const userId = user.id
-
-  const supabase = await getSupabaseServerClient()
-
-  const sanitizedEmail = sanitizeInput(newEmail, 255)
-  const sanitizedOtp = sanitizeInput(otpCode, 10)
-
-  const { data: otpData, error: otpFetchError } = await supabase
-    .from("email_change_otps")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("new_email", sanitizedEmail)
-    .single()
-
-  if (otpFetchError || !otpData) {
-    return { error: "Código de verificação não encontrado" }
-  }
-
-  if (new Date(otpData.expires_at) < new Date()) {
-    await supabase.from("email_change_otps").delete().eq("user_id", userId)
-    return { error: "Código expirado. Solicite um novo código" }
-  }
-
-  if (otpData.attempts >= 3) {
-    await supabase.from("email_change_otps").delete().eq("user_id", userId)
-    return { error: "Muitas tentativas. Solicite um novo código" }
-  }
-
-  // SECURITY: Constant-time comparison to prevent timing attacks
-  const { timingSafeEqual } = await import("crypto")
-  const otpMatch = otpData.otp_code.length === sanitizedOtp.length &&
-    timingSafeEqual(Buffer.from(otpData.otp_code), Buffer.from(sanitizedOtp))
-  if (!otpMatch) {
-    await supabase
-      .from("email_change_otps")
-      .update({ attempts: otpData.attempts + 1 })
-      .eq("user_id", userId)
-
-    return { error: "Código inválido" }
-  }
-
-  const { error: updateError } = await supabase.auth.updateUser({
-    email: sanitizedEmail,
-  })
-
-  if (updateError) {
-    return { error: "Erro ao atualizar email" }
-  }
-
-  // Nota: Email não é armazenado em user_profiles por segurança
-  // O email já está sincronizado em auth.users
-
-  await supabase.from("email_change_otps").delete().eq("user_id", userId)
-
-  return { success: true }
-}

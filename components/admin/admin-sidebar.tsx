@@ -45,8 +45,15 @@ const navItems: NavItem[] = [
     },
     {
         icon: DollarSign,
-        label: "Assinaturas",
-        href: "/ddt-admin/subscriptions",
+        label: "Faturamento",
+        href: "/ddt-admin/billing",
+        submenu: [
+            { label: "Dashboard", href: "/ddt-admin/billing" },
+            { label: "Compras", href: "/ddt-admin/billing/purchases" },
+            { label: "Assinaturas", href: "/ddt-admin/billing/subscriptions" },
+            { label: "Pagamentos", href: "/ddt-admin/billing/payments" },
+            { label: "Faturas", href: "/ddt-admin/billing/invoices" },
+        ],
     },
     {
         icon: Users,

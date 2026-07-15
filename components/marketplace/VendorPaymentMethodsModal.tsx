@@ -115,7 +115,7 @@ export function VendorPaymentMethodsModal({
             isOpen={isOpen}
             onClose={onClose}
             title={`Meios de pagamento de ${storeName}`}
-            maxWidth="md"
+            maxWidth="2xl"
         >
             <div className="py-2 space-y-6">
                 {mpConnected && (

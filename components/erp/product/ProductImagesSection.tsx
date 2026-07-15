@@ -193,8 +193,9 @@ function ProductImagesSection({
                             <label className={`w-48 h-48 ${dropzoneClasses}`}>
                                 <IconPlaceholder
                                     icon={UploadIcon}
-                                    title="Upload de Imagem"
-                                    subtitle="Clique para adicionar imagens"
+                                    iconSize="w-8 h-8"
+                                    title="Enviar imagem"
+                                    subtitle="Clique para adicionar"
                                 />
                                 <input
                                     ref={fileInputRef}

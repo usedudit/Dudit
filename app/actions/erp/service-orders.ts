@@ -100,12 +100,11 @@ export async function getServiceOrderDetailsAction(
     if (error) throw error
     if (!order) throw new Error("Ordem de serviço não encontrada")
 
-    const [servicesRes, productsRes, attachmentsRes, historyRes, historyRes2, saleRes] = await Promise.all([
+    const [servicesRes, productsRes, attachmentsRes, historyRes, saleRes] = await Promise.all([
       supabase.from("service_order_services").select("*, services(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
       supabase.from("service_order_products").select("*, products(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
       supabase.from("service_order_attachments").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
       fetchTimelineForEntity("service_order", serviceOrderId, partnerId),
-      supabase.from("service_order_history").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
       order.sale_id ? supabase.from("sales").select("*").eq("id", order.sale_id).single() : Promise.resolve({ data: null }),
     ])
 
@@ -127,7 +126,6 @@ export async function getServiceOrderDetailsAction(
         products: productsRes.data || [],
         attachments: attachmentsRes.data || [],
         history: historyRes,
-        statusHistory: historyRes2?.data || [],
         sale: saleRes?.data || null,
       },
     }
@@ -218,11 +216,6 @@ export async function createServiceOrderAction(
     const user = await requireUser()
     const admin = getAdminClient()
 
-    const { data: seqRes } = await admin.rpc("next_service_order_number", {
-      p_partner_id: partnerId,
-    })
-    const orderNumber = seqRes || `OS-${new Date().getFullYear()}-0001`
-
     const status = input.status || "aberta"
 
     // -- Plan limit check --
@@ -237,7 +230,6 @@ export async function createServiceOrderAction(
       .from("service_orders")
       .insert({
         partner_id: partnerId,
-        order_number: orderNumber,
         public_token: publicToken,
         title: input.title,
         description: input.description || null,
@@ -269,6 +261,8 @@ export async function createServiceOrderAction(
       .single()
 
     if (error) throw error
+
+    const orderNumber = data.order_number
 
     await logAuditEvent({
       partnerId,
@@ -511,14 +505,6 @@ export async function updateServiceOrderStatusAction(
       entityType: "service_order", entityId: serviceOrderId,
       actionType: "status_changed", source: "manual",
       changeLines: [`Status alterado: ${current.status} → ${status}`],
-    })
-
-    await admin.from("service_order_history").insert({
-      service_order_id: serviceOrderId,
-      previous_status: current.status,
-      new_status: status,
-      changed_fields: JSON.stringify({ status: { from: current.status, to: status } }),
-      created_by: user.id,
     })
 
     revalidatePath("/erp/service-orders")
@@ -918,7 +904,7 @@ export async function ensurePublicTokenAction(partnerId: string, serviceOrderId:
 
 export async function getServiceOrderByTokenAction(
   token: string,
-): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; statusHistory: any[]; sale: any } } | { success: false; error: string }> {
+): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; sale: any } } | { success: false; error: string }> {
   try {
     const admin = getAdminClient()
 
@@ -964,12 +950,11 @@ export async function getServiceOrderByTokenAction(
       }
     }
 
-    const [services, products, attachments, historyRes, statusHistoryRes, saleRes, addressRes] = await Promise.all([
+    const [services, products, attachments, historyRes, saleRes, addressRes] = await Promise.all([
       admin.from("service_order_services").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_products").select("*").eq("service_order_id", row.id).order("sort_order"),
       admin.from("service_order_attachments").select("file_name, file_key, file_type, category, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       admin.from("audit_logs").select("id, action_type, change_lines, created_at").eq("entity_type", "service_order").eq("entity_id", row.id).order("created_at", { ascending: false }).limit(50),
-      admin.from("service_order_history").select("*").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       row.sale_id ? admin.from("sales").select("id, sale_number, total_amount, discount_amount, final_amount, paid_amount, payment_status, status, created_at").eq("id", row.sale_id).single() : Promise.resolve({ data: null }),
       admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").eq("partner_id", row.partner_id),
     ])
@@ -1050,7 +1035,6 @@ export async function getServiceOrderByTokenAction(
         products: products.data || [],
         attachments: attachments.data || [],
         history: historyRes.data || [],
-        statusHistory: statusHistoryRes.data || [],
         sale: saleRes?.data || null,
       },
     }

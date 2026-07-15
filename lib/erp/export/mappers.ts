@@ -348,7 +348,7 @@ export function mapTransactionRow(row: any): ExportRow {
   return {
     date: row.created_at ? formatDateTime(row.created_at) : "-",
     description: row.description || "-",
-    category: row.transaction_categories?.name || row.category || "-",
+    category: row.financial_categories?.name || row.category || "-",
     transactionType: TRANSACTION_TYPE_LABELS[row.transaction_type] || row.transaction_type || "-",
     amount: formatCurrency(Number(row.amount ?? 0)),
     status: TRANSACTION_STATUS_LABELS[row.status] || row.status || "-",
@@ -378,7 +378,7 @@ export function mapSupplierRow(row: any): ExportRow {
     email: row.email || "-",
     phone: row.phone || "-",
     document: row.cnpj || row.cpf || "-",
-    city: row.city || "-",
+    city: row.city || row.street || "-",
     state: row.state || "-",
     status: row.status === "ativo" ? "Ativo" : row.status === "inativo" ? "Inativo" : row.status || "-",
     createdAt: row.created_at ? formatDate(row.created_at) : "-",

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
-import { updateProfileAction, requestEmailChangeAction, verifyEmailChangeAction } from "@/app/actions/profile"
+import { updateProfileAction } from "@/app/actions/profile"
 import { changePasswordAction } from "@/app/actions/shared/password"
 import { useNotification } from "@/hooks/use-notification"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -330,43 +330,11 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
         otpVal: string,
     ) => ({
         sendOtp: async () => {
-            if (!emailVal || !emailVal.includes("@")) { setError("Digite um email válido"); return }
-            if (nRef.current > Date.now()) { setError("Aguarde antes de enviar outro código"); return }
-            setIsLoading(true); clearMessages()
-            const result = await requestEmailChangeAction(emailVal)
-            if (result.error) {
-                setError(result.error)
-                notifyError("Erro", result.error)
-            }
-            else {
-                setOtpSentVal(true); setSuccess("Código enviado para o novo email!")
-                notifySuccess("Código enviado", "Verifique sua caixa de entrada.")
-                attemptsRef.current += 1
-                if (attemptsRef.current >= 3) {
-                    setError("Limite de tentativas atingido.")
-                    notifyError("Atenção", "Limite de tentativas atingido.")
-                    setCanResendVal(false); setIsLoading(false); return
-                }
-                startTimer(tRef, setResendTimerVal, setCanResendVal, nRef, attemptsRef.current * 60)
-            }
+            setError("Funcionalidade temporariamente desabilitada")
             setIsLoading(false)
         },
         verifyOtp: async () => {
-            if (!otpVal || otpVal.length !== 6) { setError("Digite o código de 6 dígitos"); return }
-            setIsLoading(true); clearMessages()
-            const result = await verifyEmailChangeAction(emailVal, otpVal)
-            if (result.error) {
-                setError(result.error)
-                notifyError("Erro de verificação", result.error)
-            }
-            else {
-                setSuccess("Email alterado com sucesso!")
-                notifySuccess("Sucesso", "Email alterado com sucesso!")
-                setAccountData(d => ({ ...d, email: emailVal }))
-                setChanging(false); setOtpSentVal(false); setEmailVal(""); setOtpVal("")
-                attemptsRef.current = 0; nRef.current = 0
-                if (tRef.current) { clearInterval(tRef.current); tRef.current = null }
-            }
+            setError("Funcionalidade temporariamente desabilitada")
             setIsLoading(false)
         },
         cancel: () => { setChanging(false); setOtpSentVal(false); setEmailVal(""); setOtpVal(""); clearMessages() },

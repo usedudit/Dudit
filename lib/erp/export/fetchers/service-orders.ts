@@ -7,9 +7,24 @@ import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const SERVICE_ORDER_SELECT = `
   id, order_number, title, status, customer_snapshot, assigned_user_id,
-  expected_completion_date, total_amount, created_at,
-  user_profiles!assigned_user_id(full_name)
+  expected_completion_date, total_amount, created_at
 `
+
+async function resolveAssignedUserNames(supabase: SupabaseClient, userIds: string[]) {
+  const map = new Map<string, string>()
+  const unique = [...new Set(userIds.filter(Boolean))]
+  if (!unique.length) return map
+
+  const { data } = await supabase
+    .from("user_profiles")
+    .select("user_id, full_name")
+    .in("user_id", unique)
+
+  for (const row of data || []) {
+    if (row.user_id) map.set(String(row.user_id), row.full_name || "-")
+  }
+  return map
+}
 
 export async function fetchServiceOrdersExport(
   supabase: SupabaseClient,
@@ -70,6 +85,13 @@ export async function fetchServiceOrdersExport(
     },
   })
 
-  const rows = rawRows.map(mapServiceOrderRow)
+  const assignedIds = rawRows.map((r) => String(r.assigned_user_id || ""))
+  const assignedNames = await resolveAssignedUserNames(supabase, assignedIds)
+
+  const rows = rawRows.map((r) => {
+    const assignedName = assignedNames.get(String(r.assigned_user_id || "")) || "-"
+    return mapServiceOrderRow({ ...r, user_profiles: { full_name: assignedName } })
+  })
+
   return { columns: SERVICE_ORDER_EXPORT_COLUMNS, rows, rowCount: rows.length }
 }

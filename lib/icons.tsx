@@ -150,7 +150,8 @@ import {
     MoneyBag02Icon,
     Clock04Icon,
     ClockCheckIcon as ClockCheckIcon01,
-    ClockArrowUpIcon as ClockArrowUpIcon01
+    ClockArrowUpIcon as ClockArrowUpIcon01,
+    Video01Icon
 } from "@hugeicons/core-free-icons"
 
 
@@ -225,6 +226,7 @@ export const ExportFileIcon = CreateIcon(FileUploadIcon)
 export const UploadSheetIcon = CreateIcon(Xls01Icon)
 export const TrendingUpIcon = CreateIcon(AnalyticsUpIcon)
 export const ShieldIcon = CreateIcon(Shield01Icon)
+export const VideoIcon = CreateIcon(Video01Icon)
 
 // ============================
 // STATUS / FEEDBACK

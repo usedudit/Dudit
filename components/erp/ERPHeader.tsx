@@ -399,7 +399,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             width="w-64"
                         >
                             <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
-                                <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-3 mb-4">
                                     <div
                                         className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border shadow-sm`}
                                     >
@@ -421,7 +421,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                     </div>
                                 )}
 
-                                <div className="px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                                <div className="py-1 border-y border-brand-border dark:border-dark-border">
                                     <DropdownItem className="flex items-center gap-3 w-full" onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}>
                                         <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                                         <span className="text-sm font-normal text-brand-inactive-text">Modo escuro</span>
@@ -430,13 +430,13 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
 
                                 <div className="py-2">
                                     <DropdownItem>
-                                        <Link href="/perfil" prefetch={true} className="flex items-center gap-3 w-full">
+                                        <Link href="/perfil" prefetch={false} className="flex items-center gap-3 w-full">
                                             <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                                             <span className="text-sm font-normal text-brand-inactive-text">Meu perfil</span>
                                         </Link>
                                     </DropdownItem>
                                     <DropdownItem>
-                                        <Link href="/erp/settings?tab=assinatura" prefetch={true} className="flex items-center gap-3 w-full">
+                                        <Link href="/erp/settings?tab=assinatura" prefetch={false} className="flex items-center gap-3 w-full">
                                             <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                                             <span className="text-sm font-normal text-brand-inactive-text">Meu plano</span>
                                         </Link>
@@ -449,7 +449,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                     </DropdownItem>
                                 </div>
 
-                                <div className="py-2 border-t border-brand-border dark:border-dark-border mt-1">
+                                <div className="py-1 border-t border-brand-border dark:border-dark-border mt-1">
                                     <DropdownItem className="flex items-center gap-3 w-full hover:bg-brand-red/10" onClick={handleSignOut}>
                                         <LogoutIcon className="w-4 h-4 text-brand-red" />
                                         <span className="text-sm font-normal text-brand-red">Sair da sessão</span>
@@ -521,7 +521,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                         <Link
                             href="/perfil"
                             onClick={() => setIsProfileOpen(false)}
-                            prefetch={true}
+                            prefetch={false}
                             className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
                         >
                             <UserIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />

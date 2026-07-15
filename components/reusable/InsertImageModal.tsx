@@ -10,6 +10,13 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { useR2Upload } from "@/hooks/use-r2-upload"
 import { planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 
+interface EditImageData {
+  url: string
+  alt: string
+  width: string
+  height: string
+}
+
 interface InsertImageModalProps {
   isOpen: boolean
   onClose: () => void
@@ -17,6 +24,8 @@ interface InsertImageModalProps {
   imageCount: number
   imageUploadBlocked: boolean
   onUpgradeClick?: () => void
+  editImageData?: EditImageData | null
+  onEdit?: (url: string, alt: string, width: string, height: string) => void
 }
 
 const MAX_IMAGES = 5
@@ -24,7 +33,7 @@ const MAX_DIMENSION = 900
 const DEFAULT_WIDTH = 512
 
 export const InsertImageModal: React.FC<InsertImageModalProps> = ({
-  isOpen, onClose, onInsert, imageCount, imageUploadBlocked, onUpgradeClick,
+  isOpen, onClose, onInsert, imageCount, imageUploadBlocked, onUpgradeClick, editImageData, onEdit,
 }) => {
   const [tab, setTab] = useState("url")
   const [url, setUrl] = useState("")
@@ -39,25 +48,42 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
   const [uploadError, setUploadError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { uploadFile } = useR2Upload()
+  const [editMode, setEditMode] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
-      setTab("url")
-      setUrl("")
-      setAlt("")
-      setWidth(String(DEFAULT_WIDTH))
-      setHeight("")
-      setUploadedUrl("")
-      setUploadError("")
+      if (editImageData) {
+        setEditMode(true)
+        setTab("url")
+        setUrl(editImageData.url)
+        setAlt(editImageData.alt)
+        setWidth(editImageData.width)
+        setHeight(editImageData.height)
+        setUploadedUrl("")
+        setUploadError("")
+      } else {
+        setEditMode(false)
+        setTab("url")
+        setUrl("")
+        setAlt("")
+        setWidth(String(DEFAULT_WIDTH))
+        setHeight("")
+        setUploadedUrl("")
+        setUploadError("")
+      }
     }
-  }, [isOpen])
+  }, [isOpen, editImageData])
 
-  const handleInsert = () => {
+  const handleConfirm = () => {
     const finalUrl = tab === "upload" ? uploadedUrl : url
     if (!finalUrl) return
     const w = Math.min(Number(width) || DEFAULT_WIDTH, MAX_DIMENSION)
     const h = height ? Math.min(Number(height), MAX_DIMENSION) : 0
-    onInsert(finalUrl, alt, String(w), h ? String(h) : "")
+    if (editMode && onEdit) {
+      onEdit(finalUrl, alt, String(w), h ? String(h) : "")
+    } else {
+      onInsert(finalUrl, alt, String(w), h ? String(h) : "")
+    }
     onClose()
   }
 
@@ -100,12 +126,12 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
     setTab(newTab)
   }
 
-  const atLimit = imageCount >= MAX_IMAGES
-  const canInsert = (tab === "upload" && !!uploadedUrl) || (tab === "url" && !!url)
+  const atLimit = !editMode && imageCount >= MAX_IMAGES
+  const canConfirm = (tab === "upload" && !!uploadedUrl) || (tab === "url" && !!url)
 
   return (
     <>
-      <DefaultModal isOpen={isOpen} onClose={onClose} title="Inserir imagem" maxWidth="md">
+      <DefaultModal isOpen={isOpen} onClose={onClose} title={editMode ? "Editar imagem" : "Inserir imagem"} maxWidth="md">
         <Tabs value={tab} onValueChange={handleTabChange}>
           <TabsList>
             <TabsTrigger value="url">URL</TabsTrigger>
@@ -222,13 +248,15 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
 
           {atLimit && (
             <div className="text-sm text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2.5 rounded-lg">
-              Limite de {MAX_IMAGES} imagens atingido. Remova uma imagem existente para adicionar outra.
+              Limite de {MAX_IMAGES} imagens atingido.
             </div>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleInsert} disabled={!canInsert || atLimit || isUploading}>Inserir</Button>
+            <Button onClick={handleConfirm} disabled={!canConfirm || (atLimit && !editMode) || isUploading}>
+              {editMode ? "Salvar" : "Inserir"}
+            </Button>
           </div>
         </div>
       </DefaultModal>

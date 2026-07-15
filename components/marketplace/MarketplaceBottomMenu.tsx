@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
-import { useUserSession } from "@/hooks/use-user-session"
 import {
     HomeIcon, SearchIcon, Package, MenuIcon, UserIcon, StoreIcon, HeartIcon, StarIcon, HelpCircleIcon, ChevronRightIcon, LogoutIcon, InfoIcon, MoneyIcon, FileTextIcon, ShieldIcon
 } from "@/lib/icons"
@@ -14,7 +13,6 @@ import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 export function MarketplaceBottomMenu() {
     const pathname = usePathname()
     const { user, supabase } = useSupabase()
-    const { profile } = useUserSession()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [citySlug, setCitySlug] = useState<string | null>(null)
 
@@ -54,11 +52,8 @@ export function MarketplaceBottomMenu() {
 
     const homePath = citySlug ? `/${citySlug}` : "/"
 
-    const userName = profile?.full_name
-        ? profile.full_name.split(" ")[0]
-        : (user?.email?.split("@")[0] || "Visitante")
-
-    const fullName = profile?.full_name || user?.email?.split("@")[0] || "Visitante"
+    const userName = user?.email?.split("@")[0] || "Visitante"
+    const fullName = user?.email?.split("@")[0] || "Visitante"
 
     const handleSignOut = async () => {
         document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
@@ -95,7 +90,7 @@ export function MarketplaceBottomMenu() {
 
         if (href) {
             return (
-                <Link href={href} onClick={() => setIsMenuOpen(false)}>
+                <Link href={href} prefetch={false} onClick={() => setIsMenuOpen(false)}>
                     {content}
                 </Link>
             )
@@ -124,6 +119,7 @@ export function MarketplaceBottomMenu() {
             >
                 <Link
                     href="/"
+                    prefetch={false}
                     className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
                         }`}
                 >
@@ -133,6 +129,7 @@ export function MarketplaceBottomMenu() {
 
                 <Link
                     href="/explorar"
+                    prefetch={false}
                     className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
                         }`}
                 >
@@ -142,6 +139,7 @@ export function MarketplaceBottomMenu() {
 
                 <Link
                     href="/pedidos"
+                    prefetch={false}
                     className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark font-medium"
                         }`}
                 >

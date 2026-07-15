@@ -43,7 +43,7 @@ export function StorePoliciesModal({ isOpen, onClose, partnerId, storeName }: St
       isOpen={isOpen}
       onClose={onClose}
       title={`Políticas de ${storeName}`}
-      maxWidth="md"
+      maxWidth="3xl"
     >
       <div className="py-2 space-y-6">
         {loading ? (

@@ -36,6 +36,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     const fetchedRef = useRef(false)
 
     // Fetch favorites on mount (once per session, when user is available)
+    // Uses a small delay to avoid competing with page hydration
     useEffect(() => {
         if (!user?.id) {
             setFavoriteKeys(new Set())
@@ -47,15 +48,19 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         if (fetchedRef.current) return
         fetchedRef.current = true
 
-        getUserFavoriteIdsAction().then((result) => {
-            if (result.success) {
-                const keys = new Set(
-                    result.favorites.map((f) => makeKey(f.item_id, f.item_type))
-                )
-                setFavoriteKeys(keys)
-            }
-            setIsLoaded(true)
-        })
+        const id = setTimeout(() => {
+            getUserFavoriteIdsAction().then((result) => {
+                if (result.success) {
+                    const keys = new Set(
+                        result.favorites.map((f) => makeKey(f.item_id, f.item_type))
+                    )
+                    setFavoriteKeys(keys)
+                }
+                setIsLoaded(true)
+            })
+        }, 600)
+
+        return () => clearTimeout(id)
     }, [user?.id])
 
     const isFavorited = useCallback(

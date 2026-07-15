@@ -251,13 +251,15 @@ export function ServiceDetailsPageClient({
     const [activePromotions, setActivePromotions] = useState<any[]>([])
 
     useEffect(() => {
-        if (partner?.id) {
+        if (!partner?.id) return
+        const timer = setTimeout(() => {
             listActivePromotionsForMarketplaceAction(partner.id)
                 .then((res) => {
                     if (Array.isArray(res)) setActivePromotions(res)
                 })
                 .catch((e) => console.error("Error loading promotions:", e))
-        }
+        }, 800)
+        return () => clearTimeout(timer)
     }, [partner?.id])
 
     const activePromo = useMemo(() => {
@@ -341,17 +343,20 @@ export function ServiceDetailsPageClient({
 
     // Load partner delivery configuration
     useEffect(() => {
-        if (partner.id) {
+        if (!partner.id) return
+        const timer = setTimeout(() => {
             getPartnerDeliveryConfigAction(partner.id).then((res: any) => {
                 if (res.success) setDeliveryConfig(res)
             })
-        }
+        }, 500)
+        return () => clearTimeout(timer)
     }, [partner.id])
 
     // Load user addresses if logged in
     useEffect(() => {
         if (userId) {
-            loadUserAddresses()
+            const timer = setTimeout(() => loadUserAddresses(), 1000)
+            return () => clearTimeout(timer)
         } else {
             setUserAddresses([])
             setSelectedAddressId("")

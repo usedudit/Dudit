@@ -8,7 +8,7 @@ import { EXPORT_CHUNK_SIZE } from "../constants"
 const TRANSACTION_SELECT = `
   id, description, category, amount, status, due_date, payment_date,
   payment_type, transaction_type, created_at,
-  transaction_categories(name),
+  financial_categories!category_id(name),
   financial_accounts(name),
   payment_methods(name)
 `

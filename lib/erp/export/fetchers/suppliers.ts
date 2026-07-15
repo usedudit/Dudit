@@ -6,7 +6,7 @@ import type { SuppliersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const SUPPLIER_SELECT = `
-  id, name, email, phone, cpf, cnpj, city, state, status, created_at
+  id, name, email, phone, cpf, cnpj, status, created_at
 `
 
 export async function fetchSuppliersExport(

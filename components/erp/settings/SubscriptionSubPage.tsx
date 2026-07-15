@@ -41,6 +41,7 @@ import {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { buildFeaturesDisplay, getHardcodedPlan } from "@/lib/subscription/feature-labels"
+import { BillingPage } from "@/components/billing/BillingPage"
 
 function formatLimitValue(val: number | string): string {
     if (val === "unlimited" || val === -1) return "Ilimitado"
@@ -285,6 +286,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     const [subData, setSubData] = useState<SubscriptionData | null>(null)
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
+    const [billingTab, setBillingTab] = useState<"plan" | "invoices" | "payments" | "history">("plan")
 
     // Account deletion states
     const [userId, setUserId] = useState<string | null>(null)
@@ -579,6 +581,34 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
 
                     {/* Content Body */}
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        {/* Billing Tab Bar */}
+                        <div className="flex items-center gap-1 mb-6 border-b border-brand-border dark:border-dark-border">
+                            {[
+                                { key: "plan", label: "Plano Atual" },
+                                { key: "invoices", label: "Faturas" },
+                                { key: "payments", label: "Pagamentos" },
+                                { key: "history", label: "Histórico" },
+                            ].map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setBillingTab(tab.key as typeof billingTab)}
+                                    className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 -mb-px ${
+                                        billingTab === tab.key
+                                            ? "border-brand-green text-brand-dark dark:text-dark-heading"
+                                            : "border-transparent text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {billingTab !== "plan" ? (
+                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                <BillingPage showTitle={false} />
+                            </div>
+                        ) : (
+                        <>
                         {/* Current Plan Info Bar */}
                         {!loading && subData && (
                             <motion.div
@@ -1228,6 +1258,8 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                 </div>
                             </div>
                         </DefaultModal>
+                        </>
+                    )}
                     </div>
                 </div>
             </div>

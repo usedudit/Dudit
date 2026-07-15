@@ -115,39 +115,6 @@ export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailR
     }
 
     // ====================================================================
-    // DEDUPLICATION: Check if email was already sent in last 5 minutes
-    // ====================================================================
-    const supabase = await getSupabaseServerClient()
-    const recipientEmail = Array.isArray(input.to) ? input.to[0] : input.to
-    const dedupKey = `${user.id}-${recipientEmail}-${input.subject}`
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
-
-    const { data: recentEmail } = await supabase
-      .from("email_send_log")
-      .select("id, message_id")
-      .eq("user_id", user.id)
-      .eq("recipient_email", recipientEmail)
-      .eq("subject", input.subject)
-      .gt("created_at", fiveMinutesAgo.toISOString())
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single()
-
-    if (recentEmail) {
-      SecureLogger.info("[Email Action] Duplicate email request prevented", {
-        userId: user.id,
-        recipientEmail,
-        subject: input.subject,
-        previousMessageId: recentEmail.message_id,
-      })
-      return {
-        success: true,
-        messageId: recentEmail.message_id || "duplicate",
-        error: "Este email foi enviado recentemente. Requisição duplicada foi bloqueada.",
-      }
-    }
-
-    // ====================================================================
     // PREPARE REQUEST
     // ====================================================================
     const internalRequest: InternalEmailRequest = {
@@ -185,29 +152,6 @@ export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailR
       messageId: result.messageId,
       recipientCount: recipients.length,
     })
-
-    // ====================================================================
-    // LOG EMAIL FOR DEDUPLICATION
-    // ====================================================================
-    for (const recipient of recipients) {
-      try {
-        await supabase.from("email_send_log").insert({
-          user_id: user.id,
-          recipient_email: recipient,
-          subject: input.subject,
-          message_id: result.messageId,
-          status: "sent",
-          partner_id: input.partnerId,
-        })
-      } catch (logError) {
-        // Log but don't fail if dedup logging fails
-        SecureLogger.warn("[Email Action] Failed to log email send", {
-          userId: user.id,
-          recipient,
-          error: logError instanceof Error ? logError.message : "Unknown",
-        })
-      }
-    }
 
     return {
       success: true,

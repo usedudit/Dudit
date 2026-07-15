@@ -588,19 +588,7 @@ BEGIN
     CASE WHEN p_idempotency_key IS NULL THEN NULL ELSE p_idempotency_key || ':event' END
   );
 
-  INSERT INTO public.suspicious_activities (user_id, activity_type, severity, details)
-  VALUES (
-    p_reporter_user_id,
-    'return_reported_to_dudit',
-    CASE WHEN v_request.sla_status = 'vencido' THEN 'medium' ELSE 'low' END,
-    jsonb_build_object(
-      'return_request_id', p_return_request_id,
-      'partner_id', v_request.partner_id,
-      'report_id', v_report_id
-    )
-  );
-
-  -- Reportes geram evidência (reports + suspicious_activities + return_events).
+  -- Reportes geram evidência (reports + return_events).
   -- risk_score só sobe via validate_report (admin) ou regras objetivas (ex.: SLA expirado).
 
   RETURN jsonb_build_object('report_id', v_report_id, 'created', true);

@@ -131,40 +131,6 @@ async function handler(request: NextRequest) {
     }
 
     // ====================================================================
-    // DEDUPLICATION: Check if email was already sent in last 5 minutes
-    // ====================================================================
-    const recipientEmail = recipients[0]
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
-
-    const { data: recentEmail } = await supabase
-      .from("email_send_log")
-      .select("id, message_id")
-      .eq("user_id", userId)
-      .eq("recipient_email", recipientEmail)
-      .eq("subject", body.subject)
-      .gt("created_at", fiveMinutesAgo.toISOString())
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single()
-
-    if (recentEmail) {
-      SecureLogger.info("[Email API] Duplicate email request prevented", {
-        userId,
-        recipientEmail,
-        subject: body.subject,
-        previousMessageId: recentEmail.message_id,
-      })
-      return NextResponse.json(
-        {
-          success: true,
-          messageId: recentEmail.message_id || "duplicate",
-          warning: "Este email foi enviado recentemente. Requisição duplicada foi bloqueada.",
-        },
-        { status: 200 },
-      )
-    }
-
-    // ====================================================================
     // PREPARE & SEND
     // ====================================================================
     const internalRequest: InternalEmailRequest = {
@@ -208,29 +174,6 @@ async function handler(request: NextRequest) {
       messageId: result.messageId,
       recipientCount: recipients.length,
     })
-
-    // ====================================================================
-    // LOG EMAIL FOR DEDUPLICATION
-    // ====================================================================
-    for (const recipient of recipients) {
-      try {
-        await supabase.from("email_send_log").insert({
-          user_id: userId,
-          recipient_email: recipient,
-          subject: body.subject,
-          message_id: result.messageId,
-          status: "sent",
-          partner_id: body.partnerId,
-        })
-      } catch (logError) {
-        // Log but don't fail if dedup logging fails
-        SecureLogger.warn("[Email API] Failed to log email send", {
-          userId,
-          recipient,
-          error: logError instanceof Error ? logError.message : "Unknown",
-        })
-      }
-    }
 
     return NextResponse.json(
       {

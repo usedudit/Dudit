@@ -16,6 +16,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import InsertImageModal from "./InsertImageModal"
+import { deleteImageFromR2Action } from "@/app/actions/shared/r2"
 
 interface RichTextEditorProps {
   label: string
@@ -51,8 +52,20 @@ const FONT_SIZES = [
   { tag: "h6", label: "Título 6", preview: "Aa" },
 ]
 
+const MIN_IMG_SIZE = 50
+const MAX_IMG_SIZE = 900
+const HANDLE_SIZE = 10
+
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, onChange, disabled }) => {
   const editorRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const selectedImgRef = useRef<HTMLImageElement | null>(null)
+  const resizeRef = useRef<{
+    startX: number; startY: number
+    startW: number; startH: number
+    aspect: number
+    corner: string
+  } | null>(null)
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set())
   const [showColorModal, setShowColorModal] = useState(false)
   const [showFontSizeModal, setShowFontSizeModal] = useState(false)
@@ -61,16 +74,159 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   const [tableCols, setTableCols] = useState(3)
   const [showImageModal, setShowImageModal] = useState(false)
 
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
+  const [overlayPos, setOverlayPos] = useState({ top: 0, left: 0, width: 0, height: 0 })
+  const [showActions, setShowActions] = useState(false)
+  const [editImageData, setEditImageData] = useState<{ url: string; alt: string; width: string; height: string } | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+
   const { planSlug } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
   const imageUploadBlocked = !hasMinimumPlan(planSlug, "crescer")
 
+  const updateOverlayPos = useCallback(() => {
+    const img = selectedImgRef.current
+    const cont = containerRef.current
+    if (!img || !cont) { setOverlayPos({ top: 0, left: 0, width: 0, height: 0 }); return }
+    const cr = cont.getBoundingClientRect()
+    const ir = img.getBoundingClientRect()
+    setOverlayPos({
+      top: ir.top - cr.top,
+      left: ir.left - cr.left,
+      width: ir.width,
+      height: ir.height,
+    })
+  }, [])
+
+  const selectImage = useCallback((img: HTMLImageElement | null) => {
+    if (selectedImgRef.current) {
+      selectedImgRef.current.style.outline = ""
+    }
+    selectedImgRef.current = img
+    if (img) {
+      if (!img.dataset.editorId) {
+        img.dataset.editorId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      }
+      setSelectedImageId(img.dataset.editorId)
+      img.style.outline = "2px solid #059669"
+      img.style.outlineOffset = "2px"
+      updateOverlayPos()
+      setShowActions(true)
+    } else {
+      setSelectedImageId(null)
+      setShowActions(false)
+      setOverlayPos({ top: 0, left: 0, width: 0, height: 0 })
+    }
+  }, [updateOverlayPos])
+
+  const deselectImage = useCallback(() => {
+    selectImage(null)
+  }, [selectImage])
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const handleClick = (e: MouseEvent) => {
+      const img = (e.target as HTMLElement).closest("img")
+      if (img && editor.contains(img)) {
+        e.stopPropagation()
+        selectImage(img)
+        return
+      }
+      if (!(e.target as HTMLElement).closest(".rich-text-image-overlay")) {
+        deselectImage()
+      }
+    }
+
+    const handleScroll = () => {
+      if (selectedImgRef.current) updateOverlayPos()
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") deselectImage()
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedImgRef.current) {
+        // Let native delete handle it, but deselect after
+        requestAnimationFrame(() => {
+          if (!editor.contains(selectedImgRef.current)) deselectImage()
+        })
+      }
+    }
+
+    editor.addEventListener("click", handleClick)
+    editor.addEventListener("scroll", handleScroll)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      editor.removeEventListener("click", handleClick)
+      editor.removeEventListener("scroll", handleScroll)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [selectImage, deselectImage, updateOverlayPos])
+
+  // Resize handlers
+  const onResizeStart = useCallback((e: React.PointerEvent, corner: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const img = selectedImgRef.current
+    if (!img) return
+    const rect = img.getBoundingClientRect()
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: rect.width,
+      startH: rect.height,
+      aspect: rect.width / rect.height,
+      corner,
+    }
+    img.style.willChange = "width, height"
+    const onMove = (ev: PointerEvent) => {
+      if (!resizeRef.current) return
+      const r = resizeRef.current
+      let dx: number, dy: number
+      switch (r.corner) {
+        case "se": dx = ev.clientX - r.startX; dy = ev.clientY - r.startY; break
+        case "sw": dx = r.startX - ev.clientX; dy = ev.clientY - r.startY; break
+        case "ne": dx = ev.clientX - r.startX; dy = r.startY - ev.clientY; break
+        case "nw": dx = r.startX - ev.clientX; dy = r.startY - ev.clientY; break
+        default: dx = 0; dy = 0
+      }
+      const propDx = dx / r.startW
+      const propDy = dy / r.startH
+      let newW: number, newH: number
+      if (Math.abs(propDx) >= Math.abs(propDy)) {
+        newW = Math.max(MIN_IMG_SIZE, Math.min(MAX_IMG_SIZE, r.startW + dx))
+        newH = Math.round(newW / r.aspect)
+      } else {
+        newH = Math.max(MIN_IMG_SIZE, Math.min(MAX_IMG_SIZE, r.startH + dy))
+        newW = Math.round(newH * r.aspect)
+      }
+      img.width = newW
+      img.height = newH
+      updateOverlayPos()
+    }
+    const onUp = () => {
+      resizeRef.current = null
+      if (img) img.style.willChange = ""
+      document.removeEventListener("pointermove", onMove)
+      document.removeEventListener("pointerup", onUp)
+      if (editorRef.current) onChange(editorRef.current.innerHTML)
+    }
+    document.addEventListener("pointermove", onMove)
+    document.addEventListener("pointerup", onUp)
+  }, [updateOverlayPos, onChange])
+
+  // Re-run overlay position on window resize
+  useEffect(() => {
+    const handle = () => { if (selectedImgRef.current) updateOverlayPos() }
+    window.addEventListener("resize", handle)
+    return () => window.removeEventListener("resize", handle)
+  }, [updateOverlayPos])
+
   const exec = useCallback((command: string, value?: string) => {
     const selection = window.getSelection()
     const hasSelection = selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode ?? null)
-
     editorRef.current?.focus()
-
     if (!hasSelection && editorRef.current) {
       const range = document.createRange()
       range.setStart(editorRef.current, 0)
@@ -78,14 +234,58 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
       selection?.removeAllRanges()
       selection?.addRange(range)
     }
-
     document.execCommand(command, false, value ?? undefined)
-
     if (editorRef.current) {
       onChange(editorRef.current.innerHTML)
       updateActiveFormats()
     }
   }, [onChange])
+
+  const handleClearFormat = () => {
+    const sel = window.getSelection()
+    const hasSelection = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed && editorRef.current?.contains(sel.anchorNode ?? null)
+    editorRef.current?.focus()
+    if (hasSelection) {
+      document.execCommand("removeFormat", false)
+    } else if (editorRef.current) {
+      const stripTags = (el: Element): string => {
+        const blocks = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "div", "ol", "ul", "li", "table", "thead", "tbody", "tr", "th", "td", "blockquote", "pre"]
+        const inlineFormatting = ["b", "strong", "i", "em", "u", "s", "strike", "sub", "sup", "span", "font", "mark", "small", "del", "ins"]
+        const result: string[] = []
+        for (const node of Array.from(el.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            result.push(node.textContent ?? "")
+          } else if (node instanceof HTMLElement) {
+            const tag = node.tagName.toLowerCase()
+            if (blocks.includes(tag)) {
+              const inner = stripTags(node)
+              if (tag === "li") {
+                result.push(`<li>${inner}</li>`)
+              } else if (["ol", "ul"].includes(tag)) {
+                result.push(`<${tag}>${inner}</${tag}>`)
+              } else if (["table", "thead", "tbody", "tr", "th", "td"].includes(tag)) {
+                result.push(`<${tag}>${inner}</${tag}>`)
+              } else {
+                result.push(`<p>${inner}</p>`)
+              }
+            } else if (inlineFormatting.includes(tag)) {
+              result.push(stripTags(node as Element))
+            } else {
+              result.push(node.outerHTML)
+            }
+          } else {
+            result.push(node.textContent ?? "")
+          }
+        }
+        return result.join("")
+      }
+      editorRef.current.innerHTML = stripTags(editorRef.current)
+    }
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML)
+      updateActiveFormats()
+    }
+  }
 
   const updateActiveFormats = useCallback(() => {
     const formats = new Set<string>()
@@ -124,6 +324,135 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
       exec("insertHTML", imgHtml)
     }
     if (editorRef.current) onChange(editorRef.current.innerHTML)
+  }
+
+  const handleEditImage = () => {
+    const img = selectedImgRef.current
+    if (!img) return
+    setEditImageData({
+      url: img.src,
+      alt: img.alt,
+      width: String(img.width),
+      height: String(img.height),
+    })
+    setShowEditModal(true)
+    setShowActions(false)
+  }
+
+  const handleEditConfirm = (newUrl: string, alt: string, width: string, height: string) => {
+    const img = selectedImgRef.current
+    if (!img) return
+    const oldSrc = img.src
+    const isNewImage = newUrl !== oldSrc && newUrl !== editImageData?.url
+    if (isNewImage) {
+      deleteImageFromR2Action(oldSrc)
+    }
+    img.src = newUrl
+    img.alt = alt
+    img.width = Number(width)
+    img.height = height ? Number(height) : 0
+    if (editorRef.current) onChange(editorRef.current.innerHTML)
+    requestAnimationFrame(() => {
+      updateOverlayPos()
+      selectImage(img)
+    })
+    setEditImageData(null)
+  }
+
+  const handleRemoveImage = async () => {
+    const img = selectedImgRef.current
+    if (!img || !editorRef.current) return
+    const src = img.src
+    const parent = img.parentElement
+    img.remove()
+    if (parent && !parent.textContent?.trim() && parent !== editorRef.current && parent.tagName !== "BODY") {
+      if (parent.innerText.trim() === "" && parent.querySelectorAll("img").length === 0) {
+        parent.remove()
+      }
+    }
+    if (editorRef.current) onChange(editorRef.current.innerHTML)
+    deselectImage()
+    try { await deleteImageFromR2Action(src) } catch { /* noop */ }
+  }
+
+  const handleMoveImage = (direction: "up" | "down") => {
+    const img = selectedImgRef.current
+    if (!img || !editorRef.current) return
+    const container = editorRef.current
+    if (direction === "up" && img.previousSibling) {
+      container.insertBefore(img, img.previousSibling)
+    } else if (direction === "down" && img.nextSibling) {
+      container.insertBefore(img.nextSibling, img)
+    }
+    if (editorRef.current) onChange(editorRef.current.innerHTML)
+    requestAnimationFrame(() => updateOverlayPos())
+  }
+
+  const isImageGrouped = (img: HTMLImageElement): boolean => {
+    const p = img.parentElement
+    if (!p) return false
+    const style = window.getComputedStyle(p)
+    return style.display === "flex" || style.display === "inline-flex"
+  }
+
+  const handleGroupImage = () => {
+    const img = selectedImgRef.current
+    if (!img || !editorRef.current) return
+    const editor = editorRef.current
+
+    if (isImageGrouped(img)) {
+      const container = img.parentElement!
+      const isOnlyChild = container.querySelectorAll("img").length <= 1
+      if (isOnlyChild) {
+        const ref = container.nextSibling || container.previousSibling
+        if (ref && container.parentElement) {
+          while (container.firstChild) {
+            container.parentElement.insertBefore(container.firstChild, container)
+          }
+          container.remove()
+        } else {
+          container.replaceWith(...Array.from(container.childNodes))
+        }
+      } else {
+        const ref = container.nextSibling
+        container.removeChild(img)
+        if (ref && ref.parentElement) {
+          ref.parentElement.insertBefore(img, ref)
+        } else {
+          editor.appendChild(img)
+        }
+      }
+      img.style.outline = "2px solid #059669"
+      img.style.outlineOffset = "2px"
+      if (editor) onChange(editor.innerHTML)
+      requestAnimationFrame(() => updateOverlayPos())
+      return
+    }
+
+    let prev = img.previousSibling
+    while (prev && prev.nodeType === Node.TEXT_NODE && !prev.textContent?.trim()) {
+      prev = prev.previousSibling
+    }
+    if (prev && (prev as HTMLElement).tagName === "IMG") {
+      const prevImg = prev as HTMLImageElement
+      if (isImageGrouped(prevImg)) {
+        const container = prevImg.parentElement!
+        container.appendChild(img)
+      } else {
+        const container = document.createElement("div")
+        container.style.display = "flex"
+        container.style.flexWrap = "wrap"
+        container.style.gap = "8px"
+        container.style.alignItems = "flex-start"
+        editor.insertBefore(container, prev)
+        container.appendChild(prevImg)
+        container.appendChild(img)
+      }
+    }
+    img.style.outline = "2px solid #059669"
+    img.style.outlineOffset = "2px"
+    if (editor) onChange(editor.innerHTML)
+    requestAnimationFrame(() => updateOverlayPos())
   }
 
   const countImages = () => {
@@ -181,7 +510,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   }
 
   return (
-    <div>
+    <div ref={containerRef} className="relative">
       <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1.5 truncate">
         {label}
       </label>
@@ -215,7 +544,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
 
           <div className="w-px h-5 bg-brand-border dark:bg-dark-border mx-1" />
 
-          {renderIconBtn(ClearFormatIcon, "Limpar formatação", () => exec("removeFormat"))}
+          {renderIconBtn(ClearFormatIcon, "Limpar formatação", handleClearFormat)}
         </div>
 
         <div
@@ -224,8 +553,109 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
           onInput={(e) => onChange(e.currentTarget.innerHTML)}
           onMouseUp={updateActiveFormats}
           onKeyUp={updateActiveFormats}
-          className="w-full h-[200px] overflow-y-auto bg-white dark:bg-dark-surface rounded-b-lg py-2 px-4 text-sm focus:outline-none text-brand-dark dark:text-dark-heading disabled:bg-brand-gray dark:disabled:bg-dark-border/30 custom-scrollbar"
+          className="rich-text-editor w-full h-[200px] overflow-y-auto bg-white dark:bg-dark-surface rounded-b-lg py-2 px-4 text-sm focus:outline-none text-brand-dark dark:text-dark-heading disabled:bg-brand-gray dark:disabled:bg-dark-border/30 custom-scrollbar"
         />
+
+        {/* Image selection overlay */}
+        {selectedImgRef.current && selectedImageId && (
+          <div
+            className="rich-text-image-overlay absolute pointer-events-none z-10"
+            style={{
+              top: overlayPos.top,
+              left: overlayPos.left,
+              width: overlayPos.width,
+              height: overlayPos.height,
+            }}
+          >
+            {/* Resize handles */}
+            <div
+              className="absolute pointer-events-auto cursor-nw-resize z-20 bg-white border-2 border-brand-green rounded-sm"
+              style={{ width: HANDLE_SIZE, height: HANDLE_SIZE, top: -(HANDLE_SIZE / 2), left: -(HANDLE_SIZE / 2) }}
+              onPointerDown={(e) => onResizeStart(e, "nw")}
+            />
+            <div
+              className="absolute pointer-events-auto cursor-ne-resize z-20 bg-white border-2 border-brand-green rounded-sm"
+              style={{ width: HANDLE_SIZE, height: HANDLE_SIZE, top: -(HANDLE_SIZE / 2), right: -(HANDLE_SIZE / 2) }}
+              onPointerDown={(e) => onResizeStart(e, "ne")}
+            />
+            <div
+              className="absolute pointer-events-auto cursor-sw-resize z-20 bg-white border-2 border-brand-green rounded-sm"
+              style={{ width: HANDLE_SIZE, height: HANDLE_SIZE, bottom: -(HANDLE_SIZE / 2), left: -(HANDLE_SIZE / 2) }}
+              onPointerDown={(e) => onResizeStart(e, "sw")}
+            />
+            <div
+              className="absolute pointer-events-auto cursor-se-resize z-20 bg-white border-2 border-brand-green rounded-sm"
+              style={{ width: HANDLE_SIZE, height: HANDLE_SIZE, bottom: -(HANDLE_SIZE / 2), right: -(HANDLE_SIZE / 2) }}
+              onPointerDown={(e) => onResizeStart(e, "se")}
+            />
+
+            {/* Actions button */}
+            {showActions && (
+              <div
+                className="rich-text-image-overlay pointer-events-auto absolute z-20 flex items-center gap-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg shadow-lg px-1.5 py-1"
+                style={{ top: -(HANDLE_SIZE / 2 + 32), right: 0 }}
+              >
+                <button
+                  type="button"
+                  onClick={handleEditImage}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading transition-colors"
+                  title="Editar imagem"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
+                  title="Remover imagem"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </button>
+                {selectedImgRef.current && (
+                  <button
+                    type="button"
+                    onClick={handleGroupImage}
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading transition-colors"
+                    title={isImageGrouped(selectedImgRef.current) ? "Desagrupar" : "Lado a lado"}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                      <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                    </svg>
+                  </button>
+                )}
+                <div className="w-px h-4 bg-brand-border dark:bg-dark-border" />
+                <button
+                  type="button"
+                  onClick={() => handleMoveImage("up")}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading transition-colors"
+                  title="Mover para cima"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMoveImage("down")}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading transition-colors"
+                  title="Mover para baixo"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <DefaultModal isOpen={showColorModal} onClose={() => setShowColorModal(false)} title="Cor do texto" maxWidth="sm">
@@ -298,13 +728,26 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
       </DefaultModal>
 
       <InsertImageModal
-        isOpen={showImageModal}
+        isOpen={showImageModal && !showEditModal}
         onClose={() => setShowImageModal(false)}
         onInsert={handleImageInsert}
         imageCount={countImages()}
         imageUploadBlocked={imageUploadBlocked}
         onUpgradeClick={() => openPlanUpgrade("crescer")}
       />
+
+      <InsertImageModal
+        isOpen={showEditModal}
+        onClose={() => { setShowEditModal(false); setEditImageData(null) }}
+        onInsert={handleImageInsert}
+        imageCount={countImages()}
+        imageUploadBlocked={imageUploadBlocked}
+        onUpgradeClick={() => openPlanUpgrade("crescer")}
+        editImageData={editImageData}
+        onEdit={handleEditConfirm}
+      />
     </div>
   )
 }
+
+export default RichTextEditor

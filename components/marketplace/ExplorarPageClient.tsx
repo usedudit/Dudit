@@ -606,60 +606,6 @@ export function ExplorarPageClient({
         return count
     }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType])
 
-    const activeFilterChips = useMemo(() => {
-        const chips: { key: string; label: string; value: string; onRemove: () => void }[] = []
-        if (selectedCategories.length > 0) {
-            chips.push({
-                key: "category",
-                label: "Categoria",
-                value: selectedCategories[0],
-                onRemove: () => toggleCategory(selectedCategories[0]),
-            })
-        }
-        if (minPrice || maxPrice) {
-            let value = ""
-            if (minPrice && maxPrice) value = `${formatCurrency(Number(minPrice))} - ${formatCurrency(Number(maxPrice))}`
-            else if (minPrice) value = `> ${formatCurrency(Number(minPrice))}`
-            else value = `< ${formatCurrency(Number(maxPrice))}`
-            chips.push({
-                key: "price",
-                label: "Preço",
-                value,
-                onRemove: () => { setMinPrice(""); setMaxPrice("") },
-            })
-        }
-        if (promoOn) {
-            chips.push({
-                key: "promo",
-                label: "Promoção",
-                value: "Ativo",
-                onRemove: () => setPromoOn(false),
-            })
-        }
-        if (sortBy !== "relevancia") {
-            const sortLabel = sortOptions.find(o => o.value === sortBy)?.label || sortBy
-            chips.push({
-                key: "sort",
-                label: "Ordenar",
-                value: sortLabel,
-                onRemove: () => setSortBy("relevancia"),
-            })
-        }
-        if (currentType !== "tudo") {
-            const typeLabel = typeOptions.find(o => o.value === currentType)?.label || currentType
-            chips.push({
-                key: "type",
-                label: "Tipo",
-                value: typeLabel,
-                onRemove: () => {
-                    setCurrentType("tudo")
-                    updateUrl(selectedCitySlug, selectedCategories, query, "tudo")
-                },
-            })
-        }
-        return chips
-    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query])
-
     const categoryShowcases = useMemo(() => {
         if (selectedCategories.length === 0) return []
         const activeCat = selectedCategories[0]
@@ -899,6 +845,60 @@ export function ExplorarPageClient({
         { value: "preco_maior", label: "Maior preco" },
         { value: "recentes", label: "Mais recentes" },
     ]
+
+    const activeFilterChips = useMemo(() => {
+        const chips: { key: string; label: string; value: string; onRemove: () => void }[] = []
+        if (selectedCategories.length > 0) {
+            chips.push({
+                key: "category",
+                label: "Categoria",
+                value: selectedCategories[0],
+                onRemove: () => toggleCategory(selectedCategories[0]),
+            })
+        }
+        if (minPrice || maxPrice) {
+            let value = ""
+            if (minPrice && maxPrice) value = `${formatCurrency(Number(minPrice))} - ${formatCurrency(Number(maxPrice))}`
+            else if (minPrice) value = `> ${formatCurrency(Number(minPrice))}`
+            else value = `< ${formatCurrency(Number(maxPrice))}`
+            chips.push({
+                key: "price",
+                label: "Preço",
+                value,
+                onRemove: () => { setMinPrice(""); setMaxPrice("") },
+            })
+        }
+        if (promoOn) {
+            chips.push({
+                key: "promo",
+                label: "Promoção",
+                value: "Ativo",
+                onRemove: () => setPromoOn(false),
+            })
+        }
+        if (sortBy !== "relevancia") {
+            const sortLabel = sortOptions.find(o => o.value === sortBy)?.label || sortBy
+            chips.push({
+                key: "sort",
+                label: "Ordenar",
+                value: sortLabel,
+                onRemove: () => setSortBy("relevancia"),
+            })
+        }
+        if (currentType !== "tudo") {
+            const typeLabel = typeOptions.find(o => o.value === currentType)?.label || currentType
+            chips.push({
+                key: "type",
+                label: "Tipo",
+                value: typeLabel,
+                onRemove: () => {
+                    setCurrentType("tudo")
+                    updateUrl(selectedCitySlug, selectedCategories, query, "tudo")
+                },
+            })
+        }
+        return chips
+    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getPartnerUrl(item.partners || item)

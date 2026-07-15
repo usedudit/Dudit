@@ -41,7 +41,6 @@ interface PublicOSPortalProps {
         products: any[]
         attachments: any[]
         history: any[]
-        statusHistory: any[]
         sale: any
     }
 }
@@ -53,7 +52,6 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     const [products, setProducts] = useState(initialData.products)
     const [attachments, setAttachments] = useState(initialData.attachments)
     const [history, setHistory] = useState(initialData.history)
-    const [statusHistory, setStatusHistory] = useState(initialData.statusHistory)
     const [sale, setSale] = useState(initialData.sale)
 
     const [activeTab, setActiveTab] = useState("Dados Gerais")
@@ -133,7 +131,6 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                     setProducts(res.data.products)
                     setAttachments(res.data.attachments)
                     setHistory(res.data.history)
-                    setStatusHistory(res.data.statusHistory)
                     setSale(res.data.sale)
                 }
             } catch (err) {

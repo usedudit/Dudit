@@ -6,7 +6,7 @@ import type { StockMovementsExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const STOCK_MOVEMENT_SELECT = `
-  id, created_at, movement_type, reason, reference_name, quantity,
+  id, created_at, movement_type, reason, reference_name,
   created_by,
   stock_movement_items(quantity, products(name, sku)),
   orders(order_number)

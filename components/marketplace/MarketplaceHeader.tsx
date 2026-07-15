@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect, useMemo, memo, useCallback, useTransition } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, AlertTriangleIcon } from "@/lib/icons"
+import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button, DefaultModal, Input, InfoCard } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
@@ -167,80 +167,6 @@ const Header: React.FC<HeaderProps> = ({
     const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
     const [visitorSearchQuery, setVisitorSearchQuery] = useState("")
     const [isIpLoading, setIsIpLoading] = useState(false)
-
-    const [pendingDeletion, setPendingDeletion] = useState<any>(null)
-    const [graceEndsAt, setGraceEndsAt] = useState<string | null>(null)
-    const [timeLeft, setTimeLeft] = useState("")
-    const [cancelModalOpen, setCancelModalOpen] = useState(false)
-    const [isCancelling, setIsCancelling] = useState(false)
-
-    useEffect(() => {
-        const checkDeletion = async () => {
-            try {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (!user) return
-
-                const { data } = await supabase
-                    .from("account_deletions")
-                    .select("grace_period_ends_at, status")
-                    .eq("user_id", user.id)
-                    .not("status", "eq", "completed")
-                    .maybeSingle()
-
-                if (data?.grace_period_ends_at) {
-                    setPendingDeletion(data)
-                    setGraceEndsAt(data.grace_period_ends_at)
-                }
-            } catch (err) {
-                console.error("Error checking account deletion", err)
-            }
-        }
-        checkDeletion()
-    }, [user, supabase])
-
-    useEffect(() => {
-        if (!graceEndsAt) return
-
-        const updateTimer = () => {
-            const diff = new Date(graceEndsAt).getTime() - new Date().getTime()
-            if (diff <= 0) {
-                setTimeLeft("0h")
-                return
-            }
-            const hours = Math.ceil(diff / (1000 * 60 * 60))
-            setTimeLeft(`${hours}h`)
-        }
-
-        updateTimer()
-        const interval = setInterval(updateTimer, 60000)
-        return () => clearInterval(interval)
-    }, [graceEndsAt])
-
-    const [cancellationError, setCancellationError] = useState<string | null>(null)
-
-    const handleCancelDeletion = async () => {
-        setIsCancelling(true)
-        setCancellationError(null)
-        try {
-            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
-            const token = await getCSRFToken()
-            const { cancelDeletionAction } = await import("@/app/actions/shared/decelerate-deletion")
-            const res = await cancelDeletionAction(token)
-            if (res.success) {
-                setCancelModalOpen(false)
-                setPendingDeletion(null)
-                setGraceEndsAt(null)
-                setTimeLeft("")
-                window.location.reload()
-            } else {
-                setCancellationError(res.error || "Ocorreu um erro ao cancelar o encerramento da conta.")
-            }
-        } catch (err) {
-            setCancellationError("Erro ao processar requisição.")
-        } finally {
-            setIsCancelling(false)
-        }
-    }
 
     const filteredCities = useMemo(() => {
         if (!visitorSearchQuery || visitorSearchQuery.trim().length < 2) return []
@@ -672,11 +598,6 @@ const Header: React.FC<HeaderProps> = ({
                                         height={36}
                                         className="w-9 h-9 rounded-full border border-gray-200 object-cover"
                                     />
-                                    {pendingDeletion && (
-                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-white animate-pulse z-10">
-                                            !
-                                        </span>
-                                    )}
                                 </div>
                             ) : (
                                 <div className="w-9 h-9 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center">
@@ -836,16 +757,6 @@ const Header: React.FC<HeaderProps> = ({
                         <h3 className="text-[16px] font-bold text-brand-dark">{userName}</h3>
                     </div>
 
-                    {pendingDeletion && (
-                        <div onClick={() => {
-                            setIsMobileUserMenuOpen(false)
-                            setCancelModalOpen(true)
-                        }}
-                            className="cursor-pointer">
-                            <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
-                        </div>
-                    )}
-
                     <div className="py-2">
                         {([
                             { label: "Seu Perfil", href: "/perfil" },
@@ -997,11 +908,6 @@ const Header: React.FC<HeaderProps> = ({
                                 >
                                     <div className={`w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-white overflow-hidden font-semibold text-sm ${getAvatarColor(fullName)} relative`}>
                                         {getUserInitials(fullName)}
-                                        {pendingDeletion && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-white animate-pulse z-10">
-                                                !
-                                            </span>
-                                        )}
                                     </div>
                                     <div className="flex flex-col text-white">
                                         <span className="text-[11px] font-normal">Olá, {userName}</span>
@@ -1036,16 +942,6 @@ const Header: React.FC<HeaderProps> = ({
                                         </div>
                                         <h3 className="text-[16px] font-bold text-brand-dark">{userName}</h3>
                                     </div>
-
-                                    {pendingDeletion && (
-                                        <div onClick={() => {
-                                            setIsUserMenuOpen(false)
-                                            setCancelModalOpen(true)
-                                        }}
-                                            className="cursor-pointer">
-                                            <InfoCard title="Encerramento agendado" message={`Sua conta será encerrada em ${timeLeft}. Clique para cancelar.`} color="red" />
-                                        </div>
-                                    )}
 
                                     <div className="py-2">
                                         {([
@@ -1133,50 +1029,7 @@ const Header: React.FC<HeaderProps> = ({
                     </Link>
                 </div>
             </header>
-            <DefaultModal
-                isOpen={cancelModalOpen}
-                onClose={() => {
-                    setCancelModalOpen(false)
-                    setCancellationError(null)
-                }}
-                title="Conta em encerramento"
-            >
-                <div className="space-y-6 pt-2 pb-4 text-brand-dark">
-                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 text-red-500 mb-2">
-                        <AlertTriangleIcon size={24} />
-                    </div>
 
-                    <div className="space-y-2">
-                        <h3 className="text-lg font-bold">Deseja cancelar o encerramento da sua conta?</h3>
-                        <p className="text-sm text-brand-inactive-text">
-                            Sua conta está programada para ser encerrada definitivamente em <strong className="text-brand-dark">{timeLeft}</strong>. Ao cancelar, todos os seus dados serão mantidos e sua conta retornará ao estado ativo normalmente.
-                        </p>
-                    </div>
-
-                    {cancellationError && (
-                        <InfoCard message={cancellationError} color="red" className="mt-4" />
-                    )}
-
-                    <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border">
-                        <Button
-                            variant="outline"
-                            onClick={() => setCancelModalOpen(false)}
-                            disabled={isCancelling}
-                            className="flex-1 h-12 font-bold"
-                        >
-                            Manter encerramento
-                        </Button>
-                        <Button
-                            variant="default"
-                            onClick={handleCancelDeletion}
-                            disabled={isCancelling}
-                            className="flex-1 h-12 bg-brand-green hover:bg-brand-green/90 text-white font-bold"
-                        >
-                            {isCancelling ? "Cancelando..." : "Reativar minha conta"}
-                        </Button>
-                    </div>
-                </div>
-            </DefaultModal>
             {renderVisitorModal()}
         </>
     )

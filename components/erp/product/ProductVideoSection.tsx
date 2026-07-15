@@ -4,7 +4,7 @@ import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button, FormDropdown, IconPlaceholder, Input } from "@/components/reusable"
 import { Progress } from "@/components/ui/progress"
-import { TrashIcon, UploadIcon, LockIcon } from "@/lib/icons"
+import { TrashIcon, UploadIcon, LockIcon, VideoIcon } from "@/lib/icons"
 import {
     bytesToBase64,
     compressVideoIfNeeded,
@@ -393,7 +393,7 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
                         ) : !localPreview ? (
                             <div className="w-full flex-col flex items-center justify-center mt-10">
                                 <IconPlaceholder
-                                    icon={UploadIcon}
+                                    icon={VideoIcon}
                                     title={hasVideo ? "Substituir vídeo" : "Selecionar MP4, WebM ou MOV"}
                                     subtitle={hasVideo ? "Clique para fazer upload de um novo vídeo" : "Arraste e solte aqui ou clique para selecionar"}
                                     itemButton={{
