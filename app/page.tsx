@@ -14,17 +14,17 @@ import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
     title: "Dudit | Descubra. Anuncie. Organize.",
-    description: "Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.",
+    description: "A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.",
     openGraph: {
         title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.",
+        description: "A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
             {
                 url: "https://img.dudit.com.br/static/og-image.png",
                 width: 1200,
-                height: 630,
+                height: 400,
             },
         ],
         locale: "pt_BR",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
         site: "@dudit",
         creator: "@dudit",
         title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.",
+        description: "A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {
@@ -51,9 +51,6 @@ export const metadata: Metadata = {
 }
 
 async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName }: any) {
-    const t0 = performance.now()
-    console.log(`[SSR] Home (Feed Payload) | START for city: ${cityName || "global"}`)
-
     let sections: HomeSection[] = []
     let homeAds: SponsoredAd[] = []
     let displayCityName: string | null = cityName
@@ -99,9 +96,6 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
         sections = sectionsResult
         homeAds = adsResult
     }
-
-    const tEnd = performance.now()
-    console.log(`[SSR] Home (Feed Payload) | END | ${sections.length} sections | Time: ${(tEnd - t0).toFixed(2)}ms`)
 
     return (
         <MarketplaceHome
@@ -195,9 +189,6 @@ export default async function HomePage() {
     }
 
     const cartCount = sessionData?.cartCount || 0
-
-    const tEnd = performance.now()
-    console.log(`[SSR] Home (Header) | END | Total Time: ${(tEnd - tStart).toFixed(2)}ms | User: ${!!user}`)
 
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[110px] lg:pt-[108px]">

@@ -178,17 +178,13 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
 
     const sumBase = splitRows.reduce((acc, r) => acc + r.amount, 0)
 
-    // Compute discount on baseTotal (not on amountReceived) to stay consistent with frontend
-    const baseDiscount = splitRows.reduce((acc, row) => {
-        const method = row.paymentMethodId ? methodById.get(row.paymentMethodId) : null
-        const dp = method ? Math.max(0, Number(method.discount_percent || 0)) : 0
-        return acc + (dp > 0 ? safeMoney(baseTotal * dp / 100) : 0)
-    }, 0)
+    // Use the correctly computed per-leg discount from recalculateSplitPayment
+    const baseDiscount = recalculated.paymentMethodDiscountAmount
 
     const isPartial = sumBase < baseTotal - 0.005
     const finalTotal = isPartial
-        ? Math.max(0, safeMoney(baseTotal + recalculated.feeAmount + recalculated.interestAmount - baseDiscount))
-        : Math.max(sumBase, recalculated.finalTotal)
+        ? Math.max(0, safeMoney(baseTotal + recalculated.feeAmount + recalculated.fixedFeeAmount + recalculated.interestAmount - baseDiscount))
+        : recalculated.finalTotal
 
     return {
         ok: true,
@@ -338,10 +334,24 @@ async function syncPosSaleToOrders(params: {
     })
 
     const subtotalValue = pricingResult.subtotal
-    const baseBeforePaymentMethod = safeMoney(Math.max(0, pricingResult.finalTotal - couponDiscount))
-    const finalTotal = safeMoney(Number(sale.final_amount || 0))
-    const paymentMethodDiscountAmount = safeMoney(Math.max(0, baseBeforePaymentMethod - finalTotal))
-    const paymentMethodExtraAmount = safeMoney(Math.max(0, finalTotal - baseBeforePaymentMethod))
+
+    // Use actual breakdown values instead of residual calculation
+    let paymentMethodDiscountAmount = 0
+    let paymentMethodInterestAmount = 0
+    let paymentMethodFeeAmount = 0
+    let paymentMethodFixedFeeAmount = 0
+    if (params.paymentBreakdown && params.paymentBreakdown.length > 0) {
+        for (const entry of params.paymentBreakdown) {
+            if (entry.adjustmentType === 'discount') {
+                paymentMethodDiscountAmount = safeMoney(paymentMethodDiscountAmount + Number(entry.adjustmentAmount || 0))
+            } else {
+                paymentMethodInterestAmount = safeMoney(paymentMethodInterestAmount + Number(entry.interestAmount || 0))
+                paymentMethodFeeAmount = safeMoney(paymentMethodFeeAmount + Number(entry.feeAmount || 0))
+                paymentMethodFixedFeeAmount = safeMoney(paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+            }
+        }
+    }
+    const paymentMethodExtraAmount = safeMoney(paymentMethodInterestAmount + paymentMethodFeeAmount + paymentMethodFixedFeeAmount)
     const deliveryType = shippingFee > 0 ? "delivery" : "pickup"
     let deliveryStatus = shippingFee > 0 ? "preparing" : "delivered"
     if (params.isPendingDelivery) {
@@ -447,6 +457,9 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
         discount_type: "fixed",
         discount_amount: couponDiscount,
         payment_method_discount_amount: paymentMethodDiscountAmount,
+        payment_method_interest_amount: paymentMethodInterestAmount,
+        payment_method_fee_amount: paymentMethodFeeAmount,
+        payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
         coupon_id: draft?.coupon_id || null,
         delivery_fee: shippingFee,
@@ -488,7 +501,10 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
         const missingPosFlagColumn = insertErrorMessage.includes("is_pos_sale")
         const missingPaymentDeltaColumns =
             insertErrorMessage.includes("payment_method_discount_amount") ||
-            insertErrorMessage.includes("payment_method_extra_amount")
+            insertErrorMessage.includes("payment_method_extra_amount") ||
+            insertErrorMessage.includes("payment_method_interest_amount") ||
+            insertErrorMessage.includes("payment_method_fee_amount") ||
+            insertErrorMessage.includes("payment_method_fixed_fee_amount")
         if (!missingPosFlagColumn && !missingPaymentDeltaColumns) {
             console.error("[syncPosSaleToOrders] orders insert failed:", insertError.message, insertError)
             return null
@@ -498,6 +514,9 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
         if (missingPaymentDeltaColumns) {
             delete (fallbackOrderPayload as any).payment_method_discount_amount
             delete (fallbackOrderPayload as any).payment_method_extra_amount
+            delete (fallbackOrderPayload as any).payment_method_interest_amount
+            delete (fallbackOrderPayload as any).payment_method_fee_amount
+            delete (fallbackOrderPayload as any).payment_method_fixed_fee_amount
         }
         const { data: insertedWithoutPosFlag, error: insertError2 } = await admin
             .from("orders")
@@ -963,20 +982,17 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             .eq("partner_id", input.partnerId)
     }
 
-    // Ensure the sale's final_amount, paid_amount and payment_status match the recalculated paymentAware totals
-    const updatedPaidAmount = Math.min(paymentAware.totalAmount, paidAmountForRpc)
-    const isPaid = updatedPaidAmount >= paymentAware.totalAmount - 0.005
-    const newStatus = isPaid ? "paid" : (updatedPaidAmount > 0 ? "partially_paid" : "unpaid")
-    await supabase
+    // Read back the RPC-saved values (source of truth - RPC has atomic locking)
+    const { data: savedSale } = await supabase
         .from("sales")
-        .update({
-            final_amount: paymentAware.totalAmount,
-            paid_amount: updatedPaidAmount,
-            payment_status: newStatus,
-            status: newStatus,
-        })
+        .select("final_amount, paid_amount, payment_status")
         .eq("id", saleId)
         .eq("partner_id", input.partnerId)
+        .single()
+
+    const rpcFinalAmount = savedSale ? Number(savedSale.final_amount || 0) : paymentAware.totalAmount
+    const rpcPaidAmount = savedSale ? Number(savedSale.paid_amount || 0) : paidAmountForRpc
+    const rpcPaymentStatus = savedSale?.payment_status || "paid"
 
     const sellerPartnerUserId = input.sellerId || null
     const { data: sellerPartnerUser } = sellerPartnerUserId
@@ -993,7 +1009,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             partnerId: input.partnerId,
             partnerUserId: sellerPartnerUserId,
             role: "seller",
-            saleAmount: Number(paymentAware.totalAmount || 0),
+            saleAmount: rpcFinalAmount,
             entityType: "sale",
             entityId: saleId,
             accountId: input.financeAccountId || null,
@@ -1013,7 +1029,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
                 supabase,
                 partnerId: input.partnerId,
                 sellerUserId: goalSellerUserId,
-                saleAmount: Number(paymentAware.totalAmount || 0),
+                saleAmount: rpcFinalAmount,
                 createdByUserId: user.id,
                 accountId: input.financeAccountId || null,
             })

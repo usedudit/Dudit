@@ -23,7 +23,7 @@ export default async function PaymentSuccessPage({
 
   const { data: order } = await supabase
     .from("orders")
-    .select("order_number, total_amount, situation, delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, order_items(subtotal, product_price, quantity)")
+    .select("order_number, total_amount, situation, delivery_fee, discount_amount, payment_method_discount_amount, payment_method_interest_amount, payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_extra_amount, payment_breakdown, order_items(subtotal, product_price, quantity)")
     .eq("id", orderId)
     .single()
 
@@ -39,7 +39,7 @@ export default async function PaymentSuccessPage({
   const paymentMethodExtra = Math.max(0, Number(
     checkoutPricing
       ? Number(checkoutPricing.paymentMethodInterest || 0) + Number(checkoutPricing.paymentMethodFee || 0)
-      : order?.payment_method_extra_amount || 0,
+      : (Number(order?.payment_method_interest_amount || 0) + Number(order?.payment_method_fee_amount || 0) + Number(order?.payment_method_fixed_fee_amount || 0)) || order?.payment_method_extra_amount || 0,
   ))
 
   return (

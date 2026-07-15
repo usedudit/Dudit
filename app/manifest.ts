@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Dudit | Descubra. Anuncie. Organize.',
     short_name: 'Dudit',
     description:
-      'Tudo o que você precisa para encontrar, anunciar e organizar em um só lugar.',
+      'A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.',
     start_url: '/',
     display: 'standalone',
     background_color: '#003229',

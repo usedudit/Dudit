@@ -97,11 +97,11 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const shippingCost = Math.max(0, Number(order.delivery_fee || order.shipping_cost || 0))
   const additionalCosts = Math.max(0, Number(order.additional_costs || 0))
 
-  const baseBeforePm = Math.max(0, itemsSubtotal - manualDiscount - couponDiscount + shippingCost + additionalCosts)
-  const finalTotal = Math.max(0, Number(order.total_amount || 0))
-
-  const computedMethodDiscount = baseBeforePm > finalTotal ? round2(baseBeforePm - finalTotal) : 0
-  const computedMethodExtra = finalTotal > baseBeforePm ? round2(finalTotal - baseBeforePm) : 0
+  // Use stored order columns (separated by our fix) instead of residual calculation
+  const storedMethodDiscount = Math.max(0, Number(order.payment_method_discount_amount || 0))
+  const storedMethodInterest = Math.max(0, Number(order.payment_method_interest_amount || 0))
+  const storedMethodFee = Math.max(0, Number(order.payment_method_fee_amount || 0))
+  const storedMethodFixedFee = Math.max(0, Number(order.payment_method_fixed_fee_amount || 0))
 
   // ── Payment method fees from payment_breakdown (already immutable) ──
   const paymentBreakdown: any[] = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
@@ -112,6 +112,7 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const feeLines: { method: string; fee: number }[] = []
   const fixedFeeLines: { method: string; fee: number }[] = []
 
+  // Use breakdown for per-method display, stored columns for totals
   for (const entry of paymentBreakdown) {
     const method = String(entry.method || "").toLowerCase().trim()
     const bearer = String(entry.feeBearer || "merchant")
@@ -136,6 +137,15 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
     }
   }
 
+  // Fallback to stored columns if breakdown is empty
+  if (totalPercentageFees === 0 && totalFixedFees === 0 && totalInterest === 0) {
+    totalPercentageFees = storedMethodFee
+    totalFixedFees = storedMethodFixedFee
+    totalInterest = storedMethodInterest
+    if (storedMethodFee > 0) feeLines.push({ method: "pagamento", fee: storedMethodFee })
+    if (storedMethodFixedFee > 0) fixedFeeLines.push({ method: "pagamento", fee: storedMethodFixedFee })
+  }
+
   // ── Delivery subsidy ──
   const deliverySubsidy = deliveryPayer === "seller" ? deliveryFee : 0
 
@@ -153,8 +163,8 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const discountLines: FinancialBreakdownLine[] = []
   if (couponDiscount > 0) discountLines.push({ label: "Desconto de cupom", value: -couponDiscount })
   if (manualDiscount > 0) discountLines.push({ label: "Desconto manual", value: -manualDiscount })
-  if (computedMethodDiscount > 0) discountLines.push({ label: "Desconto do método", value: -computedMethodDiscount })
-  const totalDiscounts = round2(-(couponDiscount + manualDiscount + computedMethodDiscount))
+  if (storedMethodDiscount > 0) discountLines.push({ label: "Desconto do método", value: -storedMethodDiscount })
+  const totalDiscounts = round2(-(couponDiscount + manualDiscount + storedMethodDiscount))
 
   // ── Build costs section ──
   const costLines: FinancialBreakdownLine[] = []

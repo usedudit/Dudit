@@ -437,10 +437,11 @@ describe("calculateOrderPricing", () => {
         feeBearer: "customer",
       },
     })
-    // fee = 3.5% of 100 + 1 = 4.5
+    // fee = 3.5% of 100 + 1 = 4.5 (3.5 percentage + 1 fixed)
     // finalAmountWithPayment = 100 + 4.5 = 104.5
     expect(r.finalAmountWithPayment).toBe(104.5)
-    expect(r.paymentMethodFeeAmount).toBe(4.5)
+    expect(r.paymentMethodFeeAmount).toBe(3.5)
+    expect(r.paymentMethodFixedFeeAmount).toBe(1)
   })
 
   it("does not add payment method fee when feeBearer = merchant", () => {
@@ -457,7 +458,8 @@ describe("calculateOrderPricing", () => {
     // fee = not passed to customer
     // finalAmountWithPayment = 100
     expect(r.finalAmountWithPayment).toBe(100)
-    expect(r.paymentMethodFeeAmount).toBe(4.5) // fee still tracked but not added
+    expect(r.paymentMethodFeeAmount).toBe(3.5) // percentage fee tracked
+    expect(r.paymentMethodFixedFeeAmount).toBe(1) // fixed fee tracked
   })
 
   // ── Combination: all steps ─────────────────────────────────────────────

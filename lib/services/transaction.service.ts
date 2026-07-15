@@ -111,6 +111,9 @@ function buildEntries(orderData: OrderDataForTransaction): Array<{
     adjustmentType?: string;
     adjustmentAmount?: number;
     feeBearer?: string | null;
+    interestAmount?: number;
+    feeAmount?: number;
+    fixedFeeAmount?: number;
 }> {
     const fromBreakdown = (orderData.payment_breakdown || [])
         .map((entry) => ({
@@ -122,6 +125,9 @@ function buildEntries(orderData: OrderDataForTransaction): Array<{
             adjustmentType: entry.adjustmentType || 'none',
             adjustmentAmount: Number(entry.adjustmentAmount || 0),
             feeBearer: entry.feeBearer || null,
+            interestAmount: Number(entry.interestAmount || 0),
+            feeAmount: Number(entry.feeAmount || 0),
+            fixedFeeAmount: Number(entry.fixedFeeAmount || 0),
         }))
         .filter((entry) => entry.amount > 0.009)
 
@@ -136,6 +142,9 @@ function buildEntries(orderData: OrderDataForTransaction): Array<{
         adjustmentType: 'none',
         adjustmentAmount: 0,
         feeBearer: null,
+        interestAmount: 0,
+        feeAmount: 0,
+        fixedFeeAmount: 0,
     }]
 }
 
@@ -180,14 +189,9 @@ export async function createTransactionFromOrder(
             // Skip if this exact entry was already created (retry/webhook dedup)
             if (existingRefs.has(entry.referenceNote)) continue
 
-            const interestAmount = (entry.adjustmentType === 'interest' || (entry.adjustmentType === 'fee' && entry.feeBearer === 'customer'))
-                ? Number(entry.adjustmentAmount || 0)
-                : 0
-
-            const feeAmount = (entry.adjustmentType === 'fee' && entry.feeBearer === 'merchant')
-                ? Number(entry.adjustmentAmount || 0)
-                : 0
-
+            // Use individual amounts from breakdown directly (never derive from adjustmentType)
+            const interestAmount = Number(entry.interestAmount || 0)
+            const feeAmount = Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0)
             const discountAmount = entry.adjustmentType === 'discount'
                 ? Number(entry.adjustmentAmount || 0)
                 : 0

@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
 import type { InvoiceData } from "@/lib/billing/types"
-import { formatDocument } from "@/lib/billing/invoice-generator"
+import { formatDocument } from "@/lib/billing/invoice-utils"
 
 interface InvoicePreviewProps {
     data: InvoiceData

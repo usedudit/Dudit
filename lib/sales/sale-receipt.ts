@@ -196,7 +196,10 @@ export function buildSaleReceiptFromOrder(
     const manualDiscount = Math.max(0, Number(order.discount_value || 0))
     const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || 0))
     const methodDiscount = Math.max(0, Number(order.payment_method_discount_amount || 0))
-    const methodExtra = Math.max(0, Number(order.payment_method_extra_amount || 0))
+    const methodInterest = Math.max(0, Number(order.payment_method_interest_amount || 0))
+    const methodFee = Math.max(0, Number(order.payment_method_fee_amount || 0))
+    const methodFixedFee = Math.max(0, Number(order.payment_method_fixed_fee_amount || 0))
+    const methodExtra = Math.max(0, methodInterest + methodFee + methodFixedFee)
     const shippingFee = Math.max(0, Number(order.delivery_fee || order.shipping_cost || 0))
     const otherCosts = Math.max(0, Number(order.additional_costs || 0))
     const subtotal =
@@ -233,8 +236,8 @@ export function buildSaleReceiptFromOrder(
         methodDiscount,
         generalDiscount: manualDiscount,
         couponDiscount,
-        methodFee: methodExtra,
-        methodInterest: 0,
+        methodFee: methodFee + methodFixedFee,
+        methodInterest,
         shippingFee,
         otherCosts,
         sellerName: options?.sellerName || order.seller_name || "Não informado",

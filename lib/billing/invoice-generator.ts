@@ -31,59 +31,9 @@ async function generateVerificationHash(invoiceNumber: string, purchaseId: strin
     return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
 }
 
-function formatDocument(doc: string | null): string {
-    if (!doc) return ""
-    const cleaned = doc.replace(/\D/g, "")
-    if (cleaned.length === 11) {
-        return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
-    }
-    if (cleaned.length === 14) {
-        return cleaned.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5")
-    }
-    return doc
-}
-
-function getPaymentMethodLabel(method: string | null): string {
-    const labels: Record<string, string> = {
-        pix: "PIX",
-        credit_card: "Cartão de Crédito",
-        debit_card: "Cartão de Débito",
-        boleto: "Boleto Bancário",
-        account_money: "Saldo Mercado Pago",
-        cash: "Dinheiro",
-        bank_transfer: "Transferência Bancária",
-        other: "Outro",
-    }
-    return labels[method || ""] || method || "Não informado"
-}
-
-function getGatewayLabel(gateway: string | null): string {
-    const labels: Record<string, string> = {
-        mercado_pago: "Mercado Pago",
-        stripe: "Stripe",
-        asaas: "Asaas",
-        pagseguro: "PagSeguro",
-        manual: "Manual",
-    }
-    return labels[gateway || ""] || gateway || "Não informado"
-}
-
-function getStatusLabel(status: string): string {
-    const labels: Record<string, string> = {
-        pending: "Pendente",
-        processing: "Processando",
-        approved: "Aprovado",
-        rejected: "Rejeitado",
-        refunded: "Reembolsado",
-        cancelled: "Cancelado",
-        chargeback: "Chargeback",
-        completed: "Concluído",
-        failed: "Falhou",
-    }
-    return labels[status] || status
-}
-
+import { formatDocument, getPaymentMethodLabel, getGatewayLabel, getStatusLabel } from "./invoice-utils"
 export { formatDocument, getPaymentMethodLabel, getGatewayLabel, getStatusLabel }
+
 
 function buildPurchaseTypeLabel(type: string): string {
     const labels: Record<string, string> = {
