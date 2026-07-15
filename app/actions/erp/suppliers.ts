@@ -424,7 +424,7 @@ export async function getERPSuppliersPageAction(
 
     const rows = data || []
     const hasMore = rows.length > limit
-    const items = hasMore ? rows.slice(0, limit) : rows
+    const items: any[] = hasMore ? rows.slice(0, limit) : rows
 
     // Aggregate XML import stats for this page of suppliers
     const supplierIds = items.map((s: any) => s.id).filter(Boolean)

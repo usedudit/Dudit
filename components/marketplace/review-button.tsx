@@ -89,7 +89,7 @@ export function ReviewButton({
 
       const failed = results.find((r) => r.error)
       if (failed) {
-        setError(failed.error)
+        setError(failed.error || "Erro ao enviar avaliação")
         notifyError("Erro ao enviar avaliação", failed.error)
       } else {
         setOpen(false)

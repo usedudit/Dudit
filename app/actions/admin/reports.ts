@@ -372,7 +372,7 @@ export async function getReports(
 
     const targetNames = new Map<string, string>()
 
-    const fetches: Promise<unknown>[] = []
+    const fetches: any[] = []
     if (productIds.length > 0) {
         fetches.push(
             supabase.from("products").select("id, name").in("id", productIds).then(({ data }: any) => {

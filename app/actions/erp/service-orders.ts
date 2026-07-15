@@ -1577,7 +1577,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
           payment_method: payload.paymentMethod || null,
           payment_breakdown: JSON.stringify(paymentMethodSummary),
         })
-        .eq("id", existingOrder.id)
+        .eq("id", orderId)
 
       if (orderUpdateErr) throw orderUpdateErr
     }

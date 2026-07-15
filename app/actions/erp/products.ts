@@ -148,13 +148,16 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
  * @throws ForbiddenError via requirePermission if the caller lacks access.
  */
 const verifyVariantBatchOwnership = async (
-    variants: Array<{ products?: { partner_id?: string | null } | null }>,
+    variants: Array<any>,
     user: any,
 ): Promise<string> => {
     const partnerIds = Array.from(
         new Set(
             variants
-                .map((v) => v?.products?.partner_id)
+                .map((v) => {
+                    const prod = Array.isArray(v?.products) ? v.products[0] : v?.products
+                    return prod?.partner_id
+                })
                 .filter((id): id is string => typeof id === "string" && id.length > 0),
         ),
     )
@@ -1152,8 +1155,9 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
             Promise.all(imagesToDelete.map((img: string) => _deleteFromR2(img))).catch(() => null)
         }
 
-        if (variants[0]?.products?.partner_id) {
-            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update')
+        const firstProd = Array.isArray(variants[0]?.products) ? variants[0].products[0] : variants[0]?.products
+        if (firstProd?.partner_id) {
+            await invalidateProductCache(variants[0].product_id, firstProd.partner_id, 'update')
         }
         return successResponse({ deletedCount: variantIds.length })
     } catch (error: any) {
@@ -1197,8 +1201,9 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
             return supabase.from("product_variants").update(payload).eq("id", update.id)
         }))
 
-        if (variants[0]?.products?.partner_id) {
-            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update')
+        const firstProd = Array.isArray(variants[0]?.products) ? variants[0].products[0] : variants[0]?.products
+        if (firstProd?.partner_id) {
+            await invalidateProductCache(variants[0].product_id, firstProd.partner_id, 'update')
         }
         return successResponse({ updatedCount: updates.length })
     } catch (error: any) {

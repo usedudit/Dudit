@@ -857,7 +857,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
           if (giftStockItems.length > 0) {
             await reserveOrderInventory({
-              client: supabase,
+              client: supabase as any,
               partnerId,
               orderId: order.id,
               items: giftStockItems,

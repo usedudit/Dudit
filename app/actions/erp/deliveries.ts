@@ -328,6 +328,8 @@ export async function getOrderDeliverySummaryAction(params: { partnerId: string;
     }
   }
 
+  const orderItem: any = Array.isArray(data.orders) ? data.orders[0] : data.orders
+
   return {
     success: true as const,
     data: {
@@ -339,7 +341,7 @@ export async function getOrderDeliverySummaryAction(params: { partnerId: string;
       driverName,
       orderCount: totalOrders,
       routeStep: currentStep,
-      orderLabel: data.orders?.order_number || `#${String(params.orderId).slice(0, 8).toUpperCase()}`,
+      orderLabel: orderItem?.order_number || `#${String(params.orderId).slice(0, 8).toUpperCase()}`,
     },
   }
 }
@@ -1413,7 +1415,8 @@ export async function updateERPDeliveryAction(payload: {
   const orderLabelById = new Map<string, string>()
   for (const row of previousLinks || []) {
     const id = String(row.order_id)
-    const number = row.orders?.order_number || null
+    const orderItem: any = Array.isArray(row.orders) ? row.orders[0] : row.orders
+    const number = orderItem?.order_number || null
     orderLabelById.set(id, number || `#${id.slice(0, 8).toUpperCase()}`)
   }
 

@@ -72,7 +72,7 @@ export async function createOrderAction(data: {
       csrf_token: data.csrf_token,
     })
     if (prep.error) return { error: prep.error }
-    cartItemId = prep.cartItemId
+    cartItemId = (prep as any).cartItemId
   } else {
     return { error: "Tipo de item inválido." }
   }
@@ -167,7 +167,7 @@ export async function cancelBuyerOrderAction(orderId: string) {
 
   if (!order.inventory_deducted) {
     const releaseResult = await releaseOrderInventory({
-      client: supabase,
+      client: supabase as any,
       partnerId: order.partner_id,
       orderId,
       items: order.order_items || [],

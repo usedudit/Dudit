@@ -25,7 +25,7 @@ export async function getStorefrontPaymentMethodsAction(partnerId: string) {
 
   const supabase = await getSupabaseServerClient()
 
-  const { data: methods, error } = await supabase
+  const { data: methodsRows, error } = await supabase
     .from("payment_methods")
     .select(
       "id, type, payment_type, is_active, is_default, " +
@@ -37,6 +37,8 @@ export async function getStorefrontPaymentMethodsAction(partnerId: string) {
     .order("is_default", { ascending: false })
     .order("priority", { ascending: false })
     .order("discount_percent", { ascending: false })
+
+  const methods = methodsRows as any[] | null
 
   if (error) {
     return { success: false as const, error: error.message, methods: [] as StorefrontPaymentMethod[] }

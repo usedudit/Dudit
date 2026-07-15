@@ -564,7 +564,7 @@ export async function getCustomerByIdAction(customerId: string) {
 
   const { getPartnerPlan } = await import("@/lib/services/subscription.service")
   const plan = await getPartnerPlan(customer.partner_id)
-  customer.planSlug = plan?.slug || "free"
+  ;(customer as any).planSlug = plan?.slug || "free"
 
   // Dynamically add mobile property for compatibility with frontend components
   ;(customer as any).mobile = customer.phone
@@ -895,7 +895,7 @@ export async function getERPCustomersPageAction(
 
     const rows = data || []
     const hasMore = rows.length > limit
-    const items = hasMore ? rows.slice(0, limit) : rows
+    const items: any[] = hasMore ? rows.slice(0, limit) : rows
 
     // Decrypt CPFs in parallel
     await Promise.all(items.map(async (item: any) => {

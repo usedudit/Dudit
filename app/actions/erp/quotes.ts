@@ -1529,7 +1529,7 @@ export async function convertQuoteToOrderAction(data: {
                 calculatedSubtotal += Number(row.quantity || 0) * Number(row.unit_price || 0)
 
                 if (row.product_id) {
-                    const prod = row.products
+                    const prod: any = Array.isArray(row.products) ? row.products[0] : row.products
                     if (!prod) {
                         return errorResponse(`O produto do item "${row.custom_name || 'Item'}" foi removido do sistema.`)
                     }
@@ -1558,20 +1558,24 @@ export async function convertQuoteToOrderAction(data: {
                 return errorResponse(`Falha na integridade de preços: o total calculado (${calculatedTotal}) não coincide com o total do orçamento (${quote.total}).`)
             }
 
-            const erpItems = quoteItems.map((row: any, idx: number) => ({
-                productId: row.product_id || null,
-                variantId: null as string | null,
-                customName:
-                    (row.custom_name && String(row.custom_name).trim())
-                    || (row.product_name_snapshot && String(row.product_name_snapshot).trim())
-                    || (row.products?.name && String(row.products.name).trim())
-                    || "Item",
-                quantity: Number(row.quantity || 0),
-                unitPrice: Number(row.unit_price || 0),
-                sortOrder: Number(row.sort_order ?? idx),
-            }))
+            const erpItems = quoteItems.map((row: any, idx: number) => {
+                const prod = Array.isArray(row.products) ? row.products[0] : row.products
+                return {
+                    productId: row.product_id || null,
+                    variantId: null as string | null,
+                    customName:
+                        (row.custom_name && String(row.custom_name).trim())
+                        || (row.product_name_snapshot && String(row.product_name_snapshot).trim())
+                        || (prod?.name && String(prod.name).trim())
+                        || "Item",
+                    quantity: Number(row.quantity || 0),
+                    unitPrice: Number(row.unit_price || 0),
+                    sortOrder: Number(row.sort_order ?? idx),
+                }
+            })
 
-            const primaryAddress = pickPrimaryCustomerAddress(quote.customers?.addresses)
+            const customer = Array.isArray(quote.customers) ? quote.customers[0] : quote.customers
+            const primaryAddress = pickPrimaryCustomerAddress(customer?.addresses)
             const defaultFinanceAccountId = await resolveMarketplaceOrderFinanceAccountId(
                 getAdminClient(),
                 data.partnerId,
@@ -1593,8 +1597,8 @@ export async function convertQuoteToOrderAction(data: {
 
             const orderPayload = {
                 partnerId: data.partnerId,
-                customerId: quote.customers?.id || quote.customer_id || undefined,
-                customerName: quote.customers?.name || QUOTE_DEFAULT_CUSTOMER_LABEL,
+                customerId: customer?.id || quote.customer_id || undefined,
+                customerName: customer?.name || QUOTE_DEFAULT_CUSTOMER_LABEL,
                 sourceQuoteId: data.quoteId,
                 salesChannel: "Orçamento",
                 deliveryMethod: hasFullDeliveryAddress ? ("delivery" as const) : ("pickup" as const),
