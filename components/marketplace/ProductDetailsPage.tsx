@@ -27,6 +27,7 @@ import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
+import { StorePoliciesModal } from "./StorePoliciesModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -179,6 +180,7 @@ export function ProductDetailsPageClient({
     const [customQuantity, setCustomQuantity] = useState("")
     const [deliveryConfig, setDeliveryConfig] = useState<any>(null)
     const [showPaymentMethodsModal, setShowPaymentMethodsModal] = useState(false)
+    const [showPoliciesModal, setShowPoliciesModal] = useState(false)
     const [deliveryFee, setDeliveryFee] = useState<number | null>(null)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [deliveryLoading, setDeliveryLoading] = useState(false)
@@ -1435,6 +1437,19 @@ export function ProductDetailsPageClient({
                 </div>
             </div>
 
+            {/* Políticas da loja */}
+            <div className="border-t border-brand-border pt-4 mb-6">
+                <button
+                    type="button"
+                    onClick={() => setShowPoliciesModal(true)}
+                    className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
+                >
+                    <span className="font-bold text-brand-dark text-sm">Políticas da loja</span>
+                    <ChevronRightIcon size={18} className="text-brand-inactive-text" />
+                </button>
+                <p className="text-xs text-brand-inactive-text mt-0.5">Trocas, devoluções, prazos e condições do vendedor</p>
+            </div>
+
             {/* Store (Reputation & Levels Card) */}
             <div className="mb-8 mt-4">
                 {(() => {
@@ -1653,6 +1668,13 @@ export function ProductDetailsPageClient({
                 paymentMethods={partner.paymentMethods}
                 price={pricing.current}
                 mpConnected={!!partner.mp_user_id}
+            />
+
+            <StorePoliciesModal
+                isOpen={showPoliciesModal}
+                onClose={() => setShowPoliciesModal(false)}
+                partnerId={partner.id}
+                storeName={partner.store_name}
             />
 
             <DefaultModal

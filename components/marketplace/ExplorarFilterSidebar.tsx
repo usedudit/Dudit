@@ -32,6 +32,7 @@ interface ExplorarFilterSidebarProps {
     filterConfig?: FilterConfig
     pageMode?: PageMode
     sectionId?: string | null
+    collapsed?: boolean
 }
 
 export function ExplorarFilterSidebar({
@@ -61,10 +62,19 @@ export function ExplorarFilterSidebar({
     filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
     pageMode,
     sectionId,
+    collapsed = false,
 }: ExplorarFilterSidebarProps) {
     return (
-        <aside className="hidden lg:block lg:w-[280px] lg:shrink-0 border-r border-gray-100">
-            <div className="sticky top-[128px] space-y-6 py-5 px-5 max-h-[calc(100vh-140px)] overflow-y-hidden">
+        <aside
+            className="hidden lg:block lg:shrink-0 transition-all duration-300 ease-in-out"
+            style={{
+                width: collapsed ? 0 : 280,
+                overflow: collapsed ? 'hidden' : 'visible',
+                borderRightWidth: collapsed ? 0 : 1,
+            }}
+        >
+            <div className="w-[280px]">
+                <div className="sticky top-[128px] space-y-6 py-5 px-5 max-h-[calc(100vh-140px)] overflow-y-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3 pb-0">
                     <h2 className="text-base font-bold text-brand-dark">Filtros</h2>
@@ -208,6 +218,7 @@ export function ExplorarFilterSidebar({
                         </label>
                     </section>
                 )}
+            </div>
             </div>
         </aside>
     )

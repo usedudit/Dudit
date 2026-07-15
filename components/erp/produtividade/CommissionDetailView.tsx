@@ -117,7 +117,7 @@ export default function CommissionDetailView({ isOpen, seller, partnerId, onClos
                 <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">{sellerData.name}</h2>
                 <p className="text-xs text-brand-inactive-text dark:text-dark-body">Detalhes da Comissão</p>
               </div>
-              <Button variant="ghost" onClick={onClose} size="icon" className="w-8 h-8 shrink-0 ml-2">
+              <Button variant="filled" onClick={onClose} size="icon" className="w-8 h-8 shrink-0 ml-2">
                 <XIcon className="h-5 w-5" />
               </Button>
             </header>

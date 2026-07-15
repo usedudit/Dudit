@@ -249,6 +249,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     logo_moderation_status: partner.logo_moderation_status || 'approved',
     gallery: partner.gallery || [],
     planSlug: plan?.slug || 'free',
+    isShowcaseActive: partner.is_showcase_active !== false,
   }
 
   return (

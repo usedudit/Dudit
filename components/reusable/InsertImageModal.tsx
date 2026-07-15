@@ -4,8 +4,10 @@ import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Button } from "@/components/reusable/Button"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
 import { ImageOffIcon } from "@/lib/icons"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import { useR2Upload } from "@/hooks/use-r2-upload"
 import { planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 
 interface InsertImageModalProps {
@@ -24,16 +26,19 @@ const DEFAULT_WIDTH = 512
 export const InsertImageModal: React.FC<InsertImageModalProps> = ({
   isOpen, onClose, onInsert, imageCount, imageUploadBlocked, onUpgradeClick,
 }) => {
-  const [tab, setTab] = useState<"upload" | "url">("url")
+  const [tab, setTab] = useState("url")
   const [url, setUrl] = useState("")
   const [alt, setAlt] = useState("")
   const [width, setWidth] = useState(String(DEFAULT_WIDTH))
   const [height, setHeight] = useState("")
 
-  const [uploadedSrc, setUploadedSrc] = useState("")
+  const [uploadedUrl, setUploadedUrl] = useState("")
   const [showCropper, setShowCropper] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { uploadFile } = useR2Upload()
 
   useEffect(() => {
     if (isOpen) {
@@ -42,12 +47,13 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
       setAlt("")
       setWidth(String(DEFAULT_WIDTH))
       setHeight("")
-      setUploadedSrc("")
+      setUploadedUrl("")
+      setUploadError("")
     }
   }, [isOpen])
 
   const handleInsert = () => {
-    const finalUrl = tab === "upload" ? uploadedSrc : url
+    const finalUrl = tab === "upload" ? uploadedUrl : url
     if (!finalUrl) return
     const w = Math.min(Number(width) || DEFAULT_WIDTH, MAX_DIMENSION)
     const h = height ? Math.min(Number(height), MAX_DIMENSION) : 0
@@ -64,12 +70,29 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
     }
   }
 
-  const handleCropComplete = useCallback((croppedImage: string) => {
+  const handleCropComplete = useCallback(async (croppedImage: string) => {
     setShowCropper(false)
-    setUploadedSrc(croppedImage)
-  }, [])
+    setIsUploading(true)
+    setUploadError("")
+    try {
+      const res = await fetch(croppedImage)
+      const blob = await res.blob()
+      const filename = `editor-image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
+      const file = new File([blob], filename, { type: "image/png" })
+      const result = await uploadFile(file)
+      if (result?.publicUrl) {
+        setUploadedUrl(result.publicUrl)
+      } else {
+        setUploadError("Erro ao fazer upload da imagem")
+      }
+    } catch {
+      setUploadError("Erro ao processar a imagem")
+    } finally {
+      setIsUploading(false)
+    }
+  }, [uploadFile])
 
-  const handleTabChange = (newTab: "upload" | "url") => {
+  const handleTabChange = (newTab: string) => {
     if (newTab === "upload" && imageUploadBlocked) {
       onUpgradeClick?.()
       return
@@ -78,56 +101,35 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
   }
 
   const atLimit = imageCount >= MAX_IMAGES
-  const canInsert = (tab === "upload" && !!uploadedSrc) || (tab === "url" && !!url)
+  const canInsert = (tab === "upload" && !!uploadedUrl) || (tab === "url" && !!url)
 
   return (
     <>
       <DefaultModal isOpen={isOpen} onClose={onClose} title="Inserir imagem" maxWidth="md">
-        <div className="flex gap-1 mb-4 border-b border-brand-border dark:border-dark-border">
-          <button
-            type="button"
-            onClick={() => handleTabChange("url")}
-            className={`pb-2 px-3 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-              tab === "url"
-                ? "border-brand-green text-brand-green"
-                : "border-transparent text-brand-dark/60 dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-            }`}
-          >
-            URL
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange("upload")}
-            className={`pb-2 px-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
-              tab === "upload"
-                ? "border-brand-green text-brand-green"
-                : "border-transparent text-brand-dark/60 dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-            }`}
-          >
-            Upload
-            {imageUploadBlocked && (
-              <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-            )}
-          </button>
-        </div>
+        <Tabs value={tab} onValueChange={handleTabChange}>
+          <TabsList>
+            <TabsTrigger value="url">URL</TabsTrigger>
+            <TabsTrigger value="upload" className="flex items-center gap-1.5">
+              Upload
+              {imageUploadBlocked && (
+                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="flex flex-col gap-4">
-          <div className="relative border border-brand-border dark:border-dark-border rounded-lg overflow-hidden bg-gray-50 dark:bg-dark-border/50 min-h-[120px] flex items-center justify-center">
-            {(tab === "url" && url) || (tab === "upload" && uploadedSrc) ? (
-              <img
-                src={tab === "url" ? url : uploadedSrc}
-                alt="Preview"
-                className="max-h-48 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none"
-                }}
-              />
-            ) : (
-              <ImageOffIcon className="w-8 h-8 text-brand-dark/30 dark:text-dark-body/30" />
-            )}
-          </div>
-
-          {tab === "url" && (
+          <TabsContent value="url" className="flex flex-col gap-4">
+            <div className="relative border border-brand-border dark:border-dark-border rounded-lg overflow-hidden bg-gray-50 dark:bg-dark-border/50 min-h-[120px] flex items-center justify-center">
+              {url ? (
+                <img
+                  src={url}
+                  alt="Preview"
+                  className="max-h-48 object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+                />
+              ) : (
+                <ImageOffIcon className="w-8 h-8 text-brand-dark/30 dark:text-dark-body/30" />
+              )}
+            </div>
             <div>
               <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Link da imagem</label>
               <input
@@ -138,34 +140,47 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
                 className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               />
             </div>
-          )}
+          </TabsContent>
 
-          {tab === "upload" && (
-            <div>
-              {imageUploadBlocked ? (
-                <div className="text-sm text-brand-dark/60 dark:text-dark-body/60 p-3 bg-gray-50 dark:bg-dark-border/20 rounded-lg text-center">
-                  Faça upgrade para fazer upload de imagens.
-                </div>
+          <TabsContent value="upload" className="flex flex-col gap-4">
+            <div className="relative border border-brand-border dark:border-dark-border rounded-lg overflow-hidden bg-gray-50 dark:bg-dark-border/50 min-h-[120px] flex items-center justify-center">
+              {uploadedUrl ? (
+                <img src={uploadedUrl} alt="Preview" className="max-h-48 object-contain" />
+              ) : isUploading ? (
+                <div className="text-sm text-brand-dark/60 dark:text-dark-body/60">Enviando imagem...</div>
               ) : (
-                <div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                    className="block w-full text-sm text-brand-dark dark:text-dark-body file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-green/10 file:text-brand-green hover:file:bg-brand-green/20 cursor-pointer file:cursor-pointer"
-                  />
-                  {uploadedSrc && (
-                    <div className="mt-2 text-sm text-brand-green">Imagem carregada com sucesso!</div>
-                  )}
-                  <p className="mt-1.5 text-xs text-brand-dark/50 dark:text-dark-body/50">
-                    Selecione uma imagem para recortar.
-                  </p>
-                </div>
+                <ImageOffIcon className="w-8 h-8 text-brand-dark/30 dark:text-dark-body/30" />
               )}
             </div>
-          )}
+            {imageUploadBlocked ? (
+              <div className="text-sm text-brand-dark/60 dark:text-dark-body/60 p-3 bg-gray-50 dark:bg-dark-border/20 rounded-lg text-center">
+                Faça upgrade para fazer upload de imagens.
+              </div>
+            ) : (
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  disabled={isUploading}
+                  className="block w-full text-sm text-brand-dark dark:text-dark-body file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-green/10 file:text-brand-green hover:file:bg-brand-green/20 cursor-pointer file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {uploadError && (
+                  <div className="mt-2 text-sm text-red-500">{uploadError}</div>
+                )}
+                {uploadedUrl && (
+                  <div className="mt-2 text-sm text-brand-green">Imagem enviada com sucesso!</div>
+                )}
+                <p className="mt-1.5 text-xs text-brand-dark/50 dark:text-dark-body/50">
+                  Selecione uma imagem para recortar e enviar.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
+        <div className="flex flex-col gap-4 mt-4">
           <div>
             <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">
               Texto alternativo (alt)
@@ -181,9 +196,7 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">
-                Largura (px)
-              </label>
+              <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Largura (px)</label>
               <input
                 type="number"
                 min={50}
@@ -194,9 +207,7 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">
-                Altura (px)
-              </label>
+              <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">Altura (px)</label>
               <input
                 type="number"
                 min={0}
@@ -217,9 +228,7 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleInsert} disabled={!canInsert || atLimit}>
-              Inserir
-            </Button>
+            <Button onClick={handleInsert} disabled={!canInsert || atLimit || isUploading}>Inserir</Button>
           </div>
         </div>
       </DefaultModal>

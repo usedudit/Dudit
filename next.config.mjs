@@ -66,6 +66,9 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['@/components', '@/lib'],
     optimizeCss: true,
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
   },
   async headers() {
     return [

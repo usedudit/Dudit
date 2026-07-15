@@ -25,6 +25,20 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
     return { fallback_variant_image: image, fallback_variant_price: price }
 }
 
+function applyShowcasePenalty(items: any[]): any[] {
+    const active: any[] = []
+    const inactive: any[] = []
+    for (const item of items) {
+        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        if (rawPartner?.is_showcase_active === false) {
+            inactive.push(item)
+        } else {
+            active.push(item)
+        }
+    }
+    return [...active, ...inactive]
+}
+
 function normalizePlan(item: any) {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
     const partner = rawPartner ? {
@@ -382,7 +396,8 @@ async function _searchMarketplaceCore(
 
                 // If we found ALL objects in Redis, we can return immediately (Instant Update!)
                 if (objects.length === cachedIds.length) {
-                    return { results: objects, filteredIds: cachedIds }
+                    const penalized = applyShowcasePenalty(objects)
+                    return { results: penalized, filteredIds: penalized.map((r: any) => `${r.itemType}:${r.id}`) }
                 }
 
                 console.log(`[REDIS] Partial Miss (${objects.length}/${cachedIds.length}). Falling back to Internal Search.`)
@@ -393,9 +408,13 @@ async function _searchMarketplaceCore(
     }
 
     // 2. CACHE MISS / PARTIAL MISS: Run heavy search logic
-    const { results, filteredIds } = await _searchMarketplaceInternal(query, type, limits)
+    let { results, filteredIds } = await _searchMarketplaceInternal(query, type, limits)
 
-    // 3. WRITE TO CACHE (IDs only)
+    // 3. Apply showcase penalty for items from inactive vitrines
+    results = applyShowcasePenalty(results)
+    filteredIds = results.map(r => `${r.itemType}:${r.id}`)
+
+    // 4. WRITE TO CACHE (IDs only)
     if (!isPagination && filteredIds && filteredIds.length > 0) {
         try {
             await redis.set(cacheKey, JSON.stringify(filteredIds), { ex: 60 * 60 * 24 })
@@ -518,7 +537,7 @@ async function _searchMarketplaceInternal(
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
-                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                        partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active),
                         show_price_in_store
                     `)
@@ -532,7 +551,7 @@ async function _searchMarketplaceInternal(
                     supabase.from("services").select(`
                         id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                         marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                        partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                         show_price_in_store
                     `)
                         .in("id", servicosIds)
@@ -551,7 +570,7 @@ async function _searchMarketplaceInternal(
                 promises.push(
                     supabase.from("recurring_plans").select(`
                         id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                        partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                         recurring_plan_items(
                             id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                             products:product_id(id, name, price, images),
@@ -684,7 +703,7 @@ async function hydrateMarketplaceSearchHits(
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
-                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active),
                 show_price_in_store
             `)
@@ -698,7 +717,7 @@ async function hydrateMarketplaceSearchHits(
             supabase.from("services").select(`
                 id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                 show_price_in_store
             `)
                 .in("id", servicosIds)
@@ -709,7 +728,7 @@ async function hydrateMarketplaceSearchHits(
     if (lojasIds.length > 0) {
         promises.push(
             supabase.from("partners").select(`
-                id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
+                id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, is_showcase_active, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
             `).in("id", lojasIds)
         )
     }
@@ -717,7 +736,7 @@ async function hydrateMarketplaceSearchHits(
         promises.push(
             supabase.from("recurring_plans").select(`
                 id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                 recurring_plan_items(
                     id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                     products:product_id(id, name, price, images),

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import type React from "react"
 import { useRef, useEffect, useState, useCallback } from "react"
@@ -6,7 +6,7 @@ import {
   BoldIcon, ItalicIcon, UnderlineIcon,
   OrderedListIcon, ListIcon,
   AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
-  TableIcon, ImageIcon, LinkIcon,
+  TableIcon, ImageIcon,
   ColorIcon, ClearFormatIcon, FontSizeIcon,
 } from "@/lib/icons"
 import { Tooltip } from "@/components/reusable/Tooltip"
@@ -56,8 +56,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set())
   const [showColorModal, setShowColorModal] = useState(false)
   const [showFontSizeModal, setShowFontSizeModal] = useState(false)
-  const [showLinkModal, setShowLinkModal] = useState(false)
-  const [linkUrl, setLinkUrl] = useState("")
   const [showTableModal, setShowTableModal] = useState(false)
   const [tableRows, setTableRows] = useState(3)
   const [tableCols, setTableCols] = useState(3)
@@ -68,8 +66,21 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   const imageUploadBlocked = !hasMinimumPlan(planSlug, "crescer")
 
   const exec = useCallback((command: string, value?: string) => {
+    const selection = window.getSelection()
+    const hasSelection = selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode ?? null)
+
     editorRef.current?.focus()
+
+    if (!hasSelection && editorRef.current) {
+      const range = document.createRange()
+      range.setStart(editorRef.current, 0)
+      range.collapse(true)
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+    }
+
     document.execCommand(command, false, value ?? undefined)
+
     if (editorRef.current) {
       onChange(editorRef.current.innerHTML)
       updateActiveFormats()
@@ -91,15 +102,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
     }
   }, [value])
 
-  const handleLinkSubmit = () => {
-    if (linkUrl) exec("createLink", linkUrl)
-    setShowLinkModal(false)
-    setLinkUrl("")
-  }
-
   const handleInsertTable = () => {
     const tableHtml = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${Array(tableCols).fill("").map(() => '<th style="border:1px solid #ccc;padding:8px;background:#f5f5f5;font-weight:bold;text-align:left;">Título</th>').join("")}</tr></thead><tbody>${Array(tableRows).fill("").map(() => `<tr>${Array(tableCols).fill("").map(() => '<td style="border:1px solid #ccc;padding:8px;">&nbsp;</td>').join("")}</tr>`).join("")}</tbody></table><br>`
-    editorRef.current?.focus()
     exec("insertHTML", tableHtml)
     setShowTableModal(false)
     setTableRows(3)
@@ -128,7 +132,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   }
 
   const handleFontSize = (tag: string) => {
-    exec("formatBlock", `<${tag}>`)
+    editorRef.current?.focus()
+    requestAnimationFrame(() => {
+      document.execCommand("formatBlock", false, `<${tag}>`)
+      if (editorRef.current) {
+        onChange(editorRef.current.innerHTML)
+        updateActiveFormats()
+      }
+    })
     setShowFontSizeModal(false)
   }
 
@@ -140,13 +151,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
       <Tooltip key={command} text={tooltip}>
         <button
           type="button"
-          onMouseDown={(e) => { e.preventDefault(); exec(command, value) }}
+          onClick={(e) => { e.preventDefault(); exec(command, value) }}
           disabled={disabled}
-          className={`p-1.5 rounded transition-colors ${
-            isActive(command)
-              ? "bg-brand-green/20 dark:bg-brand-green/30 text-brand-green"
-              : "hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading"
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`p-1.5 rounded transition-colors ${isActive(command)
+            ? "bg-brand-green/10 text-brand-green"
+            : "hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading"
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <Icon className="w-4 h-4" />
         </button>
@@ -160,7 +170,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
       <Tooltip text={tooltip}>
         <button
           type="button"
-          onMouseDown={(e) => { e.preventDefault(); onClick() }}
+          onClick={(e) => { e.preventDefault(); onClick() }}
           disabled={disabled}
           className="p-1.5 rounded transition-colors hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -176,7 +186,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
         {label}
       </label>
       <div className="border border-brand-border dark:border-dark-border rounded-lg">
-        <div className="flex flex-wrap items-center gap-1 p-2 border-b border-brand-border dark:border-dark-border">
+        <div className="flex flex-wrap items-center gap-1 p-2 border-b border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50">
           {renderBtn(BoldIcon, "Negrito (Ctrl+B)", "bold")}
           {renderBtn(ItalicIcon, "Itálico (Ctrl+I)", "italic")}
           {renderBtn(UnderlineIcon, "Sublinhado (Ctrl+U)", "underline")}
@@ -197,7 +207,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
 
           {renderIconBtn(TableIcon, "Inserir tabela", () => setShowTableModal(true))}
           {renderIconBtn(ImageIcon, "Inserir imagem", () => setShowImageModal(true))}
-          {renderIconBtn(LinkIcon, "Inserir link", () => { setLinkUrl(""); setShowLinkModal(true) })}
 
           <div className="w-px h-5 bg-brand-border dark:bg-dark-border mx-1" />
 
@@ -244,40 +253,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
               className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border transition-colors text-left cursor-pointer"
             >
               <span
-                className={`font-bold text-brand-dark dark:text-dark-heading min-w-[60px] ${
-                  f.tag === "h1" ? "text-3xl" :
+                className={`font-bold text-brand-dark dark:text-dark-heading min-w-[60px] ${f.tag === "h1" ? "text-3xl" :
                   f.tag === "h2" ? "text-2xl" :
-                  f.tag === "h3" ? "text-xl" :
-                  f.tag === "h4" ? "text-lg" :
-                  f.tag === "h5" ? "text-base" :
-                  f.tag === "h6" ? "text-sm" : "text-base"
-                }`}
+                    f.tag === "h3" ? "text-xl" :
+                      f.tag === "h4" ? "text-lg" :
+                        f.tag === "h5" ? "text-base" :
+                          f.tag === "h6" ? "text-sm" : "text-base"
+                  }`}
               >
                 {f.preview}
               </span>
               <span className="text-sm text-brand-dark/70 dark:text-dark-body/70">{f.label}</span>
             </button>
           ))}
-        </div>
-      </DefaultModal>
-
-      <DefaultModal isOpen={showLinkModal} onClose={() => setShowLinkModal(false)} title="Inserir link" maxWidth="sm">
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1">URL</label>
-            <input
-              type="url"
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              placeholder="https://..."
-              autoFocus
-              className="w-full px-3 py-2 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowLinkModal(false)}>Cancelar</Button>
-            <Button onClick={handleLinkSubmit} disabled={!linkUrl}>Inserir</Button>
-          </div>
         </div>
       </DefaultModal>
 

@@ -343,7 +343,7 @@ export async function fetchProductsByIdsAction(productIds: string[], partnerId?:
         const supabase = createAdminClient()
         const { data } = await supabase
             .from("products")
-            .select("id, name, sku, stock_quantity, stock_available, min_stock_quantity, images, product_variants(id, stock_available)")
+            .select("id, name, sku, stock_quantity, stock_available, min_stock, images, product_variants(id, stock_available)")
             .eq("partner_id", resolvedPartnerId)
             .in("id", productIds)
         return (data || []).map((p: any) => ({
@@ -351,7 +351,7 @@ export async function fetchProductsByIdsAction(productIds: string[], partnerId?:
             name: p.name,
             sku: p.sku || 'N/A',
             stock: p.stock_available ?? 0,
-            minStock: p.min_stock_quantity || 0,
+            minStock: p.min_stock || 0,
             image: p.images?.[0] || null,
             variants: (p.product_variants || []).map((v: any) => ({
                 id: v.id,

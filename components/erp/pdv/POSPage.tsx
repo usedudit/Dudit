@@ -246,6 +246,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
     const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null)
     const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null)
     const [appliedCouponDiscount, setAppliedCouponDiscount] = useState(0)
+    const [appliedCouponCustomerScope, setAppliedCouponCustomerScope] = useState<string>("all")
     const [preSaleSearch, setPreSaleSearch] = useState("")
 
     const filteredPreSales = useMemo(() => {
@@ -1364,10 +1365,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             const couponId = (res as any)?.couponId || (res as any)?.data?.couponId || null
             const couponCode = (res as any)?.couponCode || (res as any)?.data?.couponCode || code
             const discountAmount = Number((res as any)?.discountAmount ?? (res as any)?.data?.discountAmount ?? 0) || 0
+            const pricingCoupon = (res as any)?.pricingCoupon || (res as any)?.data?.pricingCoupon || null
+            const customerScope = pricingCoupon?.customerScope || "all"
 
             setAppliedCouponId(couponId)
             setAppliedCouponCode(couponCode)
             setAppliedCouponDiscount(discountAmount)
+            setAppliedCouponCustomerScope(customerScope)
             setDiscountType("coupon")
             setDiscountAmount(discountAmount)
             setDiscountCouponCode(couponCode)
@@ -1941,6 +1945,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                                         setIsCouponSheetOpen(true)
                                         return
                                     }
+                                    if (globalDiscountType === "fixed" && globalDiscountValue > subtotal) {
+                                        notifyError("O desconto não pode ser maior que o valor total do pedido.")
+                                        return
+                                    }
                                     setDiscountType(globalDiscountType)
                                     setDiscountAmount(globalDiscountValue)
                                     setDiscountCouponCode("")
@@ -2055,7 +2063,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                                     onChange={(e) => setNotes(e.target.value)}
                                     name="notes"
                                     rows={5}
-                                    maxLength={512}
+                                    maxLength={500}
                                     showCharacterCount
                                 />
                                 <div className="flex items-center gap-3">
@@ -2084,7 +2092,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                                     onChange={(e) => setNotes(e.target.value)}
                                     name="notes"
                                     rows={6}
-                                    maxLength={512}
+                                    maxLength={500}
                                     showCharacterCount
                                 />
                                 <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
@@ -2234,6 +2242,19 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
                         isOpen={isRemoveCustomerAlertOpen}
                         onClose={() => setIsRemoveCustomerAlertOpen(false)}
                         onConfirm={() => {
+                            if (appliedCouponId && appliedCouponCustomerScope === "specific") {
+                                if (activePreSaleId) {
+                                    removeCouponFromPreSaleAction({ partnerId, preSaleId: activePreSaleId }).catch(() => { })
+                                }
+                                setAppliedCouponId(null)
+                                setAppliedCouponCode(null)
+                                setAppliedCouponDiscount(0)
+                                setAppliedCouponCustomerScope("all")
+                                setGlobalDiscountType("fixed")
+                                setGlobalDiscountCouponCode("")
+                                setDiscountAmount(0)
+                                notifyError("Cupom removido por ser específico para um ou mais clientes.")
+                            }
                             setSelectedCustomerId(undefined)
                             setShippingCustomerDetails(null)
                             setIsRemoveCustomerAlertOpen(false)

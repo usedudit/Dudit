@@ -1227,8 +1227,12 @@ export const AppointmentSheet = ({
         // Cache these immediately in Set before hitting database to prevent duplicate requests
         productIds.forEach((id: string) => fetchingProductIdsRef.current.add(id));
 
+        console.debug("[enrichment] Fetching stock for productIds:", productIds, "partnerId:", partnerId)
         fetchProductsByIdsAction(productIds, partnerId).then((products: any[]) => {
+            console.debug("[enrichment] Fetched products:", products.length, products.map((p: any) => ({ id: p.id, stock: p.stock, variants: p.variants })))
             if (!cancelled) {
+                productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
+
                 const productsMap = Object.fromEntries(products.map((p: any) => [p.id, p]))
                 setSelectedItems(prevItems => prevItems.map((item: any) => {
                     const product = item.productId ? productsMap[item.productId] : null
@@ -1246,6 +1250,9 @@ export const AppointmentSheet = ({
                             sku: item.sku || product.sku,
                         }
                     }
+                    if (item.stock == null) {
+                        return { ...item, stock: 0 }
+                    }
                     return item
                 }))
             }
@@ -1253,6 +1260,10 @@ export const AppointmentSheet = ({
         }).catch((err) => {
             console.error("[enrichment] Failed to fetch stock for items:", err)
             if (!cancelled) {
+                productIds.forEach((id: string) => fetchingProductIdsRef.current.delete(id))
+                setSelectedItems(prevItems => prevItems.map((item: any) =>
+                    item.stock == null ? { ...item, stock: 0 } : item
+                ))
                 setIsEnrichingItems(false)
             }
         })
@@ -2244,7 +2255,7 @@ export const AppointmentSheet = ({
                                     placeholder="Adicione observações ao agendamento..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    maxLength={512}
+                                    maxLength={500}
                                     showCharacterCount
                                 />
                                 <div className="flex justify-end">
@@ -2772,7 +2783,7 @@ export const AppointmentSheet = ({
                     placeholder="Adicione observações ao agendamento..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    maxLength={512}
+                    maxLength={500}
                     showCharacterCount
                 />
             </div>
@@ -2831,89 +2842,89 @@ export const AppointmentSheet = ({
                 cancelText="Continuar editando"
                 variant="warning"
             />
-                    isMobile ? (
-                        <BottomSheet isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)}>
-                            <div className="p-6 space-y-5">
-                                <div className="text-center">
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento</h3>
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
-                                        Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
-                                    </p>
-                                </div>
-                                <div>
-                                    <FormTextarea
-                                        label="Observação (opcional)"
-                                        name="cancelNote"
-                                        placeholder="Motivo do cancelamento..."
-                                        value={cancelNote}
-                                        onChange={(e) => setCancelNote(e.target.value)}
-                                        maxLength={512}
-                                        showCharacterCount
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2 justify-center">
-                                    <Checkbox
-                                        label="Notificar o cliente sobre o cancelamento"
-                                        checked={notifyClientOnCancel}
-                                        onChange={(checked) => setNotifyClientOnCancel(!!checked)}
-                                    />
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                    <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
-                                    <Button variant="destructive" onClick={async () => {
-                                        setIsCancelConfirmOpen(false);
-                                        if (appointment?.id && onDelete) {
-                                            const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
-                                            if (success) {
-                                                toast.success("Cancelado", "Agendamento cancelado com sucesso.");
-                                            } else {
-                                                toast.error("Erro", "Não foi possível cancelar o agendamento.");
-                                            }
-                                        }
-                                    }}>Cancelar agendamento</Button>
-                                </div>
-                            </div>
-                        </BottomSheet>
-                    ) : (
-                        <DefaultModal isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
-                            <div className="text-center sm:text-left">
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
-                                    Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
-                                </p>
-                            </div>
-                            <div>
-                                <FormTextarea
-                                    label="Observação (opcional)"
-                                    name="cancelNote"
-                                    placeholder="Motivo do cancelamento..."
-                                    value={cancelNote}
-                                    onChange={(e) => setCancelNote(e.target.value)}
-                                    maxLength={512}
-                                    showCharacterCount
-                                />
-                            </div>
-                            <div className="flex items-center gap-2 justify-center sm:justify-start">
-                                <Checkbox
-                                    label="Notificar o cliente sobre o cancelamento"
-                                    checked={notifyClientOnCancel}
-                                    onChange={(checked) => setNotifyClientOnCancel(!!checked)}
-                                />
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
-                                <Button variant="destructive" onClick={async () => {
-                                    setIsCancelConfirmOpen(false);
-                                    if (appointment?.id && onDelete) {
-                                        const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
-                                        if (success) {
-                                            toast.success("Cancelado", "Agendamento cancelado com sucesso.");
-                                        } else {
-                                            toast.error("Erro", "Não foi possível cancelar o agendamento.");
-                                        }
-                                    }
-                                }}>Cancelar agendamento</Button>
-                            </div>
-                        </DefaultModal>
+            isMobile ? (
+            <BottomSheet isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)}>
+                <div className="p-6 space-y-5">
+                    <div className="text-center">
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento</h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                            Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
+                        </p>
+                    </div>
+                    <div>
+                        <FormTextarea
+                            label="Observação (opcional)"
+                            name="cancelNote"
+                            placeholder="Motivo do cancelamento..."
+                            value={cancelNote}
+                            onChange={(e) => setCancelNote(e.target.value)}
+                            maxLength={500}
+                            showCharacterCount
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 justify-center">
+                        <Checkbox
+                            label="Notificar o cliente sobre o cancelamento"
+                            checked={notifyClientOnCancel}
+                            onChange={(checked) => setNotifyClientOnCancel(!!checked)}
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
+                        <Button variant="destructive" onClick={async () => {
+                            setIsCancelConfirmOpen(false);
+                            if (appointment?.id && onDelete) {
+                                const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
+                                if (success) {
+                                    toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                                } else {
+                                    toast.error("Erro", "Não foi possível cancelar o agendamento.");
+                                }
+                            }
+                        }}>Cancelar agendamento</Button>
+                    </div>
+                </div>
+            </BottomSheet>
+            ) : (
+            <DefaultModal isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
+                <div className="text-center sm:text-left">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                        Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
+                    </p>
+                </div>
+                <div>
+                    <FormTextarea
+                        label="Observação (opcional)"
+                        name="cancelNote"
+                        placeholder="Motivo do cancelamento..."
+                        value={cancelNote}
+                        onChange={(e) => setCancelNote(e.target.value)}
+                        maxLength={500}
+                        showCharacterCount
+                    />
+                </div>
+                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                    <Checkbox
+                        label="Notificar o cliente sobre o cancelamento"
+                        checked={notifyClientOnCancel}
+                        onChange={(checked) => setNotifyClientOnCancel(!!checked)}
+                    />
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)}>Voltar</Button>
+                    <Button variant="destructive" onClick={async () => {
+                        setIsCancelConfirmOpen(false);
+                        if (appointment?.id && onDelete) {
+                            const success = await onDelete(appointment.id, notifyClientOnCancel, cancelNote);
+                            if (success) {
+                                toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                            } else {
+                                toast.error("Erro", "Não foi possível cancelar o agendamento.");
+                            }
+                        }
+                    }}>Cancelar agendamento</Button>
+                </div>
+            </DefaultModal>
             <AlertModal
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
@@ -2926,73 +2937,73 @@ export const AppointmentSheet = ({
             />
 
             {/* Stock Check Modal */}
-                    <DefaultModal
-                        isOpen={isStockCheckOpen}
-                        onClose={() => {
-                            setIsStockCheckOpen(false)
-                            setPendingNextStep(null)
-                        }}
-                        title="Atenção: Estoque baixo"
-                    >
-                        <div className="space-y-4">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                Os seguintes itens terão estoque {' '}
-                                <span className="font-bold text-red-600">negativo ou abaixo do mínimo</span>
-                                {' '}após este agendamento:
-                            </p>
-                            <div className="max-h-60 overflow-y-auto border border-brand-border dark:border-dark-border rounded-xl px-4 divide-y divide-brand-border/40 dark:divide-dark-border/40 bg-white dark:bg-dark-surface">
-                                {stockCheckItems.map((item: any, idx: number) => {
-                                    const itemStock = item.stock ?? 0;
-                                    const itemImage = item.image;
-                                    const itemName = item.name;
-                                    const itemSku = item.sku;
-                                    const newStock = item.projectedStock;
+            <DefaultModal
+                isOpen={isStockCheckOpen}
+                onClose={() => {
+                    setIsStockCheckOpen(false)
+                    setPendingNextStep(null)
+                }}
+                title="Atenção: Estoque baixo"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                        Os seguintes itens terão estoque {' '}
+                        <span className="font-bold text-red-600">negativo ou abaixo do mínimo</span>
+                        {' '}após este agendamento:
+                    </p>
+                    <div className="max-h-60 overflow-y-auto border border-brand-border dark:border-dark-border rounded-xl px-4 divide-y divide-brand-border/40 dark:divide-dark-border/40 bg-white dark:bg-dark-surface">
+                        {stockCheckItems.map((item: any, idx: number) => {
+                            const itemStock = item.stock ?? 0;
+                            const itemImage = item.image;
+                            const itemName = item.name;
+                            const itemSku = item.sku;
+                            const newStock = item.projectedStock;
 
-                                    return (
-                                        <div key={idx} className="py-4 flex items-center justify-between gap-4">
-                                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                    <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{itemName}</div>
-                                                    <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{itemSku || 'N/A'}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="h-8 w-px bg-brand-border dark:bg-dark-border shrink-0" />
-
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{itemStock} <span className="text-[10px] font-medium opacity-60">un</span></span>
-                                                <ArrowRightIcon size={14} className="text-brand-inactive-text" />
-                                                <span className="text-[15px] font-bold text-brand-red">
-                                                    {newStock} <span className="text-xs font-bold">un</span>
-                                                </span>
-                                            </div>
+                            return (
+                                <div key={idx} className="py-4 flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                            <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
                                         </div>
-                                    )
-                                })}
-                            </div>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center">
-                                Deseja prosseguir mesmo assim?
-                            </p>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setIsStockCheckOpen(false)}>Cancelar</Button>
-                                <Button
-                                    variant="destructive"
-                                    onClick={() => {
-                                        setIsStockCheckOpen(false)
-                                        if (pendingNextStep) {
-                                            pendingNextStep.fn()
-                                            setPendingNextStep(null)
-                                        }
-                                    }}
-                                >
-                                    Prosseguir mesmo assim
-                                </Button>
-                            </div>
-                        </div>
-                    </DefaultModal>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{itemName}</div>
+                                            <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{itemSku || 'N/A'}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="h-8 w-px bg-brand-border dark:bg-dark-border shrink-0" />
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{itemStock} <span className="text-[10px] font-medium opacity-60">un</span></span>
+                                        <ArrowRightIcon size={14} className="text-brand-inactive-text" />
+                                        <span className="text-[15px] font-bold text-brand-red">
+                                            {newStock} <span className="text-xs font-bold">un</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center">
+                        Deseja prosseguir mesmo assim?
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsStockCheckOpen(false)}>Cancelar</Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                setIsStockCheckOpen(false)
+                                if (pendingNextStep) {
+                                    pendingNextStep.fn()
+                                    setPendingNextStep(null)
+                                }
+                            }}
+                        >
+                            Prosseguir mesmo assim
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
 
             {isMobile ? (
                 <BottomSheet isOpen={true} onClose={handleCloseAttempt}>

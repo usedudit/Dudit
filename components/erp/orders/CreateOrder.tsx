@@ -1211,8 +1211,21 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
-    const handleApplyCoupon = async () => {
-        const code = couponCode.trim()
+    const handleSetCustomer = useCallback((val: any) => {
+        if (val === null && couponId && couponPricingData?.customerScope === "specific") {
+            setCouponId(null)
+            setCouponCode("")
+            setCouponDiscountAmount(0)
+            setCouponPricingData(null)
+            setDiscountType("fixed")
+            setDiscountValue(0)
+            notifyError("Cupom removido por ser específico para um ou mais clientes.")
+        }
+        setSelectedCustomer(val)
+    }, [couponId, couponPricingData, notifyError])
+
+    const handleApplyCoupon = async (directCode?: string) => {
+        const code = (directCode || couponCode).trim()
         if (!code) {
             notifyError("Informe um código de cupom.")
             return
@@ -1511,7 +1524,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             onApplyCoupon={handleApplyCoupon}
                                             onOpenDiscount={canDiscount ? () => setIsDiscountModalOpen(true) : undefined}
                                             onOpenShipping={handleOpenShippingSheet}
-                                            setSelectedCustomer={setSelectedCustomer}
+                                            setSelectedCustomer={handleSetCustomer}
                                             setIsCustomerSheetOpen={setIsCustomerSheetOpen}
                                             setOrderDate={setOrderDate}
                                             setSalesChannel={setSalesChannel}
@@ -2054,6 +2067,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         setIsCouponSheetOpen(true)
                                         return
                                     }
+                                    if (globalDiscountType === "fixed" && globalDiscountValue > subtotal) {
+                                        notifyError("O desconto não pode ser maior que o valor total do pedido.")
+                                        return
+                                    }
                                     setDiscountType(globalDiscountType)
                                     setDiscountValue(globalDiscountValue)
                                     setCouponId(null)
@@ -2172,7 +2189,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     hasWinningDiscount={hasWinningDiscount}
                     onApplyCoupon={async (coupon) => {
                         setCouponCode(coupon.code)
-                        await handleApplyCoupon()
+                        await handleApplyCoupon(coupon.code)
                         setIsCouponSheetOpen(false)
                     }}
                     onRemoveCoupon={async () => {

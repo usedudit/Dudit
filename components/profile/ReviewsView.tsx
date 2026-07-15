@@ -265,87 +265,87 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
             )}
 
             {/* Edit Review Modal */}
-                <DefaultModal
-                    isOpen={!!editingReview}
-                    onClose={handleCloseEdit}
-                    title="Editar sua avaliação"
-                    description={
-                        editingReview?.products?.name ||
-                        editingReview?.services?.name ||
-                        "Item avaliado"
-                    }
-                    maxWidth="md"
-                >
-                    <form onSubmit={handleSaveEdit} className="space-y-6 py-2">
-                        <div className="flex flex-col items-center justify-center gap-3">
-                            <label className="text-base font-semibold text-brand-dark dark:text-dark-heading">
-                                Sua nota para este item
-                            </label>
-                            <div className="flex gap-2">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                    <button
-                                        key={star}
-                                        type="button"
-                                        onClick={() => setEditRating(star)}
-                                        className="transition-transform hover:scale-110 focus:outline-none"
-                                    >
-                                        <StarIcon
-                                            size={42}
-                                            color={star <= editRating ? "#059669" : "#E5E7EB"}
-                                            className={star <= editRating ? "fill-[#059669]" : ""}
-                                        />
-                                    </button>
-                                ))}
-                            </div>
-                            <span className="text-sm font-medium text-brand-inactive-text">
-                                {editRating === 5 ? "Excelente!" : editRating === 4 ? "Muito bom" : editRating === 3 ? "Bom" : editRating === 2 ? "Regular" : "Ruim"}
-                            </span>
+            <DefaultModal
+                isOpen={!!editingReview}
+                onClose={handleCloseEdit}
+                title="Editar sua avaliação"
+                description={
+                    editingReview?.products?.name ||
+                    editingReview?.services?.name ||
+                    "Item avaliado"
+                }
+                maxWidth="md"
+            >
+                <form onSubmit={handleSaveEdit} className="space-y-6 py-2">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                        <label className="text-base font-semibold text-brand-dark dark:text-dark-heading">
+                            Sua nota para este item
+                        </label>
+                        <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() => setEditRating(star)}
+                                    className="transition-transform hover:scale-110 focus:outline-none"
+                                >
+                                    <StarIcon
+                                        size={42}
+                                        color={star <= editRating ? "#059669" : "#E5E7EB"}
+                                        className={star <= editRating ? "fill-[#059669]" : ""}
+                                    />
+                                </button>
+                            ))}
                         </div>
+                        <span className="text-sm font-medium text-brand-inactive-text">
+                            {editRating === 5 ? "Excelente!" : editRating === 4 ? "Muito bom" : editRating === 3 ? "Bom" : editRating === 2 ? "Regular" : "Ruim"}
+                        </span>
+                    </div>
 
-                        <div className="grid gap-2">
-                            <FormTextarea
-                                label="Conte mais (opcional)"
-                                name="editComment"
-                                rows={4}
-                                value={editComment}
-                                onChange={(e) => setEditComment(e.target.value)}
-                                placeholder="Edite sua opinião para ajudar outros compradores..."
-                                className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
-                                maxLength={512}
-                                showCharacterCount
-                            />
-                        </div>
+                    <div className="grid gap-2">
+                        <FormTextarea
+                            label="Conte mais (opcional)"
+                            name="editComment"
+                            rows={4}
+                            value={editComment}
+                            onChange={(e) => setEditComment(e.target.value)}
+                            placeholder="Edite sua opinião para ajudar outros compradores..."
+                            className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
+                            maxLength={500}
+                            showCharacterCount
+                        />
+                    </div>
 
-                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                            <Button
-                                type="button"
-                                variant="outlinered"
-                                className="flex-1 order-3 sm:order-1"
-                                onClick={() => handleDeleteReview(editingReview.id)}
-                                disabled={isSaving || isDeleting}
-                            >
-                                {isDeleting ? "Excluindo..." : "Excluir avaliação"}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="flex-1 order-2"
-                                onClick={handleCloseEdit}
-                                disabled={isSaving || isDeleting}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="flex-[2] order-1 sm:order-3"
-                                isLoading={isSaving}
-                                disabled={isDeleting}
-                            >
-                                Salvar alterações
-                            </Button>
-                        </div>
-                    </form>
-                </DefaultModal>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                        <Button
+                            type="button"
+                            variant="outlinered"
+                            className="flex-1 order-3 sm:order-1"
+                            onClick={() => handleDeleteReview(editingReview.id)}
+                            disabled={isSaving || isDeleting}
+                        >
+                            {isDeleting ? "Excluindo..." : "Excluir avaliação"}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="flex-1 order-2"
+                            onClick={handleCloseEdit}
+                            disabled={isSaving || isDeleting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            className="flex-[2] order-1 sm:order-3"
+                            isLoading={isSaving}
+                            disabled={isDeleting}
+                        >
+                            Salvar alterações
+                        </Button>
+                    </div>
+                </form>
+            </DefaultModal>
         </motion.div>
     )
 }

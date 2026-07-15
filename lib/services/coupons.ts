@@ -348,6 +348,7 @@ export async function validateCouponRow(
     freeShipping: isFreeShipping,
     allowCombination: Boolean(coupon.allow_combination),
     applyScope: coupon.apply_scope || "all",
+    customerScope: coupon.customer_scope || "all",
     applicableProductIds,
     applicableServiceIds,
     applicableCategoryIds,

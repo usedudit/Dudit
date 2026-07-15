@@ -2,13 +2,13 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Utensils, Briefcase } from 'lucide-react';
-import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea, RadioButton, FormDropdown, IconPlaceholder } from '@/components/reusable';
+import { Button, DefaultModal, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea, RadioButton, FormDropdown, IconPlaceholder } from '@/components/reusable';
 import AlertModal from "@/components/reusable/AlertModal"
 import { Appointment } from '../types';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { getEndTime, formatDateStr } from '../utils';
 import Portal from '@/components/Portal';
-import { createUnavailableTypeAction } from '@/app/actions/erp/unavailable-types';
+import { createUnavailableTypeAction, deleteUnavailableTypeAction } from '@/app/actions/erp/unavailable-types';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import BottomSheet from '@/components/BottomSheet';
 import { useMediaQuery } from '@/components/erp/hooks';
@@ -16,31 +16,9 @@ import { formatCurrency } from '@/lib/utils/formatters';
 import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, SearchIcon, CalendarIcon } from '@/lib/icons';
 import { useRef } from 'react';
 
-const EmojiPicker = ({ onSelect, onClose }: { onSelect: (emoji: string) => void, onClose: () => void }) => {
-    const emojis = ["⏰", "☕", "🍴", "🍽️", "🤝", "💻", "📞", "📅", "🚫", "💤", "🚗", "🚶", "🏢", "🏠", "⚠️", "💡", "🛠️", "🩺", "✂️", "🧘", "🚿", "🏋️", "🍕", "🧴", "🧼"];
-    return (
-        <div className="absolute bottom-full left-0 mb-2 p-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-2xl z-[100] w-[260px] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-2 px-1">
-                <span className="text-xs font-bold text-brand-inactive-text uppercase">Selecione um ícone</span>
-                <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark"><XIcon size={14} /></button>
-            </div>
-            <div className="grid grid-cols-5 gap-1.5">
-                {emojis.map(e => (
-                    <button
-                        key={e}
-                        onClick={() => { onSelect(e); onClose(); }}
-                        className="text-xl p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-all hover:scale-110 active:scale-95"
-                    >
-                        {e}
-                    </button>
-                ))}
-            </div>
-        </div>
-    );
-}
+const emojis = ["⏰", "☕", "🍴", "🍽️", "🤝", "💻", "📞", "📅", "🚫", "💤", "🚗", "🚶", "🏢", "🏠", "⚠️", "💡", "🛠️", "🩺", "✂️", "🧘", "🚿", "🏋️", "🍕", "🧴", "🧼"];
 
-
-const TypeCard = ({ icon, label, subLabel, selected, onClick, simple = false }: { icon?: any, label: string, subLabel?: string, selected?: boolean, onClick: () => void, simple?: boolean }) => {
+const TypeCard = ({ icon, label, subLabel, selected, onClick, simple = false, onDelete }: { icon?: any, label: string, subLabel?: string, selected?: boolean, onClick: () => void, simple?: boolean, onDelete?: () => void }) => {
     const isEmoji = typeof icon === 'string' && icon.length > 0;
     const IconComponent = !isEmoji ? icon : null;
 
@@ -55,6 +33,14 @@ const TypeCard = ({ icon, label, subLabel, selected, onClick, simple = false }: 
                 }
             `}
         >
+            {onDelete && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-md border border-brand-red/20 text-brand-red hover:bg-brand-red/5 hover:border-brand-red/50 dark:text-brand-red dark:border-brand-red/20 dark:hover:bg-brand-red/10 transition-all z-10 bg-white dark:bg-dark-surface shadow-sm ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                >
+                    <XIcon size={12} />
+                </button>
+            )}
             {simple ? (
                 <div className="flex flex-col items-center justify-center gap-2 h-full text-brand-green">
                     <div className="w-10 h-10 rounded-full border border-brand-green flex items-center justify-center bg-brand-green/5">
@@ -146,11 +132,15 @@ export const AddUnavailableSheet = ({
     const [newTypeDuration, setNewTypeDuration] = useState('60');
     const [isSavingNewType, setIsSavingNewType] = useState(false);
     const [newTypeEmoji, setNewTypeEmoji] = useState('⏰');
-    const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+    const [isEmojiModalOpen, setIsEmojiModalOpen] = useState(false);
 
     // DELETION MODAL STATE
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteOption, setDeleteOption] = useState<'single' | 'series'>('single');
+
+    // TYPE DELETION STATE
+    const [isDeleteTypeModalOpen, setIsDeleteTypeModalOpen] = useState(false);
+    const [typeToDelete, setTypeToDelete] = useState<any>(null);
 
     // Horizontal Scroll Ref
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -218,6 +208,19 @@ export const AddUnavailableSheet = ({
             console.error("Error saving new type:", err);
         } finally {
             setIsSavingNewType(false);
+        }
+    };
+
+    const handleDeleteType = async () => {
+        if (!typeToDelete || !partnerId) return;
+        try {
+            await deleteUnavailableTypeAction(typeToDelete.id, partnerId);
+            if (onRefreshServices) onRefreshServices();
+        } catch (err) {
+            console.error("Error deleting type:", err);
+        } finally {
+            setIsDeleteTypeModalOpen(false);
+            setTypeToDelete(null);
         }
     };
 
@@ -289,6 +292,7 @@ export const AddUnavailableSheet = ({
                                 subLabel={`${t.default_duration} min`}
                                 selected={selectedType === t.name}
                                 onClick={() => { setSelectedType(t.name); setTitle(t.name); }}
+                                onDelete={() => { setTypeToDelete(t); setIsDeleteTypeModalOpen(true); }}
                             />
                         ))}
                         <TypeCard simple label="Novo tipo" onClick={() => setIsNewTypeSheetOpen(true)} />
@@ -368,7 +372,7 @@ export const AddUnavailableSheet = ({
                     </div>
 
                     {recurrence !== 'none' && (
-                        <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-zinc-900/20 space-y-4">
+                        <div className="space-y-4">
                             <div className="flex flex-col gap-1.5">
                                 <FormDropdown
                                     label="Termina em"
@@ -409,7 +413,7 @@ export const AddUnavailableSheet = ({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
-                    maxLength={512}
+                    maxLength={500}
                     showCharacterCount
                 />
             </div>
@@ -465,6 +469,18 @@ export const AddUnavailableSheet = ({
                     </div>
                 }
             />
+
+            {/* TYPE DELETION MODAL */}
+            <AlertModal
+                isOpen={isDeleteTypeModalOpen}
+                onClose={() => { setIsDeleteTypeModalOpen(false); setTypeToDelete(null); }}
+                onConfirm={handleDeleteType}
+                title={`Excluir "${typeToDelete?.name}"?`}
+                message={`Tem certeza que deseja excluir o tipo de horário "${typeToDelete?.name}"? Isso não afetará os horários já criados com este tipo.`}
+                confirmText="Excluir"
+                variant="danger"
+                isDestructive
+            />
         </div>
     );
 
@@ -477,29 +493,34 @@ export const AddUnavailableSheet = ({
                 </Button>
             </header>
             <div className="flex-1 space-y-6 p-6">
-                <div className="relative">
-                    <div className="flex gap-3">
+                <div>
+                    <div className="flex items-end gap-2">
+                        <button
+                            onClick={() => setIsEmojiModalOpen(true)}
+                            className="w-[42px] h-[42px] flex items-center justify-center bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg text-2xl hover:bg-white dark:hover:bg-dark-surface transition-colors shrink-0"
+                        >
+                            {newTypeEmoji}
+                        </button>
                         <div className="flex-1">
                             <FormInput label="Nome" placeholder="Ex: Almoço" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} />
-                        </div>
-                        <div className="w-20 pt-7">
-                            <button
-                                onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                                className="w-full h-10 flex items-center justify-center bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg text-2xl hover:bg-white dark:hover:bg-dark-surface transition-colors"
-                            >
-                                {newTypeEmoji}
-                            </button>
-                            {isEmojiPickerOpen && (
-                                <EmojiPicker
-                                    onSelect={(e) => { setNewTypeEmoji(e); setIsEmojiPickerOpen(false); }}
-                                    onClose={() => setIsEmojiPickerOpen(false)}
-                                />
-                            )}
                         </div>
                     </div>
                 </div>
                 <FormInput label="Duração padrão (min)" type="number" value={newTypeDuration} onChange={(e) => setNewTypeDuration(e.target.value)} />
             </div>
+            <DefaultModal isOpen={isEmojiModalOpen} onClose={() => setIsEmojiModalOpen(false)} title="Selecione um ícone" maxWidth="sm">
+                <div className="grid grid-cols-5 gap-1.5">
+                    {emojis.map(e => (
+                        <button
+                            key={e}
+                            onClick={() => { setNewTypeEmoji(e); setIsEmojiModalOpen(false); }}
+                            className="text-xl p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-all hover:scale-110 active:scale-95"
+                        >
+                            {e}
+                        </button>
+                    ))}
+                </div>
+            </DefaultModal>
             <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex items-center gap-4">
                     <Button className="h-12 flex-1" isLoading={isSavingNewType} onClick={handleSaveNewType}>Salvar Tipo</Button>

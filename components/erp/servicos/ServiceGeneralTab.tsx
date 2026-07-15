@@ -471,7 +471,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             disabled={!isEditing}
                             placeholder="Observações visíveis apenas para a equipe"
                             className="min-h-[120px]"
-                            maxLength={512}
+                            maxLength={500}
                             showCharacterCount
                         />
                     </SidebarCard>

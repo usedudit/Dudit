@@ -1,8 +1,9 @@
 -- Extend search_marketplace RPC with blended relevance + popularity ranking
 -- 70% FTS relevance, 10% popularity, 10% freshness, 5% seller reputation, 5% rating
+-- Items from partners with is_showcase_active = false are penalized (×0.01 rank)
 
 CREATE OR REPLACE FUNCTION public.search_marketplace(
-  p_tsquery TEXT,
+  p_query TEXT,
   p_type TEXT DEFAULT 'tudo',
   p_limit INT DEFAULT 20,
   p_cursor_rank REAL DEFAULT NULL,
@@ -22,12 +23,12 @@ AS $$
 DECLARE
   v_tsq tsquery;
 BEGIN
-  IF coalesce(trim(p_tsquery), '') = '' THEN
+  IF coalesce(trim(p_query), '') = '' THEN
     RETURN;
   END IF;
 
   BEGIN
-    v_tsq := to_tsquery('portuguese', p_tsquery);
+    v_tsq := to_tsquery('portuguese', p_query);
   EXCEPTION WHEN OTHERS THEN
     RETURN;
   END;
@@ -46,7 +47,8 @@ BEGIN
       p.marketplace_score,
       p.rating,
       ptr.marketplace_reputation,
-      public.mp_freshness_factor(p.created_at) AS freshness
+      public.mp_freshness_factor(p.created_at) AS freshness,
+      ptr.is_showcase_active
     FROM public.products p
     INNER JOIN public.partners ptr ON ptr.id = p.partner_id
     WHERE (p_type IN ('tudo', 'produtos'))
@@ -65,7 +67,8 @@ BEGIN
       s.marketplace_score,
       s.rating,
       ptr.marketplace_reputation,
-      public.mp_freshness_factor(s.created_at)
+      public.mp_freshness_factor(s.created_at),
+      ptr.is_showcase_active
     FROM public.services s
     INNER JOIN public.partners ptr ON ptr.id = s.partner_id
     WHERE (p_type IN ('tudo', 'servicos'))
@@ -84,7 +87,8 @@ BEGIN
       pt.marketplace_reputation,
       pt.rating,
       pt.marketplace_reputation,
-      public.mp_freshness_factor(pt.created_at)
+      public.mp_freshness_factor(pt.created_at),
+      pt.is_showcase_active
     FROM public.partners pt
     WHERE (p_type IN ('tudo', 'vitrines'))
       AND pt.is_active = true
@@ -101,7 +105,8 @@ BEGIN
       rp.marketplace_score,
       0::numeric,
       ptr.marketplace_reputation,
-      public.mp_freshness_factor(rp.created_at)
+      public.mp_freshness_factor(rp.created_at),
+      ptr.is_showcase_active
     FROM public.recurring_plans rp
     INNER JOIN public.partners ptr ON ptr.id = rp.partner_id
     WHERE (p_type IN ('tudo', 'planos'))
@@ -115,13 +120,24 @@ BEGIN
       c.item_type,
       c.id,
       c.created_at,
-      (
-        0.70 * c.fts_rank +
-        0.10 * LEAST(coalesce(c.marketplace_score, 0), 1)::real +
-        0.10 * LEAST(coalesce(c.freshness, 1), 1.25)::real / 1.25 +
-        0.05 * LEAST(coalesce(c.marketplace_reputation, 0), 1)::real +
-        0.05 * LEAST(coalesce(c.rating, 0), 5)::real / 5.0
-      )::REAL AS rank
+      CASE
+        WHEN c.is_showcase_active = false THEN
+          (
+            0.70 * c.fts_rank +
+            0.10 * LEAST(coalesce(c.marketplace_score, 0), 1)::real +
+            0.10 * LEAST(coalesce(c.freshness, 1), 1.25)::real / 1.25 +
+            0.05 * LEAST(coalesce(c.marketplace_reputation, 0), 1)::real +
+            0.05 * LEAST(coalesce(c.rating, 0), 5)::real / 5.0
+          )::REAL * 0.01
+        ELSE
+          (
+            0.70 * c.fts_rank +
+            0.10 * LEAST(coalesce(c.marketplace_score, 0), 1)::real +
+            0.10 * LEAST(coalesce(c.freshness, 1), 1.25)::real / 1.25 +
+            0.05 * LEAST(coalesce(c.marketplace_reputation, 0), 1)::real +
+            0.05 * LEAST(coalesce(c.rating, 0), 5)::real / 5.0
+          )::REAL
+      END AS rank
     FROM combined c
   )
   SELECT s.item_type, s.id, s.rank, s.created_at
@@ -136,6 +152,7 @@ END;
 $$;
 
 -- Browse-by-score RPC for category/homepage (no FTS)
+-- Items from partners with is_showcase_active = false are penalized (×0.01 score)
 CREATE OR REPLACE FUNCTION public.browse_marketplace_by_score(
   p_type TEXT DEFAULT 'produtos',
   p_limit INT DEFAULT 20,
@@ -156,14 +173,18 @@ SECURITY INVOKER
 AS $$
 BEGIN
   RETURN QUERY
-  WITH combined AS (
+  WITH showcase_status AS (
+    SELECT id, is_showcase_active FROM public.partners
+  ),
+  combined AS (
     SELECT
       'produto'::TEXT AS item_type,
       p.id,
-      p.marketplace_score::REAL AS score,
+      (p.marketplace_score::REAL * CASE WHEN ss.is_showcase_active = false THEN 0.01 ELSE 1.0 END) AS score,
       p.created_at,
       p.partner_id
     FROM public.products p
+    LEFT JOIN showcase_status ss ON ss.id = p.partner_id
     WHERE p_type IN ('tudo', 'produtos')
       AND p.is_active = true
       AND p.show_in_marketplace = true
@@ -174,10 +195,11 @@ BEGIN
     SELECT
       'servico'::TEXT,
       s.id,
-      s.marketplace_score::REAL,
+      (s.marketplace_score::REAL * CASE WHEN ss.is_showcase_active = false THEN 0.01 ELSE 1.0 END),
       s.created_at,
       s.partner_id
     FROM public.services s
+    LEFT JOIN showcase_status ss ON ss.id = s.partner_id
     WHERE p_type IN ('tudo', 'servicos')
       AND s.is_active = true
       AND s.show_in_marketplace = true
@@ -188,10 +210,11 @@ BEGIN
     SELECT
       'plano'::TEXT,
       rp.id,
-      rp.marketplace_score::REAL,
+      (rp.marketplace_score::REAL * CASE WHEN ss.is_showcase_active = false THEN 0.01 ELSE 1.0 END),
       rp.created_at,
       rp.partner_id
     FROM public.recurring_plans rp
+    LEFT JOIN showcase_status ss ON ss.id = rp.partner_id
     WHERE p_type IN ('tudo', 'planos')
       AND rp.status = 'active'
       AND rp.show_in_marketplace = true

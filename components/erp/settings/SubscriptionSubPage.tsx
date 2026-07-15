@@ -881,7 +881,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                             placeholder="Seu feedback ajuda a melhorar a Dudit."
                                             value={customReason}
                                             onChange={(e: any) => setCustomReason(e.target.value)}
-                                            maxLength={512}
+                                            maxLength={500}
                                             showCharacterCount
                                             name="observacoes"
                                             className="min-h-[120px]"

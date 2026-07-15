@@ -511,7 +511,7 @@ function ReportActionModal({
                     required
                     multiline
                     rows={3}
-                    maxLength={512}
+                    maxLength={500}
                     showCharacterCount
                 />
 

@@ -55,7 +55,7 @@ export const OrderSchema = z.object({
   deliveryType: z.enum(["delivery", "pickup"]),
   deliveryAddress: z.string().min(10, "Endereço muito curto").max(500),
   paymentMethod: z.string().min(1, "Método de pagamento obrigatório").max(100),
-  notes: z.string().max(512).optional(),
+  notes: z.string().max(500).optional(),
   partnerId: z.string().uuid(),
   buyerId: z.string().uuid(),
 })
@@ -96,7 +96,7 @@ export const CustomerSchema = z.object({
     .optional()
     .nullable(),
   address: z.string().max(500).optional().nullable(),
-  notes: z.string().max(512).optional().nullable(),
+  notes: z.string().max(500).optional().nullable(),
 })
 
 // Método de Pagamento

@@ -90,12 +90,12 @@ const SelectCouponSheet = ({
 
     const applyScope = String(coupon.apply_scope || "all")
     if (applyScope !== "all") {
-      return "Cupom com regras de categoria/produto/serviço não pode ser usado no PDV."
+      return "Cupom com regras de categoria/produto/serviço não pode ser usado nesta venda."
     }
 
     const minCartValue = Number(coupon.min_cart_value || 0)
     if (minCartValue > 0 && Number(subtotal || 0) < minCartValue) {
-      return `Disponível apenas para pedidos acima de ${formatCurrency(minCartValue)}.`
+      return `Disponível apenas para vendas acima de ${formatCurrency(minCartValue)}.`
     }
 
     if (coupon.customer_scope === "specific") {
@@ -129,30 +129,6 @@ const SelectCouponSheet = ({
 
       {/* Manual code input */}
       <div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        <div className="flex gap-2 mb-4">
-          <Input
-            label=""
-            name="manualCouponCode"
-            placeholder="Digite o código do cupom..."
-            value={manualCode}
-            onChange={(e: any) => setManualCode(e.target.value)}
-            className="mb-0 flex-1"
-          />
-          <Button
-            className="h-11 px-6 shrink-0"
-            disabled={!manualCode.trim()}
-            onClick={() => {
-              if (manualCode.trim()) {
-                onApplyCoupon({ code: manualCode.trim().toUpperCase(), id: "" })
-                setManualCode("")
-                onClose()
-              }
-            }}
-          >
-            Aplicar
-          </Button>
-        </div>
-
         <Input
           label=""
           name="couponSearch"
@@ -196,7 +172,7 @@ const SelectCouponSheet = ({
                 >
                   <div className={`flex h-12 w-12 items-center justify-center rounded-full border ${isApplied
                     ? "border-brand-green bg-green-100 text-brand-green dark:bg-green-900/20"
-                    : "border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-gray-800"
+                    : "border-brand-border bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:border-dark-border"
                     }`}>
                     {isApplied ? <CheckCircleIcon size={20} /> : <TagIcon size={20} />}
                   </div>
@@ -213,7 +189,7 @@ const SelectCouponSheet = ({
                       {isBlocked && blockedReason && (
                         <Tooltip text={blockedReason}>
                           <span>
-                            <Badge variant="orange">Restrito no PDV</Badge>
+                            <Badge variant="orange">Possui restrições</Badge>
                           </span>
                         </Tooltip>
                       )}

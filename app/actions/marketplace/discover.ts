@@ -331,6 +331,11 @@ function getPartnerId(item: { partners?: any }): string | undefined {
     return raw?.id
 }
 
+function getPartnerShowcaseInactive(item: any): boolean {
+    const raw = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    return raw?.is_showcase_active === false
+}
+
 function applyTierSort<T>(
     items: T[],
     tiers: PartnerTiers,
@@ -344,7 +349,14 @@ function applyTierSort<T>(
                     : 2
             return { ...item, _tier: tier } as T & WithTier
         })
-        .sort((a, b) => a._tier - b._tier || scorer(b as T) - scorer(a as T))
+        .sort((a, b) => {
+            const tierDiff = a._tier - b._tier
+            if (tierDiff !== 0) return tierDiff
+            const aInactive = getPartnerShowcaseInactive(a) ? 1 : 0
+            const bInactive = getPartnerShowcaseInactive(b) ? 1 : 0
+            if (aInactive !== bInactive) return aInactive - bInactive
+            return scorer(b as T) - scorer(a as T)
+        })
 }
 
 // ─── Product query fields ───────────────────────────────────────────────────
@@ -353,7 +365,7 @@ const BASE_FIELDS = `id, name, price, promotional_price, images, rating`
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
-    id, store_name, store_image_url, latitude, longitude,
+    id, store_name, store_image_url, latitude, longitude, is_showcase_active,
     addresses!inner(city, state)
 )`
 
@@ -1400,7 +1412,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const { data, error } = await supabase
         .from("partners")
-        .select(`id, store_name, store_image_url, banner_url, rating, latitude, longitude, addresses!inner(city, state)`)
+        .select(`id, store_name, store_image_url, banner_url, rating, latitude, longitude, is_showcase_active, addresses!inner(city, state)`)
         .eq("is_active", true)
         .in("id", allIds)
         .order("rating", { ascending: false, nulls: "last" })
@@ -1423,7 +1435,14 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             : pid && tiers.stateIds.has(pid) ? 1
                 : 2
         return { ...p, _tier: tier }
-    }).sort((a: any, b: any) => a._tier - b._tier || (b.rating ?? 0) - (a.rating ?? 0))
+    }).sort((a: any, b: any) => {
+        const tierDiff = a._tier - b._tier
+        if (tierDiff !== 0) return tierDiff
+        const aInactive = a.is_showcase_active === false ? 1 : 0
+        const bInactive = b.is_showcase_active === false ? 1 : 0
+        if (aInactive !== bInactive) return aInactive - bInactive
+        return (b.rating ?? 0) - (a.rating ?? 0)
+    })
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topVitrines", ctx, displayScope)

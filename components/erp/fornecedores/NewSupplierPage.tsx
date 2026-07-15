@@ -648,7 +648,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                         onChange={(e) => setObservacoes(e.target.value)}
                                                         placeholder="Adicione observações internas sobre este fornecedor..."
                                                         name="observacoes"
-                                                        maxLength={512}
+                                                        maxLength={500}
                                                         showCharacterCount
                                                     />
                                                 </FormSection>

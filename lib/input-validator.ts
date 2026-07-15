@@ -136,7 +136,7 @@ export function sanitizeObject(obj: any, allowedKeys: string[]): any {
 
 export function sanitizeNotes(input: unknown): string | null {
   if (!input || typeof input !== "string") return null
-  return sanitizeInput(input, 512)
+  return sanitizeInput(input, 500)
 }
 
 export function sanitizeHTML(input: string, maxLength = 50000): string {

@@ -125,8 +125,8 @@ import {
     TextAlignCenterIcon,
     TextAlignRightIcon,
     TextAlignJustifyCenterIcon,
-    Table01Icon,
-    TextColorIcon,
+    GridTableIcon as GridTableIcon01,
+    PaintBoardIcon,
     TextClearIcon,
     TextNumberSignIcon,
     TextFontIcon,
@@ -352,8 +352,8 @@ export const AlignLeftIcon = CreateIcon(TextAlignLeftIcon)
 export const AlignCenterIcon = CreateIcon(TextAlignCenterIcon)
 export const AlignRightIcon = CreateIcon(TextAlignRightIcon)
 export const AlignJustifyIcon = CreateIcon(TextAlignJustifyCenterIcon)
-export const TableIcon = CreateIcon(Table01Icon)
-export const ColorIcon = CreateIcon(TextColorIcon)
+export const TableIcon = CreateIcon(GridTableIcon01)
+export const ColorIcon = CreateIcon(PaintBoardIcon)
 export const ClearFormatIcon = CreateIcon(TextClearIcon)
 export const OrderedListIcon = CreateIcon(TextNumberSignIcon)
 export const FontSizeIcon = CreateIcon(TextFontIcon)
@@ -365,7 +365,6 @@ export const FileTextIcon = CreateIcon(File02Icon01)
 export const RocketIcon = CreateIcon(Rocket01Icon)
 export const BriefcaseIcon = CreateIcon(Briefcase01Icon)
 export const KeyIcon = CreateIcon(Key01Icon)
-
 
 // ============================
 // SYSTEM / MISC

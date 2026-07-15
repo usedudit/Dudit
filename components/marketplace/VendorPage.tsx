@@ -46,6 +46,7 @@ interface VendorPageClientProps {
     coupons?: any[]
     userProfile?: any
     cartCount?: number
+    isShowcaseActive?: boolean
 }
 
 const getImageUrl = (path?: string | null) => getR2ImageUrl(path)
@@ -637,7 +638,7 @@ function pickBestSection(sections: any[]): any | null {
     return bestDiscount || bestBenefit
 }
 
-export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
+export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount, isShowcaseActive = true }: VendorPageClientProps) {
     const calculatedReviewsCount = reviews?.length || 0
     const calculatedAverageRating = useMemo(() => {
         if (calculatedReviewsCount === 0) return 0
@@ -1016,6 +1017,14 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
+                    {!isShowcaseActive && (
+                        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-center gap-3">
+                            <span className="text-amber-600 shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            </span>
+                            <p className="text-[14px] text-amber-800 font-medium">Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.</p>
+                        </div>
+                    )}
                     {/* Desktop Layout */}
                     <div className="hidden lg:flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">

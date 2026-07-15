@@ -56,6 +56,7 @@ export async function exportERPAction(input: ExportERPInput): Promise<ExportERPR
     }
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Erro ao gerar exportação."
+    console.error(`[Export] Erro ao exportar módulo "${input.module}":`, e)
     return { success: false, error: message }
   }
 }

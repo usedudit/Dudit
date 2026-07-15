@@ -748,7 +748,7 @@ export async function checkoutCartAction(
       : Promise.resolve({ data: [] as any[] }),
     adminClient
       .from("partners")
-      .select("opening_hours")
+      .select("opening_hours, is_showcase_active")
       .eq("id", partnerId)
       .maybeSingle(),
     hasDeliveryLines && deliveryAddress
@@ -776,6 +776,10 @@ export async function checkoutCartAction(
   const buyerProfile = buyerProfileResult.data
   const products = productsResult.data
   const partner = partnerResult.data
+
+  if (partner && partner.is_showcase_active === false) {
+    return { error: "Esta loja está com a vitrine inativa e não pode receber pedidos no momento." }
+  }
 
   let deliveryFee = 0
   let distanceKm: number | null = null

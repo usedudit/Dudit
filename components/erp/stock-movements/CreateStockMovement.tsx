@@ -800,7 +800,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     value={notes}
                                                     onChange={(e) => setNotes(e.target.value)}
                                                     name="notes"
-                                                    maxLength={512}
+                                                    maxLength={500}
                                                     showCharacterCount
                                                 />
                                             </motion.div>

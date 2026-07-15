@@ -172,12 +172,12 @@ export function ReviewButton({
                         {itemRating === 5
                           ? "Excelente!"
                           : itemRating === 4
-                          ? "Muito bom"
-                          : itemRating === 3
-                          ? "Bom"
-                          : itemRating === 2
-                          ? "Regular"
-                          : "Ruim"}
+                            ? "Muito bom"
+                            : itemRating === 3
+                              ? "Bom"
+                              : itemRating === 2
+                                ? "Regular"
+                                : "Ruim"}
                       </span>
                     </div>
 
@@ -192,7 +192,7 @@ export function ReviewButton({
                           setComments((prev) => ({ ...prev, [item.id]: e.target.value }))
                         }
                         placeholder={isReviewed ? "" : "Sua opinião ajuda outros compradores..."}
-                        maxLength={512}
+                        maxLength={500}
                         showCharacterCount
                         className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
                       />
@@ -265,12 +265,12 @@ export function ReviewButton({
                               itemRating === 5
                                 ? "Excelente!"
                                 : itemRating === 4
-                                ? "Muito bom"
-                                : itemRating === 3
-                                ? "Bom"
-                                : itemRating === 2
-                                ? "Regular"
-                                : "Ruim"
+                                  ? "Muito bom"
+                                  : itemRating === 3
+                                    ? "Bom"
+                                    : itemRating === 2
+                                      ? "Regular"
+                                      : "Ruim"
                             )}
                           </span>
                         </div>
@@ -287,7 +287,7 @@ export function ReviewButton({
                             setComments((prev) => ({ ...prev, [item.id]: e.target.value }))
                           }
                           placeholder={isReviewed ? "" : "Sua opinião ajuda outros compradores..."}
-                          maxLength={512}
+                          maxLength={500}
                           showCharacterCount
                           className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
                         />

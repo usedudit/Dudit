@@ -723,7 +723,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             label="Observações de fechamento"
                             value={closingNotes}
                             onChange={(e: any) => setClosingNotes(e.target.value)}
-                            maxLength={512}
+                            maxLength={500}
                             showCharacterCount
                         />
                         <div className="flex justify-end gap-2">

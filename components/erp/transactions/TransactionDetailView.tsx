@@ -363,8 +363,8 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                     ) : detail.transactionDetailKind === "manual_entry" ? (
                                                         detail.items.map((item) => (
                                                             <ListItem
+                                                                className="border-0 px-0 py-2 rounded-none bg-transparent hover:border-transparent hover:bg-transparent cursor-default"
                                                                 key={item.id}
-                                                                className="cursor-default"
                                                                 icon={manualEntryIcon}
                                                                 title={item.sku || item.title}
                                                                 right={
@@ -563,15 +563,15 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                     </div>
                                 </TabsContent>
 
-                                 <TabsContent value="attachments" className="mt-0">
-                                     <GenericAttachmentsTab
-                                         entityId={transactionId}
-                                         partnerId={partnerId}
-                                         entityType="transaction"
-                                         title="Comprovantes e Anexos"
-                                         subtitle="Gerencie faturas, comprovantes ou contratos desta transação."
-                                     />
-                                 </TabsContent>
+                                <TabsContent value="attachments" className="mt-0">
+                                    <GenericAttachmentsTab
+                                        entityId={transactionId}
+                                        partnerId={partnerId}
+                                        entityType="transaction"
+                                        title="Comprovantes e Anexos"
+                                        subtitle="Gerencie faturas, comprovantes ou contratos desta transação."
+                                    />
+                                </TabsContent>
 
                                 <TabsContent value="history" className="mt-0">
                                     <TransactionHistoryTab entries={historyEntries} loading={historyLoading} />

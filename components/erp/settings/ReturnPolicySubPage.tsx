@@ -175,7 +175,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
               value={policy.commercialNotes || ""}
               onChange={(e) => update("commercialNotes", e.target.value || null)}
               rows={3}
-              maxLength={512}
+              maxLength={500}
               showCharacterCount
             />
           </FormSection>

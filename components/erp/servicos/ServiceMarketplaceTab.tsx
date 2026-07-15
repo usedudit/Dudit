@@ -62,7 +62,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                             disabled={!isEditing}
                         />
                     </div>
-                    <ProductVideoSection itemType="service" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
                 </FormSection>
 
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
@@ -164,6 +163,10 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         </div>
                     </Accordion>
                 </div>
+
+                <FormSection title="Vídeos" hasSeparator>
+                    <ProductVideoSection itemType="service" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
+                </FormSection>
             </div>
 
             {/* --- COLUNA DIREITA (SIDEBAR) --- */}

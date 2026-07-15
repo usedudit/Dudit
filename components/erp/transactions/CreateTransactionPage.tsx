@@ -1895,7 +1895,7 @@ export default function CreateTransactionPage({
                                             value={notes}
                                             onChange={(e) => setNotes(e.target.value)}
                                             rows={8}
-                                            maxLength={512}
+                                            maxLength={500}
                                             showCharacterCount
                                         />
                                     </div>

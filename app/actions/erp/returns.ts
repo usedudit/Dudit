@@ -133,7 +133,7 @@ const processReturnSchema = z.object({
         unit_price: z.number().nonnegative().max(99999999),
     })).max(100).default([]),
     exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
-    notes: z.string().max(512).optional().nullable(),
+    notes: z.string().max(500).optional().nullable(),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
     skipMpPaymentCheck: z.boolean().optional().default(false),
 })

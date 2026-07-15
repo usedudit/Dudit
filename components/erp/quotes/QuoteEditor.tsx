@@ -846,7 +846,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 onChange={(e) => props.setInternalNote(e.target.value)}
                                 disabled={proposalNotesLocked}
                                 name="internalNote"
-                                maxLength={512}
+                                maxLength={500}
                                 showCharacterCount
                             />
                         </div>
@@ -859,7 +859,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 onChange={(e) => props.setStaffInternalNotes(e.target.value)}
                                 disabled={internalNotesLocked}
                                 name="staffInternalNotes"
-                                maxLength={512}
+                                maxLength={500}
                                 showCharacterCount
                             />
                         </div>

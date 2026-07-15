@@ -163,6 +163,8 @@ export function ExplorarPageClient({
         })
     }, [])
 
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
     // Modal states
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -603,6 +605,60 @@ export function ExplorarPageClient({
         if (currentType !== "tudo") count++
         return count
     }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType])
+
+    const activeFilterChips = useMemo(() => {
+        const chips: { key: string; label: string; value: string; onRemove: () => void }[] = []
+        if (selectedCategories.length > 0) {
+            chips.push({
+                key: "category",
+                label: "Categoria",
+                value: selectedCategories[0],
+                onRemove: () => toggleCategory(selectedCategories[0]),
+            })
+        }
+        if (minPrice || maxPrice) {
+            let value = ""
+            if (minPrice && maxPrice) value = `${formatCurrency(Number(minPrice))} - ${formatCurrency(Number(maxPrice))}`
+            else if (minPrice) value = `> ${formatCurrency(Number(minPrice))}`
+            else value = `< ${formatCurrency(Number(maxPrice))}`
+            chips.push({
+                key: "price",
+                label: "Preço",
+                value,
+                onRemove: () => { setMinPrice(""); setMaxPrice("") },
+            })
+        }
+        if (promoOn) {
+            chips.push({
+                key: "promo",
+                label: "Promoção",
+                value: "Ativo",
+                onRemove: () => setPromoOn(false),
+            })
+        }
+        if (sortBy !== "relevancia") {
+            const sortLabel = sortOptions.find(o => o.value === sortBy)?.label || sortBy
+            chips.push({
+                key: "sort",
+                label: "Ordenar",
+                value: sortLabel,
+                onRemove: () => setSortBy("relevancia"),
+            })
+        }
+        if (currentType !== "tudo") {
+            const typeLabel = typeOptions.find(o => o.value === currentType)?.label || currentType
+            chips.push({
+                key: "type",
+                label: "Tipo",
+                value: typeLabel,
+                onRemove: () => {
+                    setCurrentType("tudo")
+                    updateUrl(selectedCitySlug, selectedCategories, query, "tudo")
+                },
+            })
+        }
+        return chips
+    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query])
 
     const categoryShowcases = useMemo(() => {
         if (selectedCategories.length === 0) return []
@@ -1174,6 +1230,7 @@ export function ExplorarPageClient({
                             filterConfig={filterConfig}
                             pageMode={pageMode}
                             sectionId={selectedSection}
+                            collapsed={sidebarCollapsed}
                         />
 
                         <div className="min-w-0 flex-1">
@@ -1313,7 +1370,9 @@ export function ExplorarPageClient({
                                         <ExplorarViewControls
                                             viewMode={viewMode}
                                             onViewModeChange={setViewMode}
-                                            resultsCount={filteredResults.length}
+                                            sidebarCollapsed={sidebarCollapsed}
+                                            onToggleFilters={() => setSidebarCollapsed(prev => !prev)}
+                                            activeFilterChips={activeFilterChips}
                                         />
 
 

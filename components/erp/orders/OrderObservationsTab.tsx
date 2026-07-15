@@ -22,7 +22,7 @@ export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ note
                     onChange={(e: any) => setNotes(e.target.value)}
                     className="min-h-[250px]"
                     disabled={disabled}
-                    maxLength={512}
+                    maxLength={500}
                     showCharacterCount
                 />
             </FormSection>

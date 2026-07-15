@@ -53,3 +53,21 @@ export async function createUnavailableTypeAction(data: {
         return errorResponse(e.message)
     }
 }
+
+export async function deleteUnavailableTypeAction(id: string, partnerId: string): Promise<ActionResponse<any>> {
+    try {
+        await requirePermission(partnerId, "appointments", "delete")
+        const supabase = await getSupabaseServerClient()
+
+        const { error } = await supabase
+            .from("unavailable_types")
+            .update({ is_active: false })
+            .eq("id", id)
+            .eq("partner_id", partnerId)
+
+        if (error) throw error
+        return successResponse({ deleted: true })
+    } catch (e: any) {
+        return errorResponse(e.message)
+    }
+}

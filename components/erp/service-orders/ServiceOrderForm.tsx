@@ -1134,6 +1134,15 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                                     <CustomerCard
                                                         customer={selectedCustomer}
                                                         onRemove={isLocked ? undefined : () => {
+                                                            if (couponId && couponPricingData?.customerScope === "specific") {
+                                                                setCouponId(null)
+                                                                setCouponCode("")
+                                                                setCouponDiscountAmount(0)
+                                                                setCouponPricingData(null)
+                                                                setDiscountType("fixed")
+                                                                setDiscountValue(0)
+                                                                toast({ description: "Cupom removido por ser específico para um ou mais clientes." })
+                                                            }
                                                             setCustomerId("")
                                                             setCustomerName("")
                                                             setSelectedCustomer(null)
@@ -1244,7 +1253,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                             value={internalNotes}
                                             onChange={(e) => setInternalNotes(e.target.value)}
                                             name="internalNotes"
-                                            maxLength={512}
+                                            maxLength={500}
                                             showCharacterCount
                                         />
                                     </FadeIn>
@@ -2065,6 +2074,10 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
                                 if (globalDiscountType === "coupon") {
                                     setIsDiscountModalOpen(false)
                                     setIsCouponSheetOpen(true)
+                                    return
+                                }
+                                if (globalDiscountType === "fixed" && globalDiscountValue > subtotal) {
+                                    toast({ description: "O desconto não pode ser maior que o valor total do pedido." })
                                     return
                                 }
                                 setDiscountType(globalDiscountType)

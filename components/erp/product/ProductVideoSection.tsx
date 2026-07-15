@@ -301,25 +301,23 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
 
     if (videoPlanBlocked) {
         return (
-            <div className="mt-8 pt-8">
-                <div className="flex flex-col items-center">
-                    <IconPlaceholder
-                        icon={LockIcon}
-                        title="Vídeo"
-                        subtitle={"Adicione vídeos aos seus " + (itemType === "product" ? "produtos" : "serviços") + " para aumentar o engajamento. Disponível nos planos Crescer e Escalar."}
-                        itemButton={{
-                            text: "Fazer upgrade",
-                            action: () => openPlanUpgrade("crescer"),
-                            variant: "outline"
-                        }}
-                    />
-                </div>
+            <div className="flex flex-col items-center">
+                <IconPlaceholder
+                    icon={LockIcon}
+                    title="Vídeo"
+                    subtitle={"Adicione vídeos aos seus " + (itemType === "product" ? "produtos" : "serviços") + " para aumentar o engajamento. Disponível nos planos Crescer e Escalar."}
+                    itemButton={{
+                        text: "Fazer upgrade",
+                        action: () => openPlanUpgrade("crescer"),
+                        variant: "outline"
+                    }}
+                />
             </div>
         )
     }
 
     return (
-        <div className="mt-8 pt-8">
+        <div>
             <div className="flex items-center justify-between gap-4 mb-4">
                 {(hasVideo || localPreview) && isEditing && (
                     <Button variant="outlinered" onClick={handleRemoveVideo}>

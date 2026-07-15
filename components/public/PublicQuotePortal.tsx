@@ -553,7 +553,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
                             placeholder="Ex: Preço acima do orçamento planejado / Prazo de entrega inviável..."
-                            maxLength={512}
+                            maxLength={500}
                             showCharacterCount
                         />
                     </div>

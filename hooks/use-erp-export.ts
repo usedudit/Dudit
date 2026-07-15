@@ -52,7 +52,8 @@ export function useErpExport() {
           title: "Exportação concluída",
           description: `${res.rowCount} registro(s) exportado(s).`,
         })
-      } catch {
+      } catch (e) {
+        console.error("[Export] Erro inesperado no cliente:", e)
         toast({
           title: "Exportação",
           description: "Erro inesperado ao exportar.",

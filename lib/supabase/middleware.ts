@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
   const isSystemPath =
     pathname === "/" ||
     PUBLIC_PATHS.filter(p => p !== "/").some(p => pathname.startsWith(p)) ||
-    ["/institucional", "/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos"].some(p => pathname.startsWith(p));
+    ["/institucional", "/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp"].some(p => pathname.startsWith(p));
 
   // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema
   if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {
@@ -439,7 +439,7 @@ export async function middleware(request: NextRequest) {
           if (userDeletion) {
             const isPastGrace = new Date() > new Date(userDeletion.grace_period_ends_at)
             const isDeleting = userDeletion.status !== "waiting_grace_period" && userDeletion.status !== "pending_deletion"
-            
+
             if (isPastGrace || isDeleting) {
               console.log(`[MIDDLEWARE] User ${user.id} account deletion is active - redirecting to sign-out/login`)
               const logoutUrl = new URL("/auth/login?error=account_deleting", request.url)

@@ -156,6 +156,7 @@ export type PricingCoupon = {
   freeShipping: boolean
   allowCombination?: boolean
   applyScope?: string | null
+  customerScope?: string | null
   applicableProductIds?: string[] | null
   applicableServiceIds?: string[] | null
   applicableCategoryIds?: string[] | null

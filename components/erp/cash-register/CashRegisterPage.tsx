@@ -513,7 +513,7 @@ export default function CashRegisterPage({
 
     return (
         <AnimatePresence mode="wait">
-{selectedSessionId ? (
+            {selectedSessionId ? (
                 <CashSessionDetailPage
                     key="detail"
                     partnerId={partnerId}
@@ -829,7 +829,7 @@ export default function CashRegisterPage({
                                 label="Observações de fechamento"
                                 value={closingNotes}
                                 onChange={(e: any) => setClosingNotes(e.target.value)}
-                                maxLength={512}
+                                maxLength={500}
                                 showCharacterCount
                             />
                             <div className="flex justify-end gap-2">

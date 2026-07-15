@@ -310,7 +310,7 @@ export function CheckoutPageClient() {
     })
 
     const requirements: CheckoutRequirements | undefined = checkoutContext?.requirements
-    
+
     const serviceLines = useMemo(() => {
         return checkoutContext?.lines?.filter(l => l.lineKind === "service_booking") || []
     }, [checkoutContext?.lines])
@@ -319,8 +319,8 @@ export function CheckoutPageClient() {
         if (serviceLines.length === 0) return false
         return serviceLines.every(line => {
             const name = line.baseName || line.displayName
-            const match = userCredits.find(c => 
-                c.itemName.toLowerCase() === name.toLowerCase() && 
+            const match = userCredits.find(c =>
+                c.itemName.toLowerCase() === name.toLowerCase() &&
                 c.remainingCredits >= line.quantity &&
                 (!c.expiresAt || new Date(c.expiresAt) > new Date())
             )
@@ -3072,7 +3072,7 @@ export function CheckoutPageClient() {
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                         name="notes"
                         rows={4}
-                        maxLength={512}
+                        maxLength={500}
                         showCharacterCount
                     />
                 </div>
@@ -3368,82 +3368,82 @@ export function CheckoutPageClient() {
                 />
             )}
 
-                <DefaultModal
-                    isOpen={showDepositChoiceModal && !!checkoutContext?.deposit}
-                    onClose={() => setShowDepositChoiceModal(false)}
-                    title="Escolha como deseja pagar"
-                    maxWidth="md"
-                >
-                    <div className="space-y-6 py-2">
-                        <p className="text-sm text-brand-inactive-text">
-                            Este estabelecimento permite pagar um sinal/entrada para confirmar o seu agendamento, restando o valor restante para ser pago presencialmente.
-                        </p>
+            <DefaultModal
+                isOpen={showDepositChoiceModal && !!checkoutContext?.deposit}
+                onClose={() => setShowDepositChoiceModal(false)}
+                title="Escolha como deseja pagar"
+                maxWidth="md"
+            >
+                <div className="space-y-6 py-2">
+                    <p className="text-sm text-brand-inactive-text">
+                        Este estabelecimento permite pagar um sinal/entrada para confirmar o seu agendamento, restando o valor restante para ser pago presencialmente.
+                    </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Option Sinal */}
-                            <div
-                                onClick={handleSelectDeposit}
-                                className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-green bg-brand-green/5 dark:bg-brand-green/10 hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-all shadow-sm"
-                            >
-                                <div>
-                                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 dark:bg-brand-green/20 rounded-full mb-3">
-                                        Recomendado
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Option Sinal */}
+                        <div
+                            onClick={handleSelectDeposit}
+                            className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-green bg-brand-green/5 dark:bg-brand-green/10 hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-all shadow-sm"
+                        >
+                            <div>
+                                <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 dark:bg-brand-green/20 rounded-full mb-3">
+                                    Recomendado
+                                </span>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
+                                    Pagar Sinal / Entrada
+                                </h3>
+                                <p className="text-xs text-brand-inactive-text mb-4">
+                                    Pague apenas uma porcentagem agora para garantir sua reserva.
+                                </p>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
+                                <div className="flex justify-between items-baseline mb-1">
+                                    <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
+                                    <span className="text-xl font-black text-brand-green">
+                                        {formatCurrency(checkoutDepositChargeTotal || checkoutChargeTotal)}
                                     </span>
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
-                                        Pagar Sinal / Entrada
-                                    </h3>
-                                    <p className="text-xs text-brand-inactive-text mb-4">
-                                        Pague apenas uma porcentagem agora para garantir sua reserva.
-                                    </p>
                                 </div>
-                                <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
-                                    <div className="flex justify-between items-baseline mb-1">
-                                        <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
-                                        <span className="text-xl font-black text-brand-green">
-                                            {formatCurrency(checkoutDepositChargeTotal || checkoutChargeTotal)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-xs text-brand-inactive-text">Saldo restante:</span>
-                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(checkoutAmounts?.remainingAfterDeposit ?? Math.max(0, checkoutFullTotal - checkoutDepositChargeTotal))}
-                                        </span>
-                                    </div>
+                                <div className="flex justify-between items-baseline">
+                                    <span className="text-xs text-brand-inactive-text">Saldo restante:</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(checkoutAmounts?.remainingAfterDeposit ?? Math.max(0, checkoutFullTotal - checkoutDepositChargeTotal))}
+                                    </span>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Option Integral */}
-                            <div
-                                onClick={handleSelectIntegral}
-                                className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10 transition-all shadow-sm"
-                            >
-                                <div>
-                                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-inactive-text bg-brand-slate/80 dark:bg-dark-border/40 rounded-full mb-3">
-                                        Integral
+                        {/* Option Integral */}
+                        <div
+                            onClick={handleSelectIntegral}
+                            className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10 transition-all shadow-sm"
+                        >
+                            <div>
+                                <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-inactive-text bg-brand-slate/80 dark:bg-dark-border/40 rounded-full mb-3">
+                                    Integral
+                                </span>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
+                                    Pagamento Integral
+                                </h3>
+                                <p className="text-xs text-brand-inactive-text mb-4">
+                                    Pague o valor total do pedido agora e evite cobranças adicionais depois.
+                                </p>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
+                                <div className="flex justify-between items-baseline mb-1">
+                                    <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
+                                    <span className="text-xl font-black text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(checkoutFullTotal || checkoutChargeTotal)}
                                     </span>
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
-                                        Pagamento Integral
-                                    </h3>
-                                    <p className="text-xs text-brand-inactive-text mb-4">
-                                        Pague o valor total do pedido agora e evite cobranças adicionais depois.
-                                    </p>
                                 </div>
-                                <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
-                                    <div className="flex justify-between items-baseline mb-1">
-                                        <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
-                                        <span className="text-xl font-black text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(checkoutFullTotal || checkoutChargeTotal)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-xs text-brand-inactive-text">Pagar no atendimento:</span>
-                                        <span className="text-sm font-semibold text-brand-inactive-text">R$ 0,00</span>
-                                    </div>
+                                <div className="flex justify-between items-baseline">
+                                    <span className="text-xs text-brand-inactive-text">Pagar no atendimento:</span>
+                                    <span className="text-sm font-semibold text-brand-inactive-text">R$ 0,00</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </DefaultModal>
+                </div>
+            </DefaultModal>
 
             <DefaultModal
                 isOpen={showAddressModal}
@@ -3502,37 +3502,37 @@ export function CheckoutPageClient() {
                 maxWidth="md"
             >
                 <div className="pb-4">
-                        {(() => {
-                            const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
-                            const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
-                            const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
-                            const showTraditionalTab = !isPickup || canPayUponPickup
-                            const showMercadoPagoTab = partnerInfo.mpConnected
-                            const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
+                    {(() => {
+                        const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
+                        const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
+                        const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
+                        const showTraditionalTab = !isPickup || canPayUponPickup
+                        const showMercadoPagoTab = partnerInfo.mpConnected
+                        const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
 
-                            if (!hasAnyPaymentMethod) {
-                                return (
-                                    <div className="p-6 text-center">
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                            O pagamento será combinado diretamente com o vendedor.
-                                        </p>
-                                    </div>
-                                )
-                            }
-
-                            if (mustPayOnline && !partnerInfo.mpConnected) {
-                                return (
-                                    <div className="p-6 text-center">
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                            Retirada requer uma integração de pagamento online ativa.
-                                        </p>
-                                    </div>
-                                )
-                            }
-
-                            const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
-
+                        if (!hasAnyPaymentMethod) {
                             return (
+                                <div className="p-6 text-center">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                        O pagamento será combinado diretamente com o vendedor.
+                                    </p>
+                                </div>
+                            )
+                        }
+
+                        if (mustPayOnline && !partnerInfo.mpConnected) {
+                            return (
+                                <div className="p-6 text-center">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                        Retirada requer uma integração de pagamento online ativa.
+                                    </p>
+                                </div>
+                            )
+                        }
+
+                        const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
+
+                        return (
                             <Tabs defaultValue={paymentOption || (hasSubscriptionCreditsForCheckout ? "subscription_credits" : showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago" | "subscription_credits")}>
                                 {(showMercadoPagoTab || showTraditionalTab || hasSubscriptionCreditsForCheckout) ? (
                                     <TabsList className="mb-4">
