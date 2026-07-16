@@ -29,7 +29,7 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
         const methods = createMethodMap([
             { id: "pix", discount_percent: 2 }
         ])
-        // amountReceived = 12.75, 2% discount → effective = 13.01 (settles more), discount = 0.26
+        // base = 12.75, 2% discount → effective = 12.49, discount = 0.26
         const rows = [
             { method: "pix", amount: 12.75, amountReceived: 12.75, paymentMethodId: "pix", installmentNumber: 1 }
         ]
@@ -37,12 +37,12 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
 
         expect(res.ok).toBe(true)
         if (res.ok) {
-            expect(res.finalTotal).toBe(13.01) // 12.75 + 0.26 discount = 13.01 effective
+            expect(res.finalTotal).toBe(12.49) // 12.75 - 0.26 discount = 12.49 effective
             expect(res.paymentMethodDiscountAmount).toBe(0.26)
-            expect(res.adjustedRows[0].finalAmount).toBe(13.01)
+            expect(res.adjustedRows[0].finalAmount).toBe(12.49)
             expect(res.adjustedRows[0].amountReceived).toBe(12.75)
             expect(res.adjustedRows[0].adjustmentType).toBe("discount")
-            expect(res.adjustedRows[0].effectiveAmount).toBe(13.01)
+            expect(res.adjustedRows[0].effectiveAmount).toBe(12.49)
         }
     })
 
@@ -50,7 +50,7 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
         const methods = createMethodMap([
             { id: "pix", discount_percent: 2 }
         ])
-        // amountReceived = 8.00, 2% discount → effective = 8.16, discount = 0.16
+        // base = 8.00, 2% discount → effective = 7.84, discount = 0.16
         const rows = [
             { method: "pix", amount: 8.00, amountReceived: 8.00, paymentMethodId: "pix", installmentNumber: 1 }
         ]
@@ -58,9 +58,9 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
 
         expect(res.ok).toBe(true)
         if (res.ok) {
-            expect(res.finalTotal).toBe(8.16) // effective = 8 + 0.16 = 8.16
+            expect(res.finalTotal).toBe(7.84) // effective = 8 - 0.16 = 7.84
             expect(res.paymentMethodDiscountAmount).toBe(0.16) // discount on 8.00 = 0.16
-            expect(res.adjustedRows[0].finalAmount).toBe(8.16)
+            expect(res.adjustedRows[0].finalAmount).toBe(7.84)
         }
     })
 
@@ -68,7 +68,7 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
         const methods = createMethodMap([
             { id: "credit", fee_percent: 5, fee_bearer: "customer" }
         ])
-        // amountReceived = 100, 5% fee customer (inverse) → effective = 95.24, fee = 4.76
+        // base = 100, 5% fee customer (forward) → effective = 105.00, fee = 5.00
         const rows = [
             { method: "credit", amount: 100.00, amountReceived: 100.00, paymentMethodId: "credit", installmentNumber: 1 }
         ]
@@ -76,12 +76,12 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
 
         expect(res.ok).toBe(true)
         if (res.ok) {
-            expect(res.finalTotal).toBe(95.24)
-            expect(res.feeAmount).toBe(4.76)
-            expect(res.adjustedRows[0].finalAmount).toBe(95.24)
+            expect(res.finalTotal).toBe(105.00)
+            expect(res.feeAmount).toBe(5.00)
+            expect(res.adjustedRows[0].finalAmount).toBe(105.00)
             expect(res.adjustedRows[0].adjustmentType).toBe("fee")
-            expect(res.adjustedRows[0].effectiveAmount).toBe(95.24)
-            expect(res.adjustedRows[0].netAmount).toBe(95.24)
+            expect(res.adjustedRows[0].effectiveAmount).toBe(105.00)
+            expect(res.adjustedRows[0].netAmount).toBe(105.00)
         }
     })
 
@@ -89,7 +89,7 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
         const methods = createMethodMap([
             { id: "credit", fee_percent: 5, fee_bearer: "customer" }
         ])
-        // amountReceived = 60, 5% fee customer (inverse) → effective = 57.14, fee = 2.86
+        // base = 60, 5% fee customer (forward) → effective = 63.00, fee = 3.00
         const rows = [
             { method: "credit", amount: 60.00, amountReceived: 60.00, paymentMethodId: "credit", installmentNumber: 1 }
         ]
@@ -97,9 +97,9 @@ describe("recalculateSplitPaymentFromBaseAmounts - Single Payment Mode", () => {
 
         expect(res.ok).toBe(true)
         if (res.ok) {
-            expect(res.finalTotal).toBe(57.14)
-            expect(res.feeAmount).toBe(2.86)
-            expect(res.adjustedRows[0].finalAmount).toBe(57.14)
+            expect(res.finalTotal).toBe(63.00)
+            expect(res.feeAmount).toBe(3.00)
+            expect(res.adjustedRows[0].finalAmount).toBe(63.00)
         }
     })
 })
@@ -121,18 +121,18 @@ describe("recalculateSplitPaymentFromBaseAmounts - Multiple Split Payment Mode",
 
         expect(res.ok).toBe(true)
         if (res.ok) {
-            // Pix leg: received 40 -> 2% discount (0.80) -> effective 40.80
-            // Credit leg: received 60 -> 5% fee customer (inverse) -> effective 57.14, fee 2.86
-            // Final total = 40.80 + 57.14 = 97.94
-            expect(res.finalTotal).toBe(97.94)
+            // Pix leg: base 40 -> 2% discount (0.80) -> effective 39.20
+            // Credit leg: base 60 -> 5% fee customer (forward) -> effective 63.00, fee 3.00
+            // Final total = 39.20 + 63.00 = 102.20
+            expect(res.finalTotal).toBe(102.20)
             expect(res.paymentMethodDiscountAmount).toBe(0.80)
-            expect(res.feeAmount).toBe(2.86)
-            expect(res.adjustedRows[0].finalAmount).toBe(40.80)
+            expect(res.feeAmount).toBe(3.00)
+            expect(res.adjustedRows[0].finalAmount).toBe(39.20)
             expect(res.adjustedRows[0].adjustmentType).toBe("discount")
-            expect(res.adjustedRows[0].effectiveAmount).toBe(40.80)
-            expect(res.adjustedRows[1].finalAmount).toBe(57.14)
+            expect(res.adjustedRows[0].effectiveAmount).toBe(39.20)
+            expect(res.adjustedRows[1].finalAmount).toBe(63.00)
             expect(res.adjustedRows[1].adjustmentType).toBe("fee")
-            expect(res.adjustedRows[1].effectiveAmount).toBe(57.14)
+            expect(res.adjustedRows[1].effectiveAmount).toBe(63.00)
         }
     })
 })

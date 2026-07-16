@@ -1361,27 +1361,21 @@ export async function confirmServiceOrderPaymentAction(payload: {
     let originalAmount = 0
 
     if (payload.paymentBreakdown && Array.isArray(payload.paymentBreakdown)) {
+      let customerFeeAmount = 0
       for (const entry of payload.paymentBreakdown) {
-        const amt = Number(entry.amount || 0)
-        const adjAmt = Number(entry.adjustmentAmount || 0)
-        const received = Number(entry.amountReceived || 0)
-        const adjType = entry.adjustmentType || "none"
+        const received = Number(entry.amountReceived ?? entry.amount || 0)
+        originalAmount += received
+        paymentMethodDiscountAmount += Number(entry.paymentMethodDiscountAmount ?? 0)
+        interestAmount += Number(entry.interestAmount ?? 0)
+        const entryFee = Number(entry.feeAmount ?? 0) + Number(entry.fixedFeeAmount ?? 0)
         const bearer = entry.feeBearer || "merchant"
-
-        if (adjType === "interest" || (adjType === "fee" && bearer === "customer")) {
-          paymentMethodExtraAmount += adjAmt
-          interestAmount += adjAmt
-          originalAmount += received
-        } else if (adjType === "fee" && bearer === "merchant") {
-          feeAmount += adjAmt
-          originalAmount += received
-        } else if (adjType === "discount") {
-          paymentMethodDiscountAmount += adjAmt
-          originalAmount += received
+        if (bearer === "merchant") {
+          feeAmount += entryFee
         } else {
-          originalAmount += amt
+          customerFeeAmount += entryFee
         }
       }
+      paymentMethodExtraAmount = interestAmount + customerFeeAmount
     } else {
       originalAmount = payload.paidAmount
     }
@@ -1685,18 +1679,10 @@ export async function confirmServiceOrderPaymentAction(payload: {
           paymentLine++
           const amt = Number(entry.amount || 0)
           const received = Number(entry.amountReceived || 0)
-          const adjAmt = Number(entry.adjustmentAmount || 0)
-          const adjType = entry.adjustmentType || "none"
           const bearer = entry.feeBearer || "merchant"
 
-          let entryInterest = 0
-          let entryDiscount = 0
-
-          if (adjType === "interest" || (adjType === "fee" && bearer === "customer")) {
-            entryInterest = adjAmt
-          } else if (adjType === "discount") {
-            entryDiscount = adjAmt
-          }
+          const entryInterest = Number(entry.interestAmount ?? 0)
+          const entryDiscount = Number(entry.paymentMethodDiscountAmount ?? 0)
 
           return {
             partner_id: payload.partnerId,

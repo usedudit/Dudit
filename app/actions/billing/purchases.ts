@@ -4,15 +4,10 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccess } from "@/lib/auth/authorization"
 import { logBillingAudit } from "@/lib/billing/audit"
-import type { BillingPurchase, CreatePurchaseInput, PurchaseWithRelations, BillingPageResult, BillingFilters } from "@/lib/billing/types"
+import type { BillingPurchase, CreatePurchaseInput, PurchaseWithRelations, BillingPageResult, BillingPageData, BillingFilters } from "@/lib/billing/types"
 import { validateCSRFForAction } from "@/lib/security/csrf-middleware"
 
-function buildPurchaseQuery(filters?: BillingFilters) {
-    const admin = getAdminClient()
-    let query = admin
-        .from("billing_purchases")
-        .select("*, partners!billing_purchases_partner_id_fkey(store_name)")
-
+function applyFilters(query: any, filters?: BillingFilters) {
     if (filters?.partner_id) {
         query = query.eq("partner_id", filters.partner_id)
     }
@@ -34,8 +29,15 @@ function buildPurchaseQuery(filters?: BillingFilters) {
     if (filters?.date_to) {
         query = query.lte("created_at", filters.date_to)
     }
-
     return query
+}
+
+function buildPurchaseQuery(filters?: BillingFilters) {
+    const admin = getAdminClient()
+    let query = admin
+        .from("billing_purchases")
+        .select("*, partners!billing_purchases_partner_id_fkey(store_name)")
+    return applyFilters(query, filters)
 }
 
 export async function listPurchasesAction(
@@ -146,6 +148,43 @@ export async function createPurchaseAction(
         return { success: true, data: data as BillingPurchase }
     } catch (error: any) {
         return { success: false, error: error.message || "Erro ao criar compra" }
+    }
+}
+
+export async function listPurchasesPageAction(
+    page: number = 1,
+    pageSize: number = 20,
+    filters?: BillingFilters,
+    sortBy?: string,
+    sortDir?: "asc" | "desc",
+): Promise<BillingPageData> {
+    const user = await getCurrentUser()
+    if (!user) return { data: [], total: 0, page, pageSize }
+
+    const admin = getAdminClient()
+    const baseQuery = applyFilters(admin.from("billing_purchases"), filters)
+    const { count } = await baseQuery.select("*", { count: "exact", head: true })
+
+    let dataQuery = baseQuery
+        .select("*, partners!billing_purchases_partner_id_fkey(store_name)")
+        .order(sortBy || "created_at", { ascending: sortDir === "asc" })
+        .range((page - 1) * pageSize, (page - 1) * pageSize + pageSize - 1)
+
+    const { data, error } = await dataQuery
+
+    if (error) {
+        console.error("[Billing] listPurchasesPage error:", error.message)
+        return { data: [], total: 0, page, pageSize }
+    }
+
+    return {
+        data: (data || []).map((item: any) => ({
+            ...item,
+            partner_name: item.partners?.store_name || null,
+        })),
+        total: count ?? 0,
+        page,
+        pageSize,
     }
 }
 

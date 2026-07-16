@@ -340,14 +340,14 @@ export const IntegrationsSubPage = ({
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight">Mercado Pago</span>
                                                 {mpConnected ? (
-                                                    <Badge variant="green">Conectado</Badge>
+                                                    <Badge variant="green"></Badge>
                                                 ) : !hasMinimumPlan(planSlug, "crescer") ? (
                                                     <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 cursor-pointer" onClick={() => openPlanUpgrade("crescer")}>
                                                         <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
                                                         <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">Crescer</span>
                                                     </div>
                                                 ) : (
-                                                    <Badge variant="gray">Desconectado</Badge>
+                                                    <Badge variant="gray"></Badge>
                                                 )}
                                             </div>
                                             <a
@@ -368,24 +368,26 @@ export const IntegrationsSubPage = ({
 
                                 <div className="mt-4">
                                     <hr className="my-4 border-brand-border dark:border-dark-border" />
-                                    <div className="flex items-center justify-end gap-3">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => {
-                                                setKnowMoreStep(0)
-                                                setActiveModal("knowMore")
-                                            }}
-                                        >
-                                            Saber mais
-                                        </Button>
-                                        {mpConnected && (
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex justify-start gap-2">
                                             <Button
-                                                variant="outline"
-                                                onClick={() => setShowMpConfig(!showMpConfig)}
+                                                variant="link"
+                                                onClick={() => {
+                                                    setKnowMoreStep(0)
+                                                    setActiveModal("knowMore")
+                                                }}
                                             >
-                                                Configurar
+                                                Saber mais
                                             </Button>
-                                        )}
+                                            {mpConnected && (
+                                                <Button
+                                                    variant="link"
+                                                    onClick={() => setShowMpConfig(!showMpConfig)}
+                                                >
+                                                    Configurar
+                                                </Button>
+                                            )}
+                                        </div>
                                         <Switch
                                             checked={mpConnected}
                                             onCheckedChange={(checked) => {
@@ -449,23 +451,25 @@ export const IntegrationsSubPage = ({
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
                                 <div>
                                     <div className="flex gap-4 items-start">
-                                        <div className="w-12 h-12 rounded-xl bg-[#25D366] flex items-center justify-center text-white font-bold text-lg shrink-0">
-                                            WA
-                                        </div>
+                                        <img
+                                            src="https://img.dudit.com.br/static/icons/WhatsApp.png"
+                                            alt="WhatsApp"
+                                            className="w-12 h-12 rounded-xl object-contain shrink-0"
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
                                                     WhatsApp Business
                                                 </span>
                                                 {waConnection?.hasToken && waConnection?.status === "connected" ? (
-                                                    <Badge variant="green">Conectado</Badge>
+                                                    <Badge variant="green"></Badge>
                                                 ) : !hasMinimumPlan(planSlug, "escalar") ? (
                                                     <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 cursor-pointer" onClick={() => openPlanUpgrade("escalar")}>
                                                         <img src={planStarIconForTarget("escalar")!} alt="" className="w-3.5 h-3.5 object-contain" />
                                                         <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">Escalar</span>
                                                     </div>
                                                 ) : (
-                                                    <Badge variant="gray">Desconectado</Badge>
+                                                    <Badge variant="gray"></Badge>
                                                 )}
                                             </div>
                                             {waConnection?.phoneNumber || waConnection?.wabaName ? (
@@ -485,21 +489,23 @@ export const IntegrationsSubPage = ({
                                 </div>
                                 <div className="mt-4">
                                     <hr className="my-4 border-brand-border dark:border-dark-border" />
-                                    <div className="flex items-center justify-end gap-3">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => {
-                                                setWaKnowMoreStep(0)
-                                                setWaActiveModal("knowMore")
-                                            }}
-                                        >
-                                            Saber mais
-                                        </Button>
-                                        <Link href="/erp/integrations/whatsapp">
-                                            <Button variant="outline">
-                                                Configurar
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-start gap-2">
+                                            <Button
+                                                variant="link"
+                                                onClick={() => {
+                                                    setWaKnowMoreStep(0)
+                                                    setWaActiveModal("knowMore")
+                                                }}
+                                            >
+                                                Saber mais
                                             </Button>
-                                        </Link>
+                                            <Link href="/erp/integrations/whatsapp">
+                                                <Button variant="link">
+                                                    Configurar
+                                                </Button>
+                                            </Link>
+                                        </div>
                                         <Switch
                                             checked={!!(waConnection?.hasToken && waConnection?.status === "connected")}
                                             onCheckedChange={(checked) => {
@@ -518,10 +524,6 @@ export const IntegrationsSubPage = ({
                         </div>
                     </div>
                 </div>
-
-                {/* ─── Modals ───────────────────────────────────────────────────────── */}
-
-                {/* ─── WhatsApp Modals ────────────────────────────────────────────────── */}
 
                 {/* 1. WhatsApp Connection Info Modal */}
                 <DefaultModal
@@ -585,14 +587,12 @@ export const IntegrationsSubPage = ({
                 <DefaultModal
                     isOpen={waActiveModal === "knowMore"}
                     onClose={() => setWaActiveModal("info")}
-                    title="O que é o WhatsApp Business API?"
+                    title="O que é o WhatsApp API?"
                     maxWidth="lg"
                 >
-                    <div className="flex flex-col min-h-[400px]">
-                        <div className="bg-[#25D366]/10 dark:bg-[#25D366]/5 rounded-2xl py-12 flex items-center justify-center relative group">
-                            <div className="w-16 h-16 bg-[#25D366] rounded-2xl flex items-center justify-center text-white font-bold text-2xl">
-                                WA
-                            </div>
+                    <div className="flex flex-col min-h-[500px]">
+                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group">
+                            <img src="https://img.dudit.com.br/static/banners/WhatsappLogo.png" alt="" className="w-full h-full object-contain" />
                         </div>
 
                         <div className="p-8 flex-1 flex flex-col">
@@ -873,13 +873,13 @@ export const IntegrationsSubPage = ({
                                             O app poderá criar, editar e excluir informações de vendas na sua loja.
                                         </p>
                                     </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <h4 className="text-sm font-bold text-brand-green uppercase tracking-wide">Outras permissões</h4>
-                                    <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                        Pode adicionar componentes em JavaScript para melhorar o funcionamento da sua loja.
-                                    </p>
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Outras permissões</h4>
+                                        <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                            Pode adicionar componentes em JavaScript para melhorar o funcionamento da sua loja.
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div className="pt-6 border-t border-brand-border dark:border-dark-border">
@@ -897,6 +897,7 @@ export const IntegrationsSubPage = ({
                                     <InfoCard
                                         message="Importante: a plataforma não é responsável pelo funcionamento do aplicativo, então é sempre bom avaliar antes de instalar, ok?"
                                         color="orange"
+                                        className="mt-4"
                                     />
                                 </div>
                             </div>

@@ -183,7 +183,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             feeAmount: engine.feeAmount || 0,
             fixedFeeAmount: engine.fixedFeeAmount || 0,
             interestAmount: engine.interestAmount || 0,
-            paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
+            paymentMethodDiscountAmount: engine.paymentMethodDiscountAmount || 0,
             adjustedRows: [
                 {
                     ...row,
@@ -192,7 +192,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                     interestAmount: engine.interestAmount || 0,
                     feeAmount: engine.feeAmount || 0,
                     fixedFeeAmount: engine.fixedFeeAmount || 0,
-                    paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
+                    paymentMethodDiscountAmount: engine.paymentMethodDiscountAmount || 0,
                     amountReceived: engine.amountReceived,
                     adjustmentType: engine.adjustmentType,
                     adjustmentPercent: engine.adjustmentPercent,
@@ -253,7 +253,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
         totalFee = round2(totalFee + (engine.feeAmount || 0))
         totalFixedFee = round2(totalFixedFee + (engine.fixedFeeAmount || 0))
         totalInterest = round2(totalInterest + (engine.interestAmount || 0))
-        totalPmDiscount = round2(totalPmDiscount + (engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0))
+        totalPmDiscount = round2(totalPmDiscount + (engine.paymentMethodDiscountAmount || 0))
 
         adjustedRows.push({
             ...row,
@@ -262,7 +262,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             interestAmount: engine.interestAmount || 0,
             feeAmount: engine.feeAmount || 0,
             fixedFeeAmount: engine.fixedFeeAmount || 0,
-            paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
+            paymentMethodDiscountAmount: engine.paymentMethodDiscountAmount || 0,
             amountReceived: engine.amountReceived,
             adjustmentType: engine.adjustmentType,
             adjustmentPercent: engine.adjustmentPercent,
@@ -299,6 +299,7 @@ export function toStoredBreakdownAmounts(rows: RecalculatedSplitRow[]): PaymentB
         adjustmentPercent: r.adjustmentPercent ?? 0,
         adjustmentAmount: r.adjustmentAmount ?? 0,
         feeBearer: r.feeBearer ?? null,
+        paymentMethodDiscountAmount: r.paymentMethodDiscountAmount ?? 0,
         interestAmount: r.interestAmount ?? 0,
         feeAmount: r.feeAmount ?? 0,
         fixedFeeAmount: r.fixedFeeAmount ?? 0,

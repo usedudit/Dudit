@@ -7,6 +7,7 @@ import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { invalidatePartnerPlanCache } from "@/lib/services/subscription.service"
 import { getMpPlatformAccessToken } from "@/lib/services/mercadopago/subscriptions"
+import { syncSubscriptionToBilling } from "@/lib/billing/sync-subscription"
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -396,6 +397,16 @@ async function processSubscriptionWebhook(
     console.log(
       `[SUB_WEBHOOK] ✅ Subscription ${sub.id} updated: "${sub.status}" → "${newStatus}" (MP verified: "${mpStatus}")`,
     )
+
+    // ── Sync billing state ──
+    try {
+      await syncSubscriptionToBilling(sub.id, "webhook")
+      console.log(`[SUB_WEBHOOK] Billing synced for subscription ${sub.id}`)
+    } catch (syncErr: any) {
+      // Non-critical: billing sync failure must not break the webhook
+      SecureLogger.error("[SUB_WEBHOOK] Billing sync error", { error: syncErr.message, subscriptionId: sub.id })
+    }
+
     console.log("[SUB_WEBHOOK] ==========================================================\n")
   } catch (error: any) {
     if (attempt < MAX_RETRIES - 1) {

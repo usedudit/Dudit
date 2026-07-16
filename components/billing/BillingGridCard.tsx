@@ -1,10 +1,20 @@
 "use client"
 
-import { Badge, Button } from "@/components/reusable"
-import { ActionsDropdown } from "@/components/reusable"
-import { FadeIn } from "@/components/animations/FadeIn"
+import React from "react"
+import { motion } from "framer-motion"
+import { Badge } from "@/components/reusable"
+import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { formatCurrency } from "@/lib/utils"
-import { Crown, Calendar, CreditCard, Tag } from "lucide-react"
+import { Crown, Tag, CreditCard, ShoppingCart, Calendar } from "lucide-react"
+
+const TYPE_ICONS: Record<string, any> = {
+    subscription: Crown,
+    addon: Tag,
+    credit_pack: CreditCard,
+    order_payment: ShoppingCart,
+    marketplace_feature: Tag,
+    service: Calendar,
+}
 
 interface BillingGridCardProps {
     id: string
@@ -24,80 +34,102 @@ interface BillingGridCardProps {
     onInvoice?: () => void
 }
 
-const TYPE_ICONS: Record<string, any> = {
-    subscription: Crown,
-    addon: Tag,
-    credit_pack: CreditCard,
-    order_payment: Calendar,
-}
+const BillingGridCard = React.memo(
+    ({
+        id,
+        type,
+        typeLabel,
+        description,
+        amount,
+        totalAmount,
+        status,
+        statusLabel,
+        statusVariant,
+        gatewayLabel,
+        partnerName,
+        createdAt,
+        onDetails,
+        onCancel,
+        onInvoice,
+    }: BillingGridCardProps) => {
+        const TypeIcon = TYPE_ICONS[type] || Tag
+        const dateStr = new Date(createdAt).toLocaleDateString("pt-BR")
 
-export function BillingGridCard({
-    id,
-    type,
-    typeLabel,
-    description,
-    amount,
-    totalAmount,
-    status,
-    statusLabel,
-    statusVariant,
-    gatewayLabel,
-    partnerName,
-    createdAt,
-    onDetails,
-    onCancel,
-    onInvoice,
-}: BillingGridCardProps) {
-    const TypeIcon = TYPE_ICONS[type] || Tag
-    const dateStr = new Date(createdAt).toLocaleDateString("pt-BR")
-
-    return (
-        <FadeIn>
-            <div
+        return (
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={onDetails}
-                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 cursor-pointer group flex flex-col h-full relative"
             >
-                <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center shrink-0">
-                        <TypeIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                <div className="flex gap-4 mb-2">
+                    <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                        <TypeIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
                     </div>
-                    <Badge variant={statusVariant}>{statusLabel}</Badge>
-                </div>
 
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                        {description || typeLabel}
-                    </p>
-                    {partnerName && (
-                        <p className="text-xs text-brand-inactive-text mt-0.5 truncate">{partnerName}</p>
-                    )}
-                </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start gap-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate" title={description || typeLabel}>
+                                    {description || typeLabel}
+                                </h3>
+                            </div>
+                            <Badge variant={statusVariant} className="shrink-0 scale-90">{statusLabel}</Badge>
+                        </div>
 
-                <div className="mt-3 space-y-1.5">
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-brand-inactive-text">Valor</span>
-                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-brand-inactive-text">Gateway</span>
-                        <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{gatewayLabel}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-brand-inactive-text">Data</span>
-                        <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{dateStr}</span>
+                        {partnerName && (
+                            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
+                                {partnerName}
+                            </div>
+                        )}
+
+                        <div className="mt-2">
+                            <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(totalAmount)}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="border-t border-brand-border dark:border-dark-border mt-4 pt-3">
-                    <ActionsDropdown
-                        onView={onDetails}
-                        onCancel={onCancel}
-                        onPrint={onInvoice}
-                        cancelLabel="Cancelar"
-                        cancelIcon={undefined}
-                    />
+                <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Gateway</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{gatewayLabel}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 items-end">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{dateStr}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-end justify-between mt-1">
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{typeLabel}</span>
+                        </div>
+
+                        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <ActionsDropdown
+                                onView={onDetails}
+                                onCancel={onCancel}
+                                onPrint={onInvoice}
+                                cancelLabel="Cancelar"
+                            />
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </FadeIn>
-    )
-}
+            </motion.div>
+        )
+    },
+    (prev, next) =>
+        prev.id === next.id &&
+        prev.status === next.status &&
+        prev.totalAmount === next.totalAmount
+)
+
+BillingGridCard.displayName = "BillingGridCard"
+export default BillingGridCard
+export { BillingGridCard }

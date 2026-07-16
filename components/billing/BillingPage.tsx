@@ -1,17 +1,26 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ThreeDotsLoader, Pagination, AlertModal } from "@/components/reusable"
+import { Badge, Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import Pagination from "@/components/reusable/Pagination"
+import AlertModal from "@/components/reusable/AlertModal"
+
+import FilterSheet from "@/components/reusable/FilterSheet"
+import type { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import Portal from "@/components/Portal"
+import BottomSheet from "@/components/BottomSheet"
 import { BillingPageControls } from "./BillingPageControls"
-import { BillingGridCard } from "./BillingGridCard"
-import { BillingListRow } from "./BillingListRow"
-import { BillingDetailSheet } from "./BillingDetailSheet"
-import { listPurchasesAction, updatePurchaseStatusAction } from "@/app/actions/billing/purchases"
-import { generateInvoiceAction, getInvoiceAction } from "@/app/actions/billing/invoices"
+import BillingGridCard from "./BillingGridCard"
+import BillingListRow from "./BillingListRow"
 import { InvoicePrintModal } from "./InvoicePrintModal"
-import type { PurchaseWithRelations, BillingInvoice, BillingFilters } from "@/lib/billing/types"
-import { Crown, Tag, CreditCard, ShoppingCart } from "lucide-react"
+import { listPurchasesPageAction, updatePurchaseStatusAction, getPurchaseAction } from "@/app/actions/billing/purchases"
+import { generateInvoiceAction, getInvoiceAction } from "@/app/actions/billing/invoices"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { formatCurrency, formatDate } from "@/lib/utils"
+import { ArrowUpDownIcon, PrinterIcon, XIcon } from "@/lib/icons"
+import { ShoppingCart } from "lucide-react"
+import type { PurchaseWithRelations, BillingInvoice, BillingFilters, SortConfig } from "@/lib/billing/types"
 
 const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"> = {
     pending: "orange",
@@ -22,14 +31,14 @@ const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "cya
     partially_refunded: "orange",
 }
 
-const TYPE_LABELS: Record<string, string> = {
-    subscription: "Assinatura",
-    addon: "Add-on",
-    marketplace_feature: "Funcionalidade",
-    credit_pack: "Créditos",
-    service: "Serviço",
-    order_payment: "Pedido",
-    future: "Futuro",
+const PAYMENT_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "purple" | "gray"> = {
+    pending: "orange",
+    processing: "blue",
+    approved: "green",
+    rejected: "red",
+    refunded: "purple",
+    cancelled: "gray",
+    chargeback: "red",
 }
 
 function getStatusLabel(status: string): string {
@@ -40,6 +49,10 @@ function getStatusLabel(status: string): string {
         refunded: "Reembolsado",
         cancelled: "Cancelado",
         partially_refunded: "Parcial",
+        processing: "Processando",
+        approved: "Aprovado",
+        rejected: "Rejeitado",
+        chargeback: "Chargeback",
     }
     return labels[status] || status
 }
@@ -55,15 +68,28 @@ function getGatewayLabel(gateway: string | null): string {
     return labels[gateway || ""] || gateway || "—"
 }
 
+function getTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+        subscription: "Assinatura",
+        addon: "Add-on",
+        marketplace_feature: "Funcionalidade",
+        credit_pack: "Créditos",
+        service: "Serviço",
+        order_payment: "Pedido",
+        future: "Futuro",
+    }
+    return labels[type] || type
+}
+
 const COLUMNS = [
-    { id: "type", label: "Tipo", width: "100px" },
-    { id: "description", label: "Descrição" },
-    { id: "partner", label: "Parceiro" },
+    { id: "type", label: "Tipo", align: "left" as const, width: "100px" },
+    { id: "description", label: "Descrição", align: "left" as const },
+    { id: "partner", label: "Parceiro", align: "left" as const },
     { id: "amount", label: "Valor", align: "right" as const, width: "120px" },
-    { id: "status", label: "Status", width: "120px" },
-    { id: "gateway", label: "Gateway", width: "120px" },
-    { id: "date", label: "Data", width: "140px" },
-    { id: "actions", label: "", width: "60px" },
+    { id: "status", label: "Status", align: "left" as const, width: "120px" },
+    { id: "gateway", label: "Gateway", align: "left" as const, width: "120px" },
+    { id: "date", label: "Data", align: "left" as const, width: "140px" },
+    { id: "actions", label: "", align: "center" as const, width: "60px" },
 ]
 
 interface BillingPageProps {
@@ -73,13 +99,18 @@ interface BillingPageProps {
 }
 
 export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: BillingPageProps) {
-    const [purchases, setPurchases] = useState<PurchaseWithRelations[]>([])
+    const isMobile = useMediaQuery("(max-width: 767px)")
+    const [data, setData] = useState<PurchaseWithRelations[]>([])
+    const [total, setTotal] = useState(0)
+    const [page, setPage] = useState(1)
+    const [pageSize] = useState(20)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState("all")
     const [search, setSearch] = useState("")
     const [viewMode, setViewMode] = useState<"grid" | "list">("list")
-    const [cursor, setCursor] = useState<string | null>(null)
-    const [hasMore, setHasMore] = useState(false)
+    const [filters, setFilters] = useState<Record<string, any>>({})
+    const [filterOpen, setFilterOpen] = useState(false)
+    const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+
     const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null)
     const [detailOpen, setDetailOpen] = useState(false)
 
@@ -90,39 +121,79 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
     const [cancelTarget, setCancelTarget] = useState<PurchaseWithRelations | null>(null)
     const [cancelOpen, setCancelOpen] = useState(false)
 
-    const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    const effectiveViewMode = isMobile ? "grid" : viewMode
+    const filteredColumns = hidePartnerColumn ? COLUMNS.filter((c) => c.id !== "partner") : COLUMNS
 
-    const loadPurchases = useCallback(async (resetCursor = true) => {
+    const billingFilters: BillingFilters = useMemo(() => ({
+        partner_id: initialPartnerId,
+        purchase_type: filters.purchase_type?.length === 1 ? filters.purchase_type[0] : undefined,
+        status: filters.status?.length === 1 ? filters.status[0] : undefined,
+        search: search || undefined,
+        date_from: filters.date?.from || undefined,
+        date_to: filters.date?.to || undefined,
+    }), [initialPartnerId, filters, search])
+
+    const hasActiveFilters = useMemo(() => {
+        return !!(
+            (filters.purchase_type?.length && filters.purchase_type.length > 0) ||
+            (filters.status?.length && filters.status.length > 0) ||
+            filters.date?.from ||
+            filters.date?.to
+        )
+    }, [filters])
+
+    const loadPage = useCallback(async (p: number) => {
         setLoading(true)
         try {
-            const filters: BillingFilters = {
-                partner_id: initialPartnerId,
-                purchase_type: activeTab === "all" ? "all" : activeTab as any,
-                search: search || undefined,
-            }
-            const result = await listPurchasesAction(resetCursor ? null : cursor, 20, filters)
-            if (resetCursor) {
-                setPurchases(result.data)
-            } else {
-                setPurchases((prev) => [...prev, ...result.data])
-            }
-            setCursor(result.nextCursor)
-            setHasMore(result.hasMore)
+            const sortKey = sortConfig?.key === "amount" ? "total_amount"
+                : sortConfig?.key === "date" ? "created_at"
+                    : sortConfig?.key === "type" ? "purchase_type"
+                        : sortConfig?.key === "status" ? "status"
+                            : undefined
+            const result = await listPurchasesPageAction(p, pageSize, billingFilters, sortKey, sortConfig?.direction)
+            setData(result.data)
+            setTotal(result.total)
+            setPage(result.page)
         } catch (err) {
             console.error("[BillingPage] Error loading:", err)
         } finally {
             setLoading(false)
         }
-    }, [activeTab, search, cursor, initialPartnerId])
+    }, [pageSize, billingFilters, sortConfig])
 
     useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current)
-        debounceRef.current = setTimeout(() => loadPurchases(true), 300)
-        return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-    }, [activeTab, search])
+        loadPage(1)
+    }, [loadPage])
 
-    const handleViewDetails = (purchase: PurchaseWithRelations) => {
-        setSelectedPurchase(purchase)
+    const totalPages = Math.ceil(total / pageSize)
+
+    const filterSections: FilterSectionConfig[] = useMemo(() => [
+        {
+            id: "purchase_type",
+            title: "Tipo",
+            type: "checkbox-list",
+            options: ["subscription", "addon", "credit_pack", "order_payment"],
+        },
+        {
+            id: "status",
+            title: "Status",
+            type: "checkbox-list",
+            options: ["pending", "completed", "failed", "refunded", "cancelled", "partially_refunded"],
+        },
+        {
+            id: "date",
+            title: "Período",
+            type: "date-period",
+        },
+    ], [])
+
+    const clearFilters = useCallback(() => {
+        setFilters({})
+    }, [])
+
+    const handleViewDetails = async (purchase: PurchaseWithRelations) => {
+        const full = await getPurchaseAction(purchase.id)
+        setSelectedPurchase(full || purchase)
         setDetailOpen(true)
     }
 
@@ -156,7 +227,7 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
         if (result.success && result.data) {
             setInvoiceData(result.data.invoice_data)
             setInvoiceOpen(true)
-            loadPurchases(true)
+            loadPage(page)
         }
     }
 
@@ -166,20 +237,130 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
         await updatePurchaseStatusAction(cancelTarget.id, "cancelled", csrf)
         setCancelOpen(false)
         setCancelTarget(null)
-        loadPurchases(true)
+        loadPage(page)
     }
 
-    const tabs = [
-        { key: "all", label: "Todas", icon: undefined },
-        { key: "subscription", label: "Assinaturas", icon: Crown },
-        { key: "addon", label: "Add-ons", icon: Tag },
-        { key: "credit_pack", label: "Créditos", icon: CreditCard },
-        { key: "order_payment", label: "Pedidos", icon: ShoppingCart },
-    ]
+    const handleSort = (colId: string) => {
+        if (colId === "actions") return
+        setSortConfig((prev) => ({
+            key: colId,
+            direction: prev?.key === colId && prev.direction === "asc" ? "desc" : "asc",
+        }))
+    }
 
-    const filteredColumns = hidePartnerColumn
-        ? COLUMNS.filter((c) => c.id !== "partner")
-        : COLUMNS
+    // ── Detail sheet content ──
+    const detailContent = selectedPurchase && (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
+            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes da Compra</h2>
+                <Button variant="filled" onClick={() => setDetailOpen(false)} size="icon">
+                    <XIcon className="w-5 h-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
+                <div className="flex items-center justify-between">
+                    <Badge variant={STATUS_VARIANTS[selectedPurchase.status] || "gray"}>
+                        {getStatusLabel(selectedPurchase.status)}
+                    </Badge>
+                    <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                        {formatCurrency(selectedPurchase.total_amount)}
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <p className="text-xs text-brand-inactive-text font-medium">Tipo</p>
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getTypeLabel(selectedPurchase.purchase_type)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-brand-inactive-text font-medium">Gateway</p>
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">{getGatewayLabel(selectedPurchase.gateway)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-brand-inactive-text font-medium">Data</p>
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDate(selectedPurchase.created_at)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-brand-inactive-text font-medium">Parceiro</p>
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedPurchase.partner_name || selectedPurchase.partner_id}</p>
+                    </div>
+                    {selectedPurchase.description && (
+                        <div className="col-span-2">
+                            <p className="text-xs text-brand-inactive-text font-medium">Descrição</p>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading">{selectedPurchase.description}</p>
+                        </div>
+                    )}
+                </div>
+
+                {(selectedPurchase.payments || []).length > 0 && (
+                    <div>
+                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Pagamentos</h4>
+                        <div className="space-y-2">
+                            {(selectedPurchase.payments || []).map((payment) => (
+                                <div key={payment.id} className="flex items-center justify-between p-3 rounded-xl bg-brand-gray dark:bg-dark-border/50">
+                                    <div className="flex items-center gap-3">
+                                        <Badge variant={PAYMENT_VARIANTS[payment.status] || "gray"}>
+                                            {getStatusLabel(payment.status)}
+                                        </Badge>
+                                        <span className="text-xs text-brand-inactive-text">
+                                            {payment.payment_method_type || payment.gateway}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(payment.amount)}</span>
+                                        {payment.paid_at && (
+                                            <p className="text-[11px] text-brand-inactive-text">{formatDate(payment.paid_at)}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {selectedPurchase.invoice && (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-green/5 border border-brand-green/20">
+                        <div>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Fatura {selectedPurchase.invoice.invoice_number}</p>
+                            <p className="text-xs text-brand-inactive-text">Clique para visualizar</p>
+                        </div>
+                        <Button variant="outline" size="sm" leftIcon={<PrinterIcon />} onClick={() => handleInvoice(selectedPurchase.invoice!)}>
+                            Imprimir
+                        </Button>
+                    </div>
+                )}
+
+                {!selectedPurchase.invoice && selectedPurchase.status === "completed" && (
+                    <Button
+                        variant="default"
+                        leftIcon={<PrinterIcon />}
+                        onClick={handleGenerateInvoice}
+                        isLoading={invoiceLoading === "generate"}
+                    >
+                        Gerar Fatura
+                    </Button>
+                )}
+            </div>
+
+            <footer className="shrink-0 border-t border-brand-border p-4 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center justify-between">
+                    <Button variant="ghost" leftIcon={<XIcon />} onClick={() => setDetailOpen(false)}>
+                        Fechar
+                    </Button>
+                    {selectedPurchase.status === "pending" && (
+                        <Button
+                            variant="destructive"
+                            leftIcon={<XIcon />}
+                            onClick={() => { setCancelTarget(selectedPurchase); setCancelOpen(true); setDetailOpen(false) }}
+                        >
+                            Cancelar compra
+                        </Button>
+                    )}
+                </div>
+            </footer>
+        </div>
+    )
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background">
@@ -193,36 +374,35 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                 )}
 
                 <BillingPageControls
-                    activeTab={activeTab}
-                    onTabChange={setActiveTab}
                     searchValue={search}
                     onSearchChange={setSearch}
-                    viewMode={viewMode}
+                    viewMode={effectiveViewMode}
                     onViewModeChange={setViewMode}
-                    tabs={tabs}
+                    onOpenFilter={() => setFilterOpen(true)}
+                    hasActiveFilters={hasActiveFilters}
                 />
 
                 <div className="px-4 md:px-8 pb-8">
-                    {loading && purchases.length === 0 ? (
+                    {loading && data.length === 0 ? (
                         <div className="flex justify-center py-20">
                             <ThreeDotsLoader />
                         </div>
-                    ) : purchases.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-center">
-                            <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center mb-4">
-                                <ShoppingCart className="w-8 h-8 text-brand-inactive-text" />
-                            </div>
-                            <p className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Nenhuma compra encontrada</p>
-                            <p className="text-sm text-brand-inactive-text">Nenhuma compra corresponde aos filtros selecionados.</p>
+                    ) : data.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20">
+                            <IconPlaceholder
+                                icon={ShoppingCart}
+                                title="Nenhuma compra encontrada"
+                                subtitle="Nenhuma compra corresponde aos filtros selecionados."
+                            />
                         </div>
-                    ) : viewMode === "grid" ? (
+                    ) : effectiveViewMode === "grid" ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {purchases.map((p) => (
+                            {data.map((p) => (
                                 <BillingGridCard
                                     key={p.id}
                                     id={p.id}
                                     type={p.purchase_type}
-                                    typeLabel={TYPE_LABELS[p.purchase_type] || p.purchase_type}
+                                    typeLabel={getTypeLabel(p.purchase_type)}
                                     description={p.description}
                                     amount={p.amount}
                                     totalAmount={p.total_amount}
@@ -243,24 +423,38 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                             <table className="w-full">
                                 <thead>
                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                        {filteredColumns.map((col) => (
-                                            <th
-                                                key={col.id}
-                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"}`}
-                                                style={col.width ? { width: col.width } : undefined}
-                                            >
-                                                {col.label}
-                                            </th>
-                                        ))}
+                                        {filteredColumns.map((col) => {
+                                            const isSorted = sortConfig?.key === col.id
+                                            return (
+                                                <th
+                                                    key={col.id}
+                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                                    style={{ width: col.width }}
+                                                    onClick={() => handleSort(col.id)}
+                                                >
+                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                        <span>{col.label}</span>
+                                                        {col.id !== "actions" && (
+                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                <ArrowUpDownIcon
+                                                                    size={14}
+                                                                    className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </th>
+                                            )
+                                        })}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {purchases.map((p) => (
+                                    {data.map((p) => (
                                         <BillingListRow
                                             key={p.id}
                                             id={p.id}
                                             type={p.purchase_type}
-                                            typeLabel={TYPE_LABELS[p.purchase_type] || p.purchase_type}
+                                            typeLabel={getTypeLabel(p.purchase_type)}
                                             description={p.description}
                                             amount={p.amount}
                                             totalAmount={p.total_amount}
@@ -281,28 +475,50 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                         </div>
                     )}
 
-                    {hasMore && purchases.length > 0 && (
-                        <div className="flex justify-center mt-6">
-                            <button
-                                onClick={() => loadPurchases(false)}
-                                className="text-sm font-bold text-brand-green hover:text-brand-green/80"
-                                disabled={loading}
-                            >
-                                {loading ? "Carregando..." : "Carregar mais"}
-                            </button>
+                    {totalPages > 1 && (
+                        <div className="mt-6">
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPageChange={(p) => loadPage(p)}
+                            />
                         </div>
                     )}
                 </div>
             </div>
 
-            <BillingDetailSheet
-                isOpen={detailOpen}
-                onClose={() => setDetailOpen(false)}
-                purchase={selectedPurchase}
-                onInvoice={handleInvoice}
-                onCancel={(p) => { setCancelTarget(p); setCancelOpen(true); setDetailOpen(false) }}
+            {/* ── Filter Sheet ── */}
+            <FilterSheet
+                isOpen={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={clearFilters}
             />
 
+            {/* ── Detail Sheet (Portal on desktop, BottomSheet on mobile) ── */}
+            {isMobile ? (
+                <BottomSheet isOpen={detailOpen} onClose={() => setDetailOpen(false)}>
+                    {detailContent}
+                </BottomSheet>
+            ) : (
+                <Portal>
+                    <div
+                        className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${detailOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                        onClick={() => setDetailOpen(false)}
+                    >
+                        <div
+                            className={`fixed right-4 top-4 bottom-4 w-96 bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${detailOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {detailContent}
+                        </div>
+                    </div>
+                </Portal>
+            )}
+
+            {/* ── Invoice Print Modal ── */}
             <InvoicePrintModal
                 isOpen={invoiceOpen}
                 onClose={() => setInvoiceOpen(false)}
@@ -310,12 +526,13 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                 invoiceId={selectedPurchase?.invoice_id || ""}
             />
 
+            {/* ── Cancel Alert ── */}
             <AlertModal
                 isOpen={cancelOpen}
                 onClose={() => { setCancelOpen(false); setCancelTarget(null) }}
                 onConfirm={handleCancel}
                 title="Cancelar compra"
-                message={`Tem certeza que deseja cancelar esta compra? Esta ação pode não ser reversível.`}
+                message="Tem certeza que deseja cancelar esta compra? Esta ação pode não ser reversível."
                 variant="danger"
                 confirmText="Sim, cancelar"
                 cancelText="Não, manter"

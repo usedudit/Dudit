@@ -180,6 +180,18 @@ export interface BillingPageResult<T> {
     hasMore: boolean
 }
 
+export interface SortConfig {
+    key: string
+    direction: "asc" | "desc"
+}
+
+export interface BillingPageData {
+    data: PurchaseWithRelations[]
+    total: number
+    page: number
+    pageSize: number
+}
+
 export interface BillingFilters {
     purchase_type?: PurchaseType | 'all'
     status?: string

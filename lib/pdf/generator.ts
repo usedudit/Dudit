@@ -1,4 +1,5 @@
 import type { Browser } from "puppeteer-core"
+import { execSync } from "node:child_process"
 
 /**
  * Server-side function that launches a headless browser, sets authentication cookies,
@@ -11,31 +12,34 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
     const isProd = process.env.NODE_ENV === "production" || !!process.env.RAILWAY_ENVIRONMENT
 
     if (isProd) {
-        // Use system-installed Chromium (from nixpacks.toml apt packages)
-        const fs = await import("fs")
-        const systemPaths = [
-            "/usr/bin/chromium",
-            "/usr/bin/chromium-browser",
-            "/usr/bin/google-chrome-stable",
-            "/usr/bin/google-chrome",
-        ]
-
         let executablePath = process.env.CHROMIUM_PATH || ""
+
         if (!executablePath) {
-            for (const p of systemPaths) {
-                if (fs.existsSync(p)) {
-                    executablePath = p
-                    break
-                }
+            try {
+                executablePath = execSync("which chromium")
+                    .toString()
+                    .trim()
+            } catch { }
+
+            if (!executablePath) {
+                try {
+                    executablePath = execSync("which chromium-browser")
+                        .toString()
+                        .trim()
+                } catch { }
+            }
+
+            if (!executablePath) {
+                try {
+                    executablePath = execSync("which google-chrome")
+                        .toString()
+                        .trim()
+                } catch { }
             }
         }
 
         if (!executablePath) {
-            throw new Error(
-                "Nenhum executável de Chromium encontrado no sistema. " +
-                "Verifique se o pacote 'chromium' está instalado no nixpacks.toml. " +
-                `Paths verificados: ${systemPaths.join(", ")}`
-            )
+            throw new Error("Chromium não encontrado no PATH.")
         }
 
         browser = (await puppeteer.launch({
@@ -60,7 +64,7 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
             "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
             "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
         ]
-        
+
         let executablePath = ""
         for (const p of paths) {
             if (fs.existsSync(p)) {

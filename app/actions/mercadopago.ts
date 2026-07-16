@@ -36,10 +36,42 @@ export async function disconnectMercadoPagoAction() {
 
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
 
-  const { data: partner } = await supabase.from("partners").select("id").eq("id", ctx.partnerId).single()
+  const { data: partner } = await supabase
+    .from("partners")
+    .select("id, mp_access_token_encrypted, mp_refresh_token_encrypted")
+    .eq("id", ctx.partnerId)
+    .single()
 
   if (!partner) {
     return { error: "Parceiro não encontrado" }
+  }
+
+  // Revoga o token no Mercado Pago antes de limpar localmente
+  try {
+    const accessToken = partner.mp_access_token_encrypted
+      ? decrypt(partner.mp_access_token_encrypted, "mercadopago")
+      : null
+
+    const refreshToken = partner.mp_refresh_token_encrypted
+      ? decrypt(partner.mp_refresh_token_encrypted, "mercadopago")
+      : null
+
+    const tokenToRevoke = refreshToken || accessToken
+
+    if (tokenToRevoke) {
+      await fetch("https://api.mercadopago.com/oauth/token/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({
+          client_id: process.env.MP_CLIENT_ID!,
+          client_secret: process.env.MP_CLIENT_SECRET!,
+          token: tokenToRevoke,
+          token_type_hint: refreshToken ? "refresh_token" : "access_token",
+        }),
+      })
+    }
+  } catch (err) {
+    console.error({ event: "mercadopago_token_revoke_error", partnerId: partner.id, error: err })
   }
 
   const { error } = await supabase

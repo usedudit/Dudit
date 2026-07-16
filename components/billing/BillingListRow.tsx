@@ -1,15 +1,26 @@
 "use client"
 
+import React from "react"
+import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
-import { ActionsDropdown } from "@/components/reusable"
+import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { formatCurrency } from "@/lib/utils"
-import { Crown, Tag, CreditCard, EyeIcon, XIcon, PrinterIcon } from "lucide-react"
+import { Crown, Tag, CreditCard, ShoppingCart, Calendar } from "lucide-react"
 
-interface Column {
+interface ColumnDef {
     id: string
-    label: string
     align?: "left" | "center" | "right"
     width?: string
+    minWidth?: string
+}
+
+const TYPE_ICONS: Record<string, any> = {
+    subscription: Crown,
+    addon: Tag,
+    credit_pack: CreditCard,
+    order_payment: ShoppingCart,
+    marketplace_feature: Tag,
+    service: Calendar,
 }
 
 interface BillingListRowProps {
@@ -25,78 +36,120 @@ interface BillingListRowProps {
     gatewayLabel: string
     partnerName?: string | null
     createdAt: string
-    columns: Column[]
+    columns: ColumnDef[]
     onDetails: () => void
     onCancel?: () => void
     onInvoice?: () => void
 }
 
-const TYPE_ICONS: Record<string, any> = {
-    subscription: Crown,
-    addon: Tag,
-    credit_pack: CreditCard,
-}
+const BillingListRow = React.memo(
+    ({
+        id,
+        type,
+        typeLabel,
+        description,
+        totalAmount,
+        status,
+        statusLabel,
+        statusVariant,
+        gatewayLabel,
+        partnerName,
+        createdAt,
+        columns,
+        onDetails,
+        onCancel,
+        onInvoice,
+    }: BillingListRowProps) => {
+        const dateStr = new Date(createdAt).toLocaleDateString("pt-BR")
 
-export function BillingListRow({
-    id,
-    type,
-    typeLabel,
-    description,
-    amount,
-    totalAmount,
-    status,
-    statusLabel,
-    statusVariant,
-    gatewayLabel,
-    partnerName,
-    createdAt,
-    columns,
-    onDetails,
-    onCancel,
-    onInvoice,
-}: BillingListRowProps) {
-    const dateStr = new Date(createdAt).toLocaleDateString("pt-BR")
+        const getAlignClass = (align?: string) => {
+            if (align === "center") return "text-center"
+            if (align === "right") return "text-right"
+            return "text-left"
+        }
 
-    return (
-        <tr onClick={onDetails} className="group hover:bg-brand-gray cursor-pointer bg-white dark:bg-dark-surface">
-            {columns.map((col) => (
-                <td key={col.id} className={`p-2 border-b border-brand-border dark:border-dark-border ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"}`}>
-                    {col.id === "type" && (
+        const getJustifyClass = (align?: string) => {
+            if (align === "center") return "justify-center"
+            if (align === "right") return "justify-end"
+            return "justify-start"
+        }
+
+        const renderCellContent = (colId: string) => {
+            switch (colId) {
+                case "type":
+                    return (
                         <span className="text-xs text-brand-inactive-text">{typeLabel}</span>
-                    )}
-                    {col.id === "description" && (
-                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate max-w-[200px] block">
-                            {description || typeLabel}
-                        </span>
-                    )}
-                    {col.id === "partner" && partnerName && (
-                        <span className="text-xs text-brand-dark dark:text-dark-heading">{partnerName}</span>
-                    )}
-                    {col.id === "amount" && (
+                    )
+                case "description":
+                    return (
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate max-w-[200px] block">
+                                {description || typeLabel}
+                            </span>
+                        </div>
+                    )
+                case "partner":
+                    return (
+                        <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{partnerName}</span>
+                    )
+                case "amount":
+                    return (
                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
-                    )}
-                    {col.id === "status" && (
+                    )
+                case "status":
+                    return (
                         <Badge variant={statusVariant}>{statusLabel}</Badge>
-                    )}
-                    {col.id === "gateway" && (
-                        <span className="text-xs text-brand-inactive-text">{gatewayLabel}</span>
-                    )}
-                    {col.id === "date" && (
-                        <span className="text-xs text-brand-inactive-text">{dateStr}</span>
-                    )}
-                    {col.id === "actions" && (
-                        <div className="action-btn opacity-0 group-hover:opacity-100 transition-opacity">
+                    )
+                case "gateway":
+                    return (
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{gatewayLabel}</span>
+                    )
+                case "date":
+                    return (
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{dateStr}</span>
+                    )
+                case "actions":
+                    return (
+                        <div className="action-btn" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
                                 onView={onDetails}
                                 onCancel={onCancel}
                                 onPrint={onInvoice}
                                 cancelLabel="Cancelar"
-                                cancelIcon={undefined}
                             />
                         </div>
-                    )}
-                </td>
-            ))}
-        </tr>
-    )
-}
+                    )
+                default:
+                    return null
+            }
+        }
+
+        return (
+            <motion.tr
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                onClick={onDetails}
+            >
+                {columns.map((col) => (
+                    <td
+                        key={col.id}
+                        className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
+                    >
+                        <div className={`flex items-center w-full min-w-0 ${getJustifyClass(col.align)}`}>
+                            {renderCellContent(col.id)}
+                        </div>
+                    </td>
+                ))}
+            </motion.tr>
+        )
+    },
+    (prev, next) =>
+        prev.id === next.id &&
+        prev.status === next.status &&
+        prev.totalAmount === next.totalAmount
+)
+
+BillingListRow.displayName = "BillingListRow"
+export default BillingListRow
+export { BillingListRow }

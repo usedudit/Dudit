@@ -25,9 +25,10 @@ export type PaymentLineDetails = {
   feeBearer: "merchant" | "customer" | null
   effectiveAmount: number
   netAmount: number
-  interestAmount?: number
-  feeAmount?: number
-  fixedFeeAmount?: number
+  paymentMethodDiscountAmount: number
+  interestAmount: number
+  feeAmount: number
+  fixedFeeAmount: number
 }
 
 export type PaymentBreakdownLine = {
@@ -43,6 +44,7 @@ export type PaymentBreakdownLine = {
   netAmount: number
   paymentMethodId: string | null
   installmentNumber: number
+  paymentMethodDiscountAmount?: number
   interestAmount?: number
   feeAmount?: number
   fixedFeeAmount?: number
@@ -61,6 +63,7 @@ export type PaymentBreakdownEntry = {
   feeBearer?: string | null
   paymentMethodId?: string | null
   installmentNumber?: number
+  paymentMethodDiscountAmount?: number
   interestAmount?: number
   feeAmount?: number
   fixedFeeAmount?: number
@@ -92,16 +95,17 @@ export function deriveAdjustmentType(pm: PaymentMethodFeeConfig): AdjustmentType
 /**
  * Computes one payment line.
  *
- * Rules:
- *  DISCOUNT:  effective = received + adjustment,  net = effective
- *  FEE (customer): effective = received - adjustment, net = effective
- *  FEE (merchant): effective = received,            net = received - adjustment
- *  NONE:          effective = received,             net = received
+ * `amountReceived` is always the BASE amount (pre-adjustment).
+ * Operations are applied in forward order: discount → interest → fee.
+ *
+ * - Discount: subtracts from base (customer pays less)
+ * - Interest: adds to base when feeBearer=customer
+ * - Fee: adds to base when feeBearer=customer
  */
 export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails {
-  const amountReceived = toSafeMoney(input.amountReceived)
+  const baseAmount = toSafeMoney(input.amountReceived)
   const pm = input.paymentMethod
-  const adjustmentType = deriveAdjustmentType(pm)
+
   const discountPercent = Math.max(0, Number(pm.discountPercent || 0))
   const feePercent = Math.max(0, Number(pm.feePercent || 0))
   const feeFixed = Math.max(0, Number(pm.feeFixed || 0))
@@ -114,87 +118,61 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
   const fixedInterestPercent = Math.max(0, Number(pm.fixedInterestPercent || 0))
   const interestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
 
-  if (adjustmentType === "discount") {
-    const adjustmentPercent = discountPercent
-    const adjustmentAmount = round2(amountReceived * (adjustmentPercent / 100))
-    const effectiveAmount = round2(amountReceived + adjustmentAmount)
-    const netAmount = effectiveAmount
-    return {
-      amountReceived,
-      adjustmentType: "discount",
-      adjustmentPercent,
-      adjustmentAmount,
-      feeBearer: null,
-      effectiveAmount,
-      netAmount,
-      interestAmount: 0,
-      feeAmount: 0,
-      fixedFeeAmount: 0,
-    }
+  const hasDiscount = discountPercent > 0
+  const hasFee = feePercent > 0 || feeFixed > 0
+  const hasInterest = interestPercent > 0
+
+  // Step 1: Discount (always reduces base)
+  const paymentMethodDiscountAmount = round2(baseAmount * (discountPercent / 100))
+  let current = round2(baseAmount - paymentMethodDiscountAmount)
+
+  // Step 2: Interest on discounted amount
+  const interestAmount = round2(current * (interestPercent / 100))
+  if (hasInterest && feeBearer === "customer") {
+    current = round2(current + interestAmount)
   }
 
-  if (feePercent > 0 || feeFixed > 0 || interestPercent > 0) {
-    const passesCostToCustomer = feeBearer === "customer"
-
-    if (passesCostToCustomer) {
-      const effectiveAmount = round2((amountReceived - feeFixed) / ((1 + interestPercent / 100) * (1 + feePercent / 100)))
-      const interestAmount = round2(effectiveAmount * (interestPercent / 100))
-      const fixedFeeAmount = feeFixed
-      const feeAmount = Math.max(0, round2(amountReceived - effectiveAmount - interestAmount - fixedFeeAmount))
-      const adjustmentAmount = Math.max(0, round2(amountReceived - effectiveAmount))
-      
-      const adjustmentPercent = feePercent + interestPercent
-      const derivedAdjType: AdjustmentType = interestAmount > 0.009 ? "interest" : "fee"
-
-      return {
-        amountReceived,
-        adjustmentType: derivedAdjType,
-        adjustmentPercent,
-        adjustmentAmount,
-        feeBearer,
-        effectiveAmount,
-        netAmount: effectiveAmount,
-        interestAmount,
-        feeAmount,
-        fixedFeeAmount,
-      }
-    } else {
-      const effectiveAmount = amountReceived
-      const interestAmount = round2(effectiveAmount * (interestPercent / 100))
-      const percentageFeeAmount = round2((effectiveAmount + interestAmount) * (feePercent / 100))
-      const fixedFeeAmount = feeFixed
-      const adjustmentAmount = round2(interestAmount + percentageFeeAmount + fixedFeeAmount)
-      const netAmount = round2(amountReceived - adjustmentAmount)
-      
-      const adjustmentPercent = feePercent + interestPercent
-      const derivedAdjType: AdjustmentType = interestAmount > 0.009 ? "interest" : "fee"
-
-      return {
-        amountReceived,
-        adjustmentType: derivedAdjType,
-        adjustmentPercent,
-        adjustmentAmount,
-        feeBearer,
-        effectiveAmount,
-        netAmount,
-        interestAmount,
-        feeAmount: percentageFeeAmount,
-        fixedFeeAmount,
-      }
-    }
+  // Step 3: Fee on amount after interest
+  const feeAmount = round2(current * (feePercent / 100))
+  const fixedFeeAmount = feeFixed
+  if (hasFee && feeBearer === "customer") {
+    current = round2(current + feeAmount + fixedFeeAmount)
   }
+
+  const effectiveAmount = round2(current)
+  const netAmount = feeBearer === "merchant"
+    ? round2(baseAmount - paymentMethodDiscountAmount - interestAmount - feeAmount - fixedFeeAmount)
+    : effectiveAmount
+
+  // Primary adjustment type for backward compatibility
+  let adjustmentType: AdjustmentType = "none"
+  let adjustmentPercent = 0
+  if (hasDiscount) {
+    adjustmentType = "discount"
+    adjustmentPercent = discountPercent
+  } else if (hasInterest) {
+    adjustmentType = "interest"
+    adjustmentPercent = interestPercent
+  } else if (hasFee) {
+    adjustmentType = "fee"
+    adjustmentPercent = feePercent
+  }
+
+  const adjustmentAmount = round2(paymentMethodDiscountAmount + interestAmount + feeAmount + fixedFeeAmount)
+  const onlyDiscount = hasDiscount && !hasFee && !hasInterest
 
   return {
-    amountReceived,
-    adjustmentType: "none",
-    adjustmentPercent: 0,
-    adjustmentAmount: 0,
-    feeBearer: null,
-    effectiveAmount: amountReceived,
-    netAmount: amountReceived,
-    interestAmount: 0,
-    feeAmount: 0,
-    fixedFeeAmount: 0,
+    amountReceived: baseAmount,
+    adjustmentType,
+    adjustmentPercent,
+    adjustmentAmount,
+    feeBearer: onlyDiscount ? null : feeBearer,
+    effectiveAmount,
+    netAmount,
+    paymentMethodDiscountAmount,
+    interestAmount,
+    feeAmount,
+    fixedFeeAmount,
   }
 }
 
@@ -221,6 +199,10 @@ export function computePaymentBreakdown(input: {
       netAmount: details.netAmount,
       paymentMethodId: null,
       installmentNumber: line.installmentNumber || 1,
+      paymentMethodDiscountAmount: details.paymentMethodDiscountAmount,
+      interestAmount: details.interestAmount,
+      feeAmount: details.feeAmount,
+      fixedFeeAmount: details.fixedFeeAmount,
     }
   })
 

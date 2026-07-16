@@ -221,6 +221,15 @@ export async function createMpSubscription(
       metadata: { plan_id: planId, plan_name: plan.name, type: "free" },
     })
 
+    // Sync free plan to billing
+    try {
+      const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+      await syncSubscriptionToBilling(sub.id, "webhook")
+      console.log(`[Subscriptions] Billing synced for free subscription ${sub.id}`)
+    } catch (syncErr: any) {
+      SecureLogger.error("[Subscriptions] Free plan billing sync error", { error: syncErr.message, subscriptionId: sub.id })
+    }
+
     return { success: true, subscriptionId: sub.id }
   }
 

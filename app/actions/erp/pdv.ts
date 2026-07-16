@@ -169,6 +169,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
         effectiveAmount: s.effectiveAmount,
         netAmount: s.netAmount,
         feeBearer: s.feeBearer,
+        paymentMethodDiscountAmount: s.paymentMethodDiscountAmount ?? 0,
         interestAmount: s.interestAmount,
         feeAmount: s.feeAmount,
         fixedFeeAmount: s.fixedFeeAmount,
@@ -335,20 +336,17 @@ async function syncPosSaleToOrders(params: {
 
     const subtotalValue = pricingResult.subtotal
 
-    // Use actual breakdown values instead of residual calculation
+    // Use actual breakdown values (all components read regardless of adjustmentType)
     let paymentMethodDiscountAmount = 0
     let paymentMethodInterestAmount = 0
     let paymentMethodFeeAmount = 0
     let paymentMethodFixedFeeAmount = 0
     if (params.paymentBreakdown && params.paymentBreakdown.length > 0) {
         for (const entry of params.paymentBreakdown) {
-            if (entry.adjustmentType === 'discount') {
-                paymentMethodDiscountAmount = safeMoney(paymentMethodDiscountAmount + Number(entry.adjustmentAmount || 0))
-            } else {
-                paymentMethodInterestAmount = safeMoney(paymentMethodInterestAmount + Number(entry.interestAmount || 0))
-                paymentMethodFeeAmount = safeMoney(paymentMethodFeeAmount + Number(entry.feeAmount || 0))
-                paymentMethodFixedFeeAmount = safeMoney(paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
-            }
+            paymentMethodDiscountAmount = safeMoney(paymentMethodDiscountAmount + Number(entry.paymentMethodDiscountAmount ?? entry.adjustmentAmount ?? 0))
+            paymentMethodInterestAmount = safeMoney(paymentMethodInterestAmount + Number(entry.interestAmount || 0))
+            paymentMethodFeeAmount = safeMoney(paymentMethodFeeAmount + Number(entry.feeAmount || 0))
+            paymentMethodFixedFeeAmount = safeMoney(paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
         }
     }
     const paymentMethodExtraAmount = safeMoney(paymentMethodInterestAmount + paymentMethodFeeAmount + paymentMethodFixedFeeAmount)
@@ -912,6 +910,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             effectiveAmount: safeMoney(Number(row.effectiveAmount ?? row.amount ?? 0)),
             netAmount: safeMoney(Number(row.netAmount ?? row.effectiveAmount ?? row.amount ?? 0)),
             feeBearer: row.feeBearer || null,
+            paymentMethodDiscountAmount: Math.max(0, Number(row.paymentMethodDiscountAmount || 0)),
             interestAmount: Math.max(0, Number(row.interestAmount || 0)),
             feeAmount: Math.max(0, Number(row.feeAmount || 0)),
             fixedFeeAmount: Math.max(0, Number(row.fixedFeeAmount || 0)),
