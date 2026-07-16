@@ -42,11 +42,20 @@ export async function requirePermission<R extends PermissionResource>(
  * @example
  * const { allowed } = await checkPermission(partnerId, "orders", "view")
  * if (!allowed) return <AccessDenied />
+ *
+ * Quando `storeId` é fornecido, também verifica se o usuário tem acesso
+ * à store específica (via userHasStoreAccess).
  */
 export async function checkPermission<R extends PermissionResource>(
     partnerId: string,
     resource: R,
-    action: PermissionAction<R>
+    action: PermissionAction<R>,
+    storeId?: string
 ): Promise<{ allowed: boolean }> {
+    if (storeId) {
+        const { userHasStoreAccess } = await import("@/lib/store-members")
+        const hasStoreAccess = await userHasStoreAccess(partnerId, storeId)
+        if (!hasStoreAccess) return { allowed: false }
+    }
     return checkPartnerPermission(partnerId, resource as any, action as string)
 }

@@ -638,6 +638,51 @@ export async function requirePartnerRouteAccess(
   }
 }
 
+/**
+ * Verifica se o usuário autenticado tem acesso a uma store específica.
+ * Lança ForbiddenError se não tiver acesso.
+ *
+ * Aceita storeId + partnerId (resolução mais rápida) ou apenas storeId
+ * (resolução automática via admin client).
+ *
+ * Em Fase 3, verifica apenas se o usuário tem acesso ao partner da store.
+ * A partir da Fase 4, também verificará store_members.
+ */
+export async function requireStoreAccess(storeId: string, partnerId?: string): Promise<void> {
+  const { userHasStoreAccess } = await import("@/lib/store-members")
+
+  let resolvedPartnerId = partnerId
+  if (!resolvedPartnerId) {
+    const admin = getAdminClient()
+    const { data: store } = await admin
+      .from("stores")
+      .select("partner_id")
+      .eq("id", storeId)
+      .maybeSingle()
+    if (!store) throw new ForbiddenError("Loja não encontrada")
+    resolvedPartnerId = store.partner_id
+  }
+
+  const hasAccess = await userHasStoreAccess(resolvedPartnerId!, storeId)
+  if (!hasAccess) {
+    throw new ForbiddenError("Acesso negado a esta loja")
+  }
+}
+
+/**
+ * Verifica permissão de módulo + acesso à store.
+ * Equivalente a requireStoreAccess + checkPermission em um único helper.
+ */
+export async function requireStorePermission(
+  storeId: string,
+  partnerId: string,
+  module: string,
+  action: string
+): Promise<void> {
+  await requireStoreAccess(storeId, partnerId)
+  await requirePartnerAccessWithPermission(partnerId, module as any, action as string)
+}
+
 function routeKeyToPermissionKey(routeKey: string): string | null {
   switch (routeKey) {
     case "dashboard": return "dashboard.view"
@@ -663,6 +708,9 @@ function routeKeyToPermissionKey(routeKey: string): string | null {
     case "cadastros_financeiro": return "financial.view"
     case "services": return "services.view"
     case "store_customize": return "settings.settings_vitrine"
+    case "stores": return "stores.view"
+    case "stores_members": return "stores.view"
+    case "stores_settings": return "stores.edit"
     default: return null
   }
 }

@@ -132,6 +132,18 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     community_videos: { key: "community_videos", path: "/erp/marketing/videos", label: "Vídeos da Comunidade", category: "Marketing" },
     colecoes: { key: "colecoes", path: "/erp/marketing/colecoes", label: "Coleções", category: "Marketing" },
 
+    // ── Lojas e Filiais
+    stores: {
+        key: "stores", path: "/erp/stores", label: "Lojas e Filiais", category: "Configurações",
+        specificPermissions: ["manage_members"],
+    },
+    stores_members: {
+        key: "stores_members", path: "/erp/stores/members", label: "Membros por Loja", category: "Configurações",
+    },
+    stores_settings: {
+        key: "stores_settings", path: "/erp/stores/settings", label: "Configurações da Loja", category: "Configurações",
+    },
+
     // ── Configurações
     settings: { key: "settings", path: "/erp/settings", label: "Configurações", category: "Configurações" },
     settings_business: {
@@ -200,8 +212,15 @@ function withSpecific(base: RoutePermissions, specifics: Record<string, boolean>
 
 // ─── OWNER: Controle Absoluto ───────────────────────────────────────────────
 
+const storePermissions = withSpecific(full, { manage_members: true })
+const storeViewOnly = withSpecific(viewOnly, { manage_members: false })
+
 const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: full,
+    // Lojas e Filiais
+    stores: storePermissions,
+    stores_members: full,
+    stores_settings: full,
     // Vendas
     orders: withSpecific(full, {
         can_cancel_order: true, can_refund: true, can_update_status: true,
@@ -280,6 +299,10 @@ const ADMIN_PERMISSIONS: PartnerRoutePermissions = {
 
 const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: full,
+    // Lojas e Filiais
+    stores: storeViewOnly,
+    stores_members: viewOnly,
+    stores_settings: viewOnly,
     // Vendas - full ops, can cancel but CANNOT refund
     orders: withSpecific(full, {
         can_cancel_order: true, can_refund: false, can_update_status: true,
@@ -346,6 +369,10 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
 
 const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: viewOnly,
+    // Lojas e Filiais
+    stores: noAccess,
+    stores_members: noAccess,
+    stores_settings: noAccess,
     // Vendas - create/edit orders, update status, no cancel/refund
     orders: withSpecific(crud, {
         can_cancel_order: false, can_refund: false, can_update_status: true,
@@ -410,6 +437,10 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
 
 const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: noAccess,
+    // Lojas e Filiais
+    stores: noAccess,
+    stores_members: noAccess,
+    stores_settings: noAccess,
     // Vendas - view assigned orders only, update delivery status
     orders: withSpecific(viewOnly, {
         can_cancel_order: false, can_refund: false, can_update_status: false,
@@ -556,6 +587,13 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
     const pos = mapRoute("pos")
 
     return {
+        stores: {
+            view: routePerms.stores?.access ?? false,
+            create: routePerms.stores?.create ?? false,
+            edit: routePerms.stores?.edit ?? false,
+            delete: routePerms.stores?.delete ?? false,
+            manage_members: hasSpecificPermission(routePerms, "stores", "manage_members"),
+        },
         orders: {
             view: orders.view,
             create: orders.create,
@@ -775,6 +813,18 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
         }
     }
     if (legacy.goals) apply("goals", mapLegacy(legacy.goals))
+    if (legacy.stores) {
+        apply("stores", {
+            access: legacy.stores.view,
+            create: legacy.stores.create,
+            edit: legacy.stores.edit,
+            delete: legacy.stores.delete,
+            specific: { manage_members: legacy.stores.manage_members },
+        })
+        apply("stores_members", { access: legacy.stores.manage_members })
+        apply("stores_settings", { access: legacy.stores.edit || legacy.stores.view })
+    }
+
     if (legacy.productivity) {
         apply("productivity_overview", { access: legacy.productivity.view })
         apply("productivity_goals", {

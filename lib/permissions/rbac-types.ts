@@ -1,6 +1,7 @@
 export type RoleId = "operator" | "delivery" | "manager" | "admin" | "owner"
 
 export type PermissionTemplate = {
+  stores: { view: boolean; create: boolean; edit: boolean; delete: boolean; manage_members: boolean }
   orders: {
     view: boolean
     create: boolean

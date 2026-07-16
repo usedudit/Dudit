@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccess, requirePartnerAccessWithPermission, requireStorePermission, requireStoreAccess } from "@/lib/auth/authorization"
 import { setActiveStore } from "@/lib/auth/partner-context"
 import { logAudit } from "@/lib/observability/audit-log"
 import type { ActionResponse } from "@/lib/types/action-response"
@@ -35,7 +35,7 @@ export async function getStoreAction(storeId: string) {
 
     if (error) throw new Error(error.message)
 
-    await requirePartnerAccess(data.partner_id)
+    await requireStoreAccess(storeId, data.partner_id)
     return data
 }
 
@@ -55,7 +55,7 @@ interface CreateStoreInput {
 export async function createStoreAction(input: CreateStoreInput): Promise<ActionResponse<{ id: string }>> {
     try {
         await requireUser()
-        await requirePartnerAccess(input.partnerId)
+        await requirePartnerAccessWithPermission(input.partnerId, "stores" as any, "create")
 
         const supabase = await getSupabaseServerClient()
 
@@ -115,7 +115,7 @@ interface UpdateStoreInput {
 export async function updateStoreAction(input: UpdateStoreInput): Promise<ActionResponse<void>> {
     try {
         await requireUser()
-        await requirePartnerAccess(input.partnerId)
+        await requireStorePermission(input.storeId, input.partnerId, "stores", "edit")
 
         const supabase = await getSupabaseServerClient()
         const updateData: Record<string, unknown> = {}
@@ -159,7 +159,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
 export async function deleteStoreAction(storeId: string, partnerId: string): Promise<ActionResponse<void>> {
     try {
         await requireUser()
-        await requirePartnerAccess(partnerId)
+        await requireStorePermission(storeId, partnerId, "stores", "delete")
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase
@@ -185,6 +185,7 @@ export async function deleteStoreAction(storeId: string, partnerId: string): Pro
 export async function setActiveStoreAction(storeId: string): Promise<ActionResponse<void>> {
     try {
         await requireUser()
+        await requireStoreAccess(storeId)
         await setActiveStore(storeId)
 
         logAudit("store.switched", {

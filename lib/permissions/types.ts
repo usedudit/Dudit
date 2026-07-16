@@ -1,3 +1,11 @@
+export interface StorePermissions {
+    view: boolean
+    create: boolean
+    edit: boolean
+    delete: boolean
+    manage_members: boolean
+}
+
 // ─── Route-Based Permission Types ───────────────────────────────────────────
 
 export type PartnerRole = "OWNER" | "ADMIN" | "MANAGER" | "OPERATOR" | "DELIVERY"
@@ -109,6 +117,7 @@ export interface StockMovementsPermissions {
 
 // Canonical DB model for `partner_users.permissions` / `partner_invitations.permissions`
 export interface PartnerPermissions {
+    stores: StorePermissions
     orders: OrdersPermissions
     appointments: AppointmentsPermissions
     customers: ResourcePermissions
@@ -205,6 +214,10 @@ export type RouteKey =
     | "recurring_subscriptions"
     | "community_videos"
     | "colecoes"
+    // Lojas e Filiais
+    | "stores"
+    | "stores_members"
+    | "stores_settings"
     // Configurações
     | "settings"
     | "settings_business"
