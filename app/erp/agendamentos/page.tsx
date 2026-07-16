@@ -125,6 +125,7 @@ export default async function AgendamentosPage() {
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId
+  const activeStoreId = context.activeStoreId || null
 
   const { allowed } = await checkPermission(partnerId, "appointments", "view")
   if (!allowed) return <AccessDenied />
@@ -138,6 +139,7 @@ export default async function AgendamentosPage() {
       <FadeIn className="p-4">
         <AppointmentsPage
           partnerId={partnerId}
+          storeId={activeStoreId}
           initialTeam={catalogs.team}
           initialCustomers={catalogs.customers}
           initialServices={catalogs.services}

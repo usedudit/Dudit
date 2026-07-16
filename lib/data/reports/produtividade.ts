@@ -22,18 +22,24 @@ export interface ProductivityReportData {
   }
 }
 
-const getCachedProductivityData = cache(async (partnerId: string, period: Period = "monthly") => {
+const getCachedProductivityData = cache(async (partnerId: string, period: Period = "monthly", storeId?: string | null) => {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const { today, from } = getDateRangeWithPrevious(period)
 
-      const appointmentsResult = await supabase
+      let query = supabase
         .from("appointments")
         .select("id, customer_name, service_name, staff_name, price, duration_minutes, status, start_date, source")
         .eq("partner_id", partnerId)
         .gte("start_date", from)
         .neq("source", "unavailable")
+
+      if (storeId) {
+        query = query.eq("store_id", storeId)
+      }
+
+      const appointmentsResult = await query
         .order("start_date", { ascending: false })
         .limit(500)
 
@@ -144,11 +150,11 @@ const getCachedProductivityData = cache(async (partnerId: string, period: Period
         },
       }
     },
-    [`report-productivity-${partnerId}-${period}`],
+    [`report-productivity-${partnerId}-${period}-${storeId || "all"}`],
     { tags: [REPORT_TAGS.produtividade(partnerId, period)], revalidate: 120 }
   )()
 })
 
-export async function getProductivityReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedProductivityData(partnerId, period)
+export async function getProductivityReportData(partnerId: string, period: Period = "monthly", storeId?: string | null) {
+  return getCachedProductivityData(partnerId, period, storeId)
 }

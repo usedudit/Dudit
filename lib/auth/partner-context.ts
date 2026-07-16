@@ -26,6 +26,7 @@ const COOKIE_OPTIONS = {
 export interface PartnerContext {
     userId: string
     partnerId: string
+    activeStoreId: string | null
     /** @deprecated Use roleId (lowercase DB id). */
     role: PartnerRole
     roleId: RoleId
@@ -357,6 +358,7 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
             return {
                 userId: match.userId,
                 partnerId: match.partnerId,
+                activeStoreId: await getActiveStoreId(),
                 role: match.role,
                 roleId: match.roleId,
                 permissions: match.permissions,
@@ -371,6 +373,7 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
         return {
             userId: match.userId,
             partnerId: match.partnerId,
+            activeStoreId: await getActiveStoreId(),
             role: match.role,
             roleId: match.roleId,
             permissions: match.permissions,

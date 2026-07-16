@@ -197,9 +197,10 @@ export async function handleAppointmentItemsStockMovement(params: {
     oldStatus: string | null
     newStatus: string
     userId: string
+    storeId?: string | null
 }) {
     const supabase = createAdminClient()
-    const { appointmentId, partnerId, oldStatus, newStatus, userId } = params
+    const { appointmentId, partnerId, oldStatus, newStatus, userId, storeId } = params
 
     // 1. Movement Classification
     const isInProgress = (s: string | null) => s === 'Em andamento' || s === 'Iniciado'
@@ -245,6 +246,7 @@ export async function handleAppointmentItemsStockMovement(params: {
                 partnerId,
                 orderId: appointmentId,
                 items: returnableItems,
+                storeId: storeId || null,
             })
             if (!result.success) {
                 console.error(`[appointment_stock] reserve failed for ${appointmentId}:`, result.error)
@@ -276,6 +278,7 @@ export async function handleAppointmentItemsStockMovement(params: {
                 createdBy: userId,
                 reason: "Uso em serviço",
                 notes: `Agendamento concluído`,
+                storeId: storeId || null,
             })
             if (!result.success) {
                 console.error(`[appointment_stock] finalize (consumed) failed for ${appointmentId}:`, result.error)
@@ -288,6 +291,7 @@ export async function handleAppointmentItemsStockMovement(params: {
                 partnerId,
                 orderId: appointmentId,
                 items: returnableItems,
+                storeId: storeId || null,
             })
             if (!result.success) {
                 console.error(`[appointment_stock] release (returnable) failed for ${appointmentId}:`, result.error)
@@ -308,6 +312,7 @@ export async function handleAppointmentItemsStockMovement(params: {
                 partnerId,
                 orderId: appointmentId,
                 items: allItems,
+                storeId: storeId || null,
             })
             if (!result.success) {
                 console.error(`[appointment_stock] release failed for ${appointmentId}:`, result.error)

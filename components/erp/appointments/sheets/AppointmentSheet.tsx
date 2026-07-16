@@ -48,6 +48,7 @@ export const AppointmentSheet = ({
     staffCatalog,
     isSaving,
     partnerId,
+    storeId: storeIdProp,
     openingHours,
     onAppointmentUpdated,
     appointmentsList,
@@ -71,6 +72,7 @@ export const AppointmentSheet = ({
     staffCatalog?: any[],
     isSaving?: boolean,
     partnerId?: string,
+    storeId?: string | null,
     openingHours?: any,
     onAppointmentUpdated?: (item: any) => void,
     appointmentsList?: Appointment[],
@@ -445,7 +447,7 @@ export const AppointmentSheet = ({
         let cancelled = false;
         setIsLoadingSlots(true);
 
-        getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer)
+        getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer, storeIdProp)
             .then((res) => {
                 if (cancelled) return;
                 if (res.success) {

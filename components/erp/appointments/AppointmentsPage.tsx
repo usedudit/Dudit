@@ -75,6 +75,7 @@ function computeVisibleDateRange(date: Date, view: ViewType): { startDate: strin
 
 const AppointmentsPage = ({
     partnerId: initialPartnerId,
+    storeId: initialStoreId,
     initialTeam = [],
     initialCustomers = [],
     initialServices = [],
@@ -82,6 +83,7 @@ const AppointmentsPage = ({
     openingHours = null,
 }: {
     partnerId: string;
+    storeId?: string | null;
     initialTeam?: Array<{ id: string; name: string; role: string }>;
     initialCustomers?: Array<{ id: string; name: string; email?: string; phone?: string; avatar_url?: string | null }>;
     initialServices?: Array<{ id: string; name: string; price: number; promotional_price?: number | null; category_id?: string | null; duration: string; bufferMinutes: number; category: string; billingUnit: string; resources?: any[] }>;
@@ -121,6 +123,7 @@ const AppointmentsPage = ({
     );
     const [realUnavailableTypes, setRealUnavailableTypes] = useState<any[]>(initialUnavailableTypes);
     const [partnerId, setPartnerId] = useState<string>(initialPartnerId || '');
+    const [storeId] = useState<string | null>(initialStoreId || null);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [appointmentFilters, setAppointmentFilters] = useState<{ teamIds: string[] }>({ teamIds: [] });
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -238,7 +241,7 @@ const AppointmentsPage = ({
         inFlightRef.current.add(key);
 
         try {
-            const res = await getAppointmentsByDateRangeAction(startDate, endDate, undefined);
+            const res = await getAppointmentsByDateRangeAction(startDate, endDate, undefined, storeId);
             if (res.success) {
                 const mapped = (res.items || []).map(mapDbAppointment);
                 appointmentCacheRef.current.set(key, { data: mapped, ts: Date.now() });
@@ -474,6 +477,7 @@ const AppointmentsPage = ({
                     pricingUnit: payload.pricingUnit || selectedAppointment.pricingUnit,
                     notes: payload.notes ?? selectedAppointment.notes,
                     status: payload.status || selectedAppointment.status,
+                    storeId: storeId,
                 });
 
                 if (updateRes.success && updateRes.item) {
@@ -500,6 +504,7 @@ const AppointmentsPage = ({
                     customerId: item.customerId || realClients.find((c) => c.name === item.customerName)?.id || null,
                     services: item.services || undefined,
                     items: item.items || undefined,
+                    storeId: storeId,
                 }));
 
                 const createRes = await createAppointmentsAction(rows);
@@ -952,6 +957,7 @@ const AppointmentsPage = ({
                                 staffCatalog={realStaffMembers}
                                 clientsCatalog={realClients}
                                 partnerId={partnerId}
+                                storeId={storeId}
                                 isSaving={isSaving}
                                 openingHours={openingHours}
                                 appointmentsList={appointments}
@@ -1091,7 +1097,8 @@ const AppointmentsPage = ({
                                                         status: 'Indisponível',
                                                         source: 'unavailable',
                                                         recurrenceGroupId: recurrenceGroupId,
-                                                        recurrenceRule: item.recurrence !== 'none' ? item.recurrence : null
+                                                        recurrenceRule: item.recurrence !== 'none' ? item.recurrence : null,
+                                                        storeId: storeId,
                                                     });
                                                 }
                                             }

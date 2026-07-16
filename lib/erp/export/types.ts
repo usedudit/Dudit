@@ -69,6 +69,7 @@ export type AppointmentsExportFilters = {
   serviceName?: string
   customerId?: string | null
   search?: string
+  storeId?: string | null
 }
 
 export type SubscriptionsExportFilters = {

@@ -72,6 +72,7 @@ export type AppointmentInput = {
   recurrenceGroupId?: string | null
   fulfillmentMode?: string | null
   salesChannel?: string | null
+  storeId?: string | null
   services?: AppointmentServiceInfo[]
   items?: AppointmentItemInput[]
 }
@@ -119,6 +120,7 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
     recurrence_group_id: input.recurrenceGroupId || null,
     fulfillment_mode: input.fulfillmentMode || null,
     sales_channel: input.salesChannel || "manual",
+    store_id: input.storeId || null,
   }
 }
 
@@ -536,7 +538,8 @@ const APPOINTMENT_LIST_COLUMNS = `
 export async function getAppointmentsByDateRangeAction(
   startDate: string,
   endDate: string,
-  staffId?: string | null
+  staffId?: string | null,
+  storeId?: string | null
 ) {
   try {
     const { partnerId } = await getPartnerContextWithPermission("view")
@@ -553,6 +556,11 @@ export async function getAppointmentsByDateRangeAction(
     // Staff filtering at DB level
     if (staffId) {
       query = query.eq("staff_partner_user_id", staffId)
+    }
+
+    // Store filtering: if storeId provided, filter by it; if not, show all (unfiltered = visible to user)
+    if (storeId) {
+      query = query.eq("store_id", storeId)
     }
 
     const { data, error } = await query
@@ -585,21 +593,27 @@ export async function getAvailableTimeSlotsAction(
   date: string,
   staffId: string,
   serviceDurationMinutes: number,
-  bufferMinutes: number = 0
+  bufferMinutes: number = 0,
+  storeId?: string | null
 ) {
   try {
     const { partnerId } = await getPartnerContextWithPermission("view")
     const supabase = await getSupabaseServerClient()
 
     // Fetch existing appointments for this staff on this date
-    const { data: existingAppts, error } = await supabase
+    let query = supabase
       .from("appointments")
       .select("start_time, end_time, duration_minutes")
       .eq("partner_id", partnerId)
       .eq("staff_partner_user_id", staffId)
       .eq("start_date", date)
       .neq("status", "Cancelado")
-      .order("start_time", { ascending: true })
+
+    if (storeId) {
+      query = query.eq("store_id", storeId)
+    }
+
+    const { data: existingAppts, error } = await query.order("start_time", { ascending: true })
 
     if (error) throw error
 
@@ -947,10 +961,11 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       }
     }
 
-    // -- Stock Movement Integration --
+    // -- Stock Movement Integration (store-aware) --
     try {
       const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
-      for (const row of createdRows) {
+      for (let i = 0; i < createdRows.length; i++) {
+        const row = createdRows[i]
         try {
           await handleAppointmentItemsStockMovement({
             appointmentId: row.id,
@@ -958,6 +973,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
             oldStatus: null,
             newStatus: row.status,
             userId: user.id,
+            storeId: payload[i]?.storeId || null,
           })
         } catch (stockRowErr) {
           console.error(`[appointment_stock_create] failed for row ${row.id}:`, stockRowErr)
@@ -1050,6 +1066,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         status: payload.status ?? current.status,
         source: payload.source ?? current.source,
         salesChannel: payload.salesChannel ?? current.sales_channel ?? "manual",
+        storeId: payload.storeId ?? current.store_id,
       },
       partnerId,
     )
@@ -1197,7 +1214,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       }
     }
 
-    // -- Stock Movement Integration --
+    // -- Stock Movement Integration (store-aware) --
     try {
       const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
       await handleAppointmentItemsStockMovement({
@@ -1206,10 +1223,10 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         oldStatus: current.status,
         newStatus: normalizedStatus,
         userId: user.id,
+        storeId: payload.storeId ?? current.store_id ?? null,
       })
     } catch (stockErr) {
       console.error("[appointment_stock] failed to process movement:", stockErr)
-      // We don't fail the whole update if stock fails, but we log it.
     }
 
     await revalidateEntityTimeline("appointment", appointmentId)

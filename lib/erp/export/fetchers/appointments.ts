@@ -31,6 +31,10 @@ export async function fetchAppointmentsExport(
         .gte("end_date", filters.startDate)
         .neq("source", "unavailable")
 
+      if (filters.storeId) {
+        query = query.eq("store_id", filters.storeId)
+      }
+
       if (staffIds.length === 1) query = query.eq("staff_partner_user_id", staffIds[0])
       else if (staffIds.length > 1) query = query.in("staff_partner_user_id", staffIds)
 
