@@ -1302,6 +1302,10 @@ export async function confirmServiceOrderPaymentAction(payload: {
     adjustmentAmount?: number
     feeBearer?: string
     amountReceived?: number
+    paymentMethodDiscountAmount?: number
+    interestAmount?: number
+    feeAmount?: number
+    fixedFeeAmount?: number
   }>
   paymentProvider?: string | null
   mpPaymentId?: string | null
@@ -1363,7 +1367,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
     if (payload.paymentBreakdown && Array.isArray(payload.paymentBreakdown)) {
       let customerFeeAmount = 0
       for (const entry of payload.paymentBreakdown) {
-        const received = Number(entry.amountReceived ?? entry.amount || 0)
+        const received = Number(entry.amountReceived ?? entry.amount ?? 0)
         originalAmount += received
         paymentMethodDiscountAmount += Number(entry.paymentMethodDiscountAmount ?? 0)
         interestAmount += Number(entry.interestAmount ?? 0)
