@@ -2,6 +2,7 @@ type StockItem = {
   product_id?: string | null
   variant_id?: string | null
   quantity: number
+  store_product_id?: string | null
 }
 
 type StockClient = {
@@ -21,6 +22,7 @@ function normalizeItems(items: StockItem[]) {
       product_id: item.product_id,
       variant_id: item.variant_id || null,
       quantity: Number(item.quantity || 0),
+      store_product_id: item.store_product_id || null,
     }))
 }
 
@@ -38,6 +40,7 @@ export async function reserveOrderInventory(params: {
   partnerId: string
   orderId: string
   items: StockItem[]
+  storeId?: string | null
 }) {
   const items = normalizeItems(params.items)
   if (items.length === 0) return { success: true as const, data: null }
@@ -46,6 +49,7 @@ export async function reserveOrderInventory(params: {
     p_partner_id: params.partnerId,
     p_order_id: params.orderId,
     p_items: items,
+    p_store_id: params.storeId || null,
   })
 }
 
@@ -54,6 +58,7 @@ export async function releaseOrderInventory(params: {
   partnerId: string
   orderId: string
   items: StockItem[]
+  storeId?: string | null
 }) {
   const items = normalizeItems(params.items)
   if (items.length === 0) return { success: true as const, data: null }
@@ -62,6 +67,7 @@ export async function releaseOrderInventory(params: {
     p_partner_id: params.partnerId,
     p_order_id: params.orderId,
     p_items: items,
+    p_store_id: params.storeId || null,
   })
 }
 
@@ -73,6 +79,7 @@ export async function finalizeOrderInventory(params: {
   reason: string
   notes?: string
   items: StockItem[]
+  storeId?: string | null
 }) {
   const items = normalizeItems(params.items)
   if (items.length === 0) return { success: true as const, data: null }
@@ -84,5 +91,64 @@ export async function finalizeOrderInventory(params: {
     p_reason: params.reason,
     p_notes: params.notes || null,
     p_items: items,
+    p_store_id: params.storeId || null,
   })
+}
+
+export async function transferStockBetweenStores(params: {
+  client: StockClient
+  fromStoreProductId: string
+  toStoreProductId: string
+  quantity: number
+  partnerId: string
+  createdBy: string
+  notes?: string
+}) {
+  return executeInventoryRpc(params.client, "transfer_store_stock", {
+    p_from_store_product_id: params.fromStoreProductId,
+    p_to_store_product_id: params.toStoreProductId,
+    p_quantity: params.quantity,
+    p_partner_id: params.partnerId,
+    p_created_by: params.createdBy,
+    p_notes: params.notes || null,
+  })
+}
+
+export async function decrementStoreProductStock(params: {
+  client: StockClient
+  storeProductId: string
+  quantity: number
+  allowNegative?: boolean
+}) {
+  return executeInventoryRpc(params.client, "decrement_store_product_stock", {
+    p_store_product_id: params.storeProductId,
+    p_quantity: params.quantity,
+    p_allow_negative: params.allowNegative || false,
+  })
+}
+
+export async function incrementStoreProductStock(params: {
+  client: StockClient
+  storeProductId: string
+  quantity: number
+}) {
+  return executeInventoryRpc(params.client, "increment_store_product_stock", {
+    p_store_product_id: params.storeProductId,
+    p_quantity: params.quantity,
+  })
+}
+
+export async function getStoreProductStock(params: {
+  client: StockClient
+  productId: string
+  storeId: string
+}) {
+  const { data, error } = await params.client.rpc("get_store_product_stock", {
+    p_product_id: params.productId,
+    p_store_id: params.storeId,
+  })
+  if (error) {
+    return { error: error.message || "Falha ao consultar estoque." }
+  }
+  return { success: true as const, data }
 }
