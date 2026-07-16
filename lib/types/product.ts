@@ -152,3 +152,33 @@ export interface ProductSupplierWithDetails extends ProductSupplier {
   last_purchase_date: string | null
   last_invoice_key: string | null
 }
+
+/**
+ * Store-level overrides for a product.
+ * NULL fields fall back to the base product values.
+ */
+export interface StoreProductOverride {
+  id: string
+  product_id: string
+  store_id: string
+  override_price: number | null
+  override_stock_quantity: number | null
+  override_sku: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Resolved product = base product + store overrides merged.
+ * override_price/override_stock/override_sku reflect the effective
+ * values after fallback (never null for price/stock).
+ */
+export interface ResolvedProduct extends Product {
+  resolved_price: number
+  resolved_stock_quantity: number
+  resolved_sku: string | null
+  store_is_active: boolean
+  store_product_id: string | null
+  has_store_override: boolean
+}

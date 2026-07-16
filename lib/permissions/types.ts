@@ -115,6 +115,8 @@ export interface StockMovementsPermissions {
     undo: boolean
 }
 
+
+
 // Canonical DB model for `partner_users.permissions` / `partner_invitations.permissions`
 export interface PartnerPermissions {
     stores: StorePermissions
