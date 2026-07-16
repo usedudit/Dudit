@@ -87,7 +87,9 @@ export async function listStoreProducts(
             subcategory:product_categories!subcategory_id(name),
             brand:brands!brand_id(name),
             location:storage_locations!location_id(name),
-            store_overrides:store_products!left(*)
+            store_overrides:store_products!left(
+                id, override_price, override_stock_quantity, override_sku, is_active
+            )
         `)
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: false })
