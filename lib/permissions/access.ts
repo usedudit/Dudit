@@ -1,9 +1,11 @@
 import "server-only"
 import {
     requirePartnerAccessWithPermission,
-    checkPartnerPermission,
 } from "@/lib/auth/authorization"
 import type { PermissionTemplate, RoleId, RbacPermissions } from "./rbac-types"
+import { getCurrentUser } from "@/lib/auth/server-user"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 type PermissionResource = keyof PermissionTemplate
 type PermissionAction<R extends PermissionResource> = keyof PermissionTemplate[R]
@@ -13,11 +15,6 @@ type PermissionAction<R extends PermissionResource> = keyof PermissionTemplate[R
  * `resource.action` para o partner informado.
  *
  * Uso: server actions, API routes, qualquer mutação.
- *
- * @example
- * await requirePermission(partnerId, "orders", "view")
- * await requirePermission(partnerId, "orders", "can_apply_discount")
- * await requirePermission(partnerId, "products", "create")
  */
 export async function requirePermission<R extends PermissionResource>(
     partnerId: string,
@@ -37,14 +34,8 @@ export async function requirePermission<R extends PermissionResource>(
  * Retorna `{ allowed: boolean }` sem lançar erro se o usuário não tiver
  * a permissão `resource.action`.
  *
- * Uso: page loaders, renderização condicional no servidor.
- *
- * @example
- * const { allowed } = await checkPermission(partnerId, "orders", "view")
- * if (!allowed) return <AccessDenied />
- *
- * Quando `storeId` é fornecido, também verifica se o usuário tem acesso
- * à store específica (via userHasStoreAccess).
+ * Quando `storeId` é fornecido, usa `resolveEffectivePermissions` como
+ * fonte única de verdade para a permissão na store específica.
  */
 export async function checkPermission<R extends PermissionResource>(
     partnerId: string,
@@ -53,9 +44,31 @@ export async function checkPermission<R extends PermissionResource>(
     storeId?: string
 ): Promise<{ allowed: boolean }> {
     if (storeId) {
-        const { userHasStoreAccess } = await import("@/lib/store-members")
-        const hasStoreAccess = await userHasStoreAccess(partnerId, storeId)
-        if (!hasStoreAccess) return { allowed: false }
+        const { resolveEffectivePermissions } = await import("@/lib/store-members")
+        const effective = await resolveEffectivePermissions(partnerId, storeId)
+        if (!effective) return { allowed: false }
+        const rbacUser: RbacUserLike = {
+            role_id: effective.role.toLowerCase() as any,
+            permissions: effective.permissions,
+        }
+        return { allowed: can(rbacUser, `${String(resource)}.${String(action)}`) }
     }
-    return checkPartnerPermission(partnerId, resource as any, action as string)
+    return checkPartnerPermissionFallback(partnerId, resource as any, action as string)
+}
+
+/**
+ * Fallback: verifica permissão em nível de partner (sem store).
+ * Usa requirePartnerAccessWithPermission com try/catch.
+ */
+async function checkPartnerPermissionFallback(
+    partnerId: string,
+    resource: string,
+    action: string
+): Promise<{ allowed: boolean }> {
+    try {
+        await requirePartnerAccessWithPermission(partnerId, resource as any, action as string)
+        return { allowed: true }
+    } catch {
+        return { allowed: false }
+    }
 }

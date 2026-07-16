@@ -671,7 +671,12 @@ export async function requireStoreAccess(storeId: string, partnerId?: string): P
 
 /**
  * Verifica permissão de módulo + acesso à store.
- * Equivalente a requireStoreAccess + checkPermission em um único helper.
+ * Usa resolveEffectivePermissions como única fonte de verdade.
+ *
+ * Fluxo:
+ * 1. Resolve permissões efetivas para (user, partner, store)
+ * 2. Se resolveEffectivePermissions retornar null → acesso negado
+ * 3. Verifica a permissão específica usando can()
  */
 export async function requireStorePermission(
   storeId: string,
@@ -679,8 +684,15 @@ export async function requireStorePermission(
   module: string,
   action: string
 ): Promise<void> {
-  await requireStoreAccess(storeId, partnerId)
-  await requirePartnerAccessWithPermission(partnerId, module as any, action as string)
+  const { resolveEffectivePermissions } = await import("@/lib/store-members")
+  const effective = await resolveEffectivePermissions(partnerId, storeId)
+  if (!effective) {
+    throw new ForbiddenError("Acesso negado a esta loja")
+  }
+  const rbacUser = { role_id: effective.role.toLowerCase() as RoleId, permissions: effective.permissions }
+  if (!can(rbacUser, `${module}.${action}`)) {
+    throw new ForbiddenError("Permissão negada para esta ação na loja")
+  }
 }
 
 function routeKeyToPermissionKey(routeKey: string): string | null {
