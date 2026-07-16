@@ -1,16 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useStore } from "@/lib/store-context"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { NewStoreModal } from "./store-switcher-modal"
-import { PlusIcon } from "@/lib/icons"
+import { useRouter } from "next/navigation"
+import { PlusIcon, SettingsIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 export function StoreSwitcher() {
     const { selectedStore, stores, isLoading, selectStore, refreshStores } = useStore()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [partnerId, setPartnerId] = useState<string>("")
+    const router = useRouter()
 
     useEffect(() => {
         if (selectedStore?.partner_id) {
@@ -78,6 +80,14 @@ export function StoreSwitcher() {
                 >
                     <PlusIcon className="w-4 h-4" />
                     <span>Novo local</span>
+                </DropdownItem>
+
+                <DropdownItem
+                    onClick={() => router.push("/erp/stores")}
+                    className="flex items-center gap-2"
+                >
+                    <SettingsIcon className="w-4 h-4" />
+                    <span>Gerenciar lojas</span>
                 </DropdownItem>
             </Dropdown>
 

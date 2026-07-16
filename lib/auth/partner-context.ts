@@ -10,6 +10,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ─�
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
 const ACTIVE_PARTNER_COOKIE = "active_partner_id"
+const ACTIVE_STORE_COOKIE = "active_store_id"
 const PENDING_INVITE_COOKIE = "pending_invite_token"
 
 const COOKIE_OPTIONS = {
@@ -106,6 +107,37 @@ export async function consumePendingInviteToken(): Promise<string | null> {
 export async function getPendingInviteToken(): Promise<string | null> {
     const cookieStore = await cookies()
     return cookieStore.get(PENDING_INVITE_COOKIE)?.value ?? null
+}
+
+// ─── Active Store Cookie Management ─────────────────────────────────────────
+
+/**
+ * Sets the active store ID in a secure HttpOnly cookie.
+ * Used when user switches store via StoreSwitcher.
+ * This cookie is UI context only - authorization is always validated server-side.
+ */
+export async function setActiveStore(storeId: string): Promise<void> {
+    const cookieStore = await cookies()
+    cookieStore.set(ACTIVE_STORE_COOKIE, storeId, COOKIE_OPTIONS)
+}
+
+/**
+ * Clears the active store cookie.
+ * Used when switching partners or logging out.
+ */
+export async function clearActiveStore(): Promise<void> {
+    const cookieStore = await cookies()
+    cookieStore.delete(ACTIVE_STORE_COOKIE)
+}
+
+/**
+ * Reads the active store ID from the cookie.
+ * Returns null if no active store is set.
+ * This is UI context only - never trust this for authorization.
+ */
+export async function getActiveStoreId(): Promise<string | null> {
+    const cookieStore = await cookies()
+    return cookieStore.get(ACTIVE_STORE_COOKIE)?.value ?? null
 }
 
 // ─── Partner Context Resolution ─────────────────────────────────────────────

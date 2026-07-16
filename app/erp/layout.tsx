@@ -25,6 +25,7 @@ import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import {
   getAllUserPartnerAccess,
   getActivePartnerId,
+  getActiveStoreId,
 } from "@/lib/auth/partner-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
@@ -101,6 +102,7 @@ export default async function ERPLayout({
   const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
 
   const partnerPlan = await getPartnerPlan(context.partnerId)
+  const activeStoreId = await getActiveStoreId()
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
@@ -113,7 +115,7 @@ export default async function ERPLayout({
           planSlug={partnerPlan.slug}
         >
           <PlanUpgradeProvider>
-            <StoreProvider partnerId={context.partnerId}>
+            <StoreProvider partnerId={context.partnerId} activeStoreId={activeStoreId}>
               <SidebarProvider initialExpanded={initialExpanded}>
                 <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
                   <ERPSidebar />

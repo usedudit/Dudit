@@ -42,12 +42,20 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
 
-export function StoreProvider({ children, partnerId: propPartnerId }: { children: React.ReactNode; partnerId?: string }) {
+export function StoreProvider({
+  children,
+  partnerId: propPartnerId,
+  activeStoreId: propActiveStoreId,
+}: {
+  children: React.ReactNode
+  partnerId?: string
+  activeStoreId?: string | null
+}) {
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
   const [stores, setStores] = useState<Store[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [partnerId, setPartnerId] = useState<string | null>(propPartnerId || null)
-  // supabase singleton imported directly
+  const hasSyncedCookie = useRef(false)
 
   useEffect(() => {
     const cached = localStorage.getItem("cachedStores")
@@ -66,7 +74,6 @@ export function StoreProvider({ children, partnerId: propPartnerId }: { children
     }
   }, [])
 
-  // Sync propPartnerId when it changes (e.g. user switches ERPs without a full page reload)
   useEffect(() => {
     if (propPartnerId && propPartnerId !== partnerId) {
       setPartnerId(propPartnerId)
@@ -92,7 +99,11 @@ export function StoreProvider({ children, partnerId: propPartnerId }: { children
       localStorage.setItem("cachedStores", JSON.stringify(data || []))
 
       const savedStoreId = localStorage.getItem("selectedStoreId")
-      if (savedStoreId && data?.find((s: any) => s.id === savedStoreId)) {
+
+      if (propActiveStoreId && data?.find((s: any) => s.id === propActiveStoreId)) {
+        setSelectedStore(data.find((s: any) => s.id === propActiveStoreId) || null)
+        localStorage.setItem("selectedStoreId", propActiveStoreId)
+      } else if (savedStoreId && data?.find((s: any) => s.id === savedStoreId)) {
         setSelectedStore(data.find((s: any) => s.id === savedStoreId) || null)
       } else if (data && data.length > 0) {
         setSelectedStore(data[0])
@@ -103,9 +114,7 @@ export function StoreProvider({ children, partnerId: propPartnerId }: { children
     } finally {
       setIsLoading(false)
     }
-    // supabase ref is stable via useRef - no need to include it
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partnerId])
+  }, [partnerId, propActiveStoreId])
 
   useEffect(() => {
     fetchStores()
@@ -116,6 +125,10 @@ export function StoreProvider({ children, partnerId: propPartnerId }: { children
     if (store) {
       setSelectedStore(store)
       localStorage.setItem("selectedStoreId", storeId)
+
+      import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
+        setActiveStoreAction(storeId)
+      })
     }
   }
 
