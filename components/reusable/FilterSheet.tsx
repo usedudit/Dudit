@@ -110,7 +110,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                     if (section.type === "switch") {
                         const checked = !!localFilters[section.id]
                         return (
-                            <Accordion key={section.id} title={section.title} defaultOpen>
+                            <Accordion key={section.id} title={section.title}>
                                 <div className="flex items-center justify-between gap-3 px-2 py-1">
                                     <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
                                         {section.switchLabel || ""}
@@ -134,7 +134,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                         const selected = v.presets || []
 
                         return (
-                            <Accordion key={section.id} title={section.title} defaultOpen>
+                            <Accordion key={section.id} title={section.title}>
                                 {presets.map((opt) => {
                                     const isOn = selected.includes(opt)
                                     return (
@@ -193,7 +193,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                         const rangeValue = localFilters[section.id] || { min: "", max: "" }
 
                         return (
-                            <Accordion key={section.id} title={section.title} defaultOpen>
+                            <Accordion key={section.id} title={section.title}>
                                 <div className="flex items-center gap-3">
                                     <Input
                                         name={minKey}
@@ -225,7 +225,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                         const isAllSelected = selectedValues.length === 0
 
                         return (
-                            <Accordion key={section.id} title={section.title} defaultOpen>
+                            <Accordion key={section.id} title={section.title}>
                                 {/* Opção "Todos" */}
                                 <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border cursor-pointer transition-colors">
                                     <Checkbox

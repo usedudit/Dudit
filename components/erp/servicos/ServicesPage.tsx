@@ -15,6 +15,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 
 // Actions
 import {
@@ -74,6 +75,8 @@ interface FilterState {
     categories: string[]
     status: string[]
     priceRange: { min: string; max: string }
+    hasCostPrice: boolean
+    durationRange: { min: string; max: string }
     [key: string]: any
 }
 
@@ -81,6 +84,8 @@ const INITIAL_FILTERS: FilterState = {
     categories: [],
     status: [],
     priceRange: { min: "", max: "" },
+    hasCostPrice: false,
+    durationRange: { min: "", max: "" },
 }
 
 // --- CONFIGURAÇÃO DE COLUNAS ---
@@ -277,9 +282,33 @@ export default function ServicesPage({
         filters.categories.length > 0 ||
         filters.status.length > 0 ||
         !!filters.priceRange.min ||
-        !!filters.priceRange.max
+        !!filters.priceRange.max ||
+        !!filters.hasCostPrice ||
+        !!filters.durationRange.min ||
+        !!filters.durationRange.max
 
     const isFiltered = search.length > 0 || hasActiveFilters
+
+    // Dynamic Filter Sections - only show if data exists
+    const filterSections = useMemo<FilterSectionConfig[]>(() => {
+        const categories = [...new Set(services.map((s) => s.service_categories?.name).filter(Boolean))] as string[]
+        const hasCostPrice = services.some((s) => s.cost_price !== null && s.cost_price !== undefined)
+        const hasDuration = services.some((s) => s.duration_minutes !== null && s.duration_minutes !== undefined && s.duration_minutes > 0)
+
+        const sections: FilterSectionConfig[] = [
+            { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo"] },
+            { id: "priceRange", title: "Preço", type: "range", rangeConfig: { minKey: "minPrice", maxKey: "maxPrice" } },
+        ]
+
+        if (categories.length > 0) sections.push({ id: "categories", title: "Categoria", type: "checkbox-list", options: categories })
+        if (hasCostPrice) sections.push({ id: "hasCostPrice", title: "Tem Preço de Custo", type: "switch", switchLabel: "Apenas com preço de custo" })
+        if (hasDuration) sections.push({ id: "durationRange", title: "Duração (min)", type: "range", rangeConfig: { minKey: "minDuration", maxKey: "maxDuration", minPlaceholder: "Min", maxPlaceholder: "Max" } })
+
+        return sections
+    }, [services])
+
+    // UI State for FilterSheet
+    const [modals, setModals] = useState({ filter: false })
 
     const tabCounts = useMemo(() => {
         const all = services.length
@@ -301,6 +330,9 @@ export default function ServicesPage({
                 activeTab,
                 status: filters.status,
                 categories: filters.categories,
+                hasCostPrice: filters.hasCostPrice,
+                minDuration: filters.durationRange.min,
+                maxDuration: filters.durationRange.max,
             },
         }, { selectedIds: selection.ids, totalCount: services.length })
     }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, services.length])
@@ -329,6 +361,8 @@ export default function ServicesPage({
             const term = debouncedSearch.toLowerCase()
             const minPrice = filters.priceRange.min ? Number.parseFloat(filters.priceRange.min) : 0
             const maxPrice = filters.priceRange.max ? Number.parseFloat(filters.priceRange.max) : Number.POSITIVE_INFINITY
+            const minDuration = filters.durationRange.min ? Number.parseFloat(filters.durationRange.min) : 0
+            const maxDuration = filters.durationRange.max ? Number.parseFloat(filters.durationRange.max) : Number.POSITIVE_INFINITY
 
             let tabMatch = true
             if (activeTab === "active") tabMatch = s.is_active === true
@@ -337,11 +371,17 @@ export default function ServicesPage({
             const statusLabel = s.is_active ? "Ativo" : "Inativo"
             const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
+            const categoryMatch = filters.categories.length === 0 || filters.categories.includes((s.service_categories?.name || "") as any)
+            const hasCostPriceMatch = !filters.hasCostPrice || (s.cost_price !== null && s.cost_price !== undefined)
+            const durationMatch = s.duration_minutes >= minDuration && s.duration_minutes <= maxDuration
+
             return (
                 tabMatch &&
                 statusMatch &&
+                categoryMatch &&
+                hasCostPriceMatch &&
+                durationMatch &&
                 (s.name.toLowerCase().includes(term) || s.sku?.toLowerCase().includes(term)) &&
-                (filters.categories.length === 0 || filters.categories.includes((s.service_categories?.name || "") as any)) &&
                 s.price >= minPrice &&
                 s.price <= maxPrice
             )
@@ -656,7 +696,7 @@ export default function ServicesPage({
                                     setActiveTab={setActiveTab}
                                     search={search}
                                     onSearchChange={setSearch}
-                                    onOpenFilter={() => { }}
+                                    onOpenFilter={() => setModals({ filter: true })}
                                     onOpenImport={() => { }}
                                     onOpenExport={handleExport}
                                     onAddService={handleAddFirstService}
@@ -904,6 +944,15 @@ export default function ServicesPage({
                     </div>
                 </div>
             )}
+
+            <FilterSheet
+                isOpen={modals.filter}
+                onClose={() => setModals({ filter: false })}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => setFilters(INITIAL_FILTERS)}
+            />
 
             <ExportSelectionModal
                 isOpen={selectionModal.isOpen}

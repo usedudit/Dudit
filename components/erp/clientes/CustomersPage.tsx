@@ -198,9 +198,21 @@ export default function CustomersPage({
         threshold: 0,
     })
 
-    const filterSections: FilterSectionConfig[] = [
-        { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo", "Bloqueado"] },
-    ]
+    const filterSections = useMemo<FilterSectionConfig[]>(() => {
+        if (!rawCustomers) return []
+        
+        const statuses = [...new Set(rawCustomers.map((c: any) => 
+            c.status === 'bloqueado' ? "Bloqueado" : (c.status === 'inativo' ? "Inativo" : "Ativo")
+        ).filter(Boolean))] as string[]
+        
+        const sections: FilterSectionConfig[] = []
+        
+        if (statuses.length > 1) {
+            sections.push({ id: "status", title: "Status", type: "checkbox-list", options: statuses })
+        }
+        
+        return sections
+    }, [rawCustomers])
 
     const filteredCustomers: Customer[] = useMemo(() => {
         if (!rawCustomers) return []

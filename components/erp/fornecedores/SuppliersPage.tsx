@@ -181,9 +181,18 @@ export default function SuppliersPage({
         threshold: 0,
     })
 
-    const filterSections: FilterSectionConfig[] = [
-        { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo"] },
-    ]
+    const filterSections = useMemo<FilterSectionConfig[]>(() => {
+        // Only show status filter if there are suppliers with different statuses
+        const statusLabels = [...new Set((rawSuppliers || []).map((s: any) => s.status === "ativo" ? "Ativo" : "Inativo"))]
+        
+        const sections: FilterSectionConfig[] = []
+        
+        if (statusLabels.length > 1) {
+            sections.push({ id: "status", title: "Status", type: "checkbox-list", options: statusLabels })
+        }
+        
+        return sections
+    }, [rawSuppliers])
 
     const filteredSuppliers: Supplier[] = useMemo(() => {
         if (!rawSuppliers) return []

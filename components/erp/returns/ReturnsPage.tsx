@@ -20,6 +20,7 @@ import type { ReturnRequest } from "./types"
 import { formatDate } from "@/lib/utils"
 import { createReturnRequestAction, getReturnRequestsPageAction, processReturnRequestAction } from "@/app/actions/erp/returns"
 import { getReturnResolutionLabel } from "@/lib/returns/types"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 
 type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados"
 type SortKey = "id" | "order_number" | "customer" | "date" | "refund_type" | "quantity"
@@ -105,6 +106,30 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
         key: "date",
         direction: "desc",
     })
+
+    // Filter state
+    interface FilterState {
+        status: string[]
+        resolutionType: string[]
+        reason: string[]
+        condition: string[]
+        refundRange: { min: string; max: string }
+        storeCreditRange: { min: string; max: string }
+        hasEvidence: boolean
+    }
+
+    const INITIAL_FILTERS: FilterState = {
+        status: [],
+        resolutionType: [],
+        reason: [],
+        condition: [],
+        refundRange: { min: "", max: "" },
+        storeCreditRange: { min: "", max: "" },
+        hasEvidence: false,
+    }
+
+    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+    const [modals, setModals] = useState({ filter: false })
 
     const [showMpPaymentNotFoundModal, setShowMpPaymentNotFoundModal] = useState(false)
     const [mpPaymentNotFoundChecked, setMpPaymentNotFoundChecked] = useState(false)
@@ -259,7 +284,39 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
             else if (activeTab === "AguardandoCliente") matchesTab = item.status === "WAITING_CUSTOMER"
             else if (activeTab === "Aprovados") matchesTab = ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(item.status)
             else if (activeTab === "Finalizados") matchesTab = ["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status)
-            return matchesSearch && matchesTab
+
+            // Filter: Status
+            const statusLabel = getReturnStatusMeta(item.status).label
+            const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
+
+            // Filter: Resolution Type
+            const resolutionLabel = getReturnResolutionLabel(item.approvedResolution || item.desiredResolution || "")
+            const resolutionMatch = filters.resolutionType.length === 0 || filters.resolutionType.includes(resolutionLabel)
+
+            // Filter: Reason (from first item)
+            const itemReason = item.items[0]?.reason || ""
+            const reasonMatch = filters.reason.length === 0 || filters.reason.includes(itemReason)
+
+            // Filter: Condition (from first item)
+            const itemCondition = item.items[0]?.condition || ""
+            const conditionMatch = filters.condition.length === 0 || filters.condition.includes(itemCondition)
+
+            // Filter: Refund Value Range
+            const refundValue = Number(item.refundValue || 0)
+            const minRefund = filters.refundRange.min ? Number(filters.refundRange.min) : 0
+            const maxRefund = filters.refundRange.max ? Number(filters.refundRange.max) : Number.POSITIVE_INFINITY
+            const refundMatch = refundValue >= minRefund && refundValue <= maxRefund
+
+            // Filter: Store Credit Range
+            const storeCreditValue = Number(item.storeCreditValue || 0)
+            const minCredit = filters.storeCreditRange.min ? Number(filters.storeCreditRange.min) : 0
+            const maxCredit = filters.storeCreditRange.max ? Number(filters.storeCreditRange.max) : Number.POSITIVE_INFINITY
+            const creditMatch = storeCreditValue >= minCredit && storeCreditValue <= maxCredit
+
+            // Filter: Has Evidence
+            const evidenceMatch = !filters.hasEvidence || (item.items[0]?.evidence?.length > 0)
+
+            return matchesSearch && matchesTab && statusMatch && resolutionMatch && reasonMatch && conditionMatch && refundMatch && creditMatch && evidenceMatch
         })
 
         if (sortConfig) {
@@ -299,20 +356,85 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
         }
 
         return result
-    }, [returnsData, debouncedSearch, activeTab, sortConfig])
+    }, [returnsData, debouncedSearch, activeTab, sortConfig, filters])
+
+    // Dynamic Filter Sections - only show if data exists for that filter
+    const filterSections = useMemo<FilterSectionConfig[]>(() => {
+        const data = returnsData ?? []
+        if (data.length === 0) return []
+
+        // Status labels present in data
+        const statusLabels = [...new Set(data.map(item => getReturnStatusMeta(item.status).label))]
+
+        // Resolution types present
+        const resolutionLabels = [...new Set(data.map(item => getReturnResolutionLabel(item.approvedResolution || item.desiredResolution || "")).filter(Boolean))]
+
+        // Reasons present (from first item of each return)
+        const reasons = [...new Set(data.map(item => item.items[0]?.reason).filter(Boolean))]
+
+        // Conditions present
+        const conditions = [...new Set(data.map(item => item.items[0]?.condition).filter(Boolean))]
+
+        // Has any with evidence
+        const hasEvidence = data.some(item => item.items[0]?.evidence?.length > 0)
+
+        // Has refund values
+        const hasRefund = data.some(item => Number(item.refundValue || 0) > 0)
+
+        // Has store credit values
+        const hasStoreCredit = data.some(item => Number(item.storeCreditValue || 0) > 0)
+
+        const sections: FilterSectionConfig[] = []
+
+        if (statusLabels.length > 1) sections.push({ id: "status", title: "Status", type: "checkbox-list", options: statusLabels })
+        if (resolutionLabels.length > 1) sections.push({ id: "resolutionType", title: "Tipo de Resolução", type: "checkbox-list", options: resolutionLabels })
+        if (reasons.length > 1) sections.push({ id: "reason", title: "Motivo", type: "checkbox-list", options: reasons })
+        if (conditions.length > 1) sections.push({ id: "condition", title: "Condição do Item", type: "checkbox-list", options: conditions })
+        if (hasRefund) sections.push({ id: "refundRange", title: "Valor Reembolso", type: "range", rangeConfig: { minKey: "min", maxKey: "max", minPlaceholder: "Mín (R$)", maxPlaceholder: "Máx (R$)" } })
+        if (hasStoreCredit) sections.push({ id: "storeCreditRange", title: "Valor Vale-Compra", type: "range", rangeConfig: { minKey: "min", maxKey: "max", minPlaceholder: "Mín (R$)", maxPlaceholder: "Máx (R$)" } })
+        if (hasEvidence) sections.push({ id: "hasEvidence", title: "Tem Evidências", type: "switch", switchLabel: "Apenas com evidências" })
+
+        return sections
+    }, [returnsData])
 
     const totalPages = Math.max(1, Math.ceil(filteredReturns.length / ITEMS_PER_PAGE))
     const paginatedReturns = filteredReturns.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
-    const hasActiveFilters = debouncedSearch.length > 0 || activeTab !== "Todos"
+    const hasActiveFilters = debouncedSearch.length > 0 || activeTab !== "Todos" ||
+        filters.status.length > 0 ||
+        filters.resolutionType.length > 0 ||
+        filters.reason.length > 0 ||
+        filters.condition.length > 0 ||
+        !!filters.refundRange.min ||
+        !!filters.refundRange.max ||
+        !!filters.storeCreditRange.min ||
+        !!filters.storeCreditRange.max ||
+        filters.hasEvidence
+
+    const handleClearFilters = useCallback(() => {
+        setSearch("")
+        setFilters(INITIAL_FILTERS)
+    }, [setSearch])
 
     const handleExport = useCallback(() => {
         void exportData({
             partnerId,
             module: "returns",
             format: "xlsx",
-            filters: { search: debouncedSearch, activeTab },
+            filters: { 
+                search: debouncedSearch, 
+                activeTab,
+                status: filters.status,
+                resolutionType: filters.resolutionType,
+                reason: filters.reason,
+                condition: filters.condition,
+                minRefund: filters.refundRange.min,
+                maxRefund: filters.refundRange.max,
+                minStoreCredit: filters.storeCreditRange.min,
+                maxStoreCredit: filters.storeCreditRange.max,
+                hasEvidence: filters.hasEvidence,
+            },
         })
-    }, [exportData, partnerId, debouncedSearch, activeTab])
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
 
     if (planGate) {
         return (
@@ -414,7 +536,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                             <ReturnPageControls
                                 search={search}
                                 onSearchChange={setSearch}
-                                onOpenFilter={() => undefined}
+                                onOpenFilter={() => setModals({ filter: true })}
                                 onAdd={canManage ? () => openEntity("create") : undefined}
                                 viewMode={effectiveViewMode}
                                 onViewModeChange={setViewModeState}
@@ -434,7 +556,11 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                                                 imageAlt="Sem devolucoes"
                                                 title={hasActiveFilters ? "Nenhuma solicitação encontrada" : "Nenhuma solicitação cadastrada"}
                                                 subtitle={hasActiveFilters ? "Ajuste a busca para encontrar o que procura." : "Comece criando a primeira solicitação de troca ou devolução."}
-                                                itemButton={!hasActiveFilters && canManage ? { text: "Criar devolução", action: () => openEntity("create") } : undefined}
+                                                itemButton={hasActiveFilters ? {
+                                                    text: "Limpar filtros",
+                                                    action: handleClearFilters,
+                                                    variant: "outline"
+                                                } : !hasActiveFilters && canManage ? { text: "Criar devolução", action: () => openEntity("create") } : undefined}
                                             />
                                         </FadeIn>
                                     ) : effectiveViewMode === "grid" ? (
@@ -586,6 +712,15 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
                 onExportSelected={handleExportSelected}
                 onExportAll={handleExportAll}
                 onClose={closeSelectionModal}
+            />
+
+            <FilterSheet
+                isOpen={modals.filter}
+                onClose={() => setModals({ filter: false })}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => setFilters(INITIAL_FILTERS)}
             />
         </>
     )

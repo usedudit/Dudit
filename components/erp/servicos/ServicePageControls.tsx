@@ -22,10 +22,14 @@ import {
     GridIcon as CategoryIcon
 } from "@/lib/icons"
 
+// Tipos necessários
 interface FilterState {
     categories: string[]
     status: string[]
     priceRange: { min: string; max: string }
+    hasCostPrice: boolean
+    durationRange: { min: string; max: string }
+    [key: string]: any
 }
 
 interface ServicePageControlsProps {
@@ -79,7 +83,7 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
         return () => window.removeEventListener("resize", checkFilterScroll)
     }, [checkFilterScroll, filters])
 
-    const renderGroupedBadge = (label: string, items: string[], key: keyof FilterState, icon?: any) => {
+    const renderGroupedBadge = (label: string, items: string[], key: string, icon?: any) => {
         if (!items || items.length === 0) return null
         const displayValue = items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`
         const fullValue = items.join(", ")
@@ -91,7 +95,7 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                 icon={icon}
                 value={displayValue}
                 tooltip={`${label}: ${fullValue}`}
-                onRemove={() => setFilters((prev) => ({ ...prev, [key]: [] }))}
+                onRemove={() => setFilters((prev: FilterState): FilterState => ({ ...prev, [key]: [] }))}
             />
         )
     }
@@ -105,7 +109,7 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                 label="Preço"
                 icon={<MoneyIcon size={12} />}
                 value={`${min ? `R$${min}` : "R$0"} - ${max ? `R$${max}` : "∞"}`}
-                onRemove={() => setFilters((p) => ({ ...p, priceRange: { min: "", max: "" } }))}
+                onRemove={() => setFilters((p: FilterState): FilterState => ({ ...p, priceRange: { min: "", max: "" } }))}
             />
         )
     }
@@ -115,6 +119,22 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
             {renderGroupedBadge("Status", filters.status, "status", <InfoIcon size={12} />)}
             {renderGroupedBadge("Categoria", filters.categories, "categories", <CategoryIcon size={12} />)}
             {renderPriceBadge()}
+            {filters.hasCostPrice && (
+                <FilterChip
+                    key="hasCostPrice"
+                    label="Preço de Custo"
+                    value="Sim"
+                    onRemove={() => setFilters((p: FilterState): FilterState => ({ ...p, hasCostPrice: false }))}
+                />
+            )}
+            {filters.durationRange.min && (
+                <FilterChip
+                    key="durationRange"
+                    label="Duração (min)"
+                    value={`${filters.durationRange.min ? `${filters.durationRange.min} min` : "0 min"} - ${filters.durationRange.max ? `${filters.durationRange.max} min` : "∞"}`}
+                    onRemove={() => setFilters((p: FilterState): FilterState => ({ ...p, durationRange: { min: "", max: "" } }))}
+                />
+            )}
         </AnimatePresence>
     )
 

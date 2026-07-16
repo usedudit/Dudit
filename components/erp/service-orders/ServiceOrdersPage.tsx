@@ -267,30 +267,56 @@ export default function ServiceOrdersPage({
     isFetchingNextPage,
   })
 
-  const filterSections: FilterSectionConfig[] = useMemo(() => [
-    {
-      id: "status",
-      title: "Status",
-      type: "checkbox-list",
-      options: Object.entries(SERVICE_ORDER_STATUS_META).map(([_, meta]) => meta.label),
-    },
-    {
-      id: "total",
-      title: "Valor Total",
-      type: "range",
-      rangeConfig: {
-        minKey: "min",
-        maxKey: "max",
-        minPlaceholder: "Mín (R$)",
-        maxPlaceholder: "Máx (R$)",
-      },
-    },
-    {
-      id: "expected_completion_date",
-      title: "Data Prevista",
-      type: "date-period",
-    },
-  ], [])
+  const filterSections: FilterSectionConfig[] = useMemo(() => {
+    // Only show status filter if there are orders with different statuses
+    const statusLabels = [...new Set((effectiveOrders || []).map((o: any) => {
+      const meta = SERVICE_ORDER_STATUS_META[o.status as ServiceOrderStatus]
+      return meta?.label || o.status
+    }))]
+    
+    // Only show total filter if there are orders with different totals
+    const hasMultipleTotals = (effectiveOrders || []).some((o: any, i, arr) => 
+      i > 0 && Number(o.total_amount || 0) !== Number(arr[0].total_amount || 0)
+    )
+    
+    // Only show date filter if there are orders with expected_completion_date
+    const hasDates = (effectiveOrders || []).some((o: any) => o.expected_completion_date)
+
+    const sections: FilterSectionConfig[] = []
+
+    if (statusLabels.length > 1) {
+      sections.push({
+        id: "status",
+        title: "Status",
+        type: "checkbox-list",
+        options: statusLabels,
+      })
+    }
+
+    if (hasMultipleTotals) {
+      sections.push({
+        id: "total",
+        title: "Valor Total",
+        type: "range",
+        rangeConfig: {
+          minKey: "min",
+          maxKey: "max",
+          minPlaceholder: "Mín (R$)",
+          maxPlaceholder: "Máx (R$)",
+        },
+      })
+    }
+
+    if (hasDates) {
+      sections.push({
+        id: "expected_completion_date",
+        title: "Data Prevista",
+        type: "date-period",
+      })
+    }
+
+    return sections
+  }, [effectiveOrders])
 
   const hasActiveFilters = useMemo(() => {
     return (

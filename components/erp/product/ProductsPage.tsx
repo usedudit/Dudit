@@ -109,9 +109,11 @@ interface ColumnDef {
 interface FilterState {
     categories: string[]
     brands: string[]
-    units: string[]
     stocks: string[]
     status: string[]
+    productTypes: string[]
+    hasCostPrice: boolean
+    isOnPromotion: boolean
     priceRange: { min: string; max: string }
     [key: string]: any
 }
@@ -119,9 +121,11 @@ interface FilterState {
 const INITIAL_FILTERS: FilterState = {
     categories: [],
     brands: [],
-    units: [],
     stocks: [],
     status: [],
+    productTypes: [],
+    hasCostPrice: false,
+    isOnPromotion: false,
     priceRange: { min: "", max: "" },
 }
 
@@ -281,9 +285,11 @@ export default function ProductsPage({
         stocks: [],
         categories: [],
         brands: [],
-        units: [],
+        productTypes: [],
         status: [],
         priceRange: { min: "", max: "" },
+        hasCostPrice: false,
+        isOnPromotion: false,
     })
     const [activeTab, setActiveTab] = useState<"all" | "normal" | "low" | "out_of_stock">("all")
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
@@ -333,13 +339,15 @@ export default function ProductsPage({
 
     const hasProducts = products.length > 0
     const hasActiveFilters =
-        filters.stocks.length > 0 ||
+        filters.status.length > 0 ||
         filters.categories.length > 0 ||
         filters.brands.length > 0 ||
-        filters.units.length > 0 ||
-        filters.status.length > 0 ||
+        filters.productTypes.length > 0 ||
+        filters.stocks.length > 0 ||
         !!filters.priceRange.min ||
-        !!filters.priceRange.max
+        !!filters.priceRange.max ||
+        !!filters.hasCostPrice ||
+        !!filters.isOnPromotion
 
     const isFiltered = search.length > 0 || hasActiveFilters
 
@@ -367,6 +375,10 @@ export default function ProductsPage({
                 status: filters.status,
                 categories: filters.categories,
                 stockStatus: filters.stocks,
+                brands: filters.brands,
+                productTypes: filters.productTypes,
+                hasCostPrice: filters.hasCostPrice,
+                isOnPromotion: filters.isOnPromotion,
             },
         }, { selectedIds: selection.ids, totalCount: products.length })
     }, [exportData, partnerId, debouncedSearch, activeTab, filters, selection.ids, products.length])
@@ -394,17 +406,24 @@ export default function ProductsPage({
     const filterSections = useMemo<FilterSectionConfig[]>(() => {
         const categories = [...new Set(products.map((p) => p.category).filter(Boolean))] as string[]
         const brands = [...new Set(products.map((p) => p.brand).filter(Boolean))] as string[]
-        const units = [...new Set(products.map((p) => p.unit).filter(Boolean))] as string[]
         const stockLabels = [...new Set(products.map((p) => getStockStatus(p.stock_quantity ?? (p as any).stock ?? 0, p.min_stock ?? undefined).label))] as string[]
+        const productTypes = [...new Set(products.map((p) => p.product_type).filter(Boolean))] as string[]
+        const hasCostPrice = products.some((p) => p.cost_price !== null && p.cost_price !== undefined)
+        const hasPromotion = products.some((p) => p.is_on_promotion === true)
 
-        return [
+        const sections: FilterSectionConfig[] = [
             { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo"] },
             { id: "priceRange", title: "Preço", type: "range", rangeConfig: { minKey: "minPrice", maxKey: "maxPrice" } },
-            { id: "categories", title: "Categoria", type: "checkbox-list", options: categories },
-            { id: "brands", title: "Marca", type: "checkbox-list", options: brands },
-            { id: "units", title: "Unidade", type: "checkbox-list", options: units },
-            { id: "stocks", title: "Situação de Estoque", type: "checkbox-list", options: stockLabels },
         ]
+
+        if (categories.length > 0) sections.push({ id: "categories", title: "Categoria", type: "checkbox-list", options: categories })
+        if (brands.length > 0) sections.push({ id: "brands", title: "Marca", type: "checkbox-list", options: brands })
+        if (productTypes.length > 0) sections.push({ id: "productTypes", title: "Tipo de Produto", type: "checkbox-list", options: productTypes })
+        if (stockLabels.length > 0) sections.push({ id: "stocks", title: "Situação de Estoque", type: "checkbox-list", options: stockLabels })
+        if (hasCostPrice) sections.push({ id: "hasCostPrice", title: "Tem Preço de Custo", type: "switch", switchLabel: "Apenas com preço de custo" })
+        if (hasPromotion) sections.push({ id: "isOnPromotion", title: "Em Promoção", type: "switch", switchLabel: "Apenas em promoção" })
+
+        return sections
     }, [products])
 
     const filteredProducts = useMemo(() => {
@@ -424,12 +443,21 @@ export default function ProductsPage({
             const statusLabel = p.is_active ? "Ativo" : "Inativo"
             const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
+            const categoryMatch = filters.categories.length === 0 || filters.categories.includes((p.category || "") as any)
+            const brandMatch = filters.brands.length === 0 || filters.brands.includes((p.brand || "") as any)
+            const productTypeMatch = filters.productTypes.length === 0 || filters.productTypes.includes((p.product_type || "") as any)
+            const hasCostPriceMatch = !filters.hasCostPrice || (p.cost_price !== null && p.cost_price !== undefined)
+            const isOnPromotionMatch = !filters.isOnPromotion || p.is_on_promotion === true
+
             return (
                 tabMatch &&
                 statusMatch &&
+                categoryMatch &&
+                brandMatch &&
+                productTypeMatch &&
+                hasCostPriceMatch &&
+                isOnPromotionMatch &&
                 (p.name.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term)) &&
-                (filters.categories.length === 0 || filters.categories.includes((p.category || "") as any)) &&
-                (filters.brands.length === 0 || filters.brands.includes((p.brand || "") as any)) &&
                 (filters.stocks.length === 0 || filters.stocks.includes(stockLabel)) &&
                 p.price >= minPrice &&
                 p.price <= maxPrice

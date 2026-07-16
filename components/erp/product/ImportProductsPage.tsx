@@ -520,7 +520,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                         onOpenImport={() => { }}
                                         onOpenExport={() => { }}
                                         onAddProduct={() => { }}
-                                        filters={{ categories: [], brands: [], units: [], stocks: [], status: [], priceRange: { min: "", max: "" } }}
+                                        filters={{ categories: [], brands: [], stocks: [], status: [], productTypes: [], priceRange: { min: "", max: "" }, hasCostPrice: false, isOnPromotion: false }}
                                         setFilters={() => { }}
                                         hasActiveFilters={false}
                                     />

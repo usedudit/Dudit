@@ -32,10 +32,12 @@ import {
 interface FilterState {
     categories: string[]
     brands: string[]
-    units: string[]
     stocks: string[]
     status: string[]
+    productTypes: string[]
     priceRange: { min: string; max: string }
+    hasCostPrice: boolean
+    isOnPromotion: boolean
 }
 
 interface ProductPageControlsProps {
@@ -166,8 +168,24 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
             {renderGroupedBadge("Estoque", filters.stocks, "stocks", <PackageIcon size={12} />)}
             {renderGroupedBadge("Categoria", filters.categories, "categories", <GridIcon size={12} />)}
             {renderGroupedBadge("Marca", filters.brands, "brands", <TagIcon size={12} />)}
-            {renderGroupedBadge("Unidade", filters.units, "units", <BoxIcon size={12} />)}
+            {renderGroupedBadge("Tipo", filters.productTypes, "productTypes", <GridIcon size={12} />)}
             {renderPriceBadge()}
+            {filters.hasCostPrice && (
+                <FilterChip
+                    key="hasCostPrice"
+                    label="Preço de Custo"
+                    value="Sim"
+                    onRemove={() => setFilters((p) => ({ ...p, hasCostPrice: false }))}
+                />
+            )}
+            {filters.isOnPromotion && (
+                <FilterChip
+                    key="isOnPromotion"
+                    label="Promoção"
+                    value="Sim"
+                    onRemove={() => setFilters((p) => ({ ...p, isOnPromotion: false }))}
+                />
+            )}
         </AnimatePresence>
     )
 
