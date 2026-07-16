@@ -9,12 +9,27 @@ interface Store {
   id: string
   partner_id: string
   name: string
+  slug: string | null
+  description: string | null
+  phone: string | null
+  city: string | null
+  state: string | null
+  opening_hours: Record<string, unknown> | null
+  banner_url: string | null
+  logo_url: string | null
+  gallery: unknown[] | null
   image_url: string | null
+  whatsapp_phone: string | null
+  is_headquarters: boolean
+  is_active: boolean
+  address_id: string | null
+  crt: string | null
+  contribuinte: string | null
+  inscricao_estadual: string | null
+  ie_isento: boolean | null
+  inscricao_municipal: string | null
   created_at: string
-  business_info?: {
-    sells?: string[]
-    mode?: "quick" | "erp"
-  }
+  updated_at: string
 }
 
 interface StoreContextType {
