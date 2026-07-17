@@ -1,8 +1,11 @@
-import { Metadata } from 'next'
-import { searchMarketplaceDirect } from '@/app/actions/marketplace/search'
-import { redirect, permanentRedirect } from 'next/navigation'
+import { cache } from "react"
+import type { Metadata } from 'next'
+import { redirect, permanentRedirect, notFound } from 'next/navigation'
 import { isValidCitySlug } from '@/lib/validation/city'
+import { searchMarketplaceDirect } from '@/app/actions/marketplace/search'
 import ExplorarPage from '@/app/explorar/[[...slug]]/page'
+import { getStoreBySlug, buildStoreCitySlug } from '@/app/actions/marketplace/stores'
+import { StorePage, generateStoreMetadata } from './store-page'
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
   "casa-e-utilidades": "Casa & Utilidades",
@@ -16,24 +19,46 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
   "infantil-e-brinquedos": "Infantil & Brinquedos"
 }
 
-const revalidate = 86400 // Cache 24h
+const revalidate = 86400
 
 type Props = {
   params: Promise<{ cidadeUf: string; slug: string }>
 }
 
+function parseCidadeUf(cidadeUf: string): { state: string; citySlug: string } {
+  const parts = cidadeUf.split("-")
+  const state = parts.pop()?.toUpperCase() || ""
+  const citySlug = parts.join("-")
+  return { state, citySlug }
+}
+
+function isStoreInCity(store: any, cidadeUf: string): boolean {
+  const storeCitySlug = buildStoreCitySlug(store)
+  if (!storeCitySlug) return true
+  return storeCitySlug === cidadeUf.toLowerCase()
+}
+
+const getStoreForPage = cache(async (slug: string, cidadeUf: string) => {
+  const store = await getStoreBySlug(slug)
+  if (!store) return null
+  if (!isStoreInCity(store, cidadeUf)) return null
+  return store
+})
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { cidadeUf, slug } = await params
 
-  // Format para título legível
+  const store = await getStoreForPage(slug, cidadeUf)
+  if (store) {
+    return generateStoreMetadata(store, cidadeUf)
+  }
+
   const cityFormatted = cidadeUf.split('-').slice(0, -1).join(' ').replace(/\b\w/g, l => l.toUpperCase())
   const stateFormatted = cidadeUf.split('-').pop()?.toUpperCase() || ''
   const termFormatted = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 
-  // Busca rápida apenas para verificar se há resultados e indexar ou não
   const query = `${slug.replace(/-/g, ' ')} ${cidadeUf}`
   const results = await searchMarketplaceDirect(query, 'tudo', { geral: 1 })
-
   const hasResults = results && results.length > 0
 
   return {
@@ -58,19 +83,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityTermPage({ params }: Props) {
   const { cidadeUf, slug } = await params
 
-  // Redirect legacy /sp/sao-paulo to /sao-paulo-sp
   if (cidadeUf.length === 2) {
     permanentRedirect(`/${slug}-${cidadeUf}`)
   }
 
-  // Redirect invalid city to /explorar
   if (!isValidCitySlug(cidadeUf)) {
     redirect(`/explorar?q=${slug}`)
   }
 
-  // Canonical lowercase redirect
   if (cidadeUf !== cidadeUf.toLowerCase() || slug !== slug.toLowerCase()) {
     permanentRedirect(`/${cidadeUf.toLowerCase()}/${slug.toLowerCase()}`)
+  }
+
+  const store = await getStoreForPage(slug, cidadeUf)
+  if (store) {
+    return <StorePage storeData={store} />
   }
 
   const categoryName = CATEGORY_SLUG_MAP[slug]
