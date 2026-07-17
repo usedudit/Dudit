@@ -23,6 +23,7 @@ export default async function FinancialPagamentosRoute() {
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
 
   const partnerId = context.partnerId
+  const activeStoreId = context.activeStoreId || null
   const { allowed } = await checkPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
@@ -38,7 +39,7 @@ export default async function FinancialPagamentosRoute() {
   }
 
   const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult] = await Promise.all([
-    getTransactionsData(partnerId),
+    getTransactionsData(partnerId, { storeId: activeStoreId }),
     getCategoriesData(partnerId),
     getAccountsData(partnerId),
     getRecurringOccurrencesData(partnerId),
@@ -65,6 +66,7 @@ export default async function FinancialPagamentosRoute() {
           initialNextCursor={txResult.nextCursor}
           initialHasMore={txResult.hasMore}
           partnerId={partnerId}
+          storeId={activeStoreId}
           categories={categories}
           accounts={accounts}
           recurringOccurrences={recurringOccurrences}

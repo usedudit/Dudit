@@ -14,11 +14,12 @@ export default async function QuotesPageServer() {
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId
+    const activeStoreId = context.activeStoreId || null
 
     // Parallelize permission check and data fetch
     const [{ allowed }, page] = await Promise.all([
         checkPermission(partnerId, "quotes", "view"),
-        getERPQuotesPageAction(partnerId, { cursor: null, limit: 100 }),
+        getERPQuotesPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId }),
     ])
 
     if (!allowed) return <AccessDenied />
@@ -35,6 +36,7 @@ export default async function QuotesPageServer() {
                     initialNextCursor={page.nextCursor}
                     initialHasMore={page.hasMore}
                     partnerId={partnerId}
+                    storeId={activeStoreId}
                 />
             </FadeIn>
         </>

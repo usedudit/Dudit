@@ -102,11 +102,13 @@ export default function QuotesPage({
     initialNextCursor,
     initialHasMore,
     partnerId,
+    storeId: storeIdProp,
 }: {
     quotes: any[]
     initialNextCursor: ERPQuoteListCursor | null
     initialHasMore: boolean
     partnerId: string
+    storeId?: string | null
 }) {
     const { success, error } = useNotification()
     const debouncedRefresh = useDebouncedRefresh()
@@ -114,6 +116,7 @@ export default function QuotesPage({
     const partnerName = selectedStore?.name || "Sua Loja"
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
+    const [storeId] = useState<string | null>(storeIdProp || null)
 
     const queryKey = useMemo(() => ["erp", "quotes", partnerId] as const, [partnerId])
     const observerTarget = useRef<HTMLDivElement>(null)
@@ -127,7 +130,7 @@ export default function QuotesPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPQuotesPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getERPQuotesPageAction(partnerId, { cursor, limit: 100, storeId })
             if (!res.success) throw new Error(res.error || "Erro ao carregar orçamentos.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },

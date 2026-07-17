@@ -49,7 +49,7 @@ function isMissingQuotesCreatedByUserIdColumnError(error: unknown): boolean {
 
 export async function getERPQuotesPageAction(
     partnerId: string,
-    options?: { cursor?: ERPQuoteListCursor | null; limit?: number },
+    options?: { cursor?: ERPQuoteListCursor | null; limit?: number; storeId?: string | null },
 ): Promise<
     | { success: true; items: any[]; nextCursor: ERPQuoteListCursor | null; hasMore: boolean }
     | { success: false; error: string }
@@ -61,6 +61,7 @@ export async function getERPQuotesPageAction(
 
             const supabase = await getSupabaseServerClient()
             const cursor = options?.cursor ?? null
+            const storeId = options?.storeId ?? null
             const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_QUOTES_PAGE_SIZE))))
             const fetchLimit = limit + 1
 
@@ -97,6 +98,9 @@ export async function getERPQuotesPageAction(
                 `
             const runQuotesPageQuery = async (selectClause: string) => {
                 let query = supabase.from("quotes").select(selectClause).eq("partner_id", partnerId)
+                if (storeId) {
+                    query = query.eq("store_id", storeId)
+                }
                 if (cursor) {
                     query = query.or(buildQuotesKeysetOrFilter(cursor))
                 }
@@ -370,6 +374,7 @@ export async function createQuoteAction(data: {
     additionalCosts?: number
     items?: QuoteItemPayload[]
     userId?: string | null
+    storeId?: string | null
     preview?: {
         primaryColor?: string
         secondaryColor?: string
@@ -459,6 +464,14 @@ export async function createQuoteAction(data: {
                     .eq("id", quoteResult.id)
             }
 
+            // Set store_id after RPC creation
+            if (data.storeId) {
+                await supabase
+                    .from("quotes")
+                    .update({ store_id: data.storeId })
+                    .eq("id", quoteResult.id)
+            }
+
             // Sync full state to compute native triggers (subtotals)
             const { data: updatedQuote } = await supabase
                 .from("quotes")
@@ -508,6 +521,7 @@ export async function updateQuoteAction(data: {
     discountValue?: number
     shippingCost?: number
     additionalCosts?: number
+    storeId?: string | null
     preview?: {
         primaryColor?: string
         secondaryColor?: string
@@ -574,6 +588,7 @@ export async function updateQuoteAction(data: {
             if (data.discountValue !== undefined) updatePayload.discount_value = data.discountValue
             if (data.shippingCost !== undefined) updatePayload.shipping_cost = data.shippingCost
             if (data.additionalCosts !== undefined) updatePayload.additional_costs = data.additionalCosts
+            if (data.storeId !== undefined) updatePayload.store_id = data.storeId || null
             if (data.preview) {
                 const existingMeta = (currentQuote as any)?.metadata || {}
                 updatePayload.metadata = {
@@ -1064,6 +1079,14 @@ export async function addQuoteItemAction(data: {
 
         const supabase = await getSupabaseServerClient()
 
+        // Resolve store_id from parent quote
+        const { data: quote } = await supabase
+            .from("quotes")
+            .select("store_id")
+            .eq("id", data.quoteId)
+            .eq("partner_id", data.partnerId)
+            .maybeSingle()
+
         const itemGuard = await assertQuoteAllowsItemEdits(supabase, data.quoteId, data.partnerId)
         if (itemGuard) return errorResponse(itemGuard)
 
@@ -1072,6 +1095,7 @@ export async function addQuoteItemAction(data: {
             .insert({
                 quote_id: data.quoteId,
                 partner_id: data.partnerId,
+                store_id: quote?.store_id || null,
                 product_id: data.productId || null,
                 custom_name: data.customName || null,
                 description: data.description || null,

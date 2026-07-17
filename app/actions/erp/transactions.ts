@@ -312,7 +312,7 @@ function buildTransactionKeysetOrFilter(cursor: FinancialTransactionCursor): str
 
 export async function getFinancialTransactionsAction(
     partnerId: string,
-    options?: { cursor?: FinancialTransactionCursor | null },
+    options?: { cursor?: FinancialTransactionCursor | null; storeId?: string | null },
 ): Promise<
     ({ success: true } & FinancialTransactionsPageSuccess) | { success: false; error: string }
 > {
@@ -324,11 +324,16 @@ export async function getFinancialTransactionsAction(
         const supabase = createAdminClient()
 
         const cursor = options?.cursor ?? null
+        const storeId = options?.storeId ?? null
         const fetchLimit = FINANCIAL_TX_PAGE_SIZE + 1
 
         // ── Step 1: Keyset page (created_at DESC, id DESC) ──────────────
         const t1 = performance.now()
         let listQuery = supabase.from("transactions").select(FINANCIAL_TX_LIST_SELECT).eq("partner_id", partnerId)
+
+        if (storeId) {
+            listQuery = listQuery.eq("store_id", storeId)
+        }
 
         if (cursor) {
             listQuery = listQuery.or(buildTransactionKeysetOrFilter(cursor))
@@ -737,6 +742,7 @@ export type CreateManualTransactionInput = {
     referenceNote?: string | null
     installmentGroupId?: string | null
     installmentNumber?: number | null
+    storeId?: string | null
 }
 
 /** Canonical status check - ALWAYS use DB values, never UI-displayed strings */
@@ -812,6 +818,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const normalizedCategory = String(input.category || "").trim()
         const payload: Record<string, unknown> = {
             partner_id: input.partnerId,
+            store_id: input.storeId || null,
             description: description,
             category: normalizedCategory || null,
             category_id: input.categoryId ?? null,
@@ -882,6 +889,7 @@ export type CreateTransferPairInput = {
     transactionDate: string
     status?: "pending" | "paid"
     paymentMethodId?: string | null
+    storeId?: string | null
 }
 
 export async function createTransferPairAction(input: CreateTransferPairInput) {
@@ -916,8 +924,11 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const fromName = nameById.get(input.fromAccountId) || "Origem"
         const toName = nameById.get(input.toAccountId) || "Destino"
 
+        const storeIdValue = input.storeId || null
+
         const outRow = {
             partner_id: input.partnerId,
+            store_id: storeIdValue,
             description: `${baseDesc} (${fromName} → ${toName}, saída)`,
             category: "Transferência",
             transaction_type: "expense",
@@ -943,6 +954,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
 
         const inRow = {
             partner_id: input.partnerId,
+            store_id: storeIdValue,
             description: `${baseDesc} (${fromName} → ${toName}, entrada)`,
             category: "Transferência",
             transaction_type: "income",
@@ -1080,6 +1092,7 @@ export async function updateManualTransactionAction(
             "paymentDate",
             "status",
             "notes",
+            "storeId",
         ])
         const ALLOWED_PAID_KEYS = new Set<keyof CreateManualTransactionInput>([
             "description",
@@ -1135,6 +1148,7 @@ export async function updateManualTransactionAction(
             if (patch.paymentDate !== undefined) payload.payment_date = patch.paymentDate
             if (patch.status !== undefined) payload.status = patch.status
             if (patch.notes !== undefined) payload.notes = patch.notes
+            if (patch.storeId !== undefined) payload.store_id = patch.storeId
         }
 
         // NEVER allow these fields to be mutated via patch
@@ -1301,6 +1315,7 @@ export async function createInstallmentGroupAction(input: {
     notes?: string | null
     initialStatus?: "pending" | "paid"
     firstInstallmentPaymentDate?: string | null
+    storeId?: string | null
 }) {
     try {
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
@@ -1350,6 +1365,7 @@ export async function createInstallmentGroupAction(input: {
             const isFirstInstallmentPaid = initialStatus === "paid" && installmentNumber === 1
             return {
                 partner_id: input.partnerId,
+                store_id: input.storeId || null,
                 description: input.description.trim(),
                 category: String(input.categoryLabel || "").trim() || null,
                 category_id: input.categoryId || null,
@@ -2158,6 +2174,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
         // Create a fresh paid transaction from recurring template
         const payload = {
             partner_id: input.partnerId,
+            store_id: rec.store_id || null,
             description: rec.description,
             category: categoryName,
             category_id: rec.category_id,
@@ -2254,6 +2271,7 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
     newBalance: number
     description?: string | null
     transactionDateYmd?: string | null
+    storeId?: string | null
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -2285,6 +2303,7 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
 
         const res = await createManualTransactionAction({
             partnerId: input.partnerId,
+            storeId: input.storeId || null,
             transactionType: "adjustment",
             amount: delta,
             description: desc,

@@ -125,6 +125,7 @@ export default function TransactionsPage({
     initialNextCursor,
     initialHasMore,
     partnerId,
+    storeId: storeIdProp,
     categories = [],
     accounts = [],
     recurringOccurrences = [],
@@ -139,6 +140,7 @@ export default function TransactionsPage({
     initialNextCursor: FinancialTransactionCursor | null
     initialHasMore: boolean
     partnerId: string
+    storeId?: string | null
     categories?: CategoryItem[]
     accounts?: AccountItem[]
     recurringOccurrences?: RecurringOccurrence[]
@@ -189,6 +191,8 @@ export default function TransactionsPage({
     const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
     const observerTarget = useRef<HTMLDivElement>(null)
 
+    const [storeId] = useState<string | null>(storeIdProp || null)
+
     const entityPage = useEntityPage<ERPTransaction, TransactionDetailPayload, FinancialTransactionCursor>({
         entityType: "transactions",
         partnerId,
@@ -197,7 +201,7 @@ export default function TransactionsPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getFinancialTransactionsAction(partnerId, { cursor })
+            const res = await getFinancialTransactionsAction(partnerId, { cursor, storeId })
             if (!res.success) throw new Error(res.error || "Erro ao carregar transações.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
@@ -1976,6 +1980,7 @@ export default function TransactionsPage({
             >
                 <CreateTransactionPage
                     partnerId={partnerId}
+                    storeId={storeId}
                     categories={categories}
                     accounts={accounts}
                     paymentMethods={paymentMethods}

@@ -78,6 +78,7 @@ export type TxKind = "income" | "expense" | "transfer" | "adjustment" | "refund"
 
 interface CreateTransactionPageProps {
     partnerId: string
+    storeId?: string | null
     categories: CategoryItem[]
     accounts: AccountItem[]
     onBack: () => void
@@ -192,6 +193,7 @@ const SidebarCard = ({
 
 export default function CreateTransactionPage({
     partnerId,
+    storeId: storeIdProp,
     categories,
     accounts,
     onBack,
@@ -206,6 +208,7 @@ export default function CreateTransactionPage({
     const debouncedRefresh = useDebouncedRefresh()
     const { success, error } = useNotification()
     const { planSlug } = usePermissions()
+    const storeId = storeIdProp || null
     const { openPlanUpgrade } = usePlanUpgrade()
     const isFreePlan = planSlug === "free"
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -925,6 +928,7 @@ export default function CreateTransactionPage({
             try {
                 const res = await createManualTransactionAction({
                     partnerId,
+                    storeId,
                     transactionType: "adjustment",
                     amount: signed,
                     description: description.trim(),
@@ -960,6 +964,7 @@ export default function CreateTransactionPage({
             try {
                 const res = await createManualTransactionAction({
                     partnerId,
+                    storeId,
                     transactionType: "refund",
                     amount,
                     description: description.trim(),
@@ -1085,6 +1090,7 @@ export default function CreateTransactionPage({
 
             const res = await createManualTransactionAction({
                 partnerId,
+                storeId,
                 transactionType: txKind,
                 amount,
                 description,

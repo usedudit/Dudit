@@ -34,7 +34,7 @@ const getRequestId = cache(() => {
 
 // ── Transactions ────────────────────────────────────────────────────────────
 export const getTransactionsData = cache(
-    async (partnerId: string, options?: { cursor?: FinancialTransactionCursor | null }) => {
+    async (partnerId: string, options?: { cursor?: FinancialTransactionCursor | null; storeId?: string | null }) => {
         const result = await getFinancialTransactionsAction(partnerId, options)
         return result
     }
