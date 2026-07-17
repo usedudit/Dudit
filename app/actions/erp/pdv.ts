@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { revalidateOrders, revalidateTransactions, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
@@ -23,6 +23,7 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity } from "@/lib/services/commission-ledger.service"
 import { applySaleToGoals } from "@/lib/services/sales-goals.service"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
+import { listStoreProducts } from "@/lib/store-products"
 
 type DraftItemInput = {
     productId?: string | null
@@ -59,6 +60,7 @@ type DraftUpsertInput = {
     couponId?: string | null
     couponCode?: string | null
     couponDiscountAmount?: number
+    storeId?: string | null
 }
 
 type FinalizePaymentEntry = {
@@ -79,6 +81,7 @@ type FinalizePreSaleInput = {
     paymentProvider?: string
     mpPaymentId?: string | null
     sellerId?: string | null
+    storeId?: string | null
 }
 
 type PosPaymentResolveResult =
@@ -250,6 +253,7 @@ function computeSubtotal(items: Array<{ quantity: number; unit_price: number }>)
  */
 async function syncPosSaleToOrders(params: {
     partnerId: string
+    storeId?: string | null
     saleId: string
     preSaleId: string
     financeAccountId?: string | null
@@ -364,7 +368,9 @@ async function syncPosSaleToOrders(params: {
 const productIds = Array.from(
         new Set((saleItems || []).map((item: any) => item.product_id).filter(Boolean))
     ) as string[]
-const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.all([
+    // Current strategy: use stores.opening_hours when storeId is provided (multi-store),
+    // fall back to legacy partners.opening_hours for backward compatibility
+    const [{ data: preparationProducts }, { data: storeHours }] = await Promise.all([
         productIds.length > 0
             ? admin
                 .from("products")
@@ -372,11 +378,18 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
                 .eq("partner_id", params.partnerId)
                 .in("id", productIds)
             : Promise.resolve({ data: [] as any[] }),
-        admin
-            .from("partners")
-            .select("opening_hours")
-            .eq("id", params.partnerId)
-            .maybeSingle(),
+        params.storeId
+            ? admin
+                .from("stores")
+                .select("opening_hours")
+                .eq("id", params.storeId)
+                .eq("partner_id", params.partnerId)
+                .maybeSingle()
+            : admin
+                .from("partners")
+                .select("opening_hours")
+                .eq("id", params.partnerId)
+                .maybeSingle(),
     ])
 
     const preparationEstimate = computeOrderPreparationEstimate({
@@ -384,7 +397,8 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
             availability_value: Number(product.availability_value || 0),
             availability_unit: product.availability_unit || "Minutos",
         })),
-        openingHours: (partnerHours as any)?.opening_hours || null,
+        // M6: partners fallback mantido para compatibilidade com parceiros sem opening_hours na store
+        openingHours: (storeHours as any)?.opening_hours || null,
         pickupWindowMinutes: 30,
         deliveryTimeEstimateMinutes: 0,
     })
@@ -443,6 +457,7 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
 
     const orderPayload: Record<string, unknown> = {
         partner_id: params.partnerId,
+        store_id: params.storeId || null,
         buyer_id: sale.customer_id || null,
         customer_name: customerName,
         order_source: "Presencial",
@@ -573,21 +588,41 @@ const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.al
 function inputPaymentMethodLabel(paymentMethod?: string | null) {
     return String(paymentMethod || "").trim() || "PDV"
 }
-
-export async function getPOSInitialDataAction(partnerId: string) {
+export async function getPOSInitialDataAction(partnerId: string, storeId?: string | null) {
     await requireUser()
     await requirePermission(partnerId, "pdv", "view")
+
     // Read with admin client after authz so invited users can load POS datasets.
     const supabase = createAdminClient()
 
-    const [productsRes, customersRes, accountsRes, draftsRes, paymentMethodsRes] = await Promise.all([
-        supabase
+    // Use listStoreProducts when storeId is provided for store-aware product listing
+    let products: any[] = []
+    if (storeId) {
+        products = await listStoreProducts(partnerId, storeId, { isActive: true, includeVariants: true })
+    } else {
+        const productsRes = await supabase
             .from("products")
             .select("id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", partnerId)
             .eq("is_active", true)
             .order("created_at", { ascending: false })
-            .limit(150),
+            .limit(150)
+        if (productsRes.error) return { success: false as const, error: productsRes.error.message }
+        products = productsRes.data || []
+    }
+
+    // Build pre_sales query with optional store_id filter
+    let draftsQuery = supabase
+        .from("pre_sales")
+        .select("id, customer_id, subtotal, discount_amount, total_amount, shipping_fee, other_costs, notes, status, items, created_at, updated_at, coupon_id, coupon_code, coupon_discount_amount")
+        .eq("partner_id", partnerId)
+        .eq("status", "draft")
+    if (storeId) {
+        draftsQuery = draftsQuery.eq("store_id", storeId)
+    }
+    const draftsRes = await draftsQuery.order("created_at", { ascending: false }).limit(20)
+
+    const [customersRes, accountsRes, paymentMethodsRes] = await Promise.all([
         supabase
             .from("customers")
             .select("id, name")
@@ -602,13 +637,6 @@ export async function getPOSInitialDataAction(partnerId: string) {
             .eq("type", "cash")
             .order("is_default", { ascending: false }),
         supabase
-            .from("pre_sales")
-            .select("id, customer_id, subtotal, discount_amount, total_amount, shipping_fee, other_costs, notes, status, items, created_at, updated_at, coupon_id, coupon_code, coupon_discount_amount")
-            .eq("partner_id", partnerId)
-            .eq("status", "draft")
-            .order("created_at", { ascending: false })
-            .limit(20),
-        supabase
             .from("payment_methods")
             .select("id, name, type, is_default, is_active, fee_percent, discount_percent, priority")
             .eq("partner_id", partnerId)
@@ -618,12 +646,10 @@ export async function getPOSInitialDataAction(partnerId: string) {
             .order("name"),
     ])
 
-    if (productsRes.error) return { success: false as const, error: productsRes.error.message }
-
     return {
         success: true as const,
         data: {
-            products: productsRes.data || [],
+            products,
             customers: customersRes.error ? [] : (customersRes.data || []).map((c: any) => ({ id: c.id, name: c.name, avatar_url: null })),
             financeAccounts: accountsRes.error ? [] : (accountsRes.data || []),
             preSales: draftsRes.error ? [] : (draftsRes.data || []),
@@ -741,6 +767,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
 
     const payload: Record<string, unknown> = {
         partner_id: input.partnerId,
+        store_id: input.storeId || null,
         customer_id: input.customerId || null,
         items: normalizedItems,
         subtotal,
@@ -782,9 +809,12 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     return { success: true as const, data }
 }
 
-export async function deletePreSaleDraftAction(partnerId: string, preSaleId: string) {
+export async function deletePreSaleDraftAction(partnerId: string, preSaleId: string, storeId?: string | null) {
     await requireUser()
     await requirePermission(partnerId, "pdv", "view")
+    if (storeId) {
+        await requireStoreAccess(storeId, partnerId)
+    }
     const supabase = createAdminClient()
 
     const { error } = await supabase
@@ -811,6 +841,9 @@ export async function deletePreSaleDraftAction(partnerId: string, preSaleId: str
 export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const user = await requireUser()
     await requirePermission(input.partnerId, "pdv", "sell")
+    if (input.storeId) {
+        await requireStoreAccess(input.storeId, input.partnerId)
+    }
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -848,8 +881,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         if (!acc?.id) return { success: false as const, error: "Conta financeira inválida ou inativa." }
     }
 
-    // Require open cash session
-    const activeSessionResult = await getActiveCashSessionAction(input.partnerId)
+    // Require open cash session — store-aware when storeId is provided
+    const activeSessionResult = await getActiveCashSessionAction(input.partnerId, input.storeId)
     if (!activeSessionResult.success) {
         return { success: false as const, error: "Não foi possível validar o caixa aberto." }
     }
@@ -927,7 +960,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             ? safeMoney(breakdownForRpc.reduce((acc, row) => acc + Number(row.amount || 0), 0))
             : paidAmount
 
-    // Call atomic RPC
+    // Call atomic RPC — now store-aware via p_store_id
     const { data: saleId, error: rpcError } = await supabase.rpc("finalize_pos_sale", {
         p_partner_id: input.partnerId,
         p_pre_sale_id: input.preSaleId,
@@ -937,6 +970,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         p_payment_method: input.paymentMethod || "PDV",
         p_payment_breakdown: breakdownForRpc.length > 0 ? breakdownForRpc : null,
         p_user_id: user.id,
+        p_store_id: input.storeId || null,
     })
 
     if (rpcError) {
@@ -1037,6 +1071,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const syncedOrderId = await syncPosSaleToOrders({
         partnerId: input.partnerId,
+        storeId: input.storeId || null,
         saleId,
         preSaleId: input.preSaleId,
         financeAccountId: input.financeAccountId || null,
@@ -1110,6 +1145,7 @@ export async function createPOSQuickProductAction(input: {
     name: string
     price: number
     stockQuantity: number
+    storeId?: string | null
 }) {
     await requireUser()
     await requirePermission(input.partnerId, "products", "create")
@@ -1126,16 +1162,31 @@ export async function createPOSQuickProductAction(input: {
     if (stockQuantity < 0) return { success: false as const, error: "Estoque inválido." }
 
     const supabase = createAdminClient()
-    const { data: store } = await supabase
-        .from("stores")
-        .select("id")
-        .eq("partner_id", input.partnerId)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle()
 
-    if (!store?.id) {
+    // Resolve store for the product: use explicit storeId or fall back to first store
+    let targetStoreId = input.storeId || null
+    if (!targetStoreId) {
+        const { data: store } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("partner_id", input.partnerId)
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle()
+        targetStoreId = store?.id || null
+    }
+
+    if (!targetStoreId) {
         return { success: false as const, error: "Nenhuma loja encontrada para cadastrar o produto." }
+    }
+
+    // Validate user has access to the target store
+    if (targetStoreId) {
+        const { userHasStoreAccess } = await import("@/lib/store-members")
+        const hasAccess = await userHasStoreAccess(input.partnerId, targetStoreId)
+        if (!hasAccess) {
+            return { success: false as const, error: "Você não tem acesso a esta loja." }
+        }
     }
 
     const skuBase = generateSKUBase(name)
@@ -1145,7 +1196,6 @@ export async function createPOSQuickProductAction(input: {
         .from("products")
         .insert({
             partner_id: input.partnerId,
-            store_id: store.id,
             name,
             sku,
             price,
@@ -1157,6 +1207,23 @@ export async function createPOSQuickProductAction(input: {
         .single()
 
     if (error) return { success: false as const, error: error.message }
+
+    // Link the product to the store via store_products
+    // NOTE: Variants created later must be backfilled to stores via store_product_variants
+    const { error: linkError } = await supabase
+        .from("store_products")
+        .upsert({
+            product_id: product.id,
+            store_id: targetStoreId,
+            partner_id: input.partnerId,
+            override_stock_quantity: stockQuantity,
+            is_active: true,
+        }, { onConflict: "product_id, store_id" })
+
+    if (linkError) {
+        console.error("[createPOSQuickProductAction] Failed to link product to store:", linkError)
+    }
+
     return { success: true as const, data: product }
 }
 

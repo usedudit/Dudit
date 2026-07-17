@@ -38,6 +38,22 @@ export async function resolveEffectivePermissions(
 
     const supabase = createAdminClient()
 
+    // 0. Check if user is partner owner (bypass partner_users table)
+    const { data: ownerPartner } = await supabase
+        .from("partners")
+        .select("id")
+        .eq("id", partnerId)
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+    if (ownerPartner) {
+        const template = await getPermissionTemplate()
+        return {
+            role: "OWNER",
+            permissions: normalizePermissions(template, {}) as unknown as PartnerPermissions,
+        }
+    }
+
     // 1. Buscar partner_user
     const { data: pu } = await supabase
         .from("partner_users")

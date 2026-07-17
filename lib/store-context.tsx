@@ -36,6 +36,7 @@ interface StoreContextType {
   selectedStore: Store | null
   stores: Store[]
   isLoading: boolean
+  hasError: boolean
   selectStore: (storeId: string) => void
   refreshStores: () => Promise<void>
 }
@@ -54,13 +55,19 @@ export function StoreProvider({
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
   const [stores, setStores] = useState<Store[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
   const [partnerId, setPartnerId] = useState<string | null>(propPartnerId || null)
   const hasSyncedCookie = useRef(false)
 
   useEffect(() => {
     const cached = localStorage.getItem("cachedStores")
+    const cachedTime = localStorage.getItem("cachedStoresTimestamp")
     const cachedSelected = localStorage.getItem("selectedStoreId")
-    if (cached && cachedSelected) {
+
+    // M3: Invalidate cache after 5 minutes
+    const isCacheValid = cachedTime && (Date.now() - Number(cachedTime)) < 5 * 60 * 1000
+
+    if (cached && cachedSelected && isCacheValid) {
       try {
         const parsedStores = JSON.parse(cached)
         const selected = parsedStores.find((s: Store) => s.id === cachedSelected)
@@ -95,8 +102,10 @@ export function StoreProvider({
 
       if (error) throw error
 
+      setHasError(false)
       setStores(data || [])
       localStorage.setItem("cachedStores", JSON.stringify(data || []))
+      localStorage.setItem("cachedStoresTimestamp", String(Date.now()))
 
       const savedStoreId = localStorage.getItem("selectedStoreId")
 
@@ -111,6 +120,7 @@ export function StoreProvider({
       }
     } catch (error) {
       console.error("Error fetching stores:", error)
+      setHasError(true)
     } finally {
       setIsLoading(false)
     }
@@ -140,9 +150,10 @@ export function StoreProvider({
     selectedStore,
     stores,
     isLoading,
+    hasError,
     selectStore,
     refreshStores
-  }), [selectedStore, stores, isLoading, selectStore])
+  }), [selectedStore, stores, isLoading, hasError, selectStore])
 
   return (
     <StoreContext.Provider value={contextValue}>

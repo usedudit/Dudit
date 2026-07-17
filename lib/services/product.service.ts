@@ -157,14 +157,20 @@ export class ProductService {
     return this.create(newProduct)
   }
 
-  async updateStock(productId: string, partnerId: string, quantity: number): Promise<{ success: boolean; error?: string }> {
+  async updateStock(productId: string, partnerId: string, quantity: number, storeId?: string): Promise<{ success: boolean; error?: string }> {
     const supabase = await this.getSupabase()
+    if (storeId) {
+      const { data: sp } = await supabase.from("store_products").select("id").eq("product_id", productId).eq("store_id", storeId).maybeSingle()
+      if (sp) {
+        const { error } = await supabase.from("store_products").update({ override_stock_quantity: quantity }).eq("id", sp.id)
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+      }
+    }
     const { error } = await supabase.from("products").update({ stock_quantity: quantity }).eq("id", productId).eq("partner_id", partnerId)
-
     if (error) {
       return { success: false, error: error.message }
     }
-
     return { success: true }
   }
 

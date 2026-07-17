@@ -170,6 +170,33 @@ export interface StoreProductOverride {
 }
 
 /**
+ * Store-level overrides for a product variant.
+ * NULL fields fall back to the base variant values.
+ */
+export interface StoreVariantOverride {
+  id: string
+  variant_id: string
+  store_id: string
+  partner_id: string
+  override_stock_quantity: number | null
+  is_active: boolean
+  stock_reserved: number
+  stock_available: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Resolved variant = base variant + store overrides merged.
+ */
+export interface ResolvedVariant extends ProductVariant {
+  resolved_stock_quantity: number
+  store_is_active: boolean
+  store_variant_id: string | null
+  has_store_override: boolean
+}
+
+/**
  * Resolved product = base product + store overrides merged.
  * override_price/override_stock/override_sku reflect the effective
  * values after fallback (never null for price/stock).

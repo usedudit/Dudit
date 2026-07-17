@@ -181,7 +181,8 @@ export async function createBatchStockMovementAction(data: {
             p_reason: data.reason,
                 p_notes: sanitizeNotes(data.notes),
             p_created_by: userId,
-            p_items: itemsPayload
+            p_items: itemsPayload,
+            p_store_id: ctx.activeStoreId || null,
         })
 
         if (error) {
@@ -419,7 +420,8 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             p_reason: customReason || "Estorno",
             p_notes: notes,
             p_created_by: userId,
-            p_items: itemsPayload
+            p_items: itemsPayload,
+            p_store_id: ctx.activeStoreId || null,
         })
 
         if (error) {

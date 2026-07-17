@@ -49,6 +49,7 @@ type ERPOrderPayload = {
     sourceQuoteId?: string | null
     salesChannel?: string
     deliveryMethod: 'delivery' | 'pickup'
+    storeId?: string
     financeAccountId: string
     paymentStatus: 'paid' | 'partially_paid' | 'unpaid'
     deliveryStatus: 'not_sent' | 'preparing' | 'sent' | 'delivered' | 'pickup_available' | 'delivery_failed'
@@ -968,52 +969,24 @@ async function restoreCancelledOrderInventory(params: {
     items: Array<{ product_id?: string | null; variant_id?: string | null; quantity: number }>
 }) {
     const validItems = (params.items || []).filter((item) => item.product_id && Number(item.quantity || 0) > 0)
-    for (const item of validItems) {
-        const qty = Number(item.quantity || 0)
-        if (item.variant_id) {
-            const { data: variant, error: variantError } = await params.supabase
-                .from("product_variants")
-                .select("id, product_id, stock_quantity, stock_available, products!inner(partner_id)")
-                .eq("id", item.variant_id)
-                .eq("product_id", item.product_id)
-                .eq("products.partner_id", params.partnerId)
-                .maybeSingle()
-            if (variantError) return { error: variantError.message }
-            if (!variant?.id) continue
+    if (validItems.length === 0) return { success: true as const }
 
-            const { error: updateVariantError } = await params.supabase
-                .from("product_variants")
-                .update({
-                    stock_quantity: Number(variant.stock_quantity || 0) + qty,
-                    stock_available: Number(variant.stock_available || 0) + qty,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("id", variant.id)
-            if (updateVariantError) return { error: updateVariantError.message }
-            continue
-        }
+    const movementItems = validItems.map((item) => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id || null,
+        quantity: Number(item.quantity || 0),
+    }))
 
-        const { data: product, error: productReadError } = await params.supabase
-            .from("products")
-            .select("id, stock_quantity, stock_available")
-            .eq("id", item.product_id)
-            .eq("partner_id", params.partnerId)
-            .maybeSingle()
-        if (productReadError) return { error: productReadError.message }
-        if (!product?.id) continue
+    const { error } = await params.supabase.rpc("create_batch_stock_movement", {
+        p_partner_id: params.partnerId,
+        p_movement_type: "in",
+        p_reason: "CANCEL",
+        p_notes: "Restauração de inventário por cancelamento de pedido",
+        p_created_by: null,
+        p_items: movementItems,
+    })
 
-        const { error: productError } = await params.supabase
-            .from("products")
-            .update({
-                stock_quantity: Number(product.stock_quantity || 0) + qty,
-                stock_available: Number(product.stock_available || 0) + qty,
-                updated_at: new Date().toISOString(),
-            })
-            .eq("id", product.id)
-            .eq("partner_id", params.partnerId)
-        if (productError) return { error: productError.message }
-    }
-
+    if (error) return { error: error.message }
     return { success: true as const }
 }
 
@@ -1248,6 +1221,7 @@ async function createOrderStockMovement(params: {
     type: "in" | "out"
     reason: string
     notes?: string
+    storeId?: string | null
     items: Array<{ product_id?: string | null; variant_id?: string | null; quantity: number }>
 }) {
     const movementItems = params.items
@@ -1269,6 +1243,7 @@ async function createOrderStockMovement(params: {
         p_notes: params.notes || null,
         p_created_by: params.createdBy,
         p_items: movementItems,
+        p_store_id: params.storeId || null,
     })
 
     if (error) {
@@ -1544,6 +1519,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         source_quote_id: data.sourceQuoteId || null,
         order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
         delivery_type: data.deliveryMethod,
+        store_id: data.storeId || null,
         situation: paymentState.situation,
         delivery_status: data.deliveryStatus,
         total_amount: serverTotalAmount,

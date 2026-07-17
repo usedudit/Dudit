@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -19,6 +19,7 @@ export type CountedPaymentMethodEntry = {
 
 type CashMovementFallbackInput = {
   partnerId: string
+  storeId?: string | null
   cashSessionId: string
   type: "withdrawal" | "deposit"
   description: string
@@ -175,15 +176,17 @@ async function loadMovementsForSession(
 async function getActiveSessionForPartner(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
   partnerId: string,
+  storeId?: string | null,
 ) {
-  const { data } = await supabase
+  let query = supabase
     .from("cash_sessions")
     .select("*")
     .eq("partner_id", partnerId)
     .eq("status", "open")
-    .order("opened_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  }
+  const { data } = await query.order("opened_at", { ascending: false }).limit(1).maybeSingle()
   return data
 }
 
@@ -251,6 +254,7 @@ async function createCashMovementFallback(
 
   const { data: transaction, error: transactionError } = await insertCashTransactionWithSchemaFallback(supabase, {
     partner_id: input.partnerId,
+    store_id: input.storeId || null,
     description: input.type === "withdrawal" ? "Sangria de caixa" : "Reforço de caixa",
     category: "Caixa PDV",
     amount: input.amount,
@@ -307,7 +311,7 @@ async function createCashMovementFallback(
 
 async function reverseCashMovementFallback(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
-  input: { partnerId: string; movementId: string; userId: string },
+  input: { partnerId: string; storeId?: string | null; movementId: string; userId: string },
 ) {
   const nowIso = new Date().toISOString()
   const { data: movement, error: movementError } = await supabase
@@ -403,6 +407,7 @@ async function reverseCashMovementFallback(
 
   const { data: reversalTransaction, error: reversalError } = await insertCashTransactionWithSchemaFallback(supabase, {
     partner_id: input.partnerId,
+    store_id: input.storeId || null,
     description: movement.type === "withdrawal" ? "Estorno de sangria" : "Estorno de reforço",
     category: "Caixa PDV",
     amount,
@@ -459,12 +464,12 @@ async function reverseCashMovementFallback(
   }
 }
 
-export async function getActiveCashSessionAction(partnerId: string) {
+export async function getActiveCashSessionAction(partnerId: string, storeId?: string | null) {
   await requireUser()
   await requirePermission(partnerId, "pdv", "view")
   // Read with admin client after authz so invited users can load session data.
   const supabase = createAdminClient()
-  const session = await getActiveSessionForPartner(supabase, partnerId)
+  const session = await getActiveSessionForPartner(supabase, partnerId, storeId)
 
   // Enrich with opener name when a session exists
   if (session) {
@@ -489,9 +494,13 @@ export async function openCashSessionAction(input: {
   /** Troco inicial / fundo de caixa - valor de controle (não gera lançamento financeiro). */
   initialAmount: number
   notes?: string
+  storeId?: string | null
 }) {
   const user = await requireUser()
   await requirePermission(input.partnerId, "pdv", "open_pdv")
+  if (input.storeId) {
+    await requireStoreAccess(input.storeId, input.partnerId)
+  }
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -502,15 +511,16 @@ export async function openCashSessionAction(input: {
   if (!Number.isFinite(raw)) return { success: false as const, error: "Valor inicial inválido." }
   const initialAmount = money(Math.max(0, raw))
 
-  const existing = await getActiveSessionForPartner(supabase, input.partnerId)
+  const existing = await getActiveSessionForPartner(supabase, input.partnerId, input.storeId)
   if (existing?.id) {
-    return { success: false as const, error: "Já existe um caixa aberto para este estabelecimento. Utilize o caixa atual ou feche-o primeiro." }
+    return { success: false as const, error: "Já existe um caixa aberto para esta loja. Utilize o caixa atual ou feche-o primeiro." }
   }
 
   const { data, error } = await supabase
     .from("cash_sessions")
     .insert({
       partner_id: input.partnerId,
+      store_id: input.storeId || null,
       opened_by_user_id: user.id,
       initial_amount: initialAmount,
       status: "open",
@@ -521,7 +531,7 @@ export async function openCashSessionAction(input: {
 
   if (error) {
     if (error.code === "23505") {
-      return { success: false as const, error: "Já existe um caixa aberto para este estabelecimento. Utilize o caixa atual ou feche-o primeiro." }
+      return { success: false as const, error: "Já existe um caixa aberto para esta loja. Utilize o caixa atual ou feche-o primeiro." }
     }
     return { success: false as const, error: error.message }
   }
@@ -544,6 +554,7 @@ export async function openCashSessionAction(input: {
 
 export async function createCashMovementAction(input: {
   partnerId: string
+  storeId?: string | null
   cashSessionId?: string
   type: "withdrawal" | "deposit"
   description: string
@@ -561,7 +572,7 @@ export async function createCashMovementAction(input: {
 
   let sessionId = input.cashSessionId || null
   if (!sessionId) {
-    const s = await getActiveSessionForPartner(supabase, input.partnerId)
+    const s = await getActiveSessionForPartner(supabase, input.partnerId, input.storeId)
     sessionId = s?.id || null
   } else {
     const { data: s } = await supabase
@@ -606,6 +617,7 @@ export async function createCashMovementAction(input: {
   if (rpcError) {
     const fallbackResult = await createCashMovementFallback(supabase, {
       partnerId: input.partnerId,
+      storeId: input.storeId || null,
       cashSessionId: sessionId,
       type: input.type,
       description: normalizedDescription,
@@ -677,6 +689,7 @@ export async function createCashMovementAction(input: {
 
 export async function reverseCashMovementAction(input: {
   partnerId: string
+  storeId?: string | null
   movementId: string
 }) {
   const user = await requireUser()
@@ -707,6 +720,7 @@ export async function reverseCashMovementAction(input: {
   if (rpcError) {
     const fallbackResult = await reverseCashMovementFallback(supabase, {
       partnerId: input.partnerId,
+      storeId: input.storeId || null,
       movementId: input.movementId,
       userId: user.id,
     })

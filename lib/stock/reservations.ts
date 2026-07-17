@@ -1,3 +1,5 @@
+import "server-only"
+
 type StockItem = {
   product_id?: string | null
   variant_id?: string | null

@@ -306,12 +306,12 @@ const checkRealTimePartnerAccess = (partnerId: string, userId: string) => unstab
             })
             if (accessError) {
                 console.error("[checkRealTimePartnerAccess] RPC error:", accessError)
-                return { stillHasAccess: true, hasError: true }
+                return { stillHasAccess: false, hasError: true }
             }
             return { stillHasAccess: stillHasAccess === true, hasError: false }
         } catch (err) {
             console.error("[checkRealTimePartnerAccess] unexpected error:", err)
-            return { stillHasAccess: true, hasError: true }
+            return { stillHasAccess: false, hasError: true }
         }
     },
     [`realtime-access-${userId}-${partnerId}`],

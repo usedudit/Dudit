@@ -1,7 +1,8 @@
 import "server-only"
 import { createAdminClient } from "@/lib/supabase/server"
-import type { Product, StoreProductOverride, ResolvedProduct } from "@/lib/types/product"
+import type { Product, StoreProductOverride, ResolvedProduct, ResolvedVariant } from "@/lib/types/product"
 import type { ProductService } from "@/lib/services/product.service"
+import { listStoreProductVariants } from "@/lib/store-variants"
 
 type RawProduct = Record<string, unknown>
 
@@ -72,6 +73,7 @@ export async function listStoreProducts(
         categoryId?: string
         limit?: number
         offset?: number
+        includeVariants?: boolean
     }
 ): Promise<ResolvedProduct[]> {
     const supabase = createAdminClient()
@@ -115,7 +117,7 @@ export async function listStoreProducts(
 
     if (error || !data) return []
 
-    return (data as RawProduct[]).map((row) => {
+    const products = (data as RawProduct[]).map((row) => {
         const overrides = (row.store_overrides as RawProduct[] | null) || []
         const storeOverride = overrides[0] ? (overrides[0] as unknown as StoreProductOverride) : undefined
 
@@ -134,6 +136,26 @@ export async function listStoreProducts(
 
         return buildResolvedProduct(product, storeOverride || null)
     })
+
+    if (options?.includeVariants && storeId && products.length > 0) {
+        const productIds = products.map((p) => p.id)
+        const variantsByProduct = new Map<string, ResolvedVariant[]>()
+
+        const allVariants = await Promise.all(
+            productIds.map((pid) => listStoreProductVariants(pid, storeId, { isActive: true }))
+        )
+
+        for (let i = 0; i < productIds.length; i++) {
+            variantsByProduct.set(productIds[i], allVariants[i] || [])
+        }
+
+        return products.map((p) => ({
+            ...p,
+            variants: variantsByProduct.get(p.id) || [],
+        }))
+    }
+
+    return products
 }
 
 /**

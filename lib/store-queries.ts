@@ -1,38 +1,41 @@
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 
 /**
- * Fetch products for a specific store
+ * Fetch products for a specific store (uses store_products for overrides)
  */
 export async function fetchStoreProducts(partnerId: string, storeId: string | null) {
-  // supabase singleton imported directly
-
+  if (!storeId) return fetchAllPartnerProducts(partnerId)
   const { data, error } = await supabase
-    .from("products")
-    .select("id, name, price, promotional_price, stock, sku, image_url, is_active, category_id, created_at, store_id, partner_id, has_variants")
+    .from("store_products")
+    .select("id, product_id, override_stock_quantity, override_price, is_active, created_at, store_id, partner_id, product:product_id(id, name, price, promotional_price, stock_quantity, sku, image_url, category_id, has_variants)")
     .eq("partner_id", partnerId)
     .eq("store_id", storeId)
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(500)
-
   if (error) throw error
-  return data || []
+  return (data || []).map((sp: any) => ({
+    ...sp.product,
+    id: sp.product_id,
+    store_product_id: sp.id,
+    stock: sp.override_stock_quantity ?? sp.product?.stock_quantity ?? 0,
+    price: sp.override_price ?? sp.product?.price ?? 0,
+    store_id: sp.store_id,
+    partner_id: sp.partner_id,
+  }))
 }
 
 /**
  * Fetch all products for a partner (for fallback)
  */
 export async function fetchAllPartnerProducts(partnerId: string) {
-  // supabase singleton imported directly
-
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, price, promotional_price, stock, sku, image_url, is_active, category_id, created_at, store_id, partner_id, has_variants")
+    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, category_id, created_at, partner_id, has_variants")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(500)
-
   if (error) throw error
   return data || []
 }

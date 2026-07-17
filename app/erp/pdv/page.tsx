@@ -16,11 +16,12 @@ export default async function POSPageServer() {
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
 
   const partnerId = context.partnerId
+  const activeStoreId = context.activeStoreId
 
   // Parallel: load all initial data in a single waterfall step
   const [initialDataResult, activeSessionResult, promotionsResult, teamResult] = await Promise.all([
-    getPOSInitialDataAction(partnerId),
-    getActiveCashSessionAction(partnerId),
+    getPOSInitialDataAction(partnerId, activeStoreId),
+    getActiveCashSessionAction(partnerId, activeStoreId),
     listActivePromotionsForMarketplaceAction(partnerId).catch(() => []),
     getTeamMembers().catch(() => ({ members: [], currentUserId: undefined })),
   ])
@@ -56,6 +57,7 @@ export default async function POSPageServer() {
       <FadeIn className="p-4 h-full overflow-hidden">
         <POSPage
           partnerId={partnerId}
+          activeStoreId={activeStoreId}
           initialData={initialData}
           initialActiveSession={activeSession}
           initialPromotions={initialPromotions}

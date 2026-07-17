@@ -59,6 +59,7 @@ import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
 
 interface Props {
     partnerId: string
+    activeStoreId?: string | null
     initialData: {
         products: Product[]
         customers: Customer[]
@@ -120,7 +121,7 @@ function DesktopPOSSheet({
     )
 }
 
-export default function POSPage({ partnerId, initialData, initialActiveSession, initialPromotions, initialTeam }: Props) {
+export default function POSPage({ partnerId, activeStoreId, initialData, initialActiveSession, initialPromotions, initialTeam }: Props) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { planSlug, hasSpecific } = usePermissions()
@@ -688,7 +689,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
             }
             const result = await createProductComprehensiveAction({
                 partnerId,
-                storeId: "",
+                storeId: activeStoreId || "",
                 name: payload.name,
                 price: payload.price,
                 stockQuantity: payload.stockQuantity,
@@ -818,6 +819,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
         try {
             const result = await upsertPreSaleDraftAction({
                 partnerId,
+                storeId: activeStoreId || null,
                 preSaleId: activePreSaleId || undefined,
                 customerId: selectedCustomerId,
                 notes,
@@ -1041,6 +1043,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
 
             const result = await finalizePreSaleAction({
                 partnerId,
+                storeId: activeStoreId || null,
                 preSaleId: preSaleIdToFinalize,
                 financeAccountId: financeAccountId || null,
                 paidAmount: Number(paymentData.paidAmount || 0),
@@ -1283,6 +1286,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession, 
         try {
             const result = await openCashSessionAction({
                 partnerId,
+                storeId: activeStoreId || null,
                 initialAmount: openingBalance,
                 notes: openingNotes,
             })
