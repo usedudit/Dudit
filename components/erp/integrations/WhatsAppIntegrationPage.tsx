@@ -13,7 +13,6 @@ import {
     disconnectWhatsappAction,
     toggleWhatsappActiveAction,
     sendWhatsappTestMessageAction,
-    resendWhatsappMessageAction,
     getWhatsappIntegrationAction,
     syncWhatsappTemplatesAction,
     connectEvolutionAction,
@@ -23,7 +22,6 @@ import {
     isEvolutionConfiguredAction,
     resetEvolutionPairingStatusAction,
     type WhatsappConnectionView,
-    type WhatsappMessageView,
     type WhatsappTemplateView,
 } from "@/app/actions/whatsapp"
 import { motion, AnimatePresence } from "framer-motion"
@@ -71,19 +69,15 @@ const TEMPLATE_STATUS_LABELS: Record<string, string> = {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function WhatsAppIntegrationPage({
-    initialConnection,
-    initialMessages,
+    storeId,
     initialTemplates,
     initialAllConnections,
 }: {
-    initialConnection: WhatsappConnectionView | null
-    initialMessages: WhatsappMessageView[]
+    storeId?: string | null
     initialTemplates: WhatsappTemplateView[]
     initialAllConnections?: WhatsappConnectionView[]
 }) {
-    const [connection, setConnection] = useState(initialConnection)
     const [allConnections, setAllConnections] = useState(initialAllConnections || [])
-    const [messages, setMessages] = useState(initialMessages)
     const [templates, setTemplates] = useState(initialTemplates)
     const [isLoading, setIsLoading] = useState(false)
     const [activeTab, setActiveTab] = useState("evolution")
@@ -107,12 +101,12 @@ export function WhatsAppIntegrationPage({
     useEffect(() => {
         return () => {
             if (evoStatusRef.current === "qr_pending" || evoStatusRef.current === "connecting") {
-                resetEvolutionPairingStatusAction().catch((err) => {
+                resetEvolutionPairingStatusAction(storeId).catch((err) => {
                     console.error("Failed to reset Evolution pairing status on unmount:", err)
                 })
             }
         }
-    }, [])
+    }, [storeId])
 
     // Header scroll
     const [isScrolled, setIsScrolled] = useState(false)
@@ -122,21 +116,56 @@ export function WhatsAppIntegrationPage({
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
-    // Resolve Evolution connection from allConnections
-    const evoConnection = allConnections.find((c) => c.provider === "evolution")
-    const metaConnection = allConnections.find((c) => c.provider === "meta")
+    // Filter connections by store context: show store-specific first, fallback to global
+    const connectionsForStore = storeId
+        ? allConnections.filter((c) => c.storeId === storeId || c.storeId === null)
+        : allConnections.filter((c) => c.storeId === null)
+
+    const evoConnection = connectionsForStore.find((c) => c.provider === "evolution")
+    const metaConnection = connectionsForStore.find((c) => c.provider === "meta")
 
     // ─── Refresh ─────────────────────────────────────────────────────────
 
     const refresh = useCallback(async () => {
         const res = await getWhatsappIntegrationAction()
         if (res.success && res.data) {
-            setConnection(res.data.connection)
             setAllConnections(res.data.allConnections || [])
-            setMessages(res.data.messages)
             setTemplates(res.data.templates)
         }
     }, [])
+
+    // Store-aware action wrappers
+    const scopedDisconnectMeta = useCallback(async () => {
+        return disconnectWhatsappAction("meta", storeId)
+    }, [storeId])
+
+    const scopedToggleMeta = useCallback(async (active: boolean) => {
+        return toggleWhatsappActiveAction(active, "meta", storeId)
+    }, [storeId])
+
+    const scopedSyncTemplates = useCallback(async () => {
+        return syncWhatsappTemplatesAction(storeId)
+    }, [storeId])
+
+    const scopedTestMeta = useCallback(async (phone: string) => {
+        return sendWhatsappTestMessageAction(phone, storeId)
+    }, [storeId])
+
+    const scopedConnectEvolution = useCallback(async () => {
+        return connectEvolutionAction(storeId)
+    }, [storeId])
+
+    const scopedDisconnectEvolution = useCallback(async () => {
+        return disconnectEvolutionAction(storeId)
+    }, [storeId])
+
+    const scopedEvolutionStatus = useCallback(async () => {
+        return getEvolutionStatusAction(storeId)
+    }, [storeId])
+
+    const scopedTestEvolution = useCallback(async (phone: string) => {
+        return testEvolutionConnectionAction(phone, storeId)
+    }, [storeId])
 
     // Check if Evolution is configured on mount
     useEffect(() => {
@@ -173,7 +202,7 @@ export function WhatsAppIntegrationPage({
                 return
             }
 
-            const res = await getEvolutionStatusAction()
+            const res = await scopedEvolutionStatus()
             if (res.success && res.data) {
                 setEvoStatus(res.data.status)
                 if (res.data.status === "connected") {
@@ -190,7 +219,7 @@ export function WhatsAppIntegrationPage({
         }, 5000)
 
         return () => clearInterval(interval)
-    }, [evoStatus, refresh])
+    }, [evoStatus, refresh, scopedEvolutionStatus])
 
     // ─── Meta actions ────────────────────────────────────────────────────
 
@@ -198,7 +227,7 @@ export function WhatsAppIntegrationPage({
         if (!confirm("Desconectar integração WhatsApp (Meta)?")) return
         setIsLoading(true)
         try {
-            const res = await disconnectWhatsappAction("meta")
+            const res = await scopedDisconnectMeta()
             if (!res.success) { toast.error(res.error); return }
             toast.success("Integração Meta desconectada")
             await refresh()
@@ -206,7 +235,7 @@ export function WhatsAppIntegrationPage({
     }
 
     const handleToggle = async (active: boolean) => {
-        const res = await toggleWhatsappActiveAction(active, "meta")
+        const res = await scopedToggleMeta(active)
         if (!res.success) { toast.error(res.error); return }
         toast.success(active ? "Automação ativada" : "Automação pausada")
         await refresh()
@@ -215,7 +244,7 @@ export function WhatsAppIntegrationPage({
     const handleSyncTemplates = async () => {
         setIsLoading(true)
         try {
-            const res = await syncWhatsappTemplatesAction()
+            const res = await scopedSyncTemplates()
             if (!res.success) { toast.error(res.error); return }
             toast.success(`${res.data.synced} modelo(s) sincronizado(s)`)
             await refresh()
@@ -226,18 +255,11 @@ export function WhatsAppIntegrationPage({
         if (!testPhone.trim()) { toast.error("Informe um telefone para teste"); return }
         setIsLoading(true)
         try {
-            const res = await sendWhatsappTestMessageAction(testPhone.trim())
+            const res = await scopedTestMeta(testPhone.trim())
             if (!res.success) { toast.error(res.error); return }
             toast.success("Mensagem de teste enviada")
             await refresh()
         } finally { setIsLoading(false) }
-    }
-
-    const handleResend = async (messageId: string) => {
-        const res = await resendWhatsappMessageAction(messageId)
-        if (!res.success) { toast.error(res.error); return }
-        toast.success("Reenvio solicitado")
-        await refresh()
     }
 
     // ─── Evolution actions (simplified - zero config) ───────────────────
@@ -245,7 +267,7 @@ export function WhatsAppIntegrationPage({
     const handleEvoConnect = async () => {
         setEvoIsLoading(true)
         try {
-            const res = await connectEvolutionAction()
+            const res = await scopedConnectEvolution()
             if (!res.success) { toast.error(res.error); return }
             setEvoStatus(res.data.status)
             setEvoQrCode(res.data.qrCode)
@@ -259,7 +281,7 @@ export function WhatsAppIntegrationPage({
     const handleCancelEvoConnect = async () => {
         setEvoIsLoading(true)
         try {
-            const res = await resetEvolutionPairingStatusAction()
+            const res = await resetEvolutionPairingStatusAction(storeId)
             if (res.success) {
                 setEvoStatus("disconnected")
                 setEvoQrCode(null)
@@ -277,7 +299,7 @@ export function WhatsAppIntegrationPage({
         if (!confirm("Desconectar WhatsApp (Evolution)?")) return
         setEvoIsLoading(true)
         try {
-            const res = await disconnectEvolutionAction()
+            const res = await scopedDisconnectEvolution()
             if (!res.success) { toast.error(res.error); return }
             toast.success("WhatsApp desconectado")
             setEvoStatus("disconnected")
@@ -290,7 +312,7 @@ export function WhatsAppIntegrationPage({
     const handleEvoRefreshStatus = async () => {
         setEvoIsLoading(true)
         try {
-            const res = await getEvolutionStatusAction()
+            const res = await scopedEvolutionStatus()
             if (!res.success) { toast.error(res.error); return }
             setEvoStatus(res.data.status)
             if (res.data.status === "connected") {
@@ -310,7 +332,7 @@ export function WhatsAppIntegrationPage({
         if (!evoTestPhone.trim()) { toast.error("Informe um telefone para teste"); return }
         setEvoIsLoading(true)
         try {
-            const res = await testEvolutionConnectionAction(evoTestPhone.trim())
+            const res = await scopedTestEvolution(evoTestPhone.trim())
             if (!res.success) { toast.error(res.error); return }
             toast.success("Mensagem de teste enviada via Evolution")
             await refresh()
@@ -348,6 +370,11 @@ export function WhatsAppIntegrationPage({
                                                 <Badge variant="green">
                                                     <CheckCircleIcon size={12} className="mr-1" />
                                                     Ativo
+                                                </Badge>
+                                            )}
+                                            {storeId && (
+                                                <Badge variant="orange">
+                                                    Store-level
                                                 </Badge>
                                             )}
                                         </h1>

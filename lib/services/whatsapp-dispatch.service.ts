@@ -78,9 +78,9 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<Wh
 
   SecureLogger.info("[whatsapp] queue: phone_normalized", { partnerId: input.partnerId, e164 })
 
-  const connection = await getActiveWhatsappConnection(input.partnerId)
+  const connection = await getActiveWhatsappConnection(input.partnerId, input.storeId)
   if (!connection?.is_active) {
-    SecureLogger.warn("[whatsapp] queue: no active connection", { partnerId: input.partnerId })
+    SecureLogger.warn("[whatsapp] queue: no active connection", { partnerId: input.partnerId, storeId: input.storeId })
     await logWhatsappAutomation({
       partnerId: input.partnerId,
       triggerType: input.triggerType,
@@ -92,7 +92,7 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<Wh
     return { success: false, resultStatus: "skipped_no_connection", reason: "integration_inactive", messageId: null, providerMessageId: null }
   }
 
-  SecureLogger.info("[whatsapp] queue: connection found", { partnerId: input.partnerId, provider: connection.provider })
+  SecureLogger.info("[whatsapp] queue: connection found", { partnerId: input.partnerId, storeId: input.storeId, provider: connection.provider })
 
   if (input.idempotencyKey) {
     const { data: existing } = await admin
@@ -113,6 +113,7 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<Wh
     .from("whatsapp_messages")
     .insert({
       partner_id: input.partnerId,
+      store_id: input.storeId || null,
       customer_id: input.customerId || null,
       order_id: input.orderId || null,
       appointment_id: input.appointmentId || null,
@@ -170,8 +171,13 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
 
   SecureLogger.info("[whatsapp] send: starting", { messageId, partnerId })
 
+  // Usa store_id da mensagem (se disponível) para resolver conexão.
+  // Se a mensagem tem store_id, resolve com ele (store-level, depois fallback partner).
+  // Se não tem (mensagens antigas / sem contexto de loja), fallback global.
+  const messageStoreId = message.store_id ? String(message.store_id) : undefined
   const connection = await getActiveWhatsappConnection(
     partnerId,
+    messageStoreId,
     message.provider as "meta" | "evolution" | "twilio" | undefined,
   )
   if (!connection?.is_active) {

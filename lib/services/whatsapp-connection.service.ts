@@ -8,18 +8,41 @@ import { randomBytes } from "crypto"
 
 /**
  * Gets the active WhatsApp connection for a partner.
+ * Multi-store resolution: store-level > partner-level (store_id IS NULL).
+ * - storeId provided: tries store-specific first, falls back to global
+ * - storeId omitted: global only (retrocompatível)
  * When provider is omitted, returns the first active connection regardless of provider type.
- * This is the provider-agnostic default used by business logic.
  */
 export async function getActiveWhatsappConnection(
   partnerId: string,
+  storeId?: string | null,
   provider?: WhatsappProviderId,
 ): Promise<PartnerWhatsappConnection | null> {
   const admin = getAdminClient()
+
+  // 1. Tenta conexão específica da store
+  if (storeId) {
+    let query = admin
+      .from("partner_whatsapp_connections")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+
+    if (provider) {
+      query = query.eq("provider", provider)
+    }
+
+    const { data } = await query.maybeSingle()
+    if (data) return data as PartnerWhatsappConnection
+  }
+
+  // 2. Fallback: conexão global do Partner (store_id IS NULL)
   let query = admin
     .from("partner_whatsapp_connections")
     .select("*")
     .eq("partner_id", partnerId)
+    .is("store_id", null)
     .eq("is_active", true)
 
   if (provider) {
@@ -51,6 +74,7 @@ export async function findActiveConnectionByPhoneNumberId(
 
 export async function upsertWhatsappConnection(params: {
   partnerId: string
+  storeId?: string | null
   provider: WhatsappProviderId
   phoneNumber?: string
   phoneNumberId: string
@@ -66,15 +90,23 @@ export async function upsertWhatsappConnection(params: {
   const webhookSecret = randomBytes(24).toString("hex")
   const now = new Date().toISOString()
 
-  const { data: existing } = await admin
+  let existingQuery = admin
     .from("partner_whatsapp_connections")
     .select("id")
     .eq("partner_id", params.partnerId)
     .eq("provider", params.provider)
-    .maybeSingle()
+
+  if (params.storeId) {
+    existingQuery = existingQuery.eq("store_id", params.storeId)
+  } else {
+    existingQuery = existingQuery.is("store_id", null)
+  }
+
+  const { data: existing } = await existingQuery.maybeSingle()
 
   const row = {
     partner_id: params.partnerId,
+    store_id: params.storeId || null,
     provider: params.provider,
     phone_number: params.phoneNumber || null,
     phone_number_id: params.phoneNumberId,
@@ -115,6 +147,7 @@ export async function syncWhatsappTemplates(params: {
   partnerId: string
   accessToken: string
   wabaId: string
+  storeId?: string | null
 }): Promise<{ synced: number }> {
   const admin = getAdminClient()
   const management = new MetaWhatsappManagementClient(params.accessToken)
@@ -153,18 +186,30 @@ export async function syncWhatsappTemplates(params: {
   }
 
   const now = new Date().toISOString()
-  await admin
+  let updateQuery = admin
     .from("partner_whatsapp_connections")
     .update({ last_synced_at: now, updated_at: now })
     .eq("partner_id", params.partnerId)
     .eq("provider", "meta")
 
+  if (params.storeId) {
+    updateQuery = updateQuery.eq("store_id", params.storeId)
+  } else {
+    updateQuery = updateQuery.is("store_id", null)
+  }
+
+  await updateQuery
+
   return { synced }
 }
 
-export async function deactivateWhatsappConnection(partnerId: string, provider: WhatsappProviderId = "meta") {
+export async function deactivateWhatsappConnection(
+  partnerId: string,
+  provider: WhatsappProviderId = "meta",
+  storeId?: string | null,
+) {
   const admin = getAdminClient()
-  await admin
+  let query = admin
     .from("partner_whatsapp_connections")
     .update({
       is_active: false,
@@ -173,11 +218,24 @@ export async function deactivateWhatsappConnection(partnerId: string, provider: 
     })
     .eq("partner_id", partnerId)
     .eq("provider", provider)
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  } else {
+    query = query.is("store_id", null)
+  }
+
+  await query
 }
 
-export async function setWhatsappConnectionActive(partnerId: string, isActive: boolean, provider: WhatsappProviderId = "meta") {
+export async function setWhatsappConnectionActive(
+  partnerId: string,
+  isActive: boolean,
+  provider: WhatsappProviderId = "meta",
+  storeId?: string | null,
+) {
   const admin = getAdminClient()
-  await admin
+  let query = admin
     .from("partner_whatsapp_connections")
     .update({
       is_active: isActive,
@@ -186,6 +244,14 @@ export async function setWhatsappConnectionActive(partnerId: string, isActive: b
     })
     .eq("partner_id", partnerId)
     .eq("provider", provider)
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  } else {
+    query = query.is("store_id", null)
+  }
+
+  await query
 }
 
 export function getWebhookUrl(provider: WhatsappProviderId = "meta", connectionId?: string, webhookSecret?: string | null): string {
@@ -247,6 +313,7 @@ export function generateEvolutionInstanceName(): string {
  */
 export async function upsertEvolutionConnection(params: {
   partnerId: string
+  storeId?: string | null
   apiUrl: string
   apiKey: string
   instanceName: string
@@ -256,17 +323,25 @@ export async function upsertEvolutionConnection(params: {
   const admin = getAdminClient()
   const now = new Date().toISOString()
 
-  const { data: existing } = await admin
+  let existingQuery = admin
     .from("partner_whatsapp_connections")
     .select("id, evolution_webhook_secret")
     .eq("partner_id", params.partnerId)
     .eq("provider", "evolution")
-    .maybeSingle()
+
+  if (params.storeId) {
+    existingQuery = existingQuery.eq("store_id", params.storeId)
+  } else {
+    existingQuery = existingQuery.is("store_id", null)
+  }
+
+  const { data: existing } = await existingQuery.maybeSingle()
 
   const webhookSecret = existing?.evolution_webhook_secret || randomBytes(24).toString("hex")
 
   const row = {
     partner_id: params.partnerId,
+    store_id: params.storeId || null,
     provider: "evolution" as const,
     phone_number: params.phoneNumber || null,
     api_url: params.apiUrl,
@@ -308,9 +383,10 @@ export async function updateConnectionStatus(
   provider: WhatsappProviderId,
   status: WhatsappConnectionStatus,
   extra?: { phone_number?: string; connected_at?: string },
+  storeId?: string | null,
 ): Promise<void> {
   const admin = getAdminClient()
-  await admin
+  let query = admin
     .from("partner_whatsapp_connections")
     .update({
       status,
@@ -320,4 +396,12 @@ export async function updateConnectionStatus(
     .eq("partner_id", partnerId)
     .eq("provider", provider)
     .eq("is_active", true)
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  } else {
+    query = query.is("store_id", null)
+  }
+
+  await query
 }

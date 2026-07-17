@@ -62,6 +62,7 @@ async function resolveCustomerPhone(params: {
 
 export async function scheduleWhatsappJob(params: {
   partnerId: string
+  storeId?: string | null
   jobType: WhatsappAutomationTrigger
   entityType: string
   entityId: string
@@ -78,7 +79,7 @@ export async function scheduleWhatsappJob(params: {
       entity_type: params.entityType,
       entity_id: params.entityId,
       run_at: params.runAt.toISOString(),
-      payload: params.payload || {},
+      payload: { ...params.payload, storeId: params.storeId || null },
       idempotency_key: idempotencyKey,
       status: "pending",
     },
@@ -112,6 +113,7 @@ export async function scheduleWhatsappJob(params: {
 
 export async function dispatchWhatsappAutomation(params: {
   partnerId: string
+  storeId?: string | null
   trigger: WhatsappAutomationTrigger
   entityType: string
   entityId: string
@@ -173,6 +175,7 @@ export async function dispatchWhatsappAutomation(params: {
 
   const queueResult = await queueWhatsappMessage({
     partnerId: params.partnerId,
+    storeId: params.storeId,
     customerId: params.customerId,
     orderId: params.orderId,
     appointmentId: params.appointmentId,
@@ -341,6 +344,7 @@ export async function runScheduledWhatsappJob(job: {
 
     const result = await dispatchWhatsappAutomation({
       partnerId: job.partner_id,
+      storeId: (job.payload?.storeId as string) || null,
       trigger: job.job_type as WhatsappAutomationTrigger,
       entityType: "appointment",
       entityId: job.entity_id,
@@ -379,6 +383,7 @@ export async function runScheduledWhatsappJob(job: {
   } else if (job.entity_type === "quote") {
     const result = await dispatchWhatsappAutomation({
       partnerId: job.partner_id,
+      storeId: (job.payload?.storeId as string) || null,
       trigger: job.job_type as WhatsappAutomationTrigger,
       entityType: "quote",
       entityId: job.entity_id,

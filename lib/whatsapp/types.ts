@@ -108,6 +108,7 @@ export interface PartnerWhatsappConnection {
   id: string
   partner_id: string
   provider: WhatsappProviderId
+  store_id: string | null
   phone_number: string | null
   phone_number_id: string | null
   business_account_id: string | null
@@ -160,6 +161,7 @@ export interface WhatsappExecutionResult {
 
 export interface QueueMessageInput {
   partnerId: string
+  storeId?: string | null
   customerId?: string | null
   orderId?: string | null
   appointmentId?: string | null

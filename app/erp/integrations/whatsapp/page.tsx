@@ -21,13 +21,12 @@ export default async function WhatsappIntegrationRoute() {
   const result = await getWhatsappIntegrationAction()
   const initialData = result.success
     ? result.data
-    : { connection: null, allConnections: [], messages: [], templates: [] }
+    : { allConnections: [], templates: [] }
 
   return (
     <WhatsAppIntegrationPage
-      initialConnection={initialData.connection}
+      storeId={context.activeStoreId}
       initialAllConnections={initialData.allConnections}
-      initialMessages={initialData.messages}
       initialTemplates={initialData.templates}
     />
   )
