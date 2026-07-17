@@ -14,6 +14,7 @@ import {
     getCouponCustomersAction,
     getCouponLinkedItemsAction,
     getCouponScopeDataAction,
+    getCouponStoresAction,
     listCouponsAction,
     toggleCouponStatusAction,
     updateCouponAction,
@@ -86,12 +87,14 @@ export default function CouponsPage({
     partner,
     initialCoupons,
     initialTotal,
+    storeId,
     planGate,
 }: {
     partnerId: string
     partner?: any
     initialCoupons: CouponRow[]
     initialTotal: number
+    storeId?: string | null
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }) {
     const { toast } = useToast()
@@ -304,6 +307,7 @@ export default function CouponsPage({
                 services: result.services || [],
                 categories: result.categories || [],
                 customers: result.customers || [],
+                stores: (result as any).stores || [],
             }
             setScopeData(nextScopeData)
             return nextScopeData
@@ -317,9 +321,10 @@ export default function CouponsPage({
             setIsLoadingRelations(true)
             try {
                 const availableScope = await ensureScopeData()
-                const [linkedItemsResult, customersResult] = await Promise.all([
+                const [linkedItemsResult, customersResult, storesResult] = await Promise.all([
                     getCouponLinkedItemsAction(partnerId, couponId),
                     getCouponCustomersAction(partnerId, couponId),
+                    getCouponStoresAction(partnerId, couponId),
                 ])
 
                 if (!linkedItemsResult.success || !customersResult.success) {
@@ -330,16 +335,19 @@ export default function CouponsPage({
                 const productIds = (linkedItemsResult.productIds || []) as string[]
                 const serviceIds = (linkedItemsResult.serviceIds || []) as string[]
                 const customerIds = (customersResult.data || []) as string[]
+                const storeIds = (storesResult.success ? (storesResult.data || []) : []) as string[]
 
                 const nextRelations: CouponRelations = {
                     categoryIds,
                     productIds,
                     serviceIds,
                     customerIds,
+                    storeIds,
                     categories: availableScope.categories.filter((item) => categoryIds.includes(item.id)),
                     products: availableScope.products.filter((item) => productIds.includes(item.id)),
                     services: availableScope.services.filter((item) => serviceIds.includes(item.id)),
                     customers: availableScope.customers.filter((item) => customerIds.includes(item.id)),
+                    stores: availableScope.stores,
                 }
 
                 setRelations(nextRelations)
@@ -354,7 +362,7 @@ export default function CouponsPage({
     const refreshCoupons = useCallback(async () => {
         setIsLoadingPage(true)
         try {
-            const result = await listCouponsAction(partnerId, { page: 1, limit: 100 })
+            const result = await listCouponsAction(partnerId, { page: 1, limit: 100, storeId })
             if (!result.success) {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
                 return
@@ -519,6 +527,13 @@ export default function CouponsPage({
         })
     }, [scopeData.customers])
 
+    const setSelectedStoreIds = useCallback((value: React.SetStateAction<string[]>) => {
+        setRelations((prev) => {
+            const storeIds = typeof value === "function" ? value(prev.storeIds) : value
+            return { ...prev, storeIds, stores: scopeData.stores.filter((item) => storeIds.includes(item.id)) }
+        })
+    }, [scopeData.stores])
+
     useEffect(() => {
         if (autoCreate && autoCode && autoCustomerId) {
             resetRelations()
@@ -589,6 +604,7 @@ export default function CouponsPage({
             categoryIds: form.applyScope === "categories" ? relations.categoryIds : [],
             serviceIds: form.applyScope === "services" ? relations.serviceIds : [],
             customerIds: form.customerScope === "specific" ? relations.customerIds : [],
+            storeIds: relations.storeIds || [],
         }
 
         if (!payload.code) {
@@ -765,6 +781,7 @@ export default function CouponsPage({
                         setSelectedServiceIds={setSelectedServiceIds}
                         setSelectedCategoryIds={setSelectedCategoryIds}
                         setSelectedCustomerIds={setSelectedCustomerIds}
+                        setSelectedStoreIds={setSelectedStoreIds}
                         onBack={handleBackToList}
                         onSave={saveCoupon}
                         isSaving={isSaving}

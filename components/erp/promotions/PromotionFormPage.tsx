@@ -50,7 +50,7 @@ interface PromotionFormPageProps {
     partnerId: string
     mode: "add" | "edit" | "details" | "duplicate"
     campaign?: any
-    scopeData: { products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[] }
+    scopeData: { products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[]; stores?: { id: string; name: string; isActive: boolean }[] }
     promotions: any[]
     onBack: () => void
 }
@@ -95,6 +95,7 @@ export default function PromotionFormPage({
     const [editingRuleProductIds, setEditingRuleProductIds] = useState<string[]>([])
     const [editingRuleCategoryIds, setEditingRuleCategoryIds] = useState<string[]>([])
     const [editingRuleServiceIds, setEditingRuleServiceIds] = useState<string[]>([])
+    const [editingStoreIds, setEditingStoreIds] = useState<string[]>([])
     const [isProductsSheetOpen, setIsProductsSheetOpen] = useState(false)
     const [isCategoriesSheetOpen, setIsCategoriesSheetOpen] = useState(false)
     const [isServicesSheetOpen, setIsServicesSheetOpen] = useState(false)
@@ -197,10 +198,12 @@ export default function PromotionFormPage({
             setEditingRuleServiceIds(
                 (editingRule.promotion_services || []).map((s: any) => s.service_id || s)
             )
+            setEditingStoreIds(editingRule.promotion_store_ids || [])
         } else {
             setEditingRuleProductIds([])
             setEditingRuleCategoryIds([])
             setEditingRuleServiceIds([])
+            setEditingStoreIds([])
         }
     }, [editingRule])
 
@@ -291,6 +294,7 @@ export default function PromotionFormPage({
                         productIds: editingRule.apply_scope === "specific_products" ? editingRuleProductIds : [],
                         categoryIds: editingRule.apply_scope === "category" ? editingRuleCategoryIds : [],
                         serviceIds: editingRule.apply_scope === "specific_services" ? editingRuleServiceIds : [],
+                        storeIds: editingStoreIds,
                     }
 
                     let promoRes
@@ -348,6 +352,7 @@ export default function PromotionFormPage({
                             productIds: editingRule.apply_scope === "specific_products" ? editingRuleProductIds : [],
                             categoryIds: editingRule.apply_scope === "category" ? editingRuleCategoryIds : [],
                             serviceIds: editingRule.apply_scope === "specific_services" ? editingRuleServiceIds : [],
+                            storeIds: editingStoreIds,
                         }
                         const promoRes = await createPromotionAction(promoPayload)
                         if (!promoRes.success) {
@@ -1261,7 +1266,40 @@ export default function PromotionFormPage({
                                                                     onChange={(e) => setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })}
                                                                 />
                                                             </div>
-                                                        </SidebarCard>                                                        {/* Configurações e status removido */}
+                                                        </SidebarCard>
+
+                                                        {scopeData.stores && scopeData.stores.length > 0 && (
+                                                            <SidebarCard hasTopStrip={true}>
+                                                                <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Lojas</h3>
+                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                                                                    Selecione as lojas onde esta promoção será válida. Se nenhuma for selecionada, vale para todas as lojas.
+                                                                </p>
+                                                                <div className="space-y-3 max-h-[240px] overflow-y-auto">
+                                                                    <label className="flex items-center gap-3 cursor-pointer">
+                                                                        <Checkbox
+                                                                            checked={editingStoreIds.length === 0}
+                                                                            onChange={() => setEditingStoreIds([])}
+                                                                        />
+                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Todas as lojas</span>
+                                                                    </label>
+                                                                    {(scopeData.stores || []).map((store: any) => (
+                                                                        <label key={store.id} className="flex items-center gap-3 cursor-pointer pl-2">
+                                                                            <Checkbox
+                                                                                checked={editingStoreIds.includes(store.id)}
+                                                                                onChange={(checked) => {
+                                                                                    if (checked) {
+                                                                                        setEditingStoreIds((prev) => [...prev, store.id])
+                                                                                    } else {
+                                                                                        setEditingStoreIds((prev) => prev.filter((id) => id !== store.id))
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <span className="text-sm text-brand-dark dark:text-dark-heading">{store.name}</span>
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            </SidebarCard>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}

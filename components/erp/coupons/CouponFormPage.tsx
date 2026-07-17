@@ -52,6 +52,7 @@ interface CouponFormPageProps {
     setSelectedServiceIds: React.Dispatch<React.SetStateAction<string[]>>
     setSelectedCategoryIds: React.Dispatch<React.SetStateAction<string[]>>
     setSelectedCustomerIds: (value: React.SetStateAction<string[]>, newCustomerObj?: ScopeCustomer) => void
+    setSelectedStoreIds: React.Dispatch<React.SetStateAction<string[]>>
     onBack: () => void
     onSave: () => void
     isSaving: boolean
@@ -221,6 +222,7 @@ export default function CouponFormPage({
     setSelectedServiceIds,
     setSelectedCategoryIds,
     setSelectedCustomerIds,
+    setSelectedStoreIds,
     onBack,
     onSave,
     isSaving,
@@ -645,6 +647,39 @@ export default function CouponFormPage({
                                             )}
                                         </div>
                                     </SidebarCard>
+
+                                    {scopeData.stores.length > 0 && (
+                                        <SidebarCard>
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-6">Lojas</h3>
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                                                Selecione as lojas onde este cupom será válido. Se nenhuma for selecionada, vale para todas as lojas.
+                                            </p>
+                                            <div className="space-y-3 max-h-[240px] overflow-y-auto">
+                                                <label className="flex items-center gap-3 cursor-pointer">
+                                                    <Checkbox
+                                                        checked={relations.storeIds.length === 0}
+                                                        onChange={() => setSelectedStoreIds([])}
+                                                    />
+                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Todas as lojas</span>
+                                                </label>
+                                                {scopeData.stores.map((store) => (
+                                                    <label key={store.id} className="flex items-center gap-3 cursor-pointer pl-2">
+                                                        <Checkbox
+                                                            checked={relations.storeIds.includes(store.id)}
+                                                            onChange={(checked) => {
+                                                                if (checked) {
+                                                                    setSelectedStoreIds((prev) => [...prev, store.id])
+                                                                } else {
+                                                                    setSelectedStoreIds((prev) => prev.filter((id) => id !== store.id))
+                                                                }
+                                                            }}
+                                                        />
+                                                        <span className="text-sm text-brand-dark dark:text-dark-heading">{store.name}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </SidebarCard>
+                                    )}
                                 </div>
                             </div>
                         </div>

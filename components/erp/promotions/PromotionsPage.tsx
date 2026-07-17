@@ -140,6 +140,7 @@ export default function PromotionsPage({
   initialCampaigns = [],
   initialPromotions = [],
   initialTotal = 0,
+  storeId,
   planGate,
 }: {
   partnerId: string
@@ -147,6 +148,7 @@ export default function PromotionsPage({
   initialCampaigns: any[]
   initialPromotions: any[]
   initialTotal: number
+  storeId?: string | null
   planGate?: any
 }) {
   const { toast } = useToast()
@@ -166,13 +168,13 @@ export default function PromotionsPage({
     initialNextCursor: null,
     initialHasMore: false,
     fetchPageFn: async () => {
-      const res = await listCampaignsAction(partnerId, { page: 1, limit: 100 })
+      const res = await listCampaignsAction(partnerId, { page: 1, limit: 100, storeId })
       if (!res.success) throw new Error(res.error || "Erro ao carregar campanhas.")
       return { items: res.data || [], nextCursor: null, hasMore: false }
     },
     dedupeKey: useCallback((c: any) => String(c?.id || ""), []),
     getDetailFn: async (id: string) => {
-      const res = await listCampaignsAction(partnerId, { page: 1, limit: 100 })
+      const res = await listCampaignsAction(partnerId, { page: 1, limit: 100, storeId })
       if (res.success) {
         return res.data?.find((c: any) => c.id === id) || null
       }
@@ -199,12 +201,13 @@ export default function PromotionsPage({
   } = entityPage
 
   const [promotions, setPromotions] = useState<any[]>(initialPromotions)
-  const [scopeData, setScopeData] = useState<{ products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[] }>({
+  const [scopeData, setScopeData] = useState<{ products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[]; stores?: { id: string; name: string; isActive: boolean }[] }>({
     products: [],
     services: [],
     categories: [],
     serviceCategories: [],
     customers: [],
+    stores: [],
   })
   const [isLoadingScope, setIsLoadingScope] = useState(false)
   const [page, setPage] = useState(1)
@@ -240,7 +243,7 @@ export default function PromotionsPage({
   const [isSimulating, setIsSimulating] = useState(false)
 
   const refreshPromotions = async () => {
-    const res = await listPromotionsAction(partnerId)
+    const res = await listPromotionsAction(partnerId, undefined, storeId)
     if (res.success) {
       setPromotions(res.data || [])
     }
@@ -259,6 +262,7 @@ export default function PromotionsPage({
             categories: res.categories || [],
             serviceCategories: (res as any).serviceCategories || [],
             customers: res.customers || [],
+            stores: (res as any).stores || [],
           })
         }
       } catch (err) {

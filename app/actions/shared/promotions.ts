@@ -8,6 +8,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { PromotionType, DiscountType, ApplyScope, PricingPromotion } from "@/lib/types/promotion"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { validateCoupon } from "@/lib/services/coupons"
+import { setPromotionStores, getPromotionStoreIds } from "@/lib/services/promotions.service"
 import { revalidatePath } from "next/cache"
 
 // ---------------------------------------------------------------------------
@@ -48,6 +49,7 @@ const PromotionSchema = z.object({
   productIds: z.array(z.string().uuid()).optional().default([]),
   categoryIds: z.array(z.string().uuid()).optional().default([]),
   serviceIds: z.array(z.string().uuid()).optional().default([]),
+  storeIds: z.array(z.string().uuid()).optional().default([]),
 })
 
 // Helper to revalidate promotions routes
@@ -227,7 +229,7 @@ async function checkPromotionOverlap(
 
 export async function listCampaignsAction(
   partnerId: string,
-  params?: { search?: string; isActive?: string; page?: number; limit?: number }
+  params?: { search?: string; isActive?: string; page?: number; limit?: number; storeId?: string | null }
 ) {
   await requireUser()
   await requirePermission(partnerId, "coupons", "view")
@@ -358,6 +360,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
           productIds: (promo.promotion_products || []).map((p: any) => p.product_id),
           categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
           serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+          storeIds: [],
         }
 
         const overlapError = await checkPromotionOverlap(supabase, candidate, promo.id, customCampaignB)
@@ -482,6 +485,7 @@ export async function toggleCampaignsStatusAction(
               productIds: (promo.promotion_products || []).map((p: any) => p.product_id),
               categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
               serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+              storeIds: [],
             }
 
             const overlapError = await checkPromotionOverlap(supabase, candidate, promo.id, customCampaignB)
@@ -599,7 +603,7 @@ export async function bulkUpdateCampaignsAction(
 // Promotion Actions
 // ---------------------------------------------------------------------------
 
-export async function listPromotionsAction(partnerId: string, campaignId?: string) {
+export async function listPromotionsAction(partnerId: string, campaignId?: string, storeId?: string | null) {
   await requireUser()
   await requirePermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
@@ -616,6 +620,22 @@ export async function listPromotionsAction(partnerId: string, campaignId?: strin
 
   if (campaignId) {
     query = query.eq("campaign_id", campaignId)
+  }
+
+  if (storeId) {
+    const { count: hasStores } = await supabase
+      .from("promotion_stores")
+      .select("*", { count: "exact", head: true })
+
+    if (hasStores && hasStores > 0) {
+      const { data: valid } = await supabase
+        .from("promotion_stores")
+        .select("promotion_id")
+        .eq("store_id", storeId)
+
+      const validIds = (valid || []).map((r: { promotion_id: string }) => r.promotion_id)
+      query = query.in("id", validIds.length > 0 ? validIds : ["__none__"])
+    }
   }
 
   const { data, error } = await query
@@ -707,6 +727,10 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
   if (data.applyScope === "specific_services" && data.serviceIds.length > 0) {
     const records = data.serviceIds.map((sid) => ({ promotion_id: promoId, service_id: sid }))
     await supabase.from("promotion_services").insert(records)
+  }
+
+  if (data.storeIds.length > 0) {
+    await setPromotionStores(promoId, data.storeIds)
   }
 
   await revalidatePromotions(data.partnerId)
@@ -802,6 +826,8 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
     await supabase.from("promotion_services").insert(records)
   }
 
+  await setPromotionStores(promotionId, data.storeIds)
+
   await revalidatePromotions(data.partnerId)
   return { success: true, id: promotionId }
 }
@@ -821,6 +847,29 @@ export async function deletePromotionAction(partnerId: string, promotionId: stri
 
   await revalidatePromotions(partnerId)
   return { success: true }
+}
+
+export async function getPromotionStoresAction(partnerId: string, promotionId: string) {
+  await requireUser()
+  await requirePermission(partnerId, "coupons", "view")
+  try {
+    const storeIds = await getPromotionStoreIds(promotionId)
+    return { success: true, data: storeIds }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao buscar lojas" }
+  }
+}
+
+export async function setPromotionStoresAction(partnerId: string, promotionId: string, storeIds: string[]) {
+  await requireUser()
+  await requirePermission(partnerId, "coupons", "edit")
+  try {
+    await setPromotionStores(promotionId, storeIds)
+    await revalidatePromotions(partnerId)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao salvar lojas" }
+  }
 }
 
 export async function togglePromotionStatusAction(partnerId: string, promotionId: string, isActive: boolean) {
@@ -868,6 +917,7 @@ export async function togglePromotionStatusAction(partnerId: string, promotionId
       productIds: (promo.promotion_products || []).map((p: any) => p.product_id),
       categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
       serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+      storeIds: [],
     }
 
     const overlapError = await checkPromotionOverlap(supabase, candidate, promotionId)
@@ -1070,7 +1120,7 @@ export async function getPromotionScopeDataAction(partnerId: string) {
   await requirePermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
-  const [{ data: products }, { data: services }, { data: categories }, { data: serviceCategories }, { data: customers }] = await Promise.all([
+  const [{ data: products }, { data: services }, { data: categories }, { data: serviceCategories }, { data: customers }, { data: stores }] = await Promise.all([
     supabase
       .from("products")
       .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active")
@@ -1101,6 +1151,11 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       .eq("partner_id", partnerId)
       .order("name")
       .limit(300),
+    supabase
+      .from("stores")
+      .select("id, name, is_active")
+      .eq("partner_id", partnerId)
+      .order("name"),
   ])
 
   return {
@@ -1142,6 +1197,11 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       phone: c.phone,
       avatarUrl: null,
       status: c.status,
+    })),
+    stores: (stores || []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      isActive: Boolean(s.is_active),
     })),
   }
 }

@@ -79,11 +79,18 @@ export type CouponFormState = {
   isAutomatic: boolean
 }
 
+export type ScopeStore = {
+  id: string
+  name: string
+  isActive: boolean
+}
+
 export type CouponScopeData = {
   products: ScopeItem[]
   services: ScopeItem[]
   categories: ScopeCategory[]
   customers: ScopeCustomer[]
+  stores: ScopeStore[]
 }
 
 export type CouponRelations = {
@@ -91,10 +98,12 @@ export type CouponRelations = {
   serviceIds: string[]
   categoryIds: string[]
   customerIds: string[]
+  storeIds: string[]
   products: ScopeItem[]
   services: ScopeItem[]
   categories: ScopeCategory[]
   customers: ScopeCustomer[]
+  stores: ScopeStore[]
 }
 
 export const DEFAULT_COUPON_FORM: CouponFormState = {
@@ -124,6 +133,7 @@ export const EMPTY_SCOPE_DATA: CouponScopeData = {
   services: [],
   categories: [],
   customers: [],
+  stores: [],
 }
 
 export const EMPTY_COUPON_RELATIONS: CouponRelations = {
@@ -131,10 +141,12 @@ export const EMPTY_COUPON_RELATIONS: CouponRelations = {
   serviceIds: [],
   categoryIds: [],
   customerIds: [],
+  storeIds: [],
   products: [],
   services: [],
   categories: [],
   customers: [],
+  stores: [],
 }
 
 export function mapCouponToForm(coupon: CouponRow): CouponFormState {

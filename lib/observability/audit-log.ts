@@ -15,6 +15,14 @@ type AuditEvent =
   | "stock.movement"
   | "stock.transfer"
   | "whatsapp.connection_resolved"
+  | "promotion.created"
+  | "promotion.updated"
+  | "promotion.deleted"
+  | "promotion.stores_updated"
+  | "coupon.created"
+  | "coupon.updated"
+  | "coupon.deleted"
+  | "coupon.stores_updated"
 
 export function logAudit(event: AuditEvent, data: Record<string, unknown>): void {
   const payload = {

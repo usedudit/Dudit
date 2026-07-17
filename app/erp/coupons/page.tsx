@@ -21,9 +21,10 @@ export default async function CouponsRoute() {
     redirect("/select-erp")
   }
   const partnerId = context.partnerId
+  const activeStoreId = context.activeStoreId || null
 
   const [result, plan, partner] = await Promise.all([
-    listCouponsAction(partnerId, { page: 1, limit: 100 }),
+    listCouponsAction(partnerId, { page: 1, limit: 100, storeId: activeStoreId }),
     getPartnerPlan(partnerId),
     getPartnerProfile(partnerId)
   ])
@@ -47,6 +48,7 @@ export default async function CouponsRoute() {
           partner={partner}
           initialCoupons={isFreePlan ? [] : (result.data || [])}
           initialTotal={isFreePlan ? 0 : (result.total || 0)}
+          storeId={activeStoreId}
           planGate={planGate}
         />
       </FadeIn>
