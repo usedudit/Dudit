@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { getCachedStoreBySlug, buildStoreCitySlug } from "@/app/actions/marketplace/stores"
+import { getCachedStoreBySlug } from "@/app/actions/marketplace/stores"
+import { buildStoreCitySlug } from "@/app/actions/marketplace/stores-utils"
 import { listStoreProducts } from "@/lib/store-products"
 import { listStoreServices } from "@/lib/store-services"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"

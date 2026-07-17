@@ -4,7 +4,8 @@ import { redirect, permanentRedirect, notFound } from 'next/navigation'
 import { isValidCitySlug } from '@/lib/validation/city'
 import { searchMarketplaceDirect } from '@/app/actions/marketplace/search'
 import ExplorarPage from '@/app/explorar/[[...slug]]/page'
-import { getStoreBySlug, buildStoreCitySlug } from '@/app/actions/marketplace/stores'
+import { getStoreBySlug } from '@/app/actions/marketplace/stores'
+import { buildStoreCitySlug } from '@/app/actions/marketplace/stores-utils'
 import { StorePage, generateStoreMetadata } from './store-page'
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
