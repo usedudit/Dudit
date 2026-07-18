@@ -18,6 +18,7 @@ import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/ac
 import { useProductBucket } from "../hooks"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
+import { useStore } from "@/lib/store-context"
 import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import {
@@ -228,6 +229,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
     const csrfToken = useCSRFToken()
+    const { selectedStore } = useStore()
 
     const { businessInfo: contextBusinessInfo } = usePermissions()
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
@@ -1165,6 +1167,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
         return {
             partnerId,
+            storeId: selectedStore?.id,
             customerId: selectedCustomer?.id,
             customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
             salesChannel,

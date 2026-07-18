@@ -1463,6 +1463,7 @@ export async function convertQuoteToOrderAction(data: {
                 .select(`
                     id,
                     partner_id,
+                    store_id,
                     customer_id,
                     status,
                     expiration_date,
@@ -1621,6 +1622,7 @@ export async function convertQuoteToOrderAction(data: {
 
             const orderPayload = {
                 partnerId: data.partnerId,
+                storeId: quote.store_id,
                 customerId: customer?.id || quote.customer_id || undefined,
                 customerName: customer?.name || QUOTE_DEFAULT_CUSTOMER_LABEL,
                 sourceQuoteId: data.quoteId,

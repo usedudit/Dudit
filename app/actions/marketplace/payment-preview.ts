@@ -125,6 +125,7 @@ export async function previewMarketplacePaymentAction(input: {
     .from("payment_methods")
     .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
     .eq("id", input.paymentMethodId)
+    .eq("partner_id", input.partnerId)
     .single()
 
   if (error || !method) {

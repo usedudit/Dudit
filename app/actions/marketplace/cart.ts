@@ -767,6 +767,7 @@ export async function checkoutCartAction(
         .from("payment_methods")
         .select("*, payment_method_installment_fees(installment_number, fee_percent)")
         .eq("id", paymentMethod)
+        .eq("partner_id", partnerId)
         .single()
       : Promise.resolve({ data: null, error: null }),
   ])

@@ -955,6 +955,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             const result = await createQuoteAction({
                 partnerId: partnerId,
                 customerId: selectedCustomer?.id,
+                storeId: selectedStore?.id,
                 issueDate: quoteDate,
                 expirationDate: expiryDate,
                 notes: internalNote,

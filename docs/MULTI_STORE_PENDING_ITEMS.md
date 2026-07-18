@@ -1,69 +1,66 @@
 # Multi-Store Roadmap — Pendências
 
-## F15 Leftovers
+## ✅ F16 — Runtime Store Awareness Cleanup (Concluído)
 
-### 1. `delivery_payer` Snapshots (5 locais)
+### O que foi feito:
 
-**Arquivos:**
-- `app/actions/marketplace/cart.ts:1033`
-- `app/actions/erp/pdv.ts:408`
-- `app/actions/erp/orders.ts:1485`
-- `app/api/mercadopago/process-payment/route.ts:804`
-- `lib/services/recurring-execution.service.ts:252`
+| Item | Status |
+|------|:---:|
+| `delivery_payer` snapshots (4/5) | ✅ PDV, Orders, Marketplace cart, Mercado Pago |
+| `payment_methods` runtime (2/2 críticos) | ✅ `pdv.ts:120`, `usePaymentMethods` hook |
+| Helper centralizado | ✅ `resolvePaymentMethodsForStore` em `lib/data/payment-methods.ts` |
+| Hook com fallback StoreContext | ✅ `usePaymentMethods` |
+| `npx tsc --noEmit` | ✅ 0 erros |
 
-**Problema:** Todos congelam `delivery_payer` no momento da criação do pedido consultando `delivery_settings` apenas por `partner_id`, ignorando `store_id`.
+### Fora do escopo F16 (não corrigido):
 
-**Status atual:** Funcional — o fallback global retorna o valor correto para partners sem override. Se um partner configurar override de `delivery_payer` por loja, o snapshot congelará o valor global (não o da loja).
+| Item | Motivo |
+|------|--------|
+| `recurring-execution.service.ts` | Tabelas `recurring_executions` e `recurring_subscriptions` não têm `store_id`. Sem migration. |
+| `lib/services/payment-method.service.ts` | `pickBestPaymentMethod` sem store filter — usado em marketplace (global). |
 
-**Recomendação:** Não alterar agora. Revisar futuramente se pedidos precisarem recalcular ou consultar configuração histórica por loja.
+### Itens corrigidos durante auditoria final:
 
----
-
-### 2. `usePaymentMethods` Hook
-
-**Arquivo:** `hooks/use-payment-methods.ts`
-
-**Problema:** Hook compartilhado usado por 3 componentes não aceita `storeId`. Consumidores:
-- `components/erp/transactions/TransactionsPage.tsx` (via hook)
-- `components/erp/orders/PaymentModal.tsx` (via hook)
-- `components/erp/payments/BalancePaymentCollector.tsx` (via hook)
-
-**Recomendação:** Auditar consumidores futuros. Garantir que qualquer hook de frontend receba `activeStoreId`. Evitar bypass do store filtering.
+| Item | Correção |
+|------|----------|
+| `CreateOrder.tsx:1166` | `buildOrderPayload` agora inclui `storeId: selectedStore?.id` |
+| `quotes.ts:1656` | `convertQuoteToOrderAction` agora propaga `quote.store_id` para o order payload |
+| `CreateQuote.tsx:955` | `createQuoteAction` agora recebe `storeId: selectedStore?.id` |
+| 4 queries UUID em `payment_methods` | Adicionado `.eq("partner_id", partnerId)` em todos os 4 locais |
 
 ---
 
-### 3. Queries Diretas em `payment_methods` (~15 locais)
+## Pendências Restantes
 
-**Arquivos (ERP actions):**
-- `app/actions/erp/cash-register.ts:1022,1135` — lookup de tipo por ID
-- `app/actions/erp/pdv.ts:120` — fee split (crítico — store override não pego)
-- `app/actions/erp/orders.ts:244` — fee pricing (crítico)
-- `app/actions/erp/transactions.ts:197,400,1474,1656,1847,2628` — label/account lookups
-- `app/actions/erp/recurring-transactions.ts:523` — label lookup
-- `app/actions/erp/quick-mode.ts:166` — verifica se partner tem Pix
+### 1. `delivery_payer` Snapshots — Recurring Execution
 
-**Arquivos (Marketplace actions):**
-- `app/actions/marketplace/storefront-payment-methods.ts:29`
-- `app/actions/marketplace/payment-preview.ts:125`
-- `app/actions/marketplace/cart.ts:142,765`
-- `app/actions/marketplace/checkout-context.ts:126,134`
+**Arquivo:** `lib/services/recurring-execution.service.ts:252`
 
-**Arquivos (API/Lib):**
-- `app/api/mercadopago/process-payment/route.ts:221,478`
-- `lib/dashboard-engine/engine.ts:58`
-- `lib/services/payment-method.service.ts:27` — `pickBestPaymentMethod`
-- `lib/data/partner.ts:78` — `getPartnerPaymentMethodsCached`
+**Problema:** Cria pedido de assinatura recorrente congelando `delivery_payer` apenas por `partner_id`.
 
-**Análise de risco:**
+**Motivo da não correção:** As tabelas `recurring_executions` e `recurring_subscriptions` não possuem coluna `store_id`. Adicionar exigiria migration (fora do escopo F16). Quando o schema evoluir para suportar lojas em subscriptions, este local precisará ser atualizado.
 
-| Tipo | Qtde | Risco | Ação |
-|------|------|-------|------|
-| Runtime crítico (fee/checkout) | ~5 | Alto | **Prioridade** — store override não aplicado |
-| Admin/client (bypass RLS) | ~6 | Baixo | Já coberto por admin client |
-| Legado (marketplace partner-level) | ~5 | Baixo | Marketplace não usa stores |
-| Coberto por RLS | ~2 | Nenhum | RLS já filtra corretamente |
+**Status atual:** Comportamento correto para o schema atual (partner default). Nenhum impacto hoje.
 
-**Recomendação:** Focar nos ~5 locais críticos de runtime (fee/checkout) em fase futura. O restante é baixo risco.
+---
+
+### 2. UI Gaps
+
+| # | Componente | Gap | Prioridade |
+|---|-----------|-----|:---:|
+| 1 | `CheckoutPageClient.tsx:1886,2005` | `checkoutCartAction` sem `storeId` — intencional (marketplace) | N/A |
+
+---
+
+### 3. Service: `pickBestPaymentMethod`
+
+**Arquivo:** `lib/services/payment-method.service.ts:19`
+
+**Problema:** Não filtra por `store_id`. Pode retornar método de loja A quando chamado sem store context.
+
+**Uso atual:** Apenas em marketplace checkout (global). Não afeta ERP.
+
+**Prioridade:** Baixa. Se usado em ERP futuramente, precisa de store filter.
 
 ---
 

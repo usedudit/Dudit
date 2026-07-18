@@ -223,6 +223,7 @@ async function handler(request: NextRequest) {
           .from("payment_methods")
           .select("*, payment_method_installment_fees(installment_number, fee_percent)")
           .eq("id", paymentFormData.payment_method_id)
+          .eq("partner_id", partnerId)
           .single()
         if (pmtMethod) {
           const fees = pmtMethod.payment_method_installment_fees || []
@@ -480,6 +481,7 @@ async function handler(request: NextRequest) {
           .from("payment_methods")
           .select("*, payment_method_installment_fees(installment_number, fee_percent)")
           .eq("id", paymentFormData.payment_method_id)
+          .eq("partner_id", partnerId)
           .single()
         if (pmtMethod) {
           const fees = pmtMethod.payment_method_installment_fees || []
