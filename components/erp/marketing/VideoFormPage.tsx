@@ -116,7 +116,7 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                             {/* Back button - desktop only */}
@@ -158,7 +158,7 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                             {/* Left Column */}
                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                <FormSection title="Informações do Vídeo" description="Preencha os detalhes principais do vídeo.">
+                                <FormSection title="Informações do Vídeo">
                                     <div className="space-y-5">
                                         <Input label="Título" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do vídeo" error={!!errors.title} errorMessage={errors.title} disabled={readOnly} />
                                         <FormTextarea label="Descrição" name="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição do vídeo..." rows={4} disabled={readOnly} />

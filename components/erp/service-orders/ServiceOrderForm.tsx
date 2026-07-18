@@ -49,6 +49,7 @@ import { Package } from "@/lib/icons"
 
 interface ServiceOrderFormProps {
     partnerId: string
+    storeId?: string | null
     onBack: () => void
     onSaved: (data?: any) => void
     editData?: any
@@ -77,7 +78,7 @@ const getLocalTimeString = (d: Date) => {
 
 
 
-export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData }: ServiceOrderFormProps) {
+export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, editData }: ServiceOrderFormProps) {
     const { toast } = useToast()
     const [activeTab, setActiveTab] = useState("general")
     const isLocked = editData?.payment_status === "paid" || editData?.payment_status === "partially_paid"
@@ -593,6 +594,7 @@ export default function ServiceOrderForm({ partnerId, onBack, onSaved, editData 
             // Create OS
             const res = await createServiceOrderAction(partnerId, {
                 ...payload,
+                store_id: storeId || undefined,
                 payment_status: "unpaid",
                 paid_amount: 0,
             } as any)

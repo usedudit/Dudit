@@ -13,10 +13,11 @@ export default async function ServiceOrdersPageServer() {
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId
+  const activeStoreId = context.activeStoreId || null
 
   const [{ allowed }, page] = await Promise.all([
     checkPermission(partnerId, "service_orders", "view"),
-    getERPServiceOrdersPageAction(partnerId, { cursor: null, limit: 100 }),
+    getERPServiceOrdersPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId }),
   ])
 
   if (!allowed) return <AccessDenied />
@@ -33,6 +34,7 @@ export default async function ServiceOrdersPageServer() {
           initialNextCursor={page.nextCursor}
           initialHasMore={page.hasMore}
           partnerId={partnerId}
+          storeId={activeStoreId}
         />
       </FadeIn>
     </>

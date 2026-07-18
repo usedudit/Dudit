@@ -67,6 +67,7 @@ interface ServiceOrdersPageProps {
   initialNextCursor: any
   initialHasMore: boolean
   partnerId: string
+  storeId?: string | null
 }
 
 export default function ServiceOrdersPage({
@@ -74,6 +75,7 @@ export default function ServiceOrdersPage({
   initialNextCursor,
   initialHasMore,
   partnerId,
+  storeId,
 }: ServiceOrdersPageProps) {
   const { toast } = useToast()
   const [isDeleting, setIsDeleting] = useState(false)
@@ -87,6 +89,7 @@ export default function ServiceOrdersPage({
   const [activeTab, setActiveTab] = useState<string>("all")
   const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
   const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
+  const [showLegacy, setShowLegacy] = useState(false)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -117,12 +120,12 @@ export default function ServiceOrdersPage({
   const entityPage = useEntityPage<any, any, any>({
     entityType: "service_orders",
     partnerId,
-    queryKey: ["service-orders", partnerId],
+    queryKey: ["service-orders", partnerId, storeId, showLegacy],
     initialItems: rawOrders,
     initialNextCursor,
     initialHasMore,
     fetchPageFn: async ({ cursor }) => {
-      const res = await getERPServiceOrdersPageAction(partnerId, { cursor, limit: 100 })
+      const res = await getERPServiceOrdersPageAction(partnerId, { cursor, limit: 100, storeId, showLegacy })
       if (!res.success) throw new Error(res.error || "Erro ao carregar OS")
       return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
     },
@@ -147,8 +150,8 @@ export default function ServiceOrdersPage({
 
   const handleMutation = useCallback(() => {
     afterMutation()
-    queryClient.invalidateQueries({ queryKey: ["service-orders", partnerId] })
-  }, [afterMutation, queryClient, partnerId])
+    queryClient.invalidateQueries({ queryKey: ["service-orders", partnerId, storeId, showLegacy] })
+  }, [afterMutation, queryClient, partnerId, storeId, showLegacy])
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setSearch(e.target.value)
@@ -386,6 +389,7 @@ export default function ServiceOrdersPage({
             <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
               <ServiceOrderForm
                 partnerId={partnerId}
+                storeId={storeId}
                 onBack={() => closeEntity()}
                 onSaved={() => {
                   closeEntity()
@@ -495,6 +499,18 @@ export default function ServiceOrdersPage({
                   >
                     <FilterIcon className="w-4 h-4" />
                   </Button>
+                  {storeId && (
+                    <button
+                      onClick={() => setShowLegacy(v => !v)}
+                      className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                        showLegacy
+                          ? "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200"
+                          : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border text-brand-inactive-text"
+                      }`}
+                    >
+                      {showLegacy ? "Leg ✓" : "Leg"}
+                    </button>
+                  )}
                   <Button
                     onClick={() => openEntity("create")}
                     className="w-[42px] h-[42px] p-0 flex items-center justify-center animate-pulse-once"
@@ -530,6 +546,18 @@ export default function ServiceOrdersPage({
                   >
                     Filtros
                   </Button>
+                  {storeId && (
+                    <button
+                      onClick={() => setShowLegacy(v => !v)}
+                      className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
+                        showLegacy
+                          ? "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200"
+                          : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border text-brand-inactive-text"
+                      }`}
+                    >
+                      {showLegacy ? "Legados ✓" : "Legados"}
+                    </button>
+                  )}
                   {hasActiveFilters && (
                     <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1"></div>
                   )}

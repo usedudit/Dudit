@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -35,7 +35,7 @@ const PAGE_SIZE = 100
 
 export async function getERPServiceOrdersPageAction(
   partnerId: string,
-  options?: { cursor?: ServiceOrderListCursor; limit?: number; status?: string },
+  options?: { cursor?: ServiceOrderListCursor; limit?: number; status?: string; storeId?: string | null; showLegacy?: boolean },
 ): Promise<
   | { success: true; items: any[]; nextCursor: ServiceOrderListCursor; hasMore: boolean }
   | { success: false; error: string }
@@ -50,11 +50,17 @@ export async function getERPServiceOrdersPageAction(
 
     let q = supabase
       .from("service_orders")
-      .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
+      .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
       .eq("partner_id", partnerId)
 
     if (options?.status && options.status !== "all") {
       q = q.eq("status", options.status)
+    }
+
+    if (options?.storeId && !options?.showLegacy) {
+      q = q.eq("store_id", options.storeId)
+    } else if (options?.showLegacy) {
+      q = q.is("store_id", null)
     }
 
     if (cursor) {
@@ -185,6 +191,7 @@ async function fetchTimelineForEntity(entityType: string, entityId: string, part
 export async function createServiceOrderAction(
   partnerId: string,
   input: {
+    store_id?: string
     title: string
     description?: string
     diagnosis?: string
@@ -216,6 +223,12 @@ export async function createServiceOrderAction(
     const user = await requireUser()
     const admin = getAdminClient()
 
+    const storeId = input.store_id
+    if (!storeId) {
+      return { success: false, error: "store_id é obrigatório. Selecione uma loja antes de criar a OS." }
+    }
+    await requireStoreAccess(storeId, partnerId)
+
     const status = input.status || "aberta"
 
     // -- Plan limit check --
@@ -230,6 +243,7 @@ export async function createServiceOrderAction(
       .from("service_orders")
       .insert({
         partner_id: partnerId,
+        store_id: storeId,
         public_token: publicToken,
         title: input.title,
         description: input.description || null,
@@ -272,6 +286,7 @@ export async function createServiceOrderAction(
       actionType: "created",
       source: "manual",
       changeLines: [`OS #${orderNumber} criada por ${user.email || "usuário"}`],
+      metadata: { storeId, partnerId, userId: user.id, serviceOrderId: data.id },
     })
 
     try {
@@ -1048,6 +1063,7 @@ export async function updateServiceOrderAction(
   partnerId: string,
   serviceOrderId: string,
   input: {
+    store_id?: string
     title?: string
     description?: string
     diagnosis?: string
@@ -1092,6 +1108,12 @@ export async function updateServiceOrderAction(
     const allowedWhenPaid = ["internal_notes", "status", "priority", "expected_completion_date", "expected_completion_time", "estimated_hours", "specifications"]
 
     const updateData: any = {}
+    if (input.store_id !== undefined && !isPaid) {
+      if (input.store_id !== current.store_id) {
+        await requireStoreAccess(input.store_id, partnerId)
+      }
+      updateData.store_id = input.store_id
+    }
     if (input.title !== undefined && !isPaid) updateData.title = input.title
     if (input.description !== undefined && !isPaid) updateData.description = input.description
     if (input.diagnosis !== undefined && !isPaid) updateData.diagnosis = input.diagnosis
@@ -1136,12 +1158,15 @@ export async function updateServiceOrderAction(
     const changes = []
     if (input.title && input.title !== current.title) changes.push(`Título: "${current.title}" -> "${input.title}"`)
     if (input.status && input.status !== current.status) changes.push(`Status: "${current.status}" -> "${input.status}"`)
+    if (input.store_id && input.store_id !== current.store_id) changes.push(`Loja alterada`)
 
+    const updatedStoreId = data.store_id || current.store_id
     await logAuditEvent({
       partnerId, actorUserId: user.id,
       entityType: "service_order", entityId: serviceOrderId,
       actionType: "updated", source: "manual",
       changeLines: changes.length > 0 ? changes : ["Dados da OS atualizados"],
+      metadata: { storeId: updatedStoreId, partnerId, userId: user.id, serviceOrderId },
     })
 
     await recalcTotals(admin, serviceOrderId)

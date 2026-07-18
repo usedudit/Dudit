@@ -13,6 +13,7 @@ export type ServiceOrderStatus =
 export interface ServiceOrder {
   id: string
   partner_id: string
+  store_id: string | null
   order_number: string
   customer_id: string | null
   customer_snapshot: any
@@ -78,6 +79,7 @@ export interface ServiceOrderAttachment {
 export type ServiceOrderListCursor = { createdAt: string; id: string } | null
 
 export interface ServiceOrderInput {
+  store_id?: string
   title: string
   description?: string
   diagnosis?: string

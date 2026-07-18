@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, FormDropdown, IconPlaceholder, Input } from "@/components/reusable"
+import { Button, FormDropdown, IconPlaceholder, InfoCard, Input } from "@/components/reusable"
 import { Progress } from "@/components/ui/progress"
 import { TrashIcon, UploadIcon, VideoIcon } from "@/lib/icons"
 import {
@@ -11,6 +11,7 @@ import {
     prepareVideoClientPreview,
 } from "@/lib/video/client"
 import type { VideoMetadata, VideoType } from "@/lib/video/shared"
+import { size } from "zod"
 
 interface CommunityVideoUploadSectionProps {
     video: VideoMetadata
@@ -296,10 +297,9 @@ export default function CommunityVideoUploadSection({ video, onChange }: Communi
             <div className="flex items-center justify-between gap-4 mb-4">
                 <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">Vídeo</h3>
                 {(hasVideo || localPreview) && (
-                    <button type="button" onClick={handleRemoveVideo} className="text-sm text-brand-red-dark hover:underline inline-flex items-center gap-1">
-                        <TrashIcon className="w-4 h-4" />
+                    <Button variant="link" onClick={handleRemoveVideo} className="text-brand-red" leftIcon={<TrashIcon size={18} />}>
                         Remover vídeo
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -396,7 +396,9 @@ export default function CommunityVideoUploadSection({ video, onChange }: Communi
                     <p className="text-sm text-brand-inactive-text">Duração: {Math.round(uploadPlayback.duration)}s</p>
                 )}
 
-                {error && <p className="text-sm text-brand-red-dark">{error}</p>}
+                {error &&
+                    <InfoCard color="red" title="Erro ao fazer upload do vídeo" message={error} />
+                }
             </div>
         </div>
     )

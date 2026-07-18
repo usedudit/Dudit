@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, FormDropdown, IconPlaceholder, Input } from "@/components/reusable"
+import { Button, FormDropdown, IconPlaceholder, InfoCard, Input } from "@/components/reusable"
 import { Progress } from "@/components/ui/progress"
 import { TrashIcon, UploadIcon, LockIcon, VideoIcon } from "@/lib/icons"
 import {
@@ -320,8 +320,7 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
         <div>
             <div className="flex items-center justify-between gap-4 mb-4">
                 {(hasVideo || localPreview) && isEditing && (
-                    <Button variant="outlinered" onClick={handleRemoveVideo}>
-                        <TrashIcon className="w-4 h-4" />
+                    <Button variant="link" onClick={handleRemoveVideo} className="text-brand-red" leftIcon={<TrashIcon size={18} />}>
                         Remover vídeo
                     </Button>
                 )}
@@ -421,7 +420,9 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
                         <p className="text-sm text-brand-inactive-text">Duração: {Math.round(uploadPlayback.duration)}s</p>
                     )}
 
-                    {error && <p className="text-sm text-brand-red-dark">{error}</p>}
+                    {error &&
+                        <InfoCard color="red" title="Erro ao fazer upload do vídeo" message={error} />
+                    }
                 </div>
             )}
         </div>
