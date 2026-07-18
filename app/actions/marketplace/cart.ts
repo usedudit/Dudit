@@ -12,6 +12,7 @@ import { checkLimit, increment_usage_counter } from "@/lib/services/subscription
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
+import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 import { toCanonicalPaymentType, formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
@@ -638,6 +639,7 @@ export async function checkoutCartAction(
   payDepositOnly?: boolean,
   checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null,
   isPickupPayment?: boolean,
+  storeId?: string,
 ) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -1028,14 +1030,12 @@ export async function checkoutCartAction(
     console.error("Error ensuring marketplace customer in checkoutCartAction:", e)
   }
 
-  // Fetch delivery_payer setting for snapshot
-  const { data: deliverySettings } = await getAdminClient()
-    .from("delivery_settings")
-    .select("delivery_payer")
-    .eq("partner_id", partnerId)
-    .maybeSingle()
-
-  const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+  // Fetch delivery_payer setting for snapshot (store-aware)
+  const deliveryRow = await resolveDeliverySettingsRow(getAdminClient(), partnerId, storeId)
+  const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
+  if (storeId && deliveryRow?.store_id === storeId) {
+    console.log(`[delivery_payer] Marketplace checkout using store override: store=${storeId}, partner=${partnerId}, payer=${deliveryPayer}`)
+  }
 
   // For marketplace orders (customer-initiated), seller_commission_amount is 0
   const sellerCommissionAmount = 0

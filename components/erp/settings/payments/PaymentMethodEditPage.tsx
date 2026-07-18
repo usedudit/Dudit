@@ -78,13 +78,14 @@ interface PaymentMethod {
 
 interface PaymentMethodEditPageProps {
     partnerId: string
+    storeId?: string | null
     editingMethod: PaymentMethod | null
     existingMethods?: any[]
     onBack: (shouldReload?: boolean) => void
     embedded?: boolean
 }
 
-export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethods = [], onBack, embedded }: PaymentMethodEditPageProps) {
+export function PaymentMethodEditPage({ partnerId, storeId, editingMethod, existingMethods = [], onBack, embedded }: PaymentMethodEditPageProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingDetails, setIsLoadingDetails] = useState(false)
@@ -224,6 +225,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
         setIsLoading(true)
         try {
             const payload = {
+                storeId: storeId || null,
                 name: formData.name,
                 paymentType: formData.type,
                 isActive: formData.is_active,

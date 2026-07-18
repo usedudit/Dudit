@@ -1,6 +1,6 @@
 "use server"
 
-import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireStoreAccess, requireUser } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
@@ -10,6 +10,7 @@ import { calculateDistance, geocodeAddress } from "@/lib/services/location.servi
 
 function mapSettingsRow(row: any): DeliverySettings {
   return {
+    storeId: row?.store_id || null,
     baseFee: Number(row?.base_fee || 0),
     includedKm: Number(row?.included_km || 0),
     extraKmPrice: Number(row?.extra_km_price || 0),
@@ -19,6 +20,25 @@ function mapSettingsRow(row: any): DeliverySettings {
     freeDeliveryThreshold: row?.free_delivery_threshold == null ? null : Number(row.free_delivery_threshold),
     deliveryPayer: row?.delivery_payer === "seller" ? "seller" : "customer",
   }
+}
+
+export async function resolveDeliverySettingsRow(supabase: any, partnerId: string, storeId?: string | null) {
+  if (storeId) {
+    const { data } = await supabase
+      .from("delivery_settings")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("store_id", storeId)
+      .maybeSingle()
+    if (data) return data
+  }
+  const { data } = await supabase
+    .from("delivery_settings")
+    .select("*")
+    .eq("partner_id", partnerId)
+    .is("store_id", null)
+    .maybeSingle()
+  return data
 }
 
 function mapRuleRow(row: any): DeliveryFeeRule {
@@ -32,17 +52,17 @@ function mapRuleRow(row: any): DeliveryFeeRule {
   }
 }
 
-export async function getPartnerDeliveryConfigAction(partnerId: string) {
+export async function getPartnerDeliveryConfigAction(partnerId: string, storeId?: string | null) {
   const supabase = getAdminClient()
   const plan = await getPartnerPlan(partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
 
-  const [{ data: settings }, { data: rules }] = await Promise.all([
-    supabase.from("delivery_settings").select("*").eq("partner_id", partnerId).maybeSingle(),
+  const [settingsRow, { data: rules }] = await Promise.all([
+    resolveDeliverySettingsRow(supabase, partnerId, storeId),
     supabase.from("delivery_fee_rules").select("*").eq("partner_id", partnerId).order("start_time"),
   ])
 
-  const normalizedSettings = mapSettingsRow(settings)
+  const normalizedSettings = mapSettingsRow(settingsRow)
   const normalizedRules = (rules || []).map(mapRuleRow)
   return {
     success: true as const,
@@ -55,10 +75,14 @@ export async function getPartnerDeliveryConfigAction(partnerId: string) {
 
 export async function upsertPartnerDeliveryConfigAction(input: {
   partnerId: string
+  storeId?: string | null
   settings: DeliverySettings
 }) {
   await requireUser()
   await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_delivery")
+  if (input.storeId) {
+    await requireStoreAccess(input.storeId, input.partnerId)
+  }
   const supabase = await getSupabaseServerClient()
   const plan = await getPartnerPlan(input.partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
@@ -68,6 +92,7 @@ export async function upsertPartnerDeliveryConfigAction(input: {
   }
 
   const normalized: DeliverySettings = {
+    storeId: input.storeId || null,
     baseFee: Math.max(0, Number(input.settings.baseFee || 0)),
     includedKm: capability.advancedEnabled ? Math.max(0, Number(input.settings.includedKm || 0)) : 0,
     extraKmPrice: capability.advancedEnabled ? Math.max(0, Number(input.settings.extraKmPrice || 0)) : 0,
@@ -84,8 +109,18 @@ export async function upsertPartnerDeliveryConfigAction(input: {
     return { success: false as const, error: "Você deve manter ativo pelo menos um método de entrega (Entrega ou Retirada)." }
   }
 
-  const { error } = await supabase.from("delivery_settings").upsert({
+  const storeId = input.storeId || null
+  let query = supabase.from("delivery_settings").select("id").eq("partner_id", input.partnerId)
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  } else {
+    query = query.is("store_id", null)
+  }
+  const { data: existing } = await query.maybeSingle()
+
+  const payload: Record<string, any> = {
     partner_id: input.partnerId,
+    store_id: storeId,
     base_fee: normalized.baseFee,
     included_km: normalized.includedKm,
     extra_km_price: normalized.extraKmPrice,
@@ -95,7 +130,15 @@ export async function upsertPartnerDeliveryConfigAction(input: {
     free_delivery_threshold: normalized.freeDeliveryThreshold,
     delivery_payer: normalized.deliveryPayer,
     updated_at: new Date().toISOString(),
-  })
+  }
+
+  let error: any
+  if (existing) {
+    payload.id = existing.id
+    ;({ error } = await supabase.from("delivery_settings").update(payload).eq("id", existing.id))
+  } else {
+    ;({ error } = await supabase.from("delivery_settings").insert(payload))
+  }
 
   if (error) return { success: false as const, error: error.message }
   if (!capability.advancedEnabled) {
@@ -143,6 +186,7 @@ export async function deleteDeliveryFeeRuleAction(partnerId: string, ruleId: str
 
 export async function quoteDeliveryFeeAction(input: {
   partnerId: string
+  storeId?: string | null
   destinationAddress: string
   currentTimeIso?: string
   freeDeliveryCoupon?: boolean
@@ -157,8 +201,8 @@ export async function quoteDeliveryFeeAction(input: {
     return { success: false as const, error: "Entrega não disponível no plano atual." }
   }
 
-  const [{ data: settingsRow }, { data: rulesRows }, { data: store }] = await Promise.all([
-    supabase.from("delivery_settings").select("*").eq("partner_id", input.partnerId).maybeSingle(),
+  const [settingsRow, { data: rulesRows }, { data: store }] = await Promise.all([
+    resolveDeliverySettingsRow(supabase, input.partnerId, input.storeId),
     supabase.from("delivery_fee_rules").select("*").eq("partner_id", input.partnerId).eq("is_active", true).order("start_time"),
     supabase
       .from("partners")

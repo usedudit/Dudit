@@ -3,29 +3,28 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
+import { useStore } from "@/lib/store-context"
 
-const PAYMENT_METHODS_KEY = (partnerId: string) => ["erp-payment-methods", partnerId] as const
+const PAYMENT_METHODS_KEY = (partnerId: string, storeKey: string) => ["erp-payment-methods", partnerId, storeKey] as const
 
-/**
- * Shared React Query hook for payment methods.
- * Eliminates duplicate fetches across TransactionsPage, PaymentModal,
- * PaymentMethodsSubPage, and other consumers.
- *
- * Usage:
- *   const { methods, isLoading, invalidate } = usePaymentMethods(partnerId)
- *
- * After mutations (create/update/delete), call `invalidate()` to refetch.
- */
-export function usePaymentMethods(partnerId: string) {
+function resolveStoreKey(storeId?: string | null): string {
+    return storeId || "__global__"
+}
+
+export function usePaymentMethods(partnerId: string, storeId?: string | null) {
     const queryClient = useQueryClient()
+    const storeContext = useStore()
+
+    const effectiveStoreId = storeId ?? storeContext.selectedStore?.id ?? null
+    const storeKey = resolveStoreKey(effectiveStoreId)
 
     const { data, isLoading, error } = useQuery({
-        queryKey: PAYMENT_METHODS_KEY(partnerId),
+        queryKey: PAYMENT_METHODS_KEY(partnerId, storeKey),
         queryFn: async () => {
-            const res = await getPaymentMethodsAction(partnerId)
+            const res = await getPaymentMethodsAction(partnerId, effectiveStoreId)
             return res
         },
-        staleTime: 60_000, // 1 minute - payment methods rarely change mid-session
+        staleTime: 60_000,
         refetchOnWindowFocus: false,
         enabled: !!partnerId,
     })
@@ -33,15 +32,14 @@ export function usePaymentMethods(partnerId: string) {
     const methods = data?.methods || []
 
     const invalidate = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: PAYMENT_METHODS_KEY(partnerId) })
+        queryClient.invalidateQueries({ queryKey: ["erp-payment-methods", partnerId] })
     }, [queryClient, partnerId])
 
-    /** Direct cache set - use when you already have fresh data (e.g., from SSR props). */
     const setCache = useCallback(
         (freshMethods: any[]) => {
-            queryClient.setQueryData(PAYMENT_METHODS_KEY(partnerId), { methods: freshMethods })
+            queryClient.setQueryData(PAYMENT_METHODS_KEY(partnerId, storeKey), { methods: freshMethods })
         },
-        [queryClient, partnerId],
+        [queryClient, partnerId, storeKey],
     )
 
     return { methods, isLoading, error: data && "error" in data ? data.error : null, invalidate, setCache }

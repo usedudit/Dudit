@@ -37,6 +37,7 @@ import type { RoleId } from "@/lib/permissions/rbac-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { useSidebar } from "@/lib/sidebar-context"
 import { usePermissions } from "@/lib/permission-context"
+import { useStore } from "@/lib/store-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { isSystemResourceActive } from "@/lib/system-resources"
@@ -71,6 +72,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const { setHeaderOverride } = useSidebar()
   const { planSlug } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
+  const { selectedStore } = useStore()
 
   const PAGE_TO_SLUG: Record<string, string> = {
     "business-data": "dados-do-negocio",
@@ -438,6 +440,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               paymentMethods={paymentMethods}
               onBack={() => setActivePage("home")}
               planGate={paymentsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined}
+              storeId={selectedStore?.id}
             />
           )}
 
@@ -456,7 +459,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "recibo" && <ReturnPolicySubPage key="recibo" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && <ShowcaseSubPage key="vitrine" partner={partner} onBack={() => setActivePage("home")} />}
-          {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
+          {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} storeId={selectedStore?.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "system-settings" && canAccessSystemSettings && (
             <SystemSettingsSubPage key="system-settings" partnerId={partner.id} onBack={() => setActivePage("home")} />
           )}

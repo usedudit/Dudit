@@ -4,7 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath, revalidateTag, unstable_cache } from "next/cache"
 import { PaymentMethodSchema } from "@/lib/validation/schemas"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireStoreAccess, requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
@@ -17,6 +17,7 @@ type InstallmentFeeInput = { installmentNumber: number; feePercent: number }
 
 type UpsertPaymentMethodInput = {
     partnerId: string
+    storeId?: string | null
     name: string
     paymentType: string
     isActive?: boolean
@@ -137,7 +138,7 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
                 "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
                 "max_installments, card_brand, priority, " +
                 "percentage_rate, fixed_amount, created_at, " +
-                "default_finance_account_id, " +
+                "default_finance_account_id, store_id, " +
                 "finance_accounts!default_finance_account_id(name)"
             )
             .eq("partner_id", partnerId)
@@ -165,11 +166,14 @@ const getCachedPaymentMethods = (partnerId: string) => unstable_cache(
     }
 )
 
-export async function getPaymentMethodsAction(partnerId: string) {
+export async function getPaymentMethodsAction(partnerId: string, storeId?: string | null) {
     await requirePartnerAccessWithPermission(partnerId)
 
     try {
-        const methods = await getCachedPaymentMethods(partnerId)()
+        const all = await getCachedPaymentMethods(partnerId)()
+        const methods = storeId
+            ? all.filter((m: any) => !m.store_id || m.store_id === storeId)
+            : all.filter((m: any) => !m.store_id)
         return { methods }
     } catch (err: any) {
         return { error: err?.message || "Erro ao carregar métodos de pagamento" }
@@ -392,6 +396,9 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
     await requireRateLimit(RateLimitCategory.PAYMENT)
 
     await requirePartnerAccessWithPermission(data.partnerId, "payment_methods", "create")
+    if (data.storeId) {
+        await requireStoreAccess(data.storeId, data.partnerId)
+    }
 
     const canonicalType = toCanonicalPaymentType(data.paymentType)
     if (canonicalType === "cash") {
@@ -461,6 +468,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
         .from("payment_methods")
         .insert({
             partner_id: data.partnerId,
+            store_id: data.storeId || null,
             name: data.name,
             payment_type: toLegacyPaymentType(canonicalType),
             type: canonicalType,
@@ -532,7 +540,7 @@ export async function updatePaymentMethodAction(
     const supabase = createAdminClient()
     const { data: method } = await supabase
         .from("payment_methods")
-        .select("partner_id, type, payment_type, default_finance_account_id")
+        .select("partner_id, store_id, type, payment_type, default_finance_account_id")
         .eq("id", methodId)
         .single()
 
@@ -541,6 +549,9 @@ export async function updatePaymentMethodAction(
     }
 
     await requirePartnerAccessWithPermission(method.partner_id, "payment_methods", "edit")
+    if (method.store_id) {
+        await requireStoreAccess(method.store_id, method.partner_id)
+    }
 
     if (data.feePercent !== undefined && (Number(data.feePercent) < 0 || Number(data.feePercent) > 100)) {
         return { error: "Taxa percentual deve estar entre 0 e 100." }
@@ -665,7 +676,7 @@ export async function deletePaymentMethodAction(methodId: string) {
     const supabase = createAdminClient()
     const { data: method } = await supabase
         .from("payment_methods")
-        .select("partner_id, name, type, payment_type")
+        .select("partner_id, store_id, name, type, payment_type")
         .eq("id", methodId)
         .single()
 
@@ -674,6 +685,9 @@ export async function deletePaymentMethodAction(methodId: string) {
     }
 
     await requirePartnerAccessWithPermission(method.partner_id, "payment_methods", "delete")
+    if (method.store_id) {
+        await requireStoreAccess(method.store_id, method.partner_id)
+    }
 
     const normalizedType = toCanonicalPaymentType(String(method.type || method.payment_type || ""))
     const normalizedName = String(method.name || "").trim().toLowerCase()

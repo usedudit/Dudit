@@ -27,6 +27,7 @@ interface PaymentMethodsSubPageProps {
     onEdit: (id: string) => void
     onCreate?: () => void
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
+    storeId?: string | null
     embedded?: boolean
 }
 
@@ -49,7 +50,7 @@ const LIST_COLUMNS = [
     { id: "actions", label: "Ações", align: "center" as const },
 ]
 
-export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onEdit, onCreate, planGate, embedded }: PaymentMethodsSubPageProps) {
+export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onEdit, onCreate, planGate, storeId, embedded }: PaymentMethodsSubPageProps) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -95,12 +96,12 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
     }, [partner.id])
 
     const handleReloadMethods = useCallback(async () => {
-        const result = await getPaymentMethodsAction(partner.id)
+        const result = await getPaymentMethodsAction(partner.id, storeId)
         if (result.methods) {
             setMethods(result.methods)
             notifyPaymentMethodsChanged(result.methods)
         }
-    }, [notifyPaymentMethodsChanged, partner.id])
+    }, [notifyPaymentMethodsChanged, partner.id, storeId])
 
     useEffect(() => {
         const handler = setTimeout(() => setDebouncedSearch(search), 350)

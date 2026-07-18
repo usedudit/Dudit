@@ -19,6 +19,7 @@ import {
 } from "@/lib/services/marketplace-cart-checkout"
 import { buildDepositCheckoutMeta } from "@/lib/services/marketplace-checkout-amounts"
 import { patchDepositCheckoutOnPayment } from "@/lib/payments/order-financial-state"
+import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -27,6 +28,7 @@ interface ProcessPaymentRequest {
   items: Array<{ id: string; name: string; price: number; quantity: number; variant_id?: string }>
   partnerId: string
   buyerId: string
+  storeId?: string
   deliveryType: string
   deliveryAddress?: string
   notes?: string
@@ -99,7 +101,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly } = body
+    const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId } = body
     const checkoutPricing = normalizeCheckoutPricing(body.checkoutPricing)
     if (body.checkoutPricing && !checkoutPricing) {
       return NextResponse.json({ error: "Os valores do checkout nÃ£o conferem. Atualize a pÃ¡gina e tente novamente." }, { status: 400 })
@@ -799,14 +801,12 @@ async function handler(request: NextRequest) {
             ? "cancelled"
             : "pending"
 
-    // Fetch delivery_payer setting for snapshot
-    const { data: deliverySettings } = await adminClient
-      .from("delivery_settings")
-      .select("delivery_payer")
-      .eq("partner_id", partnerId)
-      .maybeSingle()
-
-    const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+    // Fetch delivery_payer setting for snapshot (store-aware)
+    const deliveryRow = await resolveDeliverySettingsRow(adminClient, partnerId, storeId)
+    const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
+    if (storeId && deliveryRow?.store_id === storeId) {
+      console.log(`[delivery_payer] MP payment using store override: store=${storeId}, partner=${partnerId}, payer=${deliveryPayer}`)
+    }
     // For MP orders (customer-initiated), seller_commission_amount is 0
     const sellerCommissionAmount = 0
 

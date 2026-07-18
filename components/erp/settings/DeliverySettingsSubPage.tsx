@@ -45,7 +45,7 @@ function checkOverlap(start1: string, end1: string, start2: string, end2: string
     return false;
 }
 
-export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partnerId: string; onBack: () => void; planGate?: { requiredPlanSlug: "crescer" | "escalar" } }) {
+export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }: { partnerId: string; storeId?: string | null; onBack: () => void; planGate?: { requiredPlanSlug: "crescer" | "escalar" } }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [loading, setLoading] = useState(true)
@@ -83,7 +83,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
 
     async function reload() {
         setLoading(true)
-        const res = await getPartnerDeliveryConfigAction(partnerId)
+        const res = await getPartnerDeliveryConfigAction(partnerId, storeId)
         if (res.success) {
             setPlanSlug(res.planSlug)
             setAdvancedEnabled(res.capability.advancedEnabled)
@@ -159,7 +159,9 @@ export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partn
                                         setSaving(true)
                                         const res = await upsertPartnerDeliveryConfigAction({
                                             partnerId,
+                                            storeId,
                                             settings: {
+                                                storeId,
                                                 baseFee: Number(settings.baseFee || 0),
                                                 includedKm: Number(settings.includedKm || 0),
                                                 extraKmPrice: chargeByDistance ? Number(settings.extraKmPrice || 0) : 0,

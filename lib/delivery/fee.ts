@@ -3,6 +3,7 @@ import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
 export type DeliveryRuleType = "fixed" | "multiplier"
 
 export type DeliverySettings = {
+  storeId?: string | null
   baseFee: number
   includedKm: number
   extraKmPrice: number

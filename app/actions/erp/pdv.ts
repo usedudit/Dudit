@@ -23,6 +23,8 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity } from "@/lib/services/commission-ledger.service"
 import { applySaleToGoals } from "@/lib/services/sales-goals.service"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
+import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
+import { resolvePaymentMethodsForStore } from "@/lib/data/payment-methods"
 import { listStoreProducts } from "@/lib/store-products"
 
 type DraftItemInput = {
@@ -95,6 +97,7 @@ type PosPaymentResolveResult =
 async function resolvePosFinalTotalWithPaymentMethod(params: {
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
     partnerId: string
+    storeId?: string | null
     preSaleId: string
     paymentBreakdown: Array<{ method?: string; amount?: number; paymentMethodId?: string | null; installmentNumber?: number }>
 }): Promise<PosPaymentResolveResult | null> {
@@ -116,12 +119,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
 
     const [{ data: methods }, { data: fees }] = await Promise.all([
         methodIds.length > 0
-            ? params.supabase
-                .from("payment_methods")
-                .select("id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
-                .eq("partner_id", params.partnerId)
-                .eq("is_active", true)
-                .in("id", methodIds)
+            ? resolvePaymentMethodsForStore(params.supabase, { partnerId: params.partnerId, storeId: params.storeId }, { select: "id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments" }).in("id", methodIds)
             : Promise.resolve({ data: [] as any[] }),
         methodIds.length > 0
             ? params.supabase
@@ -403,14 +401,12 @@ const productIds = Array.from(
         deliveryTimeEstimateMinutes: 0,
     })
 
-    // Fetch delivery_payer for snapshot
-    const { data: deliverySettings } = await admin
-        .from("delivery_settings")
-        .select("delivery_payer")
-        .eq("partner_id", params.partnerId)
-        .maybeSingle()
-
-    const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+    // Fetch delivery_payer for snapshot (store-aware)
+    const deliveryRow = await resolveDeliverySettingsRow(admin, params.partnerId, params.storeId)
+    const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
+    if (params.storeId && deliveryRow?.store_id === params.storeId) {
+        console.log(`[delivery_payer] PDV sync using store override: store=${params.storeId}, partner=${params.partnerId}, payer=${deliveryPayer}`)
+    }
 
     // Calculate seller_commission_amount for snapshot
     let sellerCommissionAmount = 0
@@ -638,13 +634,18 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
             .order("is_default", { ascending: false }),
         supabase
             .from("payment_methods")
-            .select("id, name, type, is_default, is_active, fee_percent, discount_percent, priority")
+            .select("id, name, type, is_default, is_active, fee_percent, discount_percent, priority, store_id")
             .eq("partner_id", partnerId)
             .eq("is_active", true)
             .order("is_default", { ascending: false })
             .order("priority", { ascending: false })
             .order("name"),
     ])
+
+    const rawMethods = paymentMethodsRes.error ? [] : (paymentMethodsRes.data || [])
+    const filteredMethods = storeId
+        ? rawMethods.filter((m: any) => !m.store_id || m.store_id === storeId)
+        : rawMethods.filter((m: any) => !m.store_id)
 
     return {
         success: true as const,
@@ -653,7 +654,7 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
             customers: customersRes.error ? [] : (customersRes.data || []).map((c: any) => ({ id: c.id, name: c.name, avatar_url: null })),
             financeAccounts: accountsRes.error ? [] : (accountsRes.data || []),
             preSales: draftsRes.error ? [] : (draftsRes.data || []),
-            paymentMethods: paymentMethodsRes.error ? [] : (paymentMethodsRes.data || []),
+            paymentMethods: filteredMethods,
         },
     }
 }
@@ -923,6 +924,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const paymentAware = await resolvePosFinalTotalWithPaymentMethod({
         supabase,
         partnerId: input.partnerId,
+        storeId: input.storeId,
         preSaleId: input.preSaleId,
         paymentBreakdown: resolvedBreakdown,
     })

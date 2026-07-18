@@ -30,6 +30,7 @@ import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/
 import { applySaleToGoals, reverseSaleFromGoals } from "@/lib/services/sales-goals.service"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 
 
 type ERPItemPayload = {
@@ -1480,14 +1481,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         deliveryMethod: data.deliveryMethod,
     })
 
-    // Fetch delivery_payer setting for snapshot
-    const { data: deliverySettings } = await supabase
-        .from("delivery_settings")
-        .select("delivery_payer")
-        .eq("partner_id", partnerId)
-        .maybeSingle()
-
-    const deliveryPayer: "customer" | "seller" = deliverySettings?.delivery_payer === "seller" ? "seller" : "customer"
+    // Fetch delivery_payer setting for snapshot (store-aware)
+    const deliveryRow = await resolveDeliverySettingsRow(supabase, partnerId, data.storeId)
+    const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
+    if (data.storeId && deliveryRow?.store_id === data.storeId) {
+        console.log(`[delivery_payer] ERP order using store override: store=${data.storeId}, partner=${partnerId}, payer=${deliveryPayer}`)
+    }
 
     // Calculate seller commission amount for snapshot (frozen at order creation)
     let sellerCommissionAmount = 0

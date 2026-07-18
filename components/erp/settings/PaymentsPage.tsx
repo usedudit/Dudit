@@ -26,11 +26,13 @@ export function PaymentsPage({
     paymentMethods,
     onBack,
     planGate,
+    storeId,
 }: {
     partner: any
     paymentMethods: any[]
     onBack: () => void
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
+    storeId?: string | null
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -185,6 +187,7 @@ export function PaymentsPage({
         return (
             <PaymentMethodEditPage
                 partnerId={partner.id}
+                storeId={storeId}
                 editingMethod={isCreating ? null : { id: editMethodId!, name: "", is_active: true }}
                 existingMethods={paymentMethods}
                 onBack={handleCloseEdit}
@@ -259,6 +262,7 @@ export function PaymentsPage({
                                             handleBack={onBack}
                                             onEdit={handleEditMethod}
                                             onCreate={handleCreateMethod}
+                                            storeId={storeId}
                                             embedded
                                         />
                                     </motion.div>
