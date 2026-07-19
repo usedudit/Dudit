@@ -60,10 +60,11 @@ interface ServiceGeneralTabProps {
     isQuickMode?: boolean
     isGeneratingDetails?: boolean
     onGenerateDetails?: () => void
+    allStores?: any[]
 }
 
 export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
-    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isGeneratingDetails = false, onGenerateDetails
+    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isGeneratingDetails = false, onGenerateDetails, allStores = []
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
@@ -404,6 +405,63 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     }}
                                 />
                             </>
+                        )}
+                    </div>
+                </SidebarCard>
+
+                <SidebarCard>
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-1">Visibilidade</h3>
+                    <div className="space-y-3">
+                        <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer">
+                            <input type="radio" name="visibility_scope" value="exclusive"
+                                checked={serviceData.visibility_scope === 'exclusive'}
+                                onChange={() => handleFieldChange({ target: { name: "visibility_scope", value: "exclusive" } })}
+                                disabled={!isEditing}
+                                className="w-4 h-4 text-brand-accent focus:ring-brand-accent" />
+                            <div>
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Somente esta loja</p>
+                                <p className="text-xs text-brand-inactive-text">Disponível apenas na loja atual</p>
+                            </div>
+                        </label>
+                        <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer">
+                            <input type="radio" name="visibility_scope" value="all"
+                                checked={serviceData.visibility_scope === 'all'}
+                                onChange={() => handleFieldChange({ target: { name: "visibility_scope", value: "all" } })}
+                                disabled={!isEditing}
+                                className="w-4 h-4 text-brand-accent focus:ring-brand-accent" />
+                            <div>
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Todas as lojas</p>
+                                <p className="text-xs text-brand-inactive-text">Disponível em todas as lojas do parceiro</p>
+                            </div>
+                        </label>
+                        <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer">
+                            <input type="radio" name="visibility_scope" value="selected"
+                                checked={serviceData.visibility_scope === 'selected'}
+                                onChange={() => handleFieldChange({ target: { name: "visibility_scope", value: "selected" } })}
+                                disabled={!isEditing}
+                                className="w-4 h-4 text-brand-accent focus:ring-brand-accent" />
+                            <div>
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Lojas selecionadas</p>
+                                <p className="text-xs text-brand-inactive-text">Disponível apenas nas lojas escolhidas</p>
+                            </div>
+                        </label>
+                        {serviceData.visibility_scope === 'selected' && allStores && (
+                            <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 space-y-2 max-h-48 overflow-y-auto">
+                                {allStores.map((store: any) => (
+                                    <label key={store.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer">
+                                        <input type="checkbox"
+                                            checked={(serviceData.visibility_stores || []).includes(store.id)}
+                                            onChange={(e) => {
+                                                const current = serviceData.visibility_stores || []
+                                                const next = e.target.checked ? [...current, store.id] : current.filter((id: string) => id !== store.id)
+                                                handleFieldChange({ target: { name: "visibility_stores", value: next } })
+                                            }}
+                                            disabled={!isEditing}
+                                            className="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent" />
+                                        <span className="text-sm text-brand-dark dark:text-dark-heading">{store.name}</span>
+                                    </label>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </SidebarCard>

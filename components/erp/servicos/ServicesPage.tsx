@@ -167,7 +167,8 @@ export default function ServicesPage({
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const servicesQueryKey = useMemo(() => ['erp', 'services', partnerId] as const, [partnerId])
+    const storeId = selectedStore?.id || null
+    const servicesQueryKey = useMemo(() => ['erp', 'services', partnerId, storeId] as const, [partnerId, storeId])
 
     // ── Entity Page Hook (URL state + cache + infinite list) ──────────
     const entityPage = useEntityPage<any, any, ERPServiceListCursor>({
@@ -178,7 +179,7 @@ export default function ServicesPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPServicesPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getERPServicesPageAction(partnerId, { cursor, limit: 100, storeId: storeId || undefined })
             if (!res.success) throw new Error(res.error || "Erro ao carregar serviços.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },

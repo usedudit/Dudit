@@ -11,6 +11,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useStore } from "@/lib/store-context"
 
 const ROLE_LABELS: Record<PartnerRole, string> = {
     OWNER: "Proprietário",
@@ -72,6 +73,8 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
 
     const [inviteEmail, setInviteEmail] = useState("")
     const [inviteRole, setInviteRole] = useState<string>("OPERATOR")
+    const [inviteSelectedStores, setInviteSelectedStores] = useState<string[]>([])
+    const { stores: allStores, selectedStore } = useStore()
     const [isCreating, setIsCreating] = useState(false)
     const [inviteUrl, setInviteUrl] = useState<string | null>(null)
     const [inviteError, setInviteError] = useState<string | null>(null)
@@ -124,12 +127,17 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
         setInviteError(null)
         setInviteUrl(null)
 
+        const targetStores = inviteSelectedStores.length > 0
+            ? inviteSelectedStores
+            : selectedStore ? [selectedStore.id] : []
+
         try {
             const { createInvitation } = await import("@/app/actions/invitations")
             const result = await createInvitation({
                 partnerId,
                 email: inviteEmail,
                 role: inviteRole as PartnerRole,
+                storeIds: targetStores,
             })
 
             if (result.success && result.inviteUrl) {
@@ -596,6 +604,30 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                             />
                                         ))}
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Acessos às lojas</label>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto border border-brand-border dark:border-dark-border rounded-xl p-3">
+                                        {allStores.map((store) => (
+                                            <label key={store.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={inviteSelectedStores.includes(store.id)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setInviteSelectedStores(prev => [...prev, store.id])
+                                                        } else {
+                                                            setInviteSelectedStores(prev => prev.filter(id => id !== store.id))
+                                                        }
+                                                    }}
+                                                    className="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent"
+                                                />
+                                                <span className="text-sm text-brand-dark dark:text-dark-heading">{store.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <p className="text-xs text-brand-inactive-text mt-1">Se nenhuma for selecionada, será usada a loja atual.</p>
                                 </div>
 
                                 {inviteError && <p className="text-sm text-red-500 font-medium">{inviteError}</p>}

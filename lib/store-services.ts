@@ -197,7 +197,7 @@ export async function linkServiceToStore(
     if (overrides?.override_price !== undefined) payload.override_price = overrides.override_price
     if (overrides?.override_sku !== undefined) payload.override_sku = overrides.override_sku
     if (overrides?.is_active !== undefined) payload.is_active = overrides.is_active
-    if (overrides?.visibility_scope !== undefined) payload.visibility_scope = overrides.visibility_scope
+    payload.visibility_scope = overrides?.visibility_scope ?? 'exclusive'
     if (overrides?.marketplace_visible !== undefined) payload.marketplace_visible = overrides.marketplace_visible
 
     const { data, error } = await supabase

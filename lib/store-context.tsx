@@ -2,6 +2,7 @@
 
 import type React from "react"
 
+import { useRouter } from "next/navigation"
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 
@@ -56,6 +57,7 @@ export function StoreProvider({
   const [stores, setStores] = useState<Store[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
+  const router = useRouter()
   const [partnerId, setPartnerId] = useState<string | null>(propPartnerId || null)
   const hasSyncedCookie = useRef(false)
 
@@ -137,7 +139,9 @@ export function StoreProvider({
       localStorage.setItem("selectedStoreId", storeId)
 
       import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
-        setActiveStoreAction(storeId)
+        setActiveStoreAction(storeId).then(() => {
+          router.refresh()
+        })
       })
     }
   }

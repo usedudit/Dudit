@@ -282,6 +282,8 @@ export async function createProductComprehensiveAction(data: {
     id?: string
     partnerId: string
     storeId: string
+    visibility_scope?: string
+    visibility_stores?: string[]
     name: string
     description?: string
     sku?: string
@@ -545,11 +547,20 @@ export async function createProductComprehensiveAction(data: {
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
 
-        // F4.1: create bridge relation instead of writing store_id directly to products
+        // F5.2c: create bridge relations per visibility_scope
         try {
-            await linkProductToStore(insertedProduct.id, finalStoreId)
+            const scope = data.visibility_scope || 'exclusive'
+            const targetStores = scope === 'all'
+                ? (await getAdminClient().from("stores").select("id").eq("partner_id", data.partnerId)).data?.map((s: any) => s.id) || [finalStoreId]
+                : scope === 'selected' && data.visibility_stores?.length
+                    ? data.visibility_stores
+                    : [finalStoreId]
+
+            for (const sid of targetStores) {
+                await linkProductToStore(insertedProduct.id, sid, { visibility_scope: scope as any })
+            }
         } catch (linkErr: any) {
-            return errorResponse("Produto criado, mas erro ao vincular à loja: " + linkErr.message)
+            return errorResponse("Produto criado, mas erro ao vincular à(s) loja(s): " + linkErr.message)
         }
 
         const videoUpdate = {
@@ -1922,7 +1933,7 @@ const ERP_PRODUCTS_PAGE_SIZE = 100
 
 export async function getERPProductsPageAction(
     partnerId: string,
-    options?: { cursor?: ERPProductListCursor | null; limit?: number; filters?: any },
+    options?: { cursor?: ERPProductListCursor | null; limit?: number; filters?: any; storeId?: string },
 ): Promise<
     | { success: true; items: any[]; nextCursor: ERPProductListCursor | null; hasMore: boolean }
     | { success: false; error: string }
@@ -1940,6 +1951,24 @@ export async function getERPProductsPageAction(
             .from("products")
             .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
             .eq("partner_id", partnerId)
+
+        if (options?.storeId) {
+            const { data: myLinked } = await supabase
+                .from("store_products")
+                .select("product_id")
+                .eq("store_id", options.storeId)
+            const { data: allLinked } = await supabase
+                .from("store_products")
+                .select("product_id")
+
+            const mySet = new Set(myLinked?.map(x => x.product_id) || [])
+            const allSet = new Set(allLinked?.map(x => x.product_id) || [])
+            const excludeIds = [...allSet].filter(id => !mySet.has(id))
+
+            if (excludeIds.length > 0) {
+                q = q.not("id", "in", `(${excludeIds.join(',')})`)
+            }
+        }
 
         if (!options?.filters?.includeArchived) {
             q = scopeActiveOnly(q)

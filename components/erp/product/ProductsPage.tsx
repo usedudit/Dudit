@@ -210,7 +210,8 @@ export default function ProductsPage({
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const productsQueryKey = useMemo(() => ['erp', 'products', partnerId] as const, [partnerId])
+    const storeId = selectedStore?.id || null
+    const productsQueryKey = useMemo(() => ['erp', 'products', partnerId, storeId] as const, [partnerId, storeId])
 
     // ── Entity Page Hook (URL state + cache + infinite list) ──────────
     const entityPage = useEntityPage<Product & { id: string }, Product & { id: string }, ERPProductListCursor>({
@@ -221,7 +222,7 @@ export default function ProductsPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPProductsPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getERPProductsPageAction(partnerId, { cursor, limit: 100, storeId: storeId || undefined })
             if (!res.success) throw new Error(res.error || "Erro ao carregar produtos.")
             return { items: res.items as (Product & { id: string })[], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },

@@ -59,6 +59,7 @@ export async function createInvitation(input: {
     email: string
     role: PartnerRole
     permissions?: PartnerPermissions
+    storeIds?: string[]
 }): Promise<{ success: boolean; inviteUrl?: string; error?: string }> {
     try {
         await requireRateLimit(RateLimitCategory.INVITE_CREATE)
@@ -140,7 +141,7 @@ export async function createInvitation(input: {
             token_hash: tokenHash,
             role_id: roleId,
             role: input.role, // legacy column (kept for backward compatibility)
-            permissions: input.permissions || {}, // legacy column (not authoritative anymore)
+            permissions: { ...(input.permissions || {}), _store_ids_: input.storeIds || null },
             created_by_user_id: user.id,
             created_by_role: String(access.roleId || "").toUpperCase(),
             expires_at: expiresAt.toISOString(),
@@ -297,7 +298,30 @@ export async function acceptInvitation(
             return { success: false, error: rpcResult?.error || "Erro ao processar convite." }
         }
 
-        // 8. Audit log
+        // 8. Create store_members for invited stores (if specified)
+        const storeIds = (invitation.permissions as any)?._store_ids_ as string[] | null
+        if (storeIds && storeIds.length > 0) {
+            const { data: partnerUser } = await admin
+                .from("partner_users")
+                .select("id")
+                .eq("partner_id", invitation.partner_id)
+                .eq("user_id", user.id)
+                .maybeSingle()
+
+            if (partnerUser) {
+                const memberships = storeIds.map((sid: string) => ({
+                    partner_user_id: partnerUser.id,
+                    store_id: sid,
+                }))
+                await admin.from("store_members").upsert(memberships, {
+                    onConflict: "partner_user_id, store_id",
+                }).catch((e: any) => {
+                    console.warn("[Invitations] Failed to create some store_members:", e)
+                })
+            }
+        }
+
+        // 9. Audit log
         await auditLog({
             action: "invite.accepted",
             actorUserId: user.id,
@@ -309,7 +333,7 @@ export async function acceptInvitation(
             },
         })
 
-        // 9. Invalidate caches so the new ERP appears immediately in the user's selector
+        // 10. Invalidate caches so the new ERP appears immediately in the user's selector
         const { revalidateUserAccess, revalidatePartnerInvitations } = await import("@/lib/utils/revalidation")
         revalidateUserAccess(user.id)
         revalidatePartnerInvitations(invitation.partner_id)

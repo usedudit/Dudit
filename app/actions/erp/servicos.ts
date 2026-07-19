@@ -66,7 +66,7 @@ const ERP_SERVICES_PAGE_SIZE = 100
 
 export async function getERPServicesPageAction(
     partnerId: string,
-    options?: { cursor?: ERPServiceListCursor | null; limit?: number; filters?: any },
+    options?: { cursor?: ERPServiceListCursor | null; limit?: number; filters?: any; storeId?: string },
 ): Promise<
     | { success: true; items: any[]; nextCursor: ERPServiceListCursor | null; hasMore: boolean }
     | { success: false; error: string }
@@ -84,6 +84,24 @@ export async function getERPServicesPageAction(
             .from("services")
             .select("id, name, category_id, subcategory_id, price, cost_price, is_active, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
             .eq("partner_id", partnerId)
+
+        if (options?.storeId) {
+            const { data: myLinked } = await supabase
+                .from("store_services")
+                .select("service_id")
+                .eq("store_id", options.storeId)
+            const { data: allLinked } = await supabase
+                .from("store_services")
+                .select("service_id")
+
+            const mySet = new Set(myLinked?.map(x => x.service_id) || [])
+            const allSet = new Set(allLinked?.map(x => x.service_id) || [])
+            const excludeIds = [...allSet].filter(id => !mySet.has(id))
+
+            if (excludeIds.length > 0) {
+                q = q.not("id", "in", `(${excludeIds.join(',')})`)
+            }
+        }
 
         if (!options?.filters?.includeArchived) {
             q = scopeActiveOnly(q)
@@ -240,11 +258,20 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
 
         if (insertError) return errorResponse(insertError.message)
 
-        // F4.1: create bridge relation instead of writing store_id directly to services
+        // F5.2c: create bridge relations per visibility_scope
         try {
-            await linkServiceToStore(inserted.id, finalStoreId)
+            const scope = data.visibility_scope || 'exclusive'
+            const targetStores = scope === 'all'
+                ? (await getAdminClient().from("stores").select("id").eq("partner_id", finalPartnerId)).data?.map((s: any) => s.id) || [finalStoreId]
+                : scope === 'selected' && data.visibility_stores?.length
+                    ? data.visibility_stores
+                    : [finalStoreId]
+
+            for (const sid of targetStores) {
+                await linkServiceToStore(inserted.id, sid, { visibility_scope: scope as any })
+            }
         } catch (linkErr: any) {
-            return errorResponse("Serviço criado, mas erro ao vincular à loja: " + linkErr.message)
+            return errorResponse("Serviço criado, mas erro ao vincular à(s) loja(s): " + linkErr.message)
         }
 
         revalidatePath("/erp/servicos")
