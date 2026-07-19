@@ -128,16 +128,17 @@ export const BusinessDataSubPage = ({
         loadCategoryPath()
     }, [generalInfo.categoryId, generalInfo.subcategoryId])
 
-    const address = partner.addresses?.[0] || {};
+    const partnerAddress = partner.addresses?.[0] || {};
+    const storeAddress = store?.addresses?.[0] || {};
     const [addresses, setAddresses] = useState({
-        zipCode: partner.zip_code || address.zip_code || "",
-        street: partner.street || address.street || "",
-        number: partner.number || address.number || "",
-        complement: partner.complement || address.complement || "",
-        neighborhood: partner.neighborhood || address.neighborhood || "",
-        city: partner.city || address.city || "",
-        state: partner.state || address.state || "",
-        noNumber: (partner.number || address.number) === "S/N",
+        zipCode: store?.zip_code || storeAddress.zip_code || partner.zip_code || partnerAddress.zip_code || "",
+        street: store?.street || storeAddress.street || partner.street || partnerAddress.street || "",
+        number: store?.number || storeAddress.number || partner.number || partnerAddress.number || "",
+        complement: store?.complement || storeAddress.complement || partner.complement || partnerAddress.complement || "",
+        neighborhood: store?.neighborhood || storeAddress.neighborhood || partner.neighborhood || partnerAddress.neighborhood || "",
+        city: store?.city || storeAddress.city || partner.city || partnerAddress.city || "",
+        state: store?.state || storeAddress.state || partner.state || partnerAddress.state || "",
+        noNumber: (store?.number || storeAddress.number || partner.number || partnerAddress.number) === "S/N",
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
@@ -225,7 +226,7 @@ export const BusinessDataSubPage = ({
                     mode: generalInfo.mode,
                 }
 
-                // F5.4b: Store-level fields → updateStoreAction
+                // F5.4b + F5.5c: Store-level fields → updateStoreAction
                 if (store?.id) {
                     const storeResult = await updateStoreAction({
                         storeId: store.id,
@@ -239,6 +240,14 @@ export const BusinessDataSubPage = ({
                         subcategory_id: generalInfo.subcategoryId,
                         latitude: undefined,
                         longitude: undefined,
+                        zip_code: addresses.zipCode,
+                        street: addresses.street,
+                        number: addresses.number,
+                        complement: addresses.complement,
+                        neighborhood: addresses.neighborhood,
+                        city: addresses.city,
+                        state: addresses.state,
+                        noNumber: addresses.noNumber,
                     })
                     if (!storeResult.success) {
                         notifyError(storeResult.error!)

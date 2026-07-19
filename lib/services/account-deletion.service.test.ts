@@ -94,14 +94,16 @@ describe("AccountDeletionService", () => {
   })
 
   describe("requestDeletion", () => {
-    it("initiates grace period and cancels subscription", async () => {
-      // 1. Mock partner lookup
+    it("initiates immediate deletion and cancels subscription if owner", async () => {
+      // 1. Mock partner lookup (user is owner)
       mockMaybeSingle.mockResolvedValueOnce({ data: { id: "partner-123", user_id: "user-123" }, error: null })
-      // 2. Mock existing deletion check (none)
+      // 2. Mock active subscription lookup (none)
       mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
-      // 3. Mock insert deletion tracking
+      // 3. Mock existing deletion check (none)
+      mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      // 4. Mock insert deletion tracking
       mockSingle.mockResolvedValueOnce({ data: { id: "deletion-123" }, error: null })
-      // 4. Mock subscription lookup
+      // 5. Mock subscription lookup for cancellation
       mockMaybeSingle.mockResolvedValueOnce({ data: { id: "sub-123", mercado_pago_subscription_id: "mp-sub-123" }, error: null })
 
       const res = await AccountDeletionService.requestDeletion(
@@ -113,17 +115,16 @@ describe("AccountDeletionService", () => {
       )
 
       expect(res.success).toBe(true)
-      expect(res.gracePeriodEndsAt).toBeDefined()
       expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
         user_id: "user-123",
         partner_id: "partner-123",
-        status: "pending_deletion",
+        status: "deleting_storage",
       }))
     })
 
-    it("fails early if deletion request is already pending", async () => {
-      mockMaybeSingle.mockResolvedValueOnce({ data: { id: "partner-123", user_id: "user-123" }, error: null })
-      mockMaybeSingle.mockResolvedValueOnce({ data: { id: "deletion-123", status: "waiting_grace_period" }, error: null })
+    it("fails early if user is not the owner of the partner", async () => {
+      // 1. Mock partner lookup (user is NOT owner)
+      mockMaybeSingle.mockResolvedValueOnce({ data: { id: "partner-123", user_id: "owner-456" }, error: null })
 
       const res = await AccountDeletionService.requestDeletion(
         "user-123",
@@ -134,33 +135,54 @@ describe("AccountDeletionService", () => {
       )
 
       expect(res.success).toBe(false)
-      expect(res.error).toContain("Já existe uma solicitação")
+      expect(res.error).toContain("Somente o proprietário principal")
+    })
+
+    it("fails early if partner has an active platform subscription", async () => {
+      // 1. Mock partner lookup
+      mockMaybeSingle.mockResolvedValueOnce({ data: { id: "partner-123", user_id: "user-123" }, error: null })
+      // 2. Mock active subscription lookup (active subscription exists)
+      mockMaybeSingle.mockResolvedValueOnce({ data: { id: "sub-123", status: "active" }, error: null })
+
+      const res = await AccountDeletionService.requestDeletion(
+        "user-123",
+        null,
+        "127.0.0.1",
+        null,
+        "BR"
+      )
+
+      expect(res.success).toBe(false)
+      expect(res.error).toBe("active_subscription")
+    })
+
+    it("returns current deletion status if deletion is already in progress", async () => {
+      // 1. Mock partner lookup
+      mockMaybeSingle.mockResolvedValueOnce({ data: { id: "partner-123", user_id: "user-123" }, error: null })
+      // 2. Mock active subscription lookup (none)
+      mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      // 3. Mock existing deletion check (in progress)
+      mockMaybeSingle.mockResolvedValueOnce({ data: { id: "deletion-123", status: "deleting_database" }, error: null })
+
+      const res = await AccountDeletionService.requestDeletion(
+        "user-123",
+        null,
+        "127.0.0.1",
+        null,
+        "BR"
+      )
+
+      expect(res.success).toBe(true)
+      expect(res.currentStatus).toBe("deleting_database")
     })
   })
 
   describe("cancelDeletion", () => {
-    it("deletes active deletion record within grace period", async () => {
-      mockMaybeSingle.mockResolvedValueOnce({
-        data: { id: "deletion-123", partner_id: "partner-123", status: "waiting_grace_period", trigger_run_id: null },
-        error: null
-      })
-
-      const res = await AccountDeletionService.cancelDeletion("user-123")
-
-      expect(res.success).toBe(true)
-      expect(mockDelete).toHaveBeenCalled()
-    })
-
-    it("fails if deletion is already past the grace period", async () => {
-      mockMaybeSingle.mockResolvedValueOnce({
-        data: { id: "deletion-123", partner_id: "partner-123", status: "deleting_storage", trigger_run_id: null },
-        error: null
-      })
-
+    it("always fails since grace period has been disabled", async () => {
       const res = await AccountDeletionService.cancelDeletion("user-123")
 
       expect(res.success).toBe(false)
-      expect(res.error).toContain("já entrou em fase de processamento final")
+      expect(res.error).toContain("Cancelamento de exclusão indisponível")
     })
   })
 

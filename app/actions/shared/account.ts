@@ -49,7 +49,7 @@ export async function deleteAccountAction(
     }
 
     revalidatePath("/erp/settings/subscription")
-    return { success: true, gracePeriodEndsAt: result.gracePeriodEndsAt }
+    return { success: true }
   } catch (error: any) {
     console.error("General error in deleteAccountAction:", error)
     return { error: "Ocorreu um erro inesperado." }

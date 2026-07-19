@@ -435,41 +435,26 @@ export async function middleware(request: NextRequest) {
           const userDeletion = deletionResult.data
           const partnerDeletion = partnerDeletionResult?.data
 
-          // Check if user is pending deletion (grace period) or past grace period (deleting)
+          // Under the new immediate architecture, any active deletion record blocks access instantly
           if (userDeletion) {
-            const isPastGrace = new Date() > new Date(userDeletion.grace_period_ends_at)
-            const isDeleting = userDeletion.status !== "waiting_grace_period" && userDeletion.status !== "pending_deletion"
-
-            if (isPastGrace || isDeleting) {
-              console.log(`[MIDDLEWARE] User ${user.id} account deletion is active - redirecting to sign-out/login`)
-              const logoutUrl = new URL("/auth/login?error=account_deleting", request.url)
-              const responseRedirect = NextResponse.redirect(logoutUrl)
-              request.cookies.getAll().forEach(c => {
-                if (c.name.startsWith("sb-")) {
-                  responseRedirect.cookies.delete(c.name)
-                }
-              })
-              responseRedirect.cookies.delete("active_partner_id")
-              return responseRedirect
-            } else {
-              requestHeaders.set("x-account-pending-deletion", "true")
-            }
+            console.log(`[MIDDLEWARE] User ${user.id} account deletion is in progress - redirecting to login`)
+            const logoutUrl = new URL("/auth/login?error=account_deleting", request.url)
+            const responseRedirect = NextResponse.redirect(logoutUrl)
+            request.cookies.getAll().forEach(c => {
+              if (c.name.startsWith("sb-")) {
+                responseRedirect.cookies.delete(c.name)
+              }
+            })
+            responseRedirect.cookies.delete("active_partner_id")
+            return responseRedirect
           }
 
-          // Check if active partner is pending deletion (e.g. for invited members accessing)
           if (partnerDeletion) {
-            const isPastGrace = new Date() > new Date(partnerDeletion.grace_period_ends_at)
-            const isDeleting = partnerDeletion.status !== "waiting_grace_period" && partnerDeletion.status !== "pending_deletion"
-
-            if (isPastGrace || isDeleting) {
-              console.log(`[MIDDLEWARE] Partner ${activePartnerId} deletion is active - blocking access`)
-              const selectErpUrl = new URL("/select-erp?error=partner_deleting", request.url)
-              const responseRedirect = NextResponse.redirect(selectErpUrl)
-              responseRedirect.cookies.delete("active_partner_id")
-              return responseRedirect
-            } else {
-              requestHeaders.set("x-account-pending-deletion", "true")
-            }
+            console.log(`[MIDDLEWARE] Partner ${activePartnerId} deletion is in progress - blocking access`)
+            const selectErpUrl = new URL("/select-erp?error=partner_deleting", request.url)
+            const responseRedirect = NextResponse.redirect(selectErpUrl)
+            responseRedirect.cookies.delete("active_partner_id")
+            return responseRedirect
           }
 
           // Process ban check result

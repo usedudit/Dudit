@@ -72,6 +72,8 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
     const [isDeleting, setIsDeleting] = useState(false)
     const [dryRunReport, setDryRunReport] = useState<any>(null)
     const [loadingDryRun, setLoadingDryRun] = useState(false)
+    const [confirmText, setConfirmText] = useState("")
+    const [activeSubModalOpen, setActiveSubModalOpen] = useState(false)
 
     const handleContinueToConfirm = async () => {
         setLoadingDryRun(true)
@@ -94,6 +96,11 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
     }
 
     const handleDeleteAccount = async () => {
+        if (confirmText !== "EXCLUIR") {
+            notifyError("Erro", "Por favor, digite EXCLUIR para confirmar.")
+            return
+        }
+
         setIsDeleting(true)
         try {
             const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
@@ -104,11 +111,19 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
             const res = await deleteAccountAction(userId, finalReason, token)
 
             if (res.error) {
-                notifyError("Erro ao excluir", res.error)
+                if (res.error === "active_subscription") {
+                    setDeleteStep("none")
+                    setActiveSubModalOpen(true)
+                } else {
+                    notifyError("Erro ao excluir", res.error)
+                }
                 return
             }
 
-            setDeleteStep("success")
+            // On success, sign out and redirect immediately
+            const supabase = createClient()
+            await supabase.auth.signOut()
+            window.location.href = "/auth/login?deleted=true"
         } catch (e: any) {
             notifyError("Erro", "Ocorreu um erro ao excluir a conta.")
         } finally {
@@ -729,29 +744,46 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                     </div>
                                 </div>
                                 <div className="relative">
-                                    <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-amber-50 border-4 border-white dark:border-dark-surface" />
+                                    <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-brand-green border-4 border-white dark:border-dark-surface" />
                                     <div>
-                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Em até 48 horas</strong>
-                                        <span className="text-xs text-brand-inactive-text">Você pode desistir do encerramento a qualquer momento.</span>
+                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Imediatamente</strong>
+                                        <span className="text-xs text-brand-inactive-text">Sua sessão será encerrada e o login será bloqueado.</span>
                                     </div>
                                 </div>
                                 <div className="relative">
                                     <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-red-50 border-4 border-white dark:border-dark-surface" />
                                     <div>
-                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Após 48 horas</strong>
-                                        <span className="text-xs text-brand-inactive-text">Iniciaremos a exclusão definitiva dos seus dados.</span>
+                                        <strong className="text-xs text-brand-dark dark:text-dark-heading block">Processamento assíncrono</strong>
+                                        <span className="text-xs text-brand-inactive-text">Nossos servidores iniciarão a limpeza imediata de arquivos e serviços vinculados.</span>
                                     </div>
                                 </div>
                                 <div className="relative">
                                     <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-gray-400 border-4 border-white dark:border-dark-surface" />
                                     <div>
                                         <strong className="text-xs text-brand-dark dark:text-dark-heading block">Após a conclusão</strong>
-                                        <span className="text-xs text-brand-inactive-text">Enviaremos um e-mail confirmando que a exclusão foi finalizada.</span>
+                                        <span className="text-xs text-brand-inactive-text">O processo de exclusão é finalizado sem possibilidade de recuperação de dados.</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        {/* CONFIRMAÇÃO POR ESCRITO */}
+                        <div className="py-4 border-t border-brand-border dark:border-dark-border text-center space-y-3">
+                            <p className="text-xs font-bold text-red-600 dark:text-red-400">
+                                Atenção: Esta ação é definitiva e removerá todos os seus dados.
+                            </p>
+                            <p className="text-xs text-brand-inactive-text">
+                                Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar.
+                            </p>
+                            <input
+                                type="text"
+                                value={confirmText}
+                                onChange={(e) => setConfirmText(e.target.value)}
+                                placeholder="EXCLUIR"
+                                className="w-full max-w-[200px] mx-auto text-center uppercase tracking-wider font-bold h-10 border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                            />
+                        </div>
+ 
                         {/* ALTERNATIVAS DISCRETAS */}
                         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-4 border-t border-brand-border dark:border-dark-border text-xs text-brand-inactive-text">
                             <a href="/erp/clientes" className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium">
@@ -771,7 +803,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 Voltar
                             </button>
                         </div>
-
+ 
                         {/* FOOTER ACTIONS */}
                         <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
                             <Button
@@ -785,8 +817,8 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                             <Button
                                 variant="default"
                                 onClick={handleDeleteAccount}
-                                disabled={isDeleting}
-                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold"
+                                disabled={isDeleting || confirmText !== "EXCLUIR"}
+                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isDeleting ? "Excluindo..." : "Confirmar exclusão da conta"}
                             </Button>
@@ -794,36 +826,42 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                     </div>
                 )}
             </DefaultModal>
-
-            {/* Deletion Scheduled Success Modal */}
+ 
+            {/* Modal para Assinatura Ativa (Bloqueio) */}
             <DefaultModal
-                isOpen={deleteStep === "success"}
-                onClose={() => {
-                    setDeleteStep("none")
-                    window.location.reload()
-                }}
-                title="Solicitação Recebida"
+                isOpen={activeSubModalOpen}
+                onClose={() => setActiveSubModalOpen(false)}
+                title="Assinatura Ativa Detectada"
             >
                 <div className="space-y-6 pt-2 pb-4 text-center">
-                    <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 mb-2">
-                        <CheckCircle size={32} />
+                    <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-500 mb-2">
+                        <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
                     </div>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                        Exclusão Agendada com Sucesso
+                        Cancele sua Assinatura Primeiro
                     </h3>
                     <p className="text-sm text-brand-inactive-text dark:text-dark-body px-4">
-                        A sua conta foi agendada para exclusão definitiva e entrará no período de carência de <strong>48 horas</strong>. Você pode cancelar o encerramento da conta a qualquer momento na página de assinaturas ou através do aviso flutuante no topo.
+                        Você possui uma assinatura ativa da plataforma. Cancele sua assinatura antes de excluir sua conta.
                     </p>
-                    <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+                    <div className="flex gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                        <Button
+                            variant="outline"
+                            onClick={() => setActiveSubModalOpen(false)}
+                            className="flex-1 h-12 font-bold"
+                        >
+                            Fechar
+                        </Button>
                         <Button
                             variant="default"
                             onClick={() => {
-                                setDeleteStep("none")
-                                window.location.reload()
+                                setActiveSubModalOpen(false)
+                                window.location.href = "/erp/settings/subscription"
                             }}
-                            className="w-full h-12 font-bold bg-brand-green text-white hover:bg-brand-green/90"
+                            className="flex-1 h-12 font-bold bg-amber-600 text-white hover:bg-amber-700"
                         >
-                            Entendi
+                            Ir para Assinaturas
                         </Button>
                     </div>
                 </div>

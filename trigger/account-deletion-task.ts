@@ -43,108 +43,215 @@ export const accountDeletionTask = task({
       // ───────────────────────────────────────────────────────────────────────
       // Step 0: Pre-Delete Volumetry Report
       // ───────────────────────────────────────────────────────────────────────
-      const plannedReport = await step.run("pre-delete-report", async () => {
-        const report = await AccountDeletionService.getPreDeleteReport(payload.partnerId, payload.userId)
-        
-        // Save planned report in DB
-        const updatedCheckpoints = {
-          ...deletion.checkpoints,
-          planned_report: report
-        }
+      let plannedReport = deletion.checkpoints?.planned_report
+      if (!plannedReport) {
+        plannedReport = await step.run("pre-delete-report", async () => {
+          const report = await AccountDeletionService.getPreDeleteReport(payload.partnerId, payload.userId)
+          
+          // Save planned report in DB
+          const { data: cur } = await admin
+            .from("account_deletions")
+            .select("checkpoints")
+            .eq("id", payload.deletionId)
+            .maybeSingle()
+          
+          const updatedCheckpoints = {
+            ...(cur?.checkpoints || {}),
+            planned_report: report
+          }
+          await admin
+            .from("account_deletions")
+            .update({
+              checkpoints: updatedCheckpoints
+            })
+            .eq("id", payload.deletionId)
+
+          return report
+        })
+      }
+
+      // ───────────────────────────────────────────────────────────────────────
+      // Step 1: Cloudflare R2 Purge (deleting_storage)
+      // ───────────────────────────────────────────────────────────────────────
+      let filesDeleted = deletion.checkpoints?.step_status?.deleting_storage?.filesDeleted || 0
+      let deletingStorageCompleted = deletion.checkpoints?.step_status?.deleting_storage?.completed || false
+
+      if (!deletingStorageCompleted) {
         await admin
           .from("account_deletions")
-          .update({
-            checkpoints: updatedCheckpoints
-          })
+          .update({ status: "deleting_storage" })
           .eq("id", payload.deletionId)
 
-        return report
-      })
+        filesDeleted = await step.run("purge-cloudflare-r2", async () => {
+          return await AccountDeletionService.purgeCloudflareR2(payload.userId)
+        })
 
-      // Update status to deleting storage
-      await admin
-        .from("account_deletions")
-        .update({ status: "deleting_storage" })
-        .eq("id", payload.deletionId)
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", payload.deletionId)
+          .maybeSingle()
 
-      // ───────────────────────────────────────────────────────────────────────
-      // Step 1: Cloudflare R2 and WhatsApp Purge
-      // ───────────────────────────────────────────────────────────────────────
-      const filesDeleted = await step.run("purge-cloudflare-r2", async () => {
-        return await AccountDeletionService.purgeCloudflareR2(payload.userId)
-      })
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_storage = { completed: true, filesDeleted }
 
-      const whatsappDisconnected = await step.run("disconnect-whatsapp", async () => {
-        if (payload.partnerId) {
-          return await AccountDeletionService.disconnectWhatsApp(payload.partnerId)
-        }
-        return 0
-      })
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", payload.deletionId)
+      }
 
       // ───────────────────────────────────────────────────────────────────────
-      // Step 2: Cancel Mercado Pago Customer Subscriptions
+      // Step 2: Evolution WhatsApp & MP Customer Cancel (deleting_external_services)
       // ───────────────────────────────────────────────────────────────────────
-      await step.run("cancel-customer-subscriptions", async () => {
-        if (payload.partnerId) {
-          await AccountDeletionService.cancelCustomerSubscriptions(payload.partnerId)
-        }
-      })
+      let whatsappDisconnected = deletion.checkpoints?.step_status?.deleting_external_services?.whatsappDisconnected || 0
+      let deletingExtCompleted = deletion.checkpoints?.step_status?.deleting_external_services?.completed || false
+
+      if (!deletingExtCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_external_services" })
+          .eq("id", payload.deletionId)
+
+        whatsappDisconnected = await step.run("disconnect-whatsapp", async () => {
+          if (payload.partnerId) {
+            return await AccountDeletionService.disconnectWhatsApp(payload.partnerId)
+          }
+          return 0
+        })
+
+        await step.run("cancel-customer-subscriptions", async () => {
+          if (payload.partnerId) {
+            await AccountDeletionService.cancelCustomerSubscriptions(payload.partnerId)
+          }
+        })
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", payload.deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_external_services = { completed: true, whatsappDisconnected }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", payload.deletionId)
+      }
 
       // ───────────────────────────────────────────────────────────────────────
-      // Step 3: Clear Redis Caches
+      // Step 3: Clear Redis Caches & Indexers (deleting_marketplace)
       // ───────────────────────────────────────────────────────────────────────
-      await step.run("purge-redis-cache", async () => {
-        await AccountDeletionService.purgeRedis(payload.partnerId, payload.userId)
-      })
+      let deletingMarketplaceCompleted = deletion.checkpoints?.step_status?.deleting_marketplace?.completed || false
 
-      // Update status to deleting database
-      await admin
-        .from("account_deletions")
-        .update({ status: "deleting_database" })
-        .eq("id", payload.deletionId)
+      if (!deletingMarketplaceCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_marketplace" })
+          .eq("id", payload.deletionId)
 
-      // ───────────────────────────────────────────────────────────────────────
-      // Step 4: Transactional DB Purge (linear execution via PG RPC)
-      // ───────────────────────────────────────────────────────────────────────
-      const dbRowsDeleted = await step.run("purge-database-records", async () => {
-        return await AccountDeletionService.purgeDatabase(payload.partnerId, payload.userId)
-      })
+        await step.run("purge-redis-cache", async () => {
+          await AccountDeletionService.purgeRedis(payload.partnerId, payload.userId)
+        })
 
-      // ───────────────────────────────────────────────────────────────────────
-      // Step 5: Anonymization and Compliance Log
-      // ───────────────────────────────────────────────────────────────────────
-      const ordersAnonymized = await step.run("anonymize-compliance-data", async () => {
-        return await AccountDeletionService.anonymizeOrdersAndLogs(
-          payload.userId,
-          payload.partnerId,
-          deletion.reason,
-          deletion.request_ip,
-          deletion.user_agent,
-          deletion.request_country,
-          deletion.requested_at
-        )
-      })
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", payload.deletionId)
+          .maybeSingle()
 
-      // Update status to deleting auth user
-      await admin
-        .from("account_deletions")
-        .update({ status: "deleting_auth" })
-        .eq("id", payload.deletionId)
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_marketplace = { completed: true }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", payload.deletionId)
+      }
 
       // ───────────────────────────────────────────────────────────────────────
-      // Step 6: Delete Supabase Auth User
+      // Step 4: Transactional DB Purge & Anonymization (deleting_database)
       // ───────────────────────────────────────────────────────────────────────
-      await step.run("delete-supabase-auth-user", async () => {
-        await AccountDeletionService.deleteAuthUser(payload.userId)
-      })
+      let dbRowsDeleted = deletion.checkpoints?.step_status?.deleting_database?.dbRowsDeleted || 0
+      let ordersAnonymized = deletion.checkpoints?.step_status?.deleting_database?.ordersAnonymized || 0
+      let deletingDbCompleted = deletion.checkpoints?.step_status?.deleting_database?.completed || false
+
+      if (!deletingDbCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_database" })
+          .eq("id", payload.deletionId)
+
+        dbRowsDeleted = await step.run("purge-database-records", async () => {
+          return await AccountDeletionService.purgeDatabase(payload.partnerId, payload.userId)
+        })
+
+        ordersAnonymized = await step.run("anonymize-compliance-data", async () => {
+          return await AccountDeletionService.anonymizeOrdersAndLogs(
+            payload.userId,
+            payload.partnerId,
+            deletion.reason,
+            deletion.request_ip,
+            deletion.user_agent,
+            deletion.request_country,
+            deletion.requested_at
+          )
+        })
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", payload.deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_database = { completed: true, dbRowsDeleted, ordersAnonymized }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", payload.deletionId)
+      }
 
       // ───────────────────────────────────────────────────────────────────────
-      // Step 7: Post-Delete Volumetry Report & Success
+      // Step 5: Delete Supabase Auth User (deleting_auth)
+      // ───────────────────────────────────────────────────────────────────────
+      let deletingAuthCompleted = deletion.checkpoints?.step_status?.deleting_auth?.completed || false
+
+      if (!deletingAuthCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_auth" })
+          .eq("id", payload.deletionId)
+
+        await step.run("delete-supabase-auth-user", async () => {
+          await AccountDeletionService.deleteAuthUser(payload.userId)
+        })
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", payload.deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_auth = { completed: true }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", payload.deletionId)
+      }
+
+      // ───────────────────────────────────────────────────────────────────────
+      // Step 6: Post-Delete Volumetry Report & Success
       // ───────────────────────────────────────────────────────────────────────
       await step.run("post-delete-report-and-finalize", async () => {
         const executionTime = Date.now() - startTime
 
-        const actualReport: PostDeleteReport = {
+        const actualReport = {
           productsDeleted: plannedReport.productsCount,
           servicesDeleted: plannedReport.servicesCount,
           ordersAnonymized: ordersAnonymized,

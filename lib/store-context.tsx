@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 
 interface Store {
@@ -132,11 +133,16 @@ export function StoreProvider({
     fetchStores()
   }, [partnerId, fetchStores])
 
+  const queryClient = useQueryClient()
+
   const selectStore = (storeId: string) => {
     const store = stores.find((s) => s.id === storeId)
     if (store) {
       setSelectedStore(store)
       localStorage.setItem("selectedStoreId", storeId)
+
+      // F5.5a: Invalidate all React Query caches that depend on storeId
+      queryClient.invalidateQueries()
 
       import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
         setActiveStoreAction(storeId).then(() => {

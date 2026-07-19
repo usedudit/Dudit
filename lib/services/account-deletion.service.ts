@@ -23,6 +23,9 @@ export interface PreDeleteReport {
   returnRequestsCount: number
   redisKeysCount: number
   estimatedTimeMs: number
+  storesCount?: number
+  storeNames?: string[]
+  membersCount?: number
 }
 
 export interface PostDeleteReport {
@@ -45,6 +48,7 @@ export class AccountDeletionService {
       .select("status")
       .eq("partner_id", partnerId)
       .not("status", "eq", "completed")
+      .not("status", "eq", "failed")
       .maybeSingle()
 
     if (deletion) {
@@ -55,7 +59,9 @@ export class AccountDeletionService {
 
   /**
    * Request account deletion (Fase I).
-   * Suspends billing, schedules the grace period, and queues the Trigger.dev workflow.
+   * Validates OWNER role, active Mercado Pago subscription, checks idempotency,
+   * creates the deletions record with 'deleting_storage', cancels platform MP subscription,
+   * and triggers the Trigger.dev job immediately.
    */
   static async requestDeletion(
     userId: string,
@@ -63,7 +69,7 @@ export class AccountDeletionService {
     ip: string,
     userAgent: string | null,
     country: string
-  ): Promise<{ success: boolean; gracePeriodEndsAt?: string; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; currentStatus?: string }> {
     const admin = getAdminClient()
 
     // 1. Get active partner of the user
@@ -80,31 +86,49 @@ export class AccountDeletionService {
 
     const partnerId = partner?.id || null
 
-    // 2. Check if a deletion is already pending
+    if (partner) {
+      // 1.1. Security rule check: Only OWNER (partners.user_id === userId) can delete
+      if (partner.user_id !== userId) {
+        return { success: false, error: "Somente o proprietário principal (OWNER) da conta pode realizar a exclusão." }
+      }
+
+      // 1.2. Mercado Pago check: block deletion if has active platform subscription
+      const { data: activeSub } = await admin
+        .from("subscriptions")
+        .select("id, status")
+        .eq("partner_id", partner.id)
+        .in("status", ["active", "trialing", "past_due"])
+        .maybeSingle()
+
+      if (activeSub) {
+        return { success: false, error: "active_subscription" }
+      }
+    }
+
+    // 2. Concurrency/Idempotency check: check if there's an active/in-progress deletion record
     const { data: existingDeletion } = await admin
       .from("account_deletions")
       .select("id, status")
       .eq("user_id", userId)
       .not("status", "eq", "completed")
+      .not("status", "eq", "failed")
       .maybeSingle()
 
     if (existingDeletion) {
-      return { success: false, error: "Já existe uma solicitação de exclusão pendente para esta conta." }
+      return { success: true, currentStatus: existingDeletion.status }
     }
 
-    // 3. Grace period is 48 hours
     const requestedAt = new Date()
-    const gracePeriodEndsAt = new Date(requestedAt.getTime() + 48 * 60 * 60 * 1000)
 
-    // 4. Create the deletion record
+    // 3. Create the deletion record
     const { data: deletion, error: insertError } = await admin
       .from("account_deletions")
       .insert({
         user_id: userId,
         partner_id: partnerId,
-        status: "pending_deletion",
+        status: "deleting_storage",
         requested_at: requestedAt.toISOString(),
-        grace_period_ends_at: gracePeriodEndsAt.toISOString(),
+        grace_period_ends_at: requestedAt.toISOString(),
         request_ip: ip || "unknown",
         request_country: country || "BR",
         user_agent: userAgent || null,
@@ -124,7 +148,7 @@ export class AccountDeletionService {
       return { success: false, error: "Erro ao registrar solicitação de exclusão." }
     }
 
-    // 5. Cancel platform subscription immediately (billing stops)
+    // 4. Cancel platform subscription immediately (billing stops)
     if (partnerId) {
       const { data: sub } = await admin
         .from("subscriptions")
@@ -134,11 +158,6 @@ export class AccountDeletionService {
         .maybeSingle()
 
       if (sub) {
-        await admin
-          .from("account_deletions")
-          .update({ status: "cancelling_subscription" })
-          .eq("id", deletion.id)
-
         try {
           const cancelResult = await cancelMpSubscription(sub.id, userId)
           if (!cancelResult.success) {
@@ -154,13 +173,7 @@ export class AccountDeletionService {
       }
     }
 
-    // Update status to waiting grace period
-    await admin
-      .from("account_deletions")
-      .update({ status: "waiting_grace_period" })
-      .eq("id", deletion.id)
-
-    // 6. Queue Trigger.dev workflow task
+    // 5. Queue Trigger.dev workflow task immediately (zero delay)
     try {
       if (process.env.TRIGGER_SECRET_KEY) {
         // @ts-ignore
@@ -169,8 +182,6 @@ export class AccountDeletionService {
           deletionId: deletion.id,
           userId,
           partnerId
-        }, {
-          delay: "48h"
         })
 
         await admin
@@ -178,7 +189,7 @@ export class AccountDeletionService {
           .update({ trigger_run_id: run.id })
           .eq("id", deletion.id)
       } else {
-        SecureLogger.warn("TRIGGER_SECRET_KEY not set. Account deletion scheduled locally in DB, but Trigger.dev task was not enqueued.", { deletionId: deletion.id })
+        SecureLogger.warn("TRIGGER_SECRET_KEY not set. Account deletion scheduled locally, but Trigger.dev task was not enqueued.", { deletionId: deletion.id })
       }
     } catch (triggerErr) {
       SecureLogger.error("Failed to enqueue Trigger.dev deletion task", { deletionId: deletion.id, error: triggerErr })
@@ -188,64 +199,17 @@ export class AccountDeletionService {
       action: "account.deletion_requested" as any,
       actorUserId: userId,
       partnerId,
-      metadata: { grace_period_ends_at: gracePeriodEndsAt.toISOString(), reason }
-    })
-
-    return { success: true, gracePeriodEndsAt: gracePeriodEndsAt.toISOString() }
-  }
-
-  /**
-   * Cancel pending account deletion.
-   * Restores status and cancels the Trigger.dev task run.
-   */
-  static async cancelDeletion(userId: string): Promise<{ success: boolean; error?: string }> {
-    const admin = getAdminClient()
-
-    const { data: deletion, error: queryError } = await admin
-      .from("account_deletions")
-      .select("id, partner_id, trigger_run_id, status")
-      .eq("user_id", userId)
-      .not("status", "eq", "completed")
-      .maybeSingle()
-
-    if (queryError || !deletion) {
-      return { success: false, error: "Nenhuma solicitação de exclusão ativa encontrada." }
-    }
-
-    if (deletion.status !== "waiting_grace_period" && deletion.status !== "pending_deletion") {
-      return { success: false, error: "A exclusão da conta já entrou em fase de processamento final e não pode ser cancelada." }
-    }
-
-    // Cancel Trigger.dev run if running/scheduled
-    if (deletion.trigger_run_id && process.env.TRIGGER_SECRET_KEY) {
-      try {
-        // @ts-ignore
-        const { runs } = await import("@trigger.dev/sdk/v3")
-        await runs.cancel(deletion.trigger_run_id)
-      } catch (cancelErr) {
-        SecureLogger.error("Failed to cancel scheduled Trigger.dev run", { runId: deletion.trigger_run_id, error: cancelErr })
-      }
-    }
-
-    // Remove the deletion tracking record
-    const { error: deleteError } = await admin
-      .from("account_deletions")
-      .delete()
-      .eq("id", deletion.id)
-
-    if (deleteError) {
-      SecureLogger.error("Failed to delete account_deletions tracking record", { deletionId: deletion.id, error: deleteError.message })
-      return { success: false, error: "Erro ao restaurar a conta." }
-    }
-
-    await auditLog({
-      action: "account.deletion_cancelled" as any,
-      actorUserId: userId,
-      partnerId: deletion.partner_id,
-      metadata: { deletion_id: deletion.id }
+      metadata: { reason }
     })
 
     return { success: true }
+  }
+
+  /**
+   * cancelDeletion is now a no-op (carência de 48h removida).
+   */
+  static async cancelDeletion(userId: string): Promise<{ success: boolean; error?: string }> {
+    return { success: false, error: "Cancelamento de exclusão indisponível (carência desativada)." }
   }
 
   /**
@@ -266,6 +230,10 @@ export class AccountDeletionService {
     let whatsappCount = 0
     let filesCount = 0
 
+    let storesCount = 0
+    let storeNames: string[] = []
+    let membersCount = 0
+
     if (partnerId) {
       const [
         { count: prod },
@@ -277,7 +245,9 @@ export class AccountDeletionService {
         { count: so },
         { count: appt },
         { count: rr },
-        { count: wa }
+        { count: wa },
+        { data: stores },
+        { count: members }
       ] = await Promise.all([
         admin.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
         admin.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
@@ -288,7 +258,9 @@ export class AccountDeletionService {
         admin.from("service_orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
         admin.from("appointments").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
         admin.from("return_requests").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
-        admin.from("partner_whatsapp_connections").select("id", { count: "exact", head: true }).eq("partner_id", partnerId)
+        admin.from("partner_whatsapp_connections").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
+        admin.from("stores").select("name").eq("partner_id", partnerId),
+        admin.from("partner_users").select("id", { count: "exact", head: true }).eq("partner_id", partnerId)
       ])
 
       productsCount = prod || 0
@@ -301,6 +273,9 @@ export class AccountDeletionService {
       appointmentsCount = appt || 0
       returnRequestsCount = rr || 0
       whatsappCount = wa || 0
+      storesCount = stores?.length || 0
+      storeNames = stores?.map((s: any) => s.name) || []
+      membersCount = members || 0
     }
 
     // Estimate file count from Cloudflare R2
@@ -340,7 +315,10 @@ export class AccountDeletionService {
       redisKeysCount,
       estimatedTimeMs,
       filesCount,
-      whatsappCount
+      whatsappCount,
+      storesCount,
+      storeNames,
+      membersCount
     }
   }
 

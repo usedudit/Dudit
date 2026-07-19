@@ -121,6 +121,13 @@ interface UpdateStoreInput {
     longitude?: number | null
     timezone?: string
     pickup_payment_policy?: string
+    // F5.5c: Address fields (city/state already declared above)
+    zip_code?: string
+    street?: string
+    number?: string
+    complement?: string
+    neighborhood?: string
+    noNumber?: boolean
 }
 
 export async function updateStoreAction(input: UpdateStoreInput): Promise<ActionResponse<void>> {
@@ -128,6 +135,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         await requireUser()
         await requireStorePermission(input.storeId, input.partnerId, "stores", "edit")
 
+        const admin = createAdminClient()
         const supabase = await getSupabaseServerClient()
         const updateData: Record<string, unknown> = {}
 
@@ -156,6 +164,66 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.timezone !== undefined) updateData.timezone = input.timezone
         if (input.pickup_payment_policy !== undefined) updateData.pickup_payment_policy = input.pickup_payment_policy
         updateData.updated_at = new Date().toISOString()
+
+        // F5.5c: Handle address upsert
+        const hasAddressFields = input.zip_code !== undefined || input.street !== undefined ||
+            input.number !== undefined || input.complement !== undefined ||
+            input.neighborhood !== undefined || input.city !== undefined ||
+            input.state !== undefined
+        if (hasAddressFields) {
+            const numberVal = input.noNumber ? "S/N" : (input.number || "")
+            const addressPayload: Record<string, unknown> = {
+                zip_code: input.zip_code ?? null,
+                street: input.street ?? null,
+                number: numberVal,
+                complement: input.complement ?? null,
+                neighborhood: input.neighborhood ?? null,
+                city: input.city ?? null,
+                state: input.state ?? null,
+                country: "BR",
+                store_id: input.storeId,
+            }
+
+            // Check if store already has an address_id
+            const { data: existingStore } = await admin
+                .from("stores")
+                .select("address_id")
+                .eq("id", input.storeId)
+                .single()
+
+            if (existingStore?.address_id) {
+                // Update existing address
+                const { error: addrError } = await admin
+                    .from("addresses")
+                    .update(addressPayload)
+                    .eq("id", existingStore.address_id)
+                if (addrError) throw new Error(addrError.message)
+            } else {
+                // Check if there's an address with this store_id
+                const { data: addrByStore } = await admin
+                    .from("addresses")
+                    .select("id")
+                    .eq("store_id", input.storeId)
+                    .maybeSingle()
+                if (addrByStore?.id) {
+                    const { error: addrError } = await admin
+                        .from("addresses")
+                        .update(addressPayload)
+                        .eq("id", addrByStore.id)
+                    if (addrError) throw new Error(addrError.message)
+                    updateData.address_id = addrByStore.id
+                } else {
+                    // Create new address
+                    const { data: newAddr, error: addrError } = await admin
+                        .from("addresses")
+                        .insert({ ...addressPayload, id: undefined })
+                        .select("id")
+                        .single()
+                    if (addrError) throw new Error(addrError.message)
+                    updateData.address_id = newAddr.id
+                }
+            }
+        }
 
         const { error } = await supabase
             .from("stores")
@@ -319,19 +387,34 @@ export async function createStoreWithInheritanceAction(input: CreateStoreWithInh
         // 5. Inherit payment methods
         if (input.inheritPaymentMethods) {
             const { data: paymentMethods } = await supabase
-                .from("partner_payment_methods")
+                .from("payment_methods")
                 .select("*")
                 .eq("partner_id", input.partnerId)
+                .or(`store_id.is.null,store_id.eq.${input.sourceStoreId}`)
 
             if (paymentMethods?.length) {
-                for (const pm of paymentMethods) {
-                    await supabase.from("partner_payment_methods").upsert({
-                        id: pm.id,
-                        store_id: newStoreId,
-                        partner_id: input.partnerId,
-                        ...pm,
-                    }, { onConflict: "id" })
-                }
+                const newMethods = paymentMethods.map((pm: any) => {
+                    const { id, created_at, updated_at, store_id, ...rest } = pm
+                    return { ...rest, store_id: newStoreId, partner_id: input.partnerId }
+                })
+                await supabase.from("payment_methods").insert(newMethods)
+            }
+        }
+
+        // 5b. Inherit financial settings (fiscal fields + business_info)
+        if (input.inheritFinancialSettings && sourceStore) {
+            const finData: Record<string, unknown> = {}
+            if (sourceStore.crt !== undefined) finData.crt = sourceStore.crt
+            if (sourceStore.contribuinte !== undefined) finData.contribuinte = sourceStore.contribuinte
+            if (sourceStore.inscricao_estadual !== undefined) finData.inscricao_estadual = sourceStore.inscricao_estadual
+            if (sourceStore.ie_isento !== undefined) finData.ie_isento = sourceStore.ie_isento
+            if (sourceStore.inscricao_municipal !== undefined) finData.inscricao_municipal = sourceStore.inscricao_municipal
+            if (sourceStore.business_info) finData.business_info = sourceStore.business_info
+            if (sourceStore.timezone) finData.timezone = sourceStore.timezone
+            if (sourceStore.pickup_payment_policy) finData.pickup_payment_policy = sourceStore.pickup_payment_policy
+            if (Object.keys(finData).length > 0) {
+                finData.updated_at = new Date().toISOString()
+                await supabase.from("stores").update(finData).eq("id", newStoreId)
             }
         }
 
@@ -372,6 +455,9 @@ export async function setActiveStoreAction(storeId: string): Promise<ActionRespo
         await requireUser()
         await requireStoreAccess(storeId)
         await setActiveStore(storeId)
+
+        // F5.5a: Invalidate all store-dependent caches
+        revalidatePath("/", "layout")
 
         logAudit("store.switched", {
             storeId,

@@ -561,7 +561,7 @@ export async function createProductComprehensiveAction(data: {
             }
 
             const targetStores = scope === 'all'
-                ? (await getAdminClient().from("stores").select("id").eq("partner_id", data.partnerId)).data?.map((s: any) => s.id) || [finalStoreId]
+                ? (await getAdminClient().from("stores").select("id").eq("partner_id", finalPartnerId)).data?.map((s: any) => s.id) || [finalStoreId]
                 : scope === 'selected' && data.visibility_stores?.length
                     ? data.visibility_stores
                     : [finalStoreId]
@@ -671,6 +671,9 @@ interface UpdateProductData {
     height?: number
     length?: number
     variants?: any[]
+    visibility_scope?: string
+    visibility_stores?: string[]
+    storeId?: string
 }
 
 export async function updateProductComprehensiveAction(productId: string, data: UpdateProductData): Promise<ActionResponse<any>> {
@@ -851,6 +854,57 @@ export async function updateProductComprehensiveAction(productId: string, data: 
                 _deleteFromR2(product.video_url),
                 product.video_thumbnail ? _deleteFromR2(product.video_thumbnail) : Promise.resolve(),
             ]).catch(console.error)
+        }
+
+        // F5.5b: Handle visibility_scope changes on update
+        if (data.visibility_scope !== undefined && data.storeId) {
+            const scope = data.visibility_scope || 'exclusive'
+
+            // Only Owner/Admin can set scope != 'exclusive'
+            if (scope !== 'exclusive') {
+                const { resolveEffectivePermissions } = await import("@/lib/store-members")
+                const effective = await resolveEffectivePermissions(product.partner_id, data.storeId)
+                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
+                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do produto")
+                }
+            }
+
+            const { linkProductToStore } = await import("@/lib/store-products")
+
+            if (scope === 'all') {
+                const { data: allStores } = await getAdminClient()
+                    .from("stores")
+                    .select("id")
+                    .eq("partner_id", product.partner_id)
+                for (const s of allStores || []) {
+                    await linkProductToStore(productId, s.id, { visibility_scope: 'all' })
+                }
+            } else if (scope === 'selected' && data.visibility_stores?.length) {
+                for (const sid of data.visibility_stores) {
+                    await linkProductToStore(productId, sid, { visibility_scope: 'selected' })
+                }
+                // Remove bridges for stores not in the selection
+                const { data: existingBridges } = await getAdminClient()
+                    .from("store_products")
+                    .select("store_id")
+                    .eq("product_id", productId)
+                    .not("store_id", "in", `(${data.visibility_stores.join(",")})`)
+                for (const b of existingBridges || []) {
+                    await getAdminClient().from("store_products").delete().eq("product_id", productId).eq("store_id", b.store_id)
+                }
+            } else {
+                // exclusive: link only to the current store
+                await linkProductToStore(productId, data.storeId, { visibility_scope: 'exclusive' })
+                // Remove bridges for other stores
+                const { data: otherBridges } = await getAdminClient()
+                    .from("store_products")
+                    .select("store_id")
+                    .eq("product_id", productId)
+                    .neq("store_id", data.storeId)
+                for (const b of otherBridges || []) {
+                    await getAdminClient().from("store_products").delete().eq("product_id", productId).eq("store_id", b.store_id)
+                }
+            }
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
@@ -1967,20 +2021,31 @@ export async function getERPProductsPageAction(
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {
-            const { data: myLinked } = await supabase
+            // F5.5b: Use same logic as resolveProduct — products are visible if:
+            // 1. No bridges exist (legacy), OR
+            // 2. Any bridge has visibility_scope='all', OR
+            // 3. The current store has a bridge
+            const { data: allLinks } = await supabase
                 .from("store_products")
-                .select("product_id")
-                .eq("store_id", options.storeId)
-            const { data: allLinked } = await supabase
-                .from("store_products")
-                .select("product_id")
+                .select("product_id, store_id, visibility_scope")
 
-            const mySet = new Set(myLinked?.map(x => x.product_id) || [])
-            const allSet = new Set(allLinked?.map(x => x.product_id) || [])
-            const excludeIds = [...allSet].filter(id => !mySet.has(id))
-
-            if (excludeIds.length > 0) {
-                q = q.not("id", "in", `(${excludeIds.join(',')})`)
+            if (allLinks && allLinks.length > 0) {
+                const restrictions = new Map<string, { hasAll: boolean; storeHasBridge: boolean }>()
+                for (const link of allLinks) {
+                    const r = restrictions.get(link.product_id) || { hasAll: false, storeHasBridge: false }
+                    if (link.visibility_scope === 'all') r.hasAll = true
+                    if (link.store_id === options.storeId) r.storeHasBridge = true
+                    restrictions.set(link.product_id, r)
+                }
+                const excludeIds: string[] = []
+                for (const [productId, r] of restrictions) {
+                    if (!r.hasAll && !r.storeHasBridge) {
+                        excludeIds.push(productId)
+                    }
+                }
+                if (excludeIds.length > 0) {
+                    q = q.not("id", "in", `(${excludeIds.join(',')})`)
+                }
             }
         }
 

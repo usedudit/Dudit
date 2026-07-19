@@ -10,6 +10,7 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockEq = vi.fn()
 const mockNot = vi.fn()
+const mockIn = vi.fn()
 
 const mockSingleChain: any = {}
 mockSingleChain.select = vi.fn().mockReturnValue(mockSingleChain)
@@ -18,6 +19,7 @@ mockSingleChain.update = mockUpdate.mockReturnValue(mockSingleChain)
 mockSingleChain.delete = mockDelete.mockReturnValue(mockSingleChain)
 mockSingleChain.eq = mockEq.mockReturnValue(mockSingleChain)
 mockSingleChain.not = mockNot.mockReturnValue(mockSingleChain)
+mockSingleChain.in = mockIn.mockReturnValue(mockSingleChain)
 mockSingleChain.single = mockSingle
 mockSingleChain.maybeSingle = mockMaybeSingle
 
@@ -77,6 +79,7 @@ describe("Account Deletion E2E Integration Suite", () => {
   it("E2E Scenario: Full deletion cycle and linear state transitions", async () => {
     // Stage 1: Request Deletion (Fase I)
     mockMaybeSingle.mockResolvedValueOnce({ data: { id: "partner-123", user_id: "user-123" }, error: null }) // partner lookup
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null }) // no active platform subscription
     mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null }) // no active deletions
     mockSingle.mockResolvedValueOnce({ data: { id: "deletion-123" }, error: null }) // insert deletion
     mockMaybeSingle.mockResolvedValueOnce({ data: { id: "sub-123" }, error: null }) // platform sub lookup
@@ -89,7 +92,6 @@ describe("Account Deletion E2E Integration Suite", () => {
       "BR"
     )
     expect(reqResult.success).toBe(true)
-    expect(reqResult.gracePeriodEndsAt).toBeDefined()
 
     // Stage 2: Database Purge (Fase II)
     mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 150, error: null }) // execute_account_deletion_db
@@ -107,32 +109,29 @@ describe("Account Deletion E2E Integration Suite", () => {
   })
 
   // 2. IDEMPOTENCY & RESTORE (CANCEL DURING GRACE PERIOD)
-  it("E2E Scenario: Grace period cancellation and restore validation", async () => {
-    mockMaybeSingle.mockResolvedValueOnce({
-      data: { id: "deletion-123", partner_id: "partner-123", status: "waiting_grace_period", trigger_run_id: "run-999" },
-      error: null
-    })
-
+  it("E2E Scenario: Grace period cancellation is disabled", async () => {
     const cancelResult = await AccountDeletionService.cancelDeletion("user-123")
-    expect(cancelResult.success).toBe(true)
-    expect(mockDelete).toHaveBeenCalled()
+    expect(cancelResult.success).toBe(false)
+    expect(cancelResult.error).toContain("Cancelamento de exclusão indisponível")
   })
 
   // 3. CONCURRENT REQUESTS (RACE CONDITIONS)
   it("E2E Scenario: Prevent race conditions on multiple simultaneous deletion requests", async () => {
     // First lookup partner
     mockMaybeSingle.mockResolvedValueOnce({ data: { id: "partner-123", user_id: "user-123" }, error: null })
+    // Mock active subscription check (none)
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
     // Simulate another request has just inserted a deletion record in between
-    mockMaybeSingle.mockResolvedValueOnce({ data: { id: "deletion-123", status: "waiting_grace_period" }, error: null })
+    mockMaybeSingle.mockResolvedValueOnce({ data: { id: "deletion-123", status: "deleting_storage" }, error: null })
 
     const res = await AccountDeletionService.requestDeletion("user-123", null, "127.0.0.1", null, "BR")
-    expect(res.success).toBe(false)
-    expect(res.error).toContain("Já existe uma solicitação")
+    expect(res.success).toBe(true)
+    expect(res.currentStatus).toBe("deleting_storage")
   })
 
   // 4. ERP MUTATIONS LOCKING DURING GRACE PERIOD
-  it("E2E Scenario: Assert mutations are blocked during deletion grace period", async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { status: "waiting_grace_period" }, error: null })
+  it("E2E Scenario: Assert mutations are blocked during active deletion", async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { status: "deleting_storage" }, error: null })
 
     await expect(AccountDeletionService.assertNotLocked("partner-123")).rejects.toThrow(ForbiddenError)
   })

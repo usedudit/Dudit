@@ -408,6 +408,50 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
             Promise.all(cleanup).catch(console.error)
         }
 
+        // F5.5b: Handle visibility_scope changes on update
+        if (data.visibility_scope !== undefined && data.storeId) {
+            const scope = data.visibility_scope || 'exclusive'
+
+            if (scope !== 'exclusive') {
+                const { resolveEffectivePermissions } = await import("@/lib/store-members")
+                const effective = await resolveEffectivePermissions(existing.partner_id, data.storeId)
+                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
+                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do serviço")
+                }
+            }
+
+            const { linkServiceToStore } = await import("@/lib/store-services")
+
+            if (scope === 'all') {
+                const { data: allStores } = await admin.from("stores").select("id").eq("partner_id", existing.partner_id)
+                for (const s of allStores || []) {
+                    await linkServiceToStore(serviceId, s.id, { visibility_scope: 'all' })
+                }
+            } else if (scope === 'selected' && data.visibility_stores?.length) {
+                for (const sid of data.visibility_stores) {
+                    await linkServiceToStore(serviceId, sid, { visibility_scope: 'selected' })
+                }
+                const { data: existingBridges } = await admin
+                    .from("store_services")
+                    .select("store_id")
+                    .eq("service_id", serviceId)
+                    .not("store_id", "in", `(${data.visibility_stores.join(",")})`)
+                for (const b of existingBridges || []) {
+                    await admin.from("store_services").delete().eq("service_id", serviceId).eq("store_id", b.store_id)
+                }
+            } else {
+                await linkServiceToStore(serviceId, data.storeId, { visibility_scope: 'exclusive' })
+                const { data: otherBridges } = await admin
+                    .from("store_services")
+                    .select("store_id")
+                    .eq("service_id", serviceId)
+                    .neq("store_id", data.storeId)
+                for (const b of otherBridges || []) {
+                    await admin.from("store_services").delete().eq("service_id", serviceId).eq("store_id", b.store_id)
+                }
+            }
+        }
+
         revalidatePath("/erp/servicos")
         return successResponse(updated)
     } catch (error: any) {
