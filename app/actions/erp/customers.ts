@@ -729,7 +729,7 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
     const { data: customers, error } = await supabase
       .from("customers")
-      .select("id, name, email, phone, cpf, status, store_credit, created_at, store_id, partner_id, person_type, birth_date")
+      .select("id, name, email, phone, cpf, status, store_credit, created_at, partner_id, person_type, birth_date")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
       .limit(500)
@@ -751,15 +751,6 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
         }
       }
     }))
-
-    // Prioritize: current store customers first, then others
-    if (currentStoreId) {
-      result = [...result].sort((a: any, b: any) => {
-        if (a.store_id === currentStoreId && b.store_id !== currentStoreId) return -1
-        if (a.store_id !== currentStoreId && b.store_id === currentStoreId) return 1
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      })
-    }
 
     return { customers: result }
   } catch (err: any) {
@@ -875,12 +866,8 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, partner_id, name, email, phone, phone_fixed, status, store_credit, created_at, store_id, cpf, person_type, cnpj, birth_date, user_id")
+      .select("id, partner_id, name, email, phone, phone_fixed, status, store_credit, created_at, cpf, person_type, cnpj, birth_date, user_id")
       .eq("partner_id", partnerId)
-
-    if (options?.storeId) {
-      q = q.eq("store_id", options.storeId)
-    }
 
     if (cursor) {
       q = q.or(buildCustomersKeysetOrFilter(cursor))

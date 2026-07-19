@@ -4,6 +4,8 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { encryptCPF } from "@/lib/crypto"
 import { createAddressAction } from "@/app/actions/shared/addresses"
+import { linkProductToStore } from "@/lib/store-products"
+import { linkServiceToStore } from "@/lib/store-services"
 import type { ColumnMapping, EntityType, ImportResult, ImportSession } from "./types"
 
 const BATCH_SIZE = 500
@@ -246,7 +248,6 @@ async function importProductBatch(
     const specs: Record<string, string> = {}
     const productData: any = {
       partner_id: partnerId,
-      store_id: storeId,
       name,
       sku: finalSku,
       description: row["description"] || null,
@@ -386,6 +387,13 @@ async function importProductBatch(
         if (logisticsError) {
           console.error("[BatchImport] Erro ao inserir perfis logísticos:", logisticsError)
           errorMessage = logisticsError.message
+        }
+      }
+
+      // Link all inserted products to the store
+      for (const item of inserted || []) {
+        if (item.id) {
+          await linkProductToStore(item.id, storeId)
         }
       }
     }
@@ -601,7 +609,6 @@ async function importServiceBatch(
 
     const serviceData: any = {
       partner_id: partnerId,
-      store_id: storeId,
       name,
       description: row["description"] || null,
       price: cleanNumber(row["price"] ?? "0") ?? 0,
@@ -634,6 +641,16 @@ async function importServiceBatch(
       errorMessage = error.message
     } else {
       success = inserted?.length ?? 0
+      // F4.1: create bridge relations instead of writing store_id directly to services
+      if (storeId && inserted) {
+        for (const svc of inserted) {
+          try {
+            await linkServiceToStore(svc.id, storeId)
+          } catch (linkErr: any) {
+            console.warn(`[BatchImport] Erro ao vincular serviço ${svc.id} à loja:`, linkErr.message)
+          }
+        }
+      }
     }
   }
 

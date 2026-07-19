@@ -62,7 +62,6 @@ export interface ProductDisplay extends Product {
 
 export interface ProductInput {
   partner_id: string
-  store_id: string
   name: string
   description?: string | null
   price: number

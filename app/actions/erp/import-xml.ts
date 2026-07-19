@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { linkProductToStore } from "@/lib/store-products"
 import { UNITS } from "@/lib/constants/product-constants"
 
 interface CPFCNPJValidationResult {
@@ -177,7 +178,6 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
               ...product,
               sku: generatedSku,
               partner_id: partnerId,
-              store_id: storeId,
               is_active: true,
               created_at: brasiliaTime.toISOString(),
               updated_at: brasiliaTime.toISOString(),
@@ -197,6 +197,7 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
 
             if (!insertError) {
               inserted = data
+              await linkProductToStore(data.id, storeId)
               finalError = null
               break
             }

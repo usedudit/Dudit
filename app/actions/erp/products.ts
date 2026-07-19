@@ -27,6 +27,7 @@ import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { linkProductToStore } from "@/lib/store-products"
 import { headers } from "next/headers"
 
 const _deleteFromR2 = async (url: string) => {
@@ -431,7 +432,6 @@ export async function createProductComprehensiveAction(data: {
         const productData = {
             id: data.id || undefined,
             partner_id: finalPartnerId,
-            store_id: finalStoreId,
             name: data.name,
             description: data.description || null,
             sku,
@@ -544,6 +544,13 @@ export async function createProductComprehensiveAction(data: {
         }
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
+
+        // F4.1: create bridge relation instead of writing store_id directly to products
+        try {
+            await linkProductToStore(insertedProduct.id, finalStoreId)
+        } catch (linkErr: any) {
+            return errorResponse("Produto criado, mas erro ao vincular à loja: " + linkErr.message)
+        }
 
         const videoUpdate = {
             video_type: videoMetadata.video_type,
@@ -1668,6 +1675,24 @@ export async function duplicateProductsAction(productIds: string[]) {
         }
 
         if (insertError) return { success: false, error: insertError.message }
+
+        // Link copies to the same stores as the originals
+        try {
+          const supabase2 = await getSupabaseServerClient()
+          for (let i = 0; i < (inserted?.length || 0); i++) {
+            const originalId = productIds[i]
+            const copyId = inserted![i].id
+            const { data: storeLinks } = await supabase2
+              .from("store_products")
+              .select("store_id")
+              .eq("product_id", originalId)
+            for (const link of storeLinks || []) {
+              await linkProductToStore(copyId, link.store_id)
+            }
+          }
+        } catch (linkErr) {
+          console.error("Error linking duplicated products to stores:", linkErr)
+        }
 
         Promise.resolve().then(() => revalidateProducts(products[0].partner_id)).catch(console.error)
         return { success: true, count: inserted?.length || 0, products: inserted }

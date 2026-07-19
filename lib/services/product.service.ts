@@ -1,6 +1,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { Product, ProductInput, ProductWithDetails } from "@/lib/types/product"
 import { buildSoftDeletePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { linkProductToStore } from "@/lib/store-products"
 
 export class ProductService {
   private async getSupabase() {
@@ -145,16 +146,34 @@ export class ProductService {
       return { success: false, error: "Produto não encontrado" }
     }
 
-    const { id, created_at, updated_at, sku, ...productData } = original as any
+    const { id, created_at, updated_at, sku, store_id, ...productData } = original as any
 
     const newProduct = {
       ...productData,
-      store_id: productData.store_id || '00000000-0000-0000-0000-000000000000', // required
       name: `${productData.name} (Cópia)`,
       sku: `${sku}-COPY-${Date.now().toString().slice(-6)}`,
     }
 
-    return this.create(newProduct)
+    const result = await this.create(newProduct)
+
+    // Link the duplicate to the same stores as the original
+    if (result.success && result.product) {
+      try {
+        const supabase = await this.getSupabase()
+        const { data: storeLinks } = await supabase
+          .from("store_products")
+          .select("store_id")
+          .eq("product_id", productId)
+
+        for (const link of storeLinks || []) {
+          await linkProductToStore(result.product.id, link.store_id)
+        }
+      } catch (err) {
+        console.error("Error linking duplicate product to stores:", err)
+      }
+    }
+
+    return result
   }
 
   async updateStock(productId: string, partnerId: string, quantity: number, storeId?: string): Promise<{ success: boolean; error?: string }> {

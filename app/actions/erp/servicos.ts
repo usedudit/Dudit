@@ -20,6 +20,7 @@ import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { linkServiceToStore } from "@/lib/store-services"
 import { headers } from "next/headers"
 
 const getBrasiliaTime = () => new Date(new Date().getTime() - 3 * 60 * 60 * 1000).toISOString()
@@ -174,7 +175,6 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         const serviceData: any = {
             ...(data.id ? { id: data.id } : {}),
             partner_id: finalPartnerId,
-            store_id: finalStoreId,
             name: data.name,
             description: data.description || null,
             sku,
@@ -239,6 +239,13 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         }
 
         if (insertError) return errorResponse(insertError.message)
+
+        // F4.1: create bridge relation instead of writing store_id directly to services
+        try {
+            await linkServiceToStore(inserted.id, finalStoreId)
+        } catch (linkErr: any) {
+            return errorResponse("Serviço criado, mas erro ao vincular à loja: " + linkErr.message)
+        }
 
         revalidatePath("/erp/servicos")
         return successResponse(inserted)
@@ -608,6 +615,19 @@ export async function duplicateServiceAction(serviceId: string) {
         }
 
         if (insertError) return errorResponse(insertError.message)
+
+        // F4.1: preserve store relation via bridge instead of legacy store_id
+        try {
+            const { data: storeLinks } = await supabase
+                .from("store_services")
+                .select("store_id")
+                .eq("service_id", serviceId)
+            for (const link of storeLinks || []) {
+                await linkServiceToStore(inserted.id, link.store_id)
+            }
+        } catch (linkErr: any) {
+            return errorResponse("Serviço duplicado, mas erro ao vincular à loja: " + linkErr.message)
+        }
 
         revalidatePath("/erp/servicos")
         return successResponse({ newServiceId: inserted.id, product: inserted })
