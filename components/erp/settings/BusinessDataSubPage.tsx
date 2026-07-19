@@ -24,6 +24,7 @@ import {
 } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
+import { updateStoreAction } from "@/app/actions/erp/stores"
 import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon, ChevronRightIcon, UserIcon, StoreIcon } from "@/lib/icons"
 import PartnerCategoryModal from "./PartnerCategoryModal"
 import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
@@ -72,10 +73,12 @@ const MODE_OPTIONS: Array<{
 
 export const BusinessDataSubPage = ({
     partner,
+    store,
     paymentMethods,
     onBack,
 }: {
     partner: any
+    store?: any
     paymentMethods: any[]
     onBack: () => void
 }) => {
@@ -92,19 +95,21 @@ export const BusinessDataSubPage = ({
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
-    const businessInfo = normalizeBusinessInfo(partner.business_info)
+    const partnerBusinessInfo = normalizeBusinessInfo(partner.business_info)
+    const storeBusinessInfo = store?.business_info ? normalizeBusinessInfo(store.business_info) : null
+    const effectiveBusinessInfo = storeBusinessInfo || partnerBusinessInfo
 
     const [generalInfo, setGeneralInfo] = useState({
-        storeName: partner.store_name || "",
-        storeDescription: partner.store_description || "",
+        storeName: store?.name || partner.store_name || "",
+        storeDescription: store?.description || partner.store_description || "",
         businessType: partner.business_type || "pf",
         cnpj: partner.cpf || partner.cnpj || "",
-        sells: businessInfo?.sells || ["products"],
-        mode: (businessInfo?.mode || "erp") as BusinessMode,
-        phone: formatE164ToDisplay(partner.phone) || "",
+        sells: effectiveBusinessInfo?.sells || ["products"],
+        mode: (effectiveBusinessInfo?.mode || "erp") as BusinessMode,
+        phone: formatE164ToDisplay(store?.phone || partner.phone) || "",
         category: partner.category || "",
-        categoryId: partner.category_id || null,
-        subcategoryId: partner.subcategory_id || null,
+        categoryId: store?.category_id || partner.category_id || null,
+        subcategoryId: store?.subcategory_id || partner.subcategory_id || null,
     })
 
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -143,7 +148,7 @@ export const BusinessDataSubPage = ({
         inscricaoMunicipal: partner.inscricao_municipal || "",
     })
 
-    const [hours, setHours] = useState(() => normalizeOpeningHours(partner.opening_hours))
+    const [hours, setHours] = useState(() => normalizeOpeningHours(store?.opening_hours || partner.opening_hours))
 
     const [initialState, setInitialState] = useState(() => ({
         generalInfo: { ...generalInfo },
@@ -220,14 +225,33 @@ export const BusinessDataSubPage = ({
                     mode: generalInfo.mode,
                 }
 
-                const result = await updatePartnerAction(partner.id, {
-                    storeName: generalInfo.storeName,
-                    storeDescription: generalInfo.storeDescription,
-                    phone: generalInfo.phone || null,
+                // F5.4b: Store-level fields → updateStoreAction
+                if (store?.id) {
+                    const storeResult = await updateStoreAction({
+                        storeId: store.id,
+                        partnerId: partner.id,
+                        name: generalInfo.storeName,
+                        description: generalInfo.storeDescription || undefined,
+                        phone: generalInfo.phone || undefined,
+                        business_info: businessInfoData as any,
+                        opening_hours: normalizeOpeningHours(hours) as any,
+                        category_id: generalInfo.categoryId,
+                        subcategory_id: generalInfo.subcategoryId,
+                        latitude: undefined,
+                        longitude: undefined,
+                    })
+                    if (!storeResult.success) {
+                        notifyError(storeResult.error!)
+                        setIsLoading(false)
+                        return
+                    }
+                }
+
+                // Partner-level fields → updatePartnerAction
+                const partnerResult = await updatePartnerAction(partner.id, {
                     businessType: generalInfo.businessType as "pf" | "pj",
                     cnpj: generalInfo.businessType === "pj" ? (generalInfo.cnpj || null) : null,
                     cpf: generalInfo.businessType === "pf" ? (generalInfo.cnpj || null) : null,
-                    businessInfo: businessInfoData,
                     zipCode: addresses.zipCode,
                     street: addresses.street,
                     number: addresses.noNumber ? "S/N" : addresses.number,
@@ -235,7 +259,6 @@ export const BusinessDataSubPage = ({
                     neighborhood: addresses.neighborhood,
                     city: addresses.city,
                     state: addresses.state,
-                    openingHours: normalizeOpeningHours(hours),
                     crt: fiscalInfo.crt,
                     contribuinte: fiscalInfo.contribuinte,
                     inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
@@ -247,8 +270,8 @@ export const BusinessDataSubPage = ({
                     userId: partner.user_id,
                 })
 
-                if (result?.error) {
-                    notifyError(result.error)
+                if (!partnerResult.success) {
+                    notifyError(partnerResult.error!)
                     setIsLoading(false)
                 } else {
                     notifySuccess("Configurações atualizadas com sucesso!")
@@ -258,8 +281,6 @@ export const BusinessDataSubPage = ({
                         fiscalInfo: { ...fiscalInfo },
                         hours: { ...hours },
                     })
-                    // Pequeno delay para garantir que o usuário veja a notificação e o modal de sucesso se houver, 
-                    // e então volta para a página anterior
                     setTimeout(() => {
                         onBack()
                     }, 500)

@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -75,6 +75,10 @@ export async function getERPServicesPageAction(
         // await requireMinimumPlan(partnerId, "crescer")
         await requirePermission(partnerId, "services", "view")
         const supabase = await getSupabaseServerClient()
+
+        if (options?.storeId) {
+            await requireStorePermission(options.storeId, partnerId, "services", "view")
+        }
 
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_SERVICES_PAGE_SIZE))))
@@ -261,6 +265,16 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         // F5.2c: create bridge relations per visibility_scope
         try {
             const scope = data.visibility_scope || 'exclusive'
+
+            // G2: Only Owner/Admin can set scope != 'exclusive'
+            if (scope !== 'exclusive') {
+                const { resolveEffectivePermissions } = await import("@/lib/store-members")
+                const effective = await resolveEffectivePermissions(finalPartnerId, finalStoreId)
+                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
+                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do serviço")
+                }
+            }
+
             const targetStores = scope === 'all'
                 ? (await getAdminClient().from("stores").select("id").eq("partner_id", finalPartnerId)).data?.map((s: any) => s.id) || [finalStoreId]
                 : scope === 'selected' && data.visibility_stores?.length
@@ -647,10 +661,10 @@ export async function duplicateServiceAction(serviceId: string) {
         try {
             const { data: storeLinks } = await supabase
                 .from("store_services")
-                .select("store_id")
+                .select("store_id, visibility_scope")
                 .eq("service_id", serviceId)
             for (const link of storeLinks || []) {
-                await linkServiceToStore(inserted.id, link.store_id)
+                await linkServiceToStore(inserted.id, link.store_id, { visibility_scope: link.visibility_scope })
             }
         } catch (linkErr: any) {
             return errorResponse("Serviço duplicado, mas erro ao vincular à loja: " + linkErr.message)

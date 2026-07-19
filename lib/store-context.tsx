@@ -141,8 +141,8 @@ export function StoreProvider({
       import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
         setActiveStoreAction(storeId).then(() => {
           router.refresh()
-        })
-      })
+        }).catch((e) => console.warn("setActiveStoreAction failed", e))
+      }).catch((e) => console.warn("dynamic import stores failed", e))
     }
   }
 

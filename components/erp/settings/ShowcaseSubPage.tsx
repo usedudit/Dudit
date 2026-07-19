@@ -10,7 +10,7 @@ import {
     SavingStatusModal,
     FormSection,
 } from "@/components/reusable"
-import { updatePartnerAction } from "@/app/actions/marketplace/partners"
+import { updateStoreAction } from "@/app/actions/erp/stores"
 import { ChevronLeftIcon, SaveIcon, Store, TrashIcon, PlusIcon, WhatsappIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -23,10 +23,12 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { MessageCircle, Laptop, Lock } from "lucide-react"
 
 export const ShowcaseSubPage = ({
-    partner,
+    store,
+    partnerId,
     onBack,
 }: {
-    partner: any
+    store: any
+    partnerId: string
     onBack: () => void
 }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -41,11 +43,11 @@ export const ShowcaseSubPage = ({
     }, [])
 
     const [generalInfo, setGeneralInfo] = useState({
-        storeImageUrl: partner.store_image_url || "",
-        bannerUrl: partner.banner_url || "",
-        isShowcaseActive: partner.is_showcase_active ?? true,
-        gallery: partner.gallery || [],
-        orderFlow: planSlug === "free" ? "whatsapp" : (partner.order_flow || "dudit"),
+        storeImageUrl: store.logo_url || "",
+        bannerUrl: store.banner_url || "",
+        isShowcaseActive: store.is_showcase_active ?? true,
+        gallery: store.gallery || [],
+        orderFlow: planSlug === "free" ? "whatsapp" : (store.order_flow || "dudit"),
     })
 
     const [initialState, setInitialState] = useState(() => ({
@@ -62,13 +64,13 @@ export const ShowcaseSubPage = ({
         handleNavigation(onBack)
     }, [handleNavigation, onBack])
 
-    const [imagePreview, setImagePreview] = useState<string | null>(partner.store_image_url ? getR2ImageUrl(partner.store_image_url) : null)
+    const [imagePreview, setImagePreview] = useState<string | null>(store.logo_url ? getR2ImageUrl(store.logo_url) : null)
     const [cropModalOpen, setCropModalOpen] = useState(false)
     const [tempImageFile, setTempImageFile] = useState<File | null>(null)
     const [imageUploading, setImageUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const [bannerPreview, setBannerPreview] = useState<string | null>(partner.banner_url ? getR2ImageUrl(partner.banner_url) : null)
+    const [bannerPreview, setBannerPreview] = useState<string | null>(store.banner_url ? getR2ImageUrl(store.banner_url) : null)
     const [bannerCropModalOpen, setBannerCropModalOpen] = useState(false)
     const [tempBannerFile, setTempBannerFile] = useState<File | null>(null)
     const [bannerUploading, setBannerUploading] = useState(false)
@@ -201,19 +203,18 @@ export const ShowcaseSubPage = ({
             }
 
             try {
-                const result = await updatePartnerAction(partner.id, {
-                    storeImageUrl: finalLogoUrl || null,
-                    logoModerationStatus: (finalLogoUrl && finalLogoUrl !== partner.store_image_url) ? 'pending_moderation' : undefined,
-                    bannerUrl: finalBannerUrl || null,
-                    bannerModerationStatus: (finalBannerUrl && finalBannerUrl !== partner.banner_url) ? 'pending_moderation' : undefined,
-                    isShowcaseActive: generalInfo.isShowcaseActive,
+                const result = await updateStoreAction({
+                    storeId: store.id,
+                    partnerId,
+                    logo_url: finalLogoUrl || null,
+                    banner_url: finalBannerUrl || null,
+                    is_showcase_active: generalInfo.isShowcaseActive,
                     gallery: finalGalleryUrls,
-                    userId: partner.user_id,
-                    orderFlow: generalInfo.orderFlow,
+                    order_flow: generalInfo.orderFlow,
                 })
 
-                if (result?.error) {
-                    notifyError(result.error)
+                if (!result.success) {
+                    notifyError(result.error!)
                     setIsLoading(false)
                 } else {
                     notifySuccess("Configurações da vitrine atualizadas!")

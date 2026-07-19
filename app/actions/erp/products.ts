@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { unstable_cache } from "next/cache"
 import { cache } from "react"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
@@ -550,6 +550,16 @@ export async function createProductComprehensiveAction(data: {
         // F5.2c: create bridge relations per visibility_scope
         try {
             const scope = data.visibility_scope || 'exclusive'
+
+            // G2: Only Owner/Admin can set scope != 'exclusive'
+            if (scope !== 'exclusive') {
+                const { resolveEffectivePermissions } = await import("@/lib/store-members")
+                const effective = await resolveEffectivePermissions(finalPartnerId, finalStoreId)
+                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
+                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do produto")
+                }
+            }
+
             const targetStores = scope === 'all'
                 ? (await getAdminClient().from("stores").select("id").eq("partner_id", data.partnerId)).data?.map((s: any) => s.id) || [finalStoreId]
                 : scope === 'selected' && data.visibility_stores?.length
@@ -1695,10 +1705,10 @@ export async function duplicateProductsAction(productIds: string[]) {
             const copyId = inserted![i].id
             const { data: storeLinks } = await supabase2
               .from("store_products")
-              .select("store_id")
+              .select("store_id, visibility_scope")
               .eq("product_id", originalId)
             for (const link of storeLinks || []) {
-              await linkProductToStore(copyId, link.store_id)
+              await linkProductToStore(copyId, link.store_id, { visibility_scope: link.visibility_scope })
             }
           }
         } catch (linkErr) {
@@ -1942,6 +1952,10 @@ export async function getERPProductsPageAction(
         // await requireMinimumPlan(partnerId, "crescer")
         await requirePermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
+
+        if (options?.storeId) {
+            await requireStorePermission(options.storeId, partnerId, "products", "view")
+        }
 
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_PRODUCTS_PAGE_SIZE))))

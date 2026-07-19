@@ -428,6 +428,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
             <BusinessDataSubPage
               key="business-data"
               partner={partner}
+              store={selectedStore}
               paymentMethods={paymentMethods}
               onBack={() => setActivePage("home")}
             />
@@ -458,7 +459,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "recibo" && <ReturnPolicySubPage key="recibo" partnerId={partner.id} onBack={() => setActivePage("home")} />}
-          {activePage === "vitrine" && <ShowcaseSubPage key="vitrine" partner={partner} onBack={() => setActivePage("home")} />}
+          {activePage === "vitrine" && selectedStore && <ShowcaseSubPage key="vitrine" store={selectedStore} partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} storeId={selectedStore?.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "system-settings" && canAccessSystemSettings && (
             <SystemSettingsSubPage key="system-settings" partnerId={partner.id} onBack={() => setActivePage("home")} />

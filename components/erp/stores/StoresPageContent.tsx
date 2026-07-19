@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { listStoresAction, createStoreAction, updateStoreAction, deleteStoreAction } from "@/app/actions/erp/stores"
+import { listStoresAction, createStoreWithInheritanceAction, updateStoreAction, deleteStoreAction } from "@/app/actions/erp/stores"
 import { useStore } from "@/lib/store-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog"
@@ -35,7 +36,18 @@ export function StoresPageContent({ partnerId }: { partnerId: string }) {
   const [storeSlug, setStoreSlug] = useState("")
   const [error, setError] = useState("")
   const [isSaving, setIsSaving] = useState(false)
-  const { selectStore } = useStore()
+  const [showInheritance, setShowInheritance] = useState(false)
+  const [inheritOptions, setInheritOptions] = useState({
+    inheritProducts: true,
+    inheritServices: true,
+    inheritCategories: true,
+    inheritPaymentMethods: true,
+    inheritFinancialSettings: true,
+    inheritLogistics: true,
+    inheritOpeningHours: true,
+    inheritShowcase: true,
+  })
+  const { selectStore, stores: contextStores } = useStore()
 
   const loadStores = useCallback(async () => {
     try {
@@ -52,24 +64,53 @@ export function StoresPageContent({ partnerId }: { partnerId: string }) {
     loadStores()
   }, [loadStores])
 
+  const sourceStore = contextStores?.find((s: any) => s.is_headquarters) || contextStores?.[0]
+
   const handleCreate = async () => {
     if (!storeName.trim()) return
     setIsSaving(true)
     setError("")
 
-    const result = await createStoreAction({
-      partnerId,
-      name: storeName,
-      slug: storeSlug || undefined,
-    })
+    if (showInheritance && sourceStore) {
+      const result = await createStoreWithInheritanceAction({
+        partnerId,
+        name: storeName.trim(),
+        sourceStoreId: sourceStore.id,
+        ...inheritOptions,
+      })
 
-    if (result.success) {
-      setIsCreateOpen(false)
-      setStoreName("")
-      setStoreSlug("")
-      await loadStores()
+      if (result.success) {
+        setIsCreateOpen(false)
+        setStoreName("")
+        setShowInheritance(false)
+        setInheritOptions({
+          inheritProducts: true,
+          inheritServices: true,
+          inheritCategories: true,
+          inheritPaymentMethods: true,
+          inheritFinancialSettings: true,
+          inheritLogistics: true,
+          inheritOpeningHours: true,
+          inheritShowcase: true,
+        })
+        await loadStores()
+      } else {
+        setError(result.error)
+      }
     } else {
-      setError(result.error)
+      const { createStoreAction } = await import("@/app/actions/erp/stores")
+      const result = await createStoreAction({
+        partnerId,
+        name: storeName.trim(),
+      })
+
+      if (result.success) {
+        setIsCreateOpen(false)
+        setStoreName("")
+        await loadStores()
+      } else {
+        setError(result.error)
+      }
     }
     setIsSaving(false)
   }
@@ -199,19 +240,67 @@ export function StoresPageContent({ partnerId }: { partnerId: string }) {
       </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nova Loja</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Nome da Loja</label>
-              <Input value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="Ex: Filial Centro" />
+              <Input
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                placeholder="Ex: Filial Centro"
+              />
+              {storeName.trim() && (
+                <p className="text-xs text-brand-inactive-text mt-1">
+                  Slug: /{storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}
+                </p>
+              )}
             </div>
-            <div>
-              <label className="text-sm font-medium">Slug (opcional)</label>
-              <Input value={storeSlug} onChange={(e) => setStoreSlug(e.target.value)} placeholder="Ex: filial-centro" />
-            </div>
+
+            {sourceStore && (
+              <div className="pt-2 border-t border-brand-border">
+                <label className="flex items-center gap-2 text-sm font-medium mb-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showInheritance}
+                    onChange={(e) => setShowInheritance(e.target.checked)}
+                    className="rounded border-brand-border"
+                  />
+                  Copiar configurações da loja atual
+                </label>
+
+                {showInheritance && (
+                  <div className="space-y-2 ml-1">
+                    <p className="text-xs text-brand-inactive-text mb-2">
+                      Origem: <strong>{sourceStore.name}</strong>
+                    </p>
+                    {[
+                      { key: "inheritProducts", label: "Produtos" },
+                      { key: "inheritServices", label: "Serviços" },
+                      { key: "inheritCategories", label: "Categorias" },
+                      { key: "inheritPaymentMethods", label: "Formas de pagamento" },
+                      { key: "inheritFinancialSettings", label: "Configurações financeiras" },
+                      { key: "inheritLogistics", label: "Configurações de logística" },
+                      { key: "inheritOpeningHours", label: "Horários" },
+                      { key: "inheritShowcase", label: "Vitrine" },
+                    ].map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(inheritOptions as any)[key]}
+                          onChange={() => setInheritOptions((prev) => ({ ...prev, [key]: !(prev as any)[key] }))}
+                          className="rounded border-brand-border"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {error && <InfoCard message={error} color="red" />}
           </div>
           <DialogFooter>
