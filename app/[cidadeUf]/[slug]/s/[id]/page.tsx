@@ -6,6 +6,7 @@ import {
     getServiceStaffMembers,
     getServiceReviews,
 } from "@/app/actions/marketplace/services"
+import { getStoreBySlug } from "@/app/actions/marketplace/stores"
 import { getServiceUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
@@ -15,8 +16,10 @@ import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 export const dynamicParams = true
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
-    const { id } = await params
-    const service = await getMarketplaceService(id)
+    const { id, slug } = await params
+    const store = slug ? await getStoreBySlug(slug) : null
+    const storeId = store?.id || null
+    const service = await getMarketplaceService(id, storeId)
 
     if (!service) {
         return { title: 'Serviço não encontrado | Dudit' }
@@ -67,10 +70,13 @@ export default async function ServiceDetailsPage({
 }) {
     const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
-    const [user, service] = await Promise.all([
+    const [store, user] = await Promise.all([
+        getStoreBySlug(currentSlug).catch(() => null),
         getCurrentUser(),
-        getMarketplaceService(id),
     ])
+    const storeId = store?.id || null
+
+    const service = await getMarketplaceService(id, storeId)
 
     if (!service) {
         redirect("/")
@@ -102,7 +108,7 @@ export default async function ServiceDetailsPage({
     const partner = Array.isArray(service.partners) ? service.partners[0] : service.partners
     const [staff, reviews, detailAds] = await Promise.all([
         getServiceStaffMembers(partner?.id || service.partner_id),
-        getServiceReviews(id),
+        getServiceReviews(id, storeId),
         getSponsoredAdsForSlot("detail", {
             lat: userProfile?.latitude ?? null,
             lng: userProfile?.longitude ?? null,

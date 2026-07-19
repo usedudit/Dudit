@@ -3,6 +3,7 @@
 import { revalidateTag } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -221,6 +222,15 @@ export async function getUserFavoritesAction(params?: {
                     .in("id", serviceIds)
                 : Promise.resolve({ data: [] }),
         ])
+
+        if (productsRes.data && productsRes.data.length > 0) {
+          const visibleProductIds = await filterMarketplaceVisibleProducts(productsRes.data.map((p: any) => p.id))
+          productsRes.data = productsRes.data.filter((p: any) => visibleProductIds.has(p.id))
+        }
+        if (servicesRes.data && servicesRes.data.length > 0) {
+          const visibleServiceIds = await filterMarketplaceVisibleServices(servicesRes.data.map((s: any) => s.id))
+          servicesRes.data = servicesRes.data.filter((s: any) => visibleServiceIds.has(s.id))
+        }
 
         // Build lookup maps
         const productsMap = new Map<string, any>()

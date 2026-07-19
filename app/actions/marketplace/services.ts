@@ -4,6 +4,8 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { cache } from "react"
 import { sanitizeNotes } from "@/lib/input-validator"
+import { resolveService } from "@/lib/store-services"
+import { filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
 import { startOfDay } from "@/lib/date"
 
@@ -18,7 +20,7 @@ const SLOT_INCREMENT_MINUTES = 15
  * Includes partner info (store name, address, avatar, payment methods).
  * No auth required - public data only.
  */
-async function _getMarketplaceService(serviceId: string) {
+async function _getMarketplaceService(serviceId: string, storeId?: string | null) {
   if (!serviceId) return null
 
   const supabase = getAdminClient()
@@ -56,6 +58,18 @@ async function _getMarketplaceService(serviceId: string) {
     return null
   }
 
+  // Validate store visibility if store context is available
+  if (storeId && data) {
+    const resolvedService = await resolveService(serviceId, storeId)
+    if (!resolvedService) {
+      console.warn(`[Service] ${serviceId} rejeitado pelo resolver (store:${storeId})`)
+      return null
+    }
+    data.price = resolvedService.resolved_price
+    data.sku = resolvedService.resolved_sku
+    data.is_active = resolvedService.store_is_active
+  }
+
   const user = await getCurrentUser()
   const rawPartner = Array.isArray(data.partners) ? data.partners[0] : data.partners
   const partnerId = rawPartner?.id || data.partner_id
@@ -85,12 +99,18 @@ export const getMarketplaceService = cache(_getMarketplaceService)
 /**
  * Fetch the reviews for a specific service.
  */
-export async function getServiceReviews(serviceId: string) {
+export async function getServiceReviews(serviceId: string, storeId?: string | null) {
   const supabase = getAdminClient()
-  const { data: reviewsData, error } = await supabase
+  let query = supabase
     .from("reviews")
     .select("*")
     .eq("service_id", serviceId)
+
+  if (storeId) {
+    query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+  }
+
+  const { data: reviewsData, error } = await query
     .order("created_at", { ascending: false })
 
   if (error || !reviewsData) return []

@@ -21,7 +21,7 @@ export async function resolveService(
 ): Promise<ResolvedService | null> {
     const supabase = createAdminClient()
 
-    const [serviceRes, ssRes] = await Promise.all([
+    const [serviceRes, ssRes, allSsRes] = await Promise.all([
         supabase
             .from("services")
             .select(`
@@ -37,6 +37,10 @@ export async function resolveService(
             .eq("service_id", serviceId)
             .eq("store_id", storeId)
             .maybeSingle(),
+        supabase
+            .from("store_services")
+            .select("store_id, visibility_scope")
+            .eq("service_id", serviceId),
     ])
 
     if (serviceRes.error || !serviceRes.data) return null
@@ -47,6 +51,16 @@ export async function resolveService(
     }
 
     const override = ssRes.data as StoreServiceOverride | null
+    const allLinks = (allSsRes.data || []) as { store_id: string; visibility_scope: string }[]
+
+    if (!override) {
+        if (allLinks.length > 0) {
+            const hasGlobalScope = allLinks.some(l => l.visibility_scope === 'all')
+            if (!hasGlobalScope) {
+                return null
+            }
+        }
+    }
 
     return buildResolvedService(service, override)
 }
@@ -80,7 +94,7 @@ export async function listStoreServices(
             category:service_categories!category_id(name),
             subcategory:service_categories!subcategory_id(name),
             store_overrides:store_services!left(
-                id, override_price, override_sku, is_active
+                id, override_price, override_sku, is_active, visibility_scope, marketplace_visible
             )
         `)
         .eq("partner_id", partnerId)
@@ -107,7 +121,7 @@ export async function listStoreServices(
 
     if (error || !data) return []
 
-    return (data as RawService[]).map((row) => {
+    let fetchedServices = (data as RawService[]).map((row) => {
         const overrides = (row.store_overrides as RawService[] | null) || []
         const storeOverride = overrides[0] ? (overrides[0] as unknown as StoreServiceOverride) : undefined
 
@@ -120,8 +134,40 @@ export async function listStoreServices(
         if (service.subcategory?.name) service.subcategory = service.subcategory.name as any
         delete (service as any).store_overrides
 
-        return buildResolvedService(service, storeOverride || null)
+        return { service, storeOverride: storeOverride || null }
     })
+
+    if (storeId && fetchedServices.length > 0) {
+        const serviceIds = fetchedServices.map(s => s.service.id)
+        const { data: allLinks } = await supabase
+            .from("store_services")
+            .select("service_id, store_id, visibility_scope")
+            .in("service_id", serviceIds)
+
+        if (allLinks && allLinks.length > 0) {
+            const restrictions = new Map<string, { hasAll: boolean; storeHasBridge: boolean }>()
+            for (const link of allLinks) {
+                if (!restrictions.has(link.service_id)) {
+                    restrictions.set(link.service_id, { hasAll: false, storeHasBridge: false })
+                }
+                const r = restrictions.get(link.service_id)!
+                if (link.visibility_scope === 'all') r.hasAll = true
+                if (link.store_id === storeId) r.storeHasBridge = true
+            }
+
+            fetchedServices = fetchedServices.filter(({ service }) => {
+                const r = restrictions.get(service.id)
+                if (!r) return true
+                if (r.hasAll) return true
+                if (r.storeHasBridge) return true
+                return false
+            })
+        }
+    }
+
+    return fetchedServices.map(({ service, storeOverride }) =>
+        buildResolvedService(service, storeOverride)
+    )
 }
 
 /**
@@ -136,6 +182,8 @@ export async function linkServiceToStore(
         override_price?: number | null
         override_sku?: string | null
         is_active?: boolean | null
+        visibility_scope?: 'all' | 'selected' | 'exclusive'
+        marketplace_visible?: boolean
     }
 ): Promise<StoreServiceOverride> {
     const supabase = createAdminClient()
@@ -149,6 +197,8 @@ export async function linkServiceToStore(
     if (overrides?.override_price !== undefined) payload.override_price = overrides.override_price
     if (overrides?.override_sku !== undefined) payload.override_sku = overrides.override_sku
     if (overrides?.is_active !== undefined) payload.is_active = overrides.is_active
+    if (overrides?.visibility_scope !== undefined) payload.visibility_scope = overrides.visibility_scope
+    if (overrides?.marketplace_visible !== undefined) payload.marketplace_visible = overrides.marketplace_visible
 
     const { data, error } = await supabase
         .from("store_services")
@@ -173,6 +223,8 @@ export async function updateStoreServiceOverride(
         override_price?: number | null
         override_sku?: string | null
         is_active?: boolean | null
+        visibility_scope?: 'all' | 'selected' | 'exclusive'
+        marketplace_visible?: boolean
     }
 ): Promise<StoreServiceOverride> {
     const supabase = createAdminClient()
@@ -184,6 +236,8 @@ export async function updateStoreServiceOverride(
     if (overrides.override_price !== undefined) payload.override_price = overrides.override_price
     if (overrides.override_sku !== undefined) payload.override_sku = overrides.override_sku
     if (overrides.is_active !== undefined) payload.is_active = overrides.is_active
+    if (overrides.visibility_scope !== undefined) payload.visibility_scope = overrides.visibility_scope
+    if (overrides.marketplace_visible !== undefined) payload.marketplace_visible = overrides.marketplace_visible
 
     const { data, error } = await supabase
         .from("store_services")
@@ -284,5 +338,11 @@ function buildResolvedService(
             : service.is_active,
         store_service_id: hasOverride ? override!.id : null,
         has_store_override: hasOverride,
+        visibility_scope: hasOverride
+            ? override!.visibility_scope
+            : 'all',
+        marketplace_visible: hasOverride
+            ? override!.marketplace_visible
+            : (service.show_in_marketplace ?? true),
     }
 }

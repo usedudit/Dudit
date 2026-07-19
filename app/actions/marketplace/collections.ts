@@ -8,6 +8,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -331,7 +332,7 @@ export async function getCollectionItems(collectionId: string) {
   const productIds = links.filter((l: any) => l.item_type === "product").map((l: any) => l.item_id)
   const serviceIds = links.filter((l: any) => l.item_type === "service").map((l: any) => l.item_id)
 
-  const [productsData, servicesData] = await Promise.all([
+  let [productsData, servicesData] = await Promise.all([
     productIds.length > 0
       ? supabase
           .from("products")
@@ -349,6 +350,15 @@ export async function getCollectionItems(collectionId: string) {
           .then((r: any) => r.data || [])
       : Promise.resolve([]),
   ])
+
+  if (productsData.length > 0) {
+    const visibleProductIds = await filterMarketplaceVisibleProducts(productsData.map((p: any) => p.id))
+    productsData = productsData.filter((p: any) => visibleProductIds.has(p.id))
+  }
+  if (servicesData.length > 0) {
+    const visibleServiceIds = await filterMarketplaceVisibleServices(servicesData.map((s: any) => s.id))
+    servicesData = servicesData.filter((s: any) => visibleServiceIds.has(s.id))
+  }
 
   const productMap = new Map(productsData.map((p: any) => [p.id, { ...p, _type: "product" as const }]))
   const serviceMap = new Map(servicesData.map((s: any) => [s.id, { ...s, _type: "service" as const }]))

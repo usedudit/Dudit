@@ -165,6 +165,8 @@ export interface StoreProductOverride {
   override_stock_quantity: number | null
   override_sku: string | null
   is_active: boolean
+  visibility_scope: 'all' | 'selected' | 'exclusive'
+  marketplace_visible: boolean
   created_at: string
   updated_at: string
 }
@@ -208,4 +210,6 @@ export interface ResolvedProduct extends Product {
   store_is_active: boolean
   store_product_id: string | null
   has_store_override: boolean
+  visibility_scope: 'all' | 'selected' | 'exclusive'
+  marketplace_visible: boolean
 }

@@ -13,6 +13,7 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 import { cachedResolveCheckoutCartLines, cachedListActivePromotionsInBatch } from "@/lib/cache/checkout-cache"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getCachedAddresses } from "@/app/actions/shared/addresses"
@@ -221,6 +222,15 @@ export async function getMarketplaceCheckoutContextAction(input: {
         .select("id, name, price, images")
         .in("id", giftIds),
     ])
+
+    if (productsRes.data && productsRes.data.length > 0) {
+      const visibleProductIds = await filterMarketplaceVisibleProducts(productsRes.data.map((p: any) => p.id))
+      productsRes.data = productsRes.data.filter((p: any) => visibleProductIds.has(p.id))
+    }
+    if (servicesRes.data && servicesRes.data.length > 0) {
+      const visibleServiceIds = await filterMarketplaceVisibleServices(servicesRes.data.map((s: any) => s.id))
+      servicesRes.data = servicesRes.data.filter((s: any) => visibleServiceIds.has(s.id))
+    }
 
     const giftProducts = productsRes.data || []
     const giftServices = servicesRes.data || []

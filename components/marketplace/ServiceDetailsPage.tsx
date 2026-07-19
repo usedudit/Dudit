@@ -41,6 +41,7 @@ import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
 import {
     prepareServiceBookingCheckoutAction,
     addServiceBookingToCartAction,
+    getGiftItemDetailsAction,
 } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
@@ -292,25 +293,17 @@ export function ServiceDetailsPageClient({
         const fetchGift = async () => {
             try {
                 if (activeGiftPromo.giftProductId) {
-                    const { data, error } = await supabase
-                        .from("products")
-                        .select("name, image_url, images")
-                        .eq("id", activeGiftPromo.giftProductId)
-                        .single()
-                    if (data && !error) {
-                        const img = data.image_url || (data.images && data.images[0]) || null
-                        setGiftDetails({ name: data.name, image_url: img, isProduct: true })
-                    }
+                    const result = await getGiftItemDetailsAction({
+                        itemId: activeGiftPromo.giftProductId,
+                        itemType: "product",
+                    })
+                    if (result) setGiftDetails(result)
                 } else if (activeGiftPromo.giftServiceId) {
-                    const { data, error } = await supabase
-                        .from("services")
-                        .select("name, images")
-                        .eq("id", activeGiftPromo.giftServiceId)
-                        .single()
-                    if (data && !error) {
-                        const img = (data.images && data.images[0]) || null
-                        setGiftDetails({ name: data.name, image_url: img, isProduct: false })
-                    }
+                    const result = await getGiftItemDetailsAction({
+                        itemId: activeGiftPromo.giftServiceId,
+                        itemType: "service",
+                    })
+                    if (result) setGiftDetails(result)
                 }
             } catch (e) {
                 console.error("Error loading gift details:", e)

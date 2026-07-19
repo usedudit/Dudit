@@ -7,7 +7,7 @@ export async function fetchStoreProducts(partnerId: string, storeId: string | nu
   if (!storeId) return fetchAllPartnerProducts(partnerId)
   const { data, error } = await supabase
     .from("store_products")
-    .select("id, product_id, override_stock_quantity, override_price, is_active, created_at, store_id, partner_id, product:product_id(id, name, price, promotional_price, stock_quantity, sku, image_url, category_id, has_variants)")
+    .select("id, product_id, override_stock_quantity, override_price, is_active, visibility_scope, marketplace_visible, created_at, store_id, partner_id, product:product_id(id, name, price, promotional_price, stock_quantity, sku, image_url, category_id, has_variants)")
     .eq("partner_id", partnerId)
     .eq("store_id", storeId)
     .eq("is_active", true)
@@ -22,11 +22,17 @@ export async function fetchStoreProducts(partnerId: string, storeId: string | nu
     price: sp.override_price ?? sp.product?.price ?? 0,
     store_id: sp.store_id,
     partner_id: sp.partner_id,
+    visibility_scope: sp.visibility_scope ?? 'all',
+    marketplace_visible: sp.marketplace_visible ?? true,
   }))
 }
 
 /**
  * Fetch all products for a partner (for fallback)
+ */
+/**
+ * Fetch all partner products (admin/ERP context).
+ * NOT for marketplace display — does NOT filter by marketplace_visible.
  */
 export async function fetchAllPartnerProducts(partnerId: string) {
   const { data, error } = await supabase
@@ -34,6 +40,23 @@ export async function fetchAllPartnerProducts(partnerId: string) {
     .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, category_id, created_at, partner_id, has_variants")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(500)
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Fetch partner products for marketplace display.
+ * Filters by show_in_marketplace for backward compatibility.
+ */
+export async function fetchMarketplacePartnerProducts(partnerId: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, category_id, created_at, partner_id, has_variants, show_in_marketplace")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .eq("show_in_marketplace", true)
     .order("created_at", { ascending: false })
     .limit(500)
   if (error) throw error
@@ -121,18 +144,39 @@ export async function fetchStoreOrders(partnerId: string, storeId: string | null
  * Fetch services for a specific store
  */
 export async function fetchStoreServices(partnerId: string, storeId: string | null) {
-  // supabase singleton imported directly
+  if (!storeId) {
+    const { data, error } = await supabase
+      .from("services")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+    return data || []
+  }
 
   const { data, error } = await supabase
-    .from("services")
-    .select("*")
+    .from("store_services")
+    .select("id, service_id, override_price, is_active, visibility_scope, marketplace_visible, created_at, store_id, partner_id, service:service_id(id, name, price, promotional_price, sku, image_url, is_active, show_in_marketplace, duration_minutes, category_id)")
     .eq("partner_id", partnerId)
     .eq("store_id", storeId)
     .eq("is_active", true)
     .order("created_at", { ascending: false })
+    .limit(500)
 
   if (error) throw error
-  return data || []
+  return (data || []).map((ss: any) => ({
+    ...ss.service,
+    id: ss.service_id,
+    store_service_id: ss.id,
+    price: ss.override_price ?? ss.service?.price ?? 0,
+    store_id: ss.store_id,
+    partner_id: ss.partner_id,
+    is_active: ss.is_active ?? ss.service?.is_active ?? true,
+    visibility_scope: ss.visibility_scope ?? 'all',
+    marketplace_visible: ss.marketplace_visible ?? ss.service?.show_in_marketplace ?? true,
+  }))
 }
 
 /**

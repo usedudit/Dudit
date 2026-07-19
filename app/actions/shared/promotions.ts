@@ -24,6 +24,7 @@ const CampaignSchema = z.object({
   endsAt: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   customerIds: z.array(z.string().uuid()).optional().default([]),
+  storeId: z.string().uuid().nullable().optional(),
 })
 
 const PromotionSchema = z.object({
@@ -247,6 +248,14 @@ export async function listCampaignsAction(
     .order("created_at", { ascending: false })
     .range(from, to)
 
+  if (params?.storeId !== undefined) {
+    if (params.storeId === null) {
+      query = query.is("store_id", null)
+    } else {
+      query = query.eq("store_id", params.storeId)
+    }
+  }
+
   if (params?.search?.trim()) {
     query = query.ilike("name", `%${params.search.trim()}%`)
   }
@@ -283,6 +292,7 @@ export async function createCampaignAction(input: z.infer<typeof CampaignSchema>
       starts_at: data.startsAt || null,
       ends_at: data.endsAt || null,
       is_active: data.isActive,
+      store_id: data.storeId || null,
     })
     .select("id")
     .single()

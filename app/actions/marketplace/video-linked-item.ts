@@ -7,6 +7,7 @@ import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/p
 import { getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 
 export interface LinkedItemData {
   type: "product" | "service" | "collection"
@@ -41,6 +42,9 @@ async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemD
       .maybeSingle()
 
     if (!product) return null
+
+    const visibleProductIds = await filterMarketplaceVisibleProducts([product.id])
+    if (!visibleProductIds.has(product.id)) return null
 
     let p: any = product.partners
     if (Array.isArray(p)) p = p[0]
@@ -81,6 +85,9 @@ async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemD
       .maybeSingle()
 
     if (!service) return null
+
+    const visibleServiceIds = await filterMarketplaceVisibleServices([service.id])
+    if (!visibleServiceIds.has(service.id)) return null
 
     let p: any = service.partners
     if (Array.isArray(p)) p = p[0]

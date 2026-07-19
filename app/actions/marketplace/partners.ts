@@ -85,6 +85,7 @@ async function getDefaultPartnerBannerUrl(storeName: string, storeImageUrl?: str
 }
 
 import { getCurrentUser } from "@/lib/auth/server-user"
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 
 // ... (existing code)
 
@@ -120,7 +121,12 @@ async function _getPartnerProducts(partnerId: string) {
     .order("created_at", { ascending: false })
     .limit(100)
 
-  const safeData = (data || []).map((item: any) => {
+  let resultData = data || []
+  if (!isOwner && resultData.length > 0) {
+    const visibleIds = await filterMarketplaceVisibleProducts(resultData.map((p: any) => p.id))
+    resultData = resultData.filter((p: any) => visibleIds.has(p.id))
+  }
+  const safeData = resultData.map((item: any) => {
     const variants = item.product_variants
     let fallback_variant_image: string | null = null
     let fallback_variant_price: number | null = null
@@ -167,7 +173,12 @@ async function _getPartnerServices(partnerId: string) {
   }
 
   const { data } = await query.order("created_at", { ascending: false })
-  return data || []
+  let services = data || []
+  if (!isOwner && services.length > 0) {
+    const visibleIds = await filterMarketplaceVisibleServices(services.map((s: any) => s.id))
+    services = services.filter((s: any) => visibleIds.has(s.id))
+  }
+  return services
 }
 
 async function _getPartnerReviews(partnerId: string) {
@@ -320,7 +331,7 @@ export const getCachedPartnerProducts = async (partnerId: string) => {
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const { data } = await supabase
+      const { data: rawData } = await supabase
         .from("products")
         .select(`
           *,
@@ -335,8 +346,14 @@ export const getCachedPartnerProducts = async (partnerId: string) => {
         .order("created_at", { ascending: false })
         .limit(100)
 
+      let resultData = rawData || []
+      if (resultData.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleProducts(resultData.map((p: any) => p.id))
+        resultData = resultData.filter((p: any) => visibleIds.has(p.id))
+      }
+
       // Extrai fallback de variante e remove product_variants do payload
-      const safeData = (data || []).map((item: any) => {
+      const safeData = resultData.map((item: any) => {
         const variants = item.product_variants
         let fallback_variant_image: string | null = null
         let fallback_variant_price: number | null = null
@@ -373,13 +390,19 @@ export const getCachedPartnerServices = async (partnerId: string) => {
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const { data } = await supabase
+      const { data: rawData } = await supabase
         .from("services")
         .select("*")
         .eq("partner_id", partnerId)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
-      return data || []
+
+      let services = rawData || []
+      if (services.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleServices(services.map((s: any) => s.id))
+        services = services.filter((s: any) => visibleIds.has(s.id))
+      }
+      return services
     },
     [`partner-services-${partnerId}`],
     { tags: ["partner-services", `partner-${partnerId}`] }
@@ -893,7 +916,7 @@ export async function registerPartner(data: any) {
 
 export async function getPartnerOrderBumps(partnerId: string, limit = 5) {
   const supabase = getAdminClient()
-  const { data, error } = await supabase
+  const { data: rawData, error } = await supabase
     .from("products")
     .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
     .eq("partner_id", partnerId)
@@ -908,6 +931,11 @@ export async function getPartnerOrderBumps(partnerId: string, limit = 5) {
     console.error("Error fetching order bumps:", error)
     return []
   }
-  return data || []
+  let data = rawData || []
+  if (data.length > 0) {
+    const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+    data = data.filter((p: any) => visibleIds.has(p.id))
+  }
+  return data
 }
 

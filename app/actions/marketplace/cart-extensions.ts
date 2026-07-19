@@ -240,3 +240,32 @@ export async function addPurchasableServiceToCartAction(
     csrf_token: input.csrf_token,
   })
 }
+
+// ─── Gift Item Details (marketplace-safe fetch) ──────────────────────────
+
+export async function getGiftItemDetailsAction(input: {
+  itemId: string
+  itemType: "product" | "service"
+}) {
+  const admin = getAdminClient()
+  if (input.itemType === "product") {
+    const { data } = await admin
+      .from("products")
+      .select("name, image_url, images")
+      .eq("id", input.itemId)
+      .eq("is_active", true)
+      .eq("show_in_marketplace", true)
+      .single()
+    if (!data) return null
+    return { name: data.name, image_url: data.image_url || (data.images?.[0]) || null, isProduct: true as const }
+  }
+  const { data } = await admin
+    .from("services")
+    .select("name, images")
+    .eq("id", input.itemId)
+    .eq("is_active", true)
+    .eq("show_in_marketplace", true)
+    .single()
+  if (!data) return null
+  return { name: data.name, image_url: (data.images?.[0]) || null, isProduct: false as const }
+}

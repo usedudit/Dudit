@@ -1,5 +1,6 @@
 "use server"
 
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -531,7 +532,10 @@ async function _searchMarketplaceInternal(
 
             const promises = []
 
+            let _prodIdx = -1, _servIdx = -1
+
             if (produtosIds.length > 0) {
+                _prodIdx = promises.length
                 promises.push(
                     supabase.from("products").select(`
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
@@ -547,6 +551,7 @@ async function _searchMarketplaceInternal(
                 )
             }
             if (servicosIds.length > 0) {
+                _servIdx = promises.length
                 promises.push(
                     supabase.from("services").select(`
                         id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
@@ -584,6 +589,16 @@ async function _searchMarketplaceInternal(
             }
 
             const results = await Promise.all(promises)
+
+            if (_prodIdx !== -1 && results[_prodIdx]?.data?.length > 0) {
+                const visibleIds = await filterMarketplaceVisibleProducts(results[_prodIdx].data.map((p: any) => p.id))
+                results[_prodIdx].data = results[_prodIdx].data.filter((p: any) => visibleIds.has(p.id))
+            }
+            if (_servIdx !== -1 && results[_servIdx]?.data?.length > 0) {
+                const visibleIds = await filterMarketplaceVisibleServices(results[_servIdx].data.map((s: any) => s.id))
+                results[_servIdx].data = results[_servIdx].data.filter((s: any) => visibleIds.has(s.id))
+            }
+
             let fallbackRecords: any[] = []
 
             results.forEach((res) => {
@@ -696,7 +711,10 @@ async function hydrateMarketplaceSearchHits(
 
     const promises = []
 
+    let _hydrateProdIdx = -1, _hydrateServIdx = -1
+
     if (produtosIds.length > 0) {
+        _hydrateProdIdx = promises.length
         promises.push(
             supabase.from("products").select(`
                 id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
@@ -713,6 +731,7 @@ async function hydrateMarketplaceSearchHits(
         )
     }
     if (servicosIds.length > 0) {
+        _hydrateServIdx = promises.length
         promises.push(
             supabase.from("services").select(`
                 id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
@@ -750,6 +769,15 @@ async function hydrateMarketplaceSearchHits(
     }
 
     const queryResults = await Promise.all(promises)
+
+    if (_hydrateProdIdx !== -1 && queryResults[_hydrateProdIdx]?.data?.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleProducts(queryResults[_hydrateProdIdx].data.map((p: any) => p.id))
+        queryResults[_hydrateProdIdx].data = queryResults[_hydrateProdIdx].data.filter((p: any) => visibleIds.has(p.id))
+    }
+    if (_hydrateServIdx !== -1 && queryResults[_hydrateServIdx]?.data?.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleServices(queryResults[_hydrateServIdx].data.map((s: any) => s.id))
+        queryResults[_hydrateServIdx].data = queryResults[_hydrateServIdx].data.filter((s: any) => visibleIds.has(s.id))
+    }
     const recordMap = new Map<string, any>()
 
     queryResults.forEach((res) => {
@@ -1087,11 +1115,19 @@ async function searchMarketplaceByCity(
             const res = resList[idx++]
             if (res?.error) console.error("[searchMarketplaceByCity] Products query error:", res.error)
             rawProducts = res?.data || []
+            if (rawProducts && rawProducts.length > 0) {
+                const visibleIds = await filterMarketplaceVisibleProducts(rawProducts.map((p: any) => p.id))
+                rawProducts = rawProducts.filter((p: any) => visibleIds.has(p.id))
+            }
         }
         if (type === 'tudo' || type === 'servicos') {
             const res = resList[idx++]
             if (res?.error) console.error("[searchMarketplaceByCity] Services query error:", res.error)
             rawServices = res?.data || []
+            if (rawServices && rawServices.length > 0) {
+                const visibleIds = await filterMarketplaceVisibleServices(rawServices.map((s: any) => s.id))
+                rawServices = rawServices.filter((s: any) => visibleIds.has(s.id))
+            }
         }
         if (type === 'tudo' || type === 'planos') {
             const res = resList[idx++]

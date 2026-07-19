@@ -10,6 +10,7 @@ export type TransactionContactRow = {
     name: string
     type: string
     description: string | null
+    store_id: string | null
 }
 
 const CONTACT_TYPES = new Set(["customer", "supplier", "service", "employee", "partner", "other"])
@@ -20,16 +21,25 @@ function normalizeName(value: string) {
 
 export async function listAllTransactionContactsAction(
     partnerId: string,
+    storeId?: string | null,
 ): Promise<{ success: true; data: TransactionContactRow[] } | { success: false; error: string }> {
     try {
         await requirePermission(partnerId, "financial", "view")
         const supabase = await getSupabaseServerClient()
-        const { data, error } = await supabase
+        let query = supabase
             .from("transaction_contacts")
-            .select("id, name, type, description")
+            .select("id, name, type, description, store_id")
             .eq("partner_id", partnerId)
-            .order("name")
 
+        if (storeId !== undefined) {
+            if (storeId === null) {
+                query = query.is("store_id", null)
+            } else {
+                query = query.eq("store_id", storeId)
+            }
+        }
+
+        const { data, error } = await query.order("name")
         if (error) throw error
         return { success: true, data: (data || []) as TransactionContactRow[] }
     } catch (e: any) {
@@ -40,6 +50,7 @@ export async function listAllTransactionContactsAction(
 export async function listTransactionContactsByTypeAction(
     partnerId: string,
     contactType: string,
+    storeId?: string | null,
 ): Promise<{ success: true; data: TransactionContactRow[] } | { success: false; error: string }> {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -49,13 +60,21 @@ export async function listTransactionContactsByTypeAction(
         if (!CONTACT_TYPES.has(contactType)) throw new Error("Tipo de contato inválido.")
 
         const supabase = await getSupabaseServerClient()
-        const { data, error } = await supabase
+        let query = supabase
             .from("transaction_contacts")
-            .select("id, name, type, description")
+            .select("id, name, type, description, store_id")
             .eq("partner_id", partnerId)
             .eq("type", contactType)
-            .order("name")
 
+        if (storeId !== undefined) {
+            if (storeId === null) {
+                query = query.is("store_id", null)
+            } else {
+                query = query.eq("store_id", storeId)
+            }
+        }
+
+        const { data, error } = await query.order("name")
         if (error) throw error
         return { success: true, data: (data || []) as TransactionContactRow[] }
     } catch (e: any) {
@@ -68,6 +87,7 @@ export async function createTransactionContactAction(input: {
     name: string
     type: "customer" | "supplier" | "service" | "employee" | "partner" | "other"
     description?: string | null
+    store_id?: string | null
 }): Promise<{ success: true; data: TransactionContactRow } | { success: false; error: string }> {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -96,8 +116,9 @@ export async function createTransactionContactAction(input: {
                 name: normalizedName,
                 type: input.type,
                 description: input.description?.trim() || null,
+                store_id: input.store_id || null,
             })
-            .select("id, name, type, description")
+            .select("id, name, type, description, store_id")
             .single()
 
         if (error) throw error

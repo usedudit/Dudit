@@ -17,7 +17,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
 import { ReviewsSection } from "./ReviewsSection"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
-import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
+import { prepareProductBuyNowCheckoutAction, getGiftItemDetailsAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -288,25 +288,17 @@ export function ProductDetailsPageClient({
         const fetchGift = async () => {
             try {
                 if (activeGiftPromo.giftProductId) {
-                    const { data, error } = await supabase
-                        .from("products")
-                        .select("name, image_url, images")
-                        .eq("id", activeGiftPromo.giftProductId)
-                        .single()
-                    if (data && !error) {
-                        const img = data.image_url || (data.images && data.images[0]) || null
-                        setGiftDetails({ name: data.name, image_url: img, isProduct: true })
-                    }
+                    const result = await getGiftItemDetailsAction({
+                        itemId: activeGiftPromo.giftProductId,
+                        itemType: "product",
+                    })
+                    if (result) setGiftDetails(result)
                 } else if (activeGiftPromo.giftServiceId) {
-                    const { data, error } = await supabase
-                        .from("services")
-                        .select("name, images")
-                        .eq("id", activeGiftPromo.giftServiceId)
-                        .single()
-                    if (data && !error) {
-                        const img = (data.images && data.images[0]) || null
-                        setGiftDetails({ name: data.name, image_url: img, isProduct: false })
-                    }
+                    const result = await getGiftItemDetailsAction({
+                        itemId: activeGiftPromo.giftServiceId,
+                        itemType: "service",
+                    })
+                    if (result) setGiftDetails(result)
                 }
             } catch (e) {
                 console.error("Error loading gift details:", e)

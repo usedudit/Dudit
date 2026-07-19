@@ -3,6 +3,7 @@
 import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { normalizeSearchQuery } from "@/lib/search/normalize"
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 
 export type AutocompleteSuggestion = {
   label: string
@@ -61,13 +62,13 @@ export const getSearchSuggestionsBucket = async () => {
       const [productsRes, servicesRes, partnersRes] = await Promise.all([
         supabase
           .from("products")
-          .select("name")
+          .select("id, name")
           .eq("is_active", true)
           .eq("show_in_marketplace", true)
           .limit(200),
         supabase
           .from("services")
-          .select("name")
+          .select("id, name")
           .eq("is_active", true)
           .limit(200),
         supabase
@@ -78,6 +79,15 @@ export const getSearchSuggestionsBucket = async () => {
       ])
 
       const suggestions: AutocompleteSuggestion[] = []
+
+      if (productsRes.data && productsRes.data.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleProducts(productsRes.data.map((p: any) => p.id))
+        productsRes.data = productsRes.data.filter((p: any) => visibleIds.has(p.id))
+      }
+      if (servicesRes.data && servicesRes.data.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleServices(servicesRes.data.map((s: any) => s.id))
+        servicesRes.data = servicesRes.data.filter((s: any) => visibleIds.has(s.id))
+      }
 
       if (productsRes.data) {
         productsRes.data.forEach((p: { name: string }) => {

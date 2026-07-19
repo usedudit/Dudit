@@ -25,7 +25,7 @@ export async function resolveProduct(
 ): Promise<ResolvedProduct | null> {
     const supabase = createAdminClient()
 
-    const [productRes, spRes] = await Promise.all([
+    const [productRes, spRes, allSpRes] = await Promise.all([
         supabase
             .from("products")
             .select(`*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name)`)
@@ -37,6 +37,10 @@ export async function resolveProduct(
             .eq("product_id", productId)
             .eq("store_id", storeId)
             .maybeSingle(),
+        supabase
+            .from("store_products")
+            .select("store_id, visibility_scope")
+            .eq("product_id", productId),
     ])
 
     if (productRes.error || !productRes.data) return null
@@ -49,6 +53,16 @@ export async function resolveProduct(
     }
 
     const override = spRes.data as StoreProductOverride | null
+    const allLinks = (allSpRes.data || []) as { store_id: string; visibility_scope: string }[]
+
+    if (!override) {
+        if (allLinks.length > 0) {
+            const hasGlobalScope = allLinks.some(l => l.visibility_scope === 'all')
+            if (!hasGlobalScope) {
+                return null
+            }
+        }
+    }
 
     return buildResolvedProduct(product, override)
 }
@@ -90,7 +104,7 @@ export async function listStoreProducts(
             brand:brands!brand_id(name),
             location:storage_locations!location_id(name),
             store_overrides:store_products!left(
-                id, override_price, override_stock_quantity, override_sku, is_active
+                id, override_price, override_stock_quantity, override_sku, is_active, visibility_scope, marketplace_visible
             )
         `)
         .eq("partner_id", partnerId)
@@ -117,7 +131,7 @@ export async function listStoreProducts(
 
     if (error || !data) return []
 
-    const products = (data as RawProduct[]).map((row) => {
+    let fetchedProducts = (data as RawProduct[]).map((row) => {
         const overrides = (row.store_overrides as RawProduct[] | null) || []
         const storeOverride = overrides[0] ? (overrides[0] as unknown as StoreProductOverride) : undefined
 
@@ -134,8 +148,40 @@ export async function listStoreProducts(
         if (product.location?.name) product.location = product.location.name as any
         delete (product as any).store_overrides
 
-        return buildResolvedProduct(product, storeOverride || null)
+        return { product, storeOverride: storeOverride || null }
     })
+
+    if (storeId && fetchedProducts.length > 0) {
+        const productIds = fetchedProducts.map(p => p.product.id)
+        const { data: allLinks } = await supabase
+            .from("store_products")
+            .select("product_id, store_id, visibility_scope")
+            .in("product_id", productIds)
+
+        if (allLinks && allLinks.length > 0) {
+            const restrictions = new Map<string, { hasAll: boolean; storeHasBridge: boolean }>()
+            for (const link of allLinks) {
+                if (!restrictions.has(link.product_id)) {
+                    restrictions.set(link.product_id, { hasAll: false, storeHasBridge: false })
+                }
+                const r = restrictions.get(link.product_id)!
+                if (link.visibility_scope === 'all') r.hasAll = true
+                if (link.store_id === storeId) r.storeHasBridge = true
+            }
+
+            fetchedProducts = fetchedProducts.filter(({ product }) => {
+                const r = restrictions.get(product.id)
+                if (!r) return true
+                if (r.hasAll) return true
+                if (r.storeHasBridge) return true
+                return false
+            })
+        }
+    }
+
+    const products = fetchedProducts.map(({ product, storeOverride }) =>
+        buildResolvedProduct(product, storeOverride)
+    )
 
     if (options?.includeVariants && storeId && products.length > 0) {
         const productIds = products.map((p) => p.id)
@@ -171,6 +217,8 @@ export async function linkProductToStore(
         override_stock_quantity?: number | null
         override_sku?: string | null
         is_active?: boolean | null
+        visibility_scope?: 'all' | 'selected' | 'exclusive'
+        marketplace_visible?: boolean
     }
 ): Promise<StoreProductOverride> {
     const supabase = createAdminClient()
@@ -185,6 +233,8 @@ export async function linkProductToStore(
     if (overrides?.override_stock_quantity !== undefined) payload.override_stock_quantity = overrides.override_stock_quantity
     if (overrides?.override_sku !== undefined) payload.override_sku = overrides.override_sku
     if (overrides?.is_active !== undefined) payload.is_active = overrides.is_active
+    if (overrides?.visibility_scope !== undefined) payload.visibility_scope = overrides.visibility_scope
+    if (overrides?.marketplace_visible !== undefined) payload.marketplace_visible = overrides.marketplace_visible
 
     const { data, error } = await supabase
         .from("store_products")
@@ -211,6 +261,8 @@ export async function updateStoreProductOverride(
         override_stock_quantity?: number | null
         override_sku?: string | null
         is_active?: boolean | null
+        visibility_scope?: 'all' | 'selected' | 'exclusive'
+        marketplace_visible?: boolean
     }
 ): Promise<StoreProductOverride> {
     const supabase = createAdminClient()
@@ -223,6 +275,8 @@ export async function updateStoreProductOverride(
     if (overrides.override_stock_quantity !== undefined) payload.override_stock_quantity = overrides.override_stock_quantity
     if (overrides.override_sku !== undefined) payload.override_sku = overrides.override_sku
     if (overrides.is_active !== undefined) payload.is_active = overrides.is_active
+    if (overrides.visibility_scope !== undefined) payload.visibility_scope = overrides.visibility_scope
+    if (overrides.marketplace_visible !== undefined) payload.marketplace_visible = overrides.marketplace_visible
 
     const { data, error } = await supabase
         .from("store_products")
@@ -326,10 +380,16 @@ function buildResolvedProduct(
         resolved_sku: hasOverride && override!.override_sku !== null
             ? override!.override_sku
             : product.sku,
-        store_is_active: hasOverride
-            ? override!.is_active !== false
-            : product.is_active,
-        store_product_id: hasOverride ? override!.id : null,
-        has_store_override: hasOverride,
-    }
+    store_is_active: hasOverride
+        ? override!.is_active !== false
+        : product.is_active,
+    store_product_id: hasOverride ? override!.id : null,
+    has_store_override: hasOverride,
+    visibility_scope: hasOverride
+        ? override!.visibility_scope
+        : 'all',
+    marketplace_visible: hasOverride
+        ? override!.marketplace_visible
+        : (product.show_in_marketplace ?? true),
+}
 }

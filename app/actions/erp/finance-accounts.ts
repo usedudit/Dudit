@@ -77,20 +77,28 @@ export async function resolveMarketplaceOrderFinanceAccountId(
   return accounts[0]?.id ?? null
 }
 
-export async function getFinanceAccountsAction(partnerId: string) {
+export async function getFinanceAccountsAction(partnerId: string, storeId?: string | null) {
   try {
     await requirePermission(partnerId, "financial", "view")
 
     // Use admin client after authz check so invited ERP users can read accounts.
     const supabase = createAdminClient()
-    const { data, error } = await supabase
+    let query = supabase
       .from("finance_accounts")
       .select(
         "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
       )
       .eq("partner_id", partnerId)
-      .order("name")
 
+    if (storeId !== undefined) {
+      if (storeId === null) {
+        query = query.is("store_id", null)
+      } else {
+        query = query.eq("store_id", storeId)
+      }
+    }
+
+    const { data, error } = await query.order("name")
     if (error) throw error
     return { success: true, data: { accounts: data || [] } }
   } catch (error: any) {
@@ -124,6 +132,7 @@ export async function createFinanceAccountAction(data: {
   isSystemManaged?: boolean
   integrationSource?: string | null
   isDefault?: boolean
+  storeId?: string | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -162,6 +171,7 @@ export async function createFinanceAccountAction(data: {
         is_system_managed: data.isSystemManaged ?? false,
         integration_source: data.integrationSource ?? null,
         is_default: Boolean(data.isDefault),
+        store_id: data.storeId || null,
       })
       .select(
         "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",

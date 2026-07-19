@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { calculateDistance } from "@/lib/services/location.service"
+import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 
 const DISCOVER_DEBUG = false
 
@@ -416,7 +417,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const { data, error } = await supabase
+    let { data: trendingData, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${STATS_FIELDS}, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -430,12 +431,18 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    if (!data || data.length === 0) {
+    if (trendingData && trendingData.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(trendingData.map((p: any) => p.id))
+      const filtered = trendingData.filter((p: any) => visibleIds.has(p.id))
+      trendingData = filtered as any
+    }
+
+    if (!trendingData || trendingData.length === 0) {
         dLog(`[Discover] SKIP trending reason=no_products`)
         return null
     }
 
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
+    const tagged = applyTierSort(trendingData as RawProduct[], tiers, item => {
         const r = item as RawProduct
         return (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5
     })
@@ -562,7 +569,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    const { data: products, error: prodErr } = await supabase
+    let { data: products, error: prodErr } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -574,6 +581,12 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         dError(`[DISCOVER][ENDING_SOON] Products error:`, prodErr)
         dLog(`[Discover] SKIP endingSoon reason=products_error`)
         return null
+    }
+
+    if (products && products.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(products.map((p: any) => p.id))
+      const filtered = products.filter((p: any) => visibleIds.has(p.id))
+      products = filtered as any
     }
 
     if (!products || products.length === 0) {
@@ -632,7 +645,7 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -646,6 +659,12 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         dError(`[DISCOVER][NEARBY] Error:`, error)
         dLog(`[Discover] SKIP nearby reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -760,6 +779,15 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         dError(`[DISCOVER][RECENT] Services Error:`, servResult.error, `city=${ctx.city} state=${ctx.state}`)
     }
 
+    if (prodResult.data && prodResult.data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(prodResult.data.map((p: any) => p.id))
+      prodResult.data = prodResult.data.filter((p: any) => visibleIds.has(p.id))
+    }
+    if (servResult.data && servResult.data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleServices(servResult.data.map((s: any) => s.id))
+      servResult.data = servResult.data.filter((s: any) => visibleIds.has(s.id))
+    }
+
     const products = (prodResult.data || []) as RawProduct[]
     const services = (servResult.data || []) as any[]
 
@@ -852,7 +880,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
     const seed = dailySeed(ctx.userId)
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${STATS_FIELDS}, condition, created_at, category_id, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -864,6 +892,12 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         dError(`[DISCOVER][GEMS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP gems reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -985,14 +1019,18 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         if (catErr) {
             dError(`[DISCOVER][PERSONALIZED] Category error:`, catErr)
         } else if (favProducts) {
-            const counts = new Map<string, number>()
-            for (const p of favProducts) {
-                if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
+            if (favProducts.length > 0) {
+              const visibleIds = await filterMarketplaceVisibleProducts(favProductIds)
+              const filtered = favProducts.filter((_: any, i: number) => visibleIds.has(favProductIds[i]))
+              const counts = new Map<string, number>()
+              for (const p of filtered) {
+                  if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
+              }
+              preferredCatIds = [...counts.entries()]
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 3)
+                  .map(([id]) => id)
             }
-            preferredCatIds = [...counts.entries()]
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([id]) => id)
         }
     }
 
@@ -1001,7 +1039,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         return fetchPopular(tiers, ctx)
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${STATS_FIELDS}, category_id, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1015,6 +1053,12 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         dError(`[DISCOVER][PERSONALIZED] Products error:`, error)
         dLog(`[Discover] SKIP personalized reason=products_error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1060,7 +1104,7 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, sales_last_30_days, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1074,6 +1118,12 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         dError(`[DISCOVER][BEST_SELLERS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP bestSellers reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1124,7 +1174,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1138,6 +1188,12 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         dError(`[DISCOVER][TOP_RATED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP topRated reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1187,7 +1243,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1200,6 +1256,12 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         dError(`[DISCOVER][PROMOS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP promos reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     const discounted = (data || []).filter(
@@ -1258,7 +1320,7 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, views_last_30_days, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1271,6 +1333,12 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         dError(`[DISCOVER][MOST_VIEWED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP mostViewed reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1321,7 +1389,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("services")
         .select(`id, name, price, images, rating, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1334,6 +1402,12 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         dError(`[DISCOVER][SERVICES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP services reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleServices(data.map((s: any) => s.id))
+      const filtered = data.filter((s: any) => visibleIds.has(s.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1410,7 +1484,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("partners")
         .select(`id, store_name, store_image_url, banner_url, rating, latitude, longitude, is_showcase_active, addresses!inner(city, state)`)
         .eq("is_active", true)
@@ -1502,7 +1576,7 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, marketplace_score, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1515,6 +1589,12 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
         dError(`[DISCOVER][POPULAR] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP popular reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1558,7 +1638,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         return null
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, created_at, ${PARTNER_JOIN}`)
         .eq("is_active", true)
@@ -1570,6 +1650,12 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         dError(`[DISCOVER][ALL_PRODUCTS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP allProducts reason=error`)
         return null
+    }
+
+    if (data && data.length > 0) {
+      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+      const filtered = data.filter((p: any) => visibleIds.has(p.id))
+      data = filtered as any
     }
 
     if (!data || data.length === 0) {

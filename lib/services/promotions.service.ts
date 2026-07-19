@@ -11,6 +11,7 @@ export type CampaignRow = {
   starts_at: string | null
   ends_at: string | null
   is_active: boolean
+  store_id: string | null
   created_at: string
 }
 

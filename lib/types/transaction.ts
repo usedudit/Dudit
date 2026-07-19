@@ -4,6 +4,7 @@ export interface TransactionContact {
     name: string
     type: "cliente" | "fornecedor" | "funcionario" | "outro" | "customer" | "supplier" | "service" | "employee" | "partner" | "other"
     description: string | null
+    store_id: string | null
     created_at: string
     updated_at: string
 }

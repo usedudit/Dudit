@@ -7,6 +7,7 @@ import {
   getProductVariants,
   getProductReviews,
 } from "@/app/actions/marketplace/products"
+import { getStoreBySlug } from "@/app/actions/marketplace/stores"
 import { createSlug } from "@/lib/utils/slugify"
 import { getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
@@ -39,8 +40,10 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
-  const { id } = await params
-  const product = await getMarketplaceProduct(id)
+  const { id, slug } = await params
+  const store = slug ? await getStoreBySlug(slug) : null
+  const storeId = store?.id || null
+  const product = await getMarketplaceProduct(id, storeId)
 
   if (!product) {
     return { title: 'Produto não encontrado | Dudit' }
@@ -96,11 +99,13 @@ export default async function ProductDetailsPage({
 }) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
-  // Parallelize ALL independent data fetching
-  const [user, product] = await Promise.all([
+  const [store, user] = await Promise.all([
+    getStoreBySlug(currentSlug).catch(() => null),
     getCurrentUser(),
-    getMarketplaceProduct(id),
   ])
+  const storeId = store?.id || null
+
+  const product = await getMarketplaceProduct(id, storeId)
   const sessionData = user ? await getUserSessionData(user.id) : null
 
   const userProfile = sessionData?.profile ? {
@@ -135,7 +140,7 @@ export default async function ProductDetailsPage({
   // 2. Fetch variants + reviews in parallel (Deduplicated but fresh)
   const [variants, reviews, detailAds] = await Promise.all([
     getProductVariants(id),
-    getProductReviews(id),
+    getProductReviews(id, storeId),
     getSponsoredAdsForSlot("detail", {
       lat: userProfile?.latitude ?? null,
       lng: userProfile?.longitude ?? null,

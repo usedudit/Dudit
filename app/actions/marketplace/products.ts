@@ -5,6 +5,8 @@ import { searchMarketplaceDirect, searchMarketplaceDirectFull } from "@/app/acti
 import { applySellerDiversity, sortByTrendingScore } from "@/lib/marketplace/ranking"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
+import { resolveProduct } from "@/lib/store-products"
+import { filterMarketplaceVisibleProducts } from "@/lib/resolve-marketplace-visibility"
 
 // --- 1. PRODUTOS DA HOME (LISTAGEM) ---
 // NO unstable_cache - Redis is the single source of truth.
@@ -20,7 +22,7 @@ export const getCachedHomeProducts = async () => {
 // Used by force-dynamic pages for strict consistency
 // =============================================
 
-async function _getMarketplaceProductBase(id: string) {
+async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
   const supabase = getAdminClient()
 
   const { data, error } = await supabase
@@ -55,6 +57,21 @@ async function _getMarketplaceProductBase(id: string) {
     if (error) console.error(`[Product] Fetch error for ${id}:`, error.message)
     console.warn(`[MarketplaceTrace] produto:${id} ausente na query PDP`)
     return null
+  }
+
+  // Validate store visibility if store context is available
+  if (storeId) {
+    const resolvedProduct = await resolveProduct(id, storeId)
+    if (!resolvedProduct) {
+      console.warn(`[MarketplaceTrace] produto:${id} rejeitado pelo resolver (store:${storeId})`)
+      return null
+    }
+    // Override resolved fields from the resolver
+    data.price = resolvedProduct.resolved_price
+    data.stock_quantity = resolvedProduct.resolved_stock_quantity
+    data.sku = resolvedProduct.resolved_sku
+    data.is_active = resolvedProduct.store_is_active
+    data.marketplace_visible = resolvedProduct.marketplace_visible
   }
 
   if (process.env.NODE_ENV !== "production" && data.video_type && data.video_url) {
@@ -93,8 +110,8 @@ async function _getMarketplaceProductBase(id: string) {
   return data
 }
 
-async function _getMarketplaceProduct(id: string) {
-  const data = await _getMarketplaceProductBase(id)
+async function _getMarketplaceProduct(id: string, storeId?: string | null) {
+  const data = await _getMarketplaceProductBase(id, storeId)
   if (!data) return null
 
   const user = await getCurrentUser()
@@ -123,12 +140,18 @@ async function _getProductVariants(productId: string) {
 }
 
 // --- REVIEWS (DIRECT - NO CACHE) ---
-async function _getProductReviews(productId: string) {
+async function _getProductReviews(productId: string, storeId?: string | null) {
   const supabase = getAdminClient()
-  const { data: reviewsData, error } = await supabase
+  let query = supabase
     .from("reviews")
-    .select("id, rating, comment, created_at, user_id, product_id")
+    .select("id, rating, comment, created_at, user_id, product_id, store_id")
     .eq("product_id", productId)
+
+  if (storeId) {
+    query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+  }
+
+  const { data: reviewsData, error } = await query
     .order("created_at", { ascending: false })
     .limit(20)
 
@@ -166,7 +189,7 @@ async function _getProductReviews(productId: string) {
 // (generateMetadata + page component share the same result)
 export const getMarketplaceProduct = cache(_getMarketplaceProduct)
 export const getProductVariants = cache(_getProductVariants)
-export const getProductReviews = cache(_getProductReviews)
+export const getProductReviews = cache(_getProductReviews) as unknown as typeof _getProductReviews
 
 // =============================================
 // CACHED FUNCTIONS (kept for home/explore pages)
@@ -177,9 +200,9 @@ export const getProductReviews = cache(_getProductReviews)
  * Fetches product data with Next.js tags for invalidation.
  * The product detail page uses this to ensure real-time updates via Supabase Webhooks.
  */
-export const getCachedMarketplaceProduct = async (id: string) => {
+export const getCachedMarketplaceProduct = async (id: string, storeId?: string | null) => {
   const fn = unstable_cache(
-    async () => _getMarketplaceProductBase(id),
+    async () => _getMarketplaceProductBase(id, storeId),
     [`product-details-${id}-v13`],
     { tags: ["marketplace-product", `product-${id}`] }
   )
@@ -257,7 +280,7 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const { data } = await supabase
+      const result = await supabase
         .from("products")
         .select(`
           id, name, price, promotional_price, images, video_thumbnail, rating,
@@ -272,7 +295,13 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
         .order("created_at", { ascending: false })
         .limit(10)
 
+      let data = result.data as any
       if (!data) return []
+
+      if (data && data.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
+        data = data.filter((p: any) => visibleIds.has(p.id)) as any
+      }
 
       const safeData = data.map((item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -456,6 +485,10 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       console.error("[getHomeDataByCity] Error fetching products:", productsRes.error)
     } else {
       rawProducts = productsRes.data || []
+      if (rawProducts.length > 0) {
+        const visibleIds = await filterMarketplaceVisibleProducts(rawProducts.map((p: any) => p.id))
+        rawProducts = rawProducts.filter((p: any) => visibleIds.has(p.id))
+      }
     }
   }
 
