@@ -2,7 +2,7 @@ import "server-only"
 import { createAdminClient } from "@/lib/supabase/server"
 import type { Product, StoreProductOverride, ResolvedProduct, ResolvedVariant } from "@/lib/types/product"
 import type { ProductService } from "@/lib/services/product.service"
-import { listStoreProductVariants } from "@/lib/store-variants"
+import { listStoreProductVariantsBatch } from "@/lib/store-variants"
 
 type RawProduct = Record<string, unknown>
 
@@ -185,15 +185,8 @@ export async function listStoreProducts(
 
     if (options?.includeVariants && storeId && products.length > 0) {
         const productIds = products.map((p) => p.id)
-        const variantsByProduct = new Map<string, ResolvedVariant[]>()
 
-        const allVariants = await Promise.all(
-            productIds.map((pid) => listStoreProductVariants(pid, storeId, { isActive: true }))
-        )
-
-        for (let i = 0; i < productIds.length; i++) {
-            variantsByProduct.set(productIds[i], allVariants[i] || [])
-        }
+        const variantsByProduct = await listStoreProductVariantsBatch(productIds, storeId, { isActive: true })
 
         return products.map((p) => ({
             ...p,

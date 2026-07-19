@@ -146,7 +146,7 @@ export class ProductService {
       return { success: false, error: "Produto não encontrado" }
     }
 
-    const { id, created_at, updated_at, sku, store_id, ...productData } = original as any
+    const { id, created_at, updated_at, sku, ...productData } = original as any
 
     const newProduct = {
       ...productData,

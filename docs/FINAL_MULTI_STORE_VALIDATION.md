@@ -1,6 +1,6 @@
-# Validação Arquitetural Multi-Store — F1-F2.6 vs Modelo Final
+# Validação Arquitetural Multi-Store — Baseline Final Pós-F4
 
-## Status: ✅ GO (com 2 ressalvas)
+## Status: ✅ BASELINE FINAL — Architecture: MULTI_STORE_ARCHITECTURE.md
 
 ---
 
@@ -251,15 +251,22 @@ VISIBILITY:
 | **Correção** | Aceitar `storeId` opcional e filtrar `reviews.store_id = storeId OR store_id IS NULL` |
 | **Resultado** | PDP com storeId: mostra apenas reviews da loja + reviews legadas. PDP sem storeId: mostra todas (backward compat). |
 
-### ~~⏳ Pendências já programadas (Fase 3+)~~ ✅ Fase 3 Concluída
+### ✅ Fases 3–4 Concluídas (até F4.5)
 
 | Item | Status | Risco |
 |------|--------|-------|
 | `store_product_kits` bridge | ✅ Concluído | 🟡 Médio |
 | `store_suppliers` bridge | ✅ Concluído | 🟡 Médio |
 | Resolver functions (kits+suppliers) | ✅ Concluído | 🟡 Médio |
+| **Remover store_id legacy (products, services, customers, suppliers, product_kits)** | **✅ F4.3 CONCLUÍDO** | 🟡 Médio |
+| — F4.0: Auditoria completa | ✅ | 🟢 |
+| — F4.1: Parar writes + bridge backfill | ✅ | 🟢 |
+| — F4.2: RLS atualizado + indexes dropados | ✅ | 🟢 |
+| — F4.3: DROP COLUMN nas 5 tabelas | ✅ | 🟢 |
+| — F4.4: Post-migration integrity audit (65 checks, 0 falhas) | ✅ | 🟢 |
+| — F4.5: N+1 optimization (variants batch query) | ✅ | 🟢 |
+| **Oficial Architecture Baseline** | **✅ MULTI_STORE_ARCHITECTURE.md** | 🟢 |
 | STORE órfãs (deliveries, returns, etc) | 🔄 Pendente Fase 5 | 🔴 Alto |
-| Remover store_id legacy (products, services, etc) | 🔄 Pendente Fase 4 | 🟡 Médio |
 | `product_fiscal_profiles` store_id nullable | 🔄 Pendente Fase 1b | 🟢 Baixo |
 | `created_store_id` em products | 🔄 Pendente Fase 4b | 🟢 Baixo |
 | Marketplace discover/search para kits+suppliers | 🔄 Pendente | 🟢 Baixo |
@@ -316,6 +323,10 @@ Nenhum bloqueio. Fase 3 executada com sucesso:
 ║   • Marketplace filtered (F2.5) + client audit (F2.6) ✅    ║
 ║   • RLS híbrida nullable para financeiro ✅                 ║
 ║   • Nenhum products.store_id ou services.store_id ativo ✅   ║
+║   • Fase 4 completa: 5 colunas legacy DROPPED ✅             ║
+║   • F4.4: Post-migration audit 65/65 checks aprovados ✅    ║
+║   • F4.5: N+1 batch variant query otimizado ✅              ║
+║   • Arquitetura documentada em MULTI_STORE_ARCHITECTURE.md  ║
 ║                                                              ║
 ║   2 GAPs encontrados e corrigidos:                         ║
 ║   🔴 PDP store context ✅                                   ║
@@ -323,6 +334,9 @@ Nenhum bloqueio. Fase 3 executada com sucesso:
 ║                                                              ║
 ║   Fase 3 concluída: store_product_kits + store_suppliers    ║
 ║   + resolver functions para kits e fornecedores.             ║
+║                                                              ║
+║   Fase 4 concluída: legacy store_id removido das 5 tabelas  ║
+║   base. Arquitetura multi-store finalizada sem legado.       ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 ```

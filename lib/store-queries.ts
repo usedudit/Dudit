@@ -90,7 +90,7 @@ export async function fetchCustomersWithStorePriority(partnerId: string, current
   try {
     let query = supabase
       .from("customers")
-      .select("id, name, email, phone, status, store_credit, created_at, store_id, partner_id, person_type")
+      .select("id, name, email, phone, status, store_credit, created_at, partner_id, person_type")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
       .limit(500)
@@ -103,15 +103,6 @@ export async function fetchCustomersWithStorePriority(partnerId: string, current
     }
 
     let result = data || []
-
-    // Prioritize: current store customers first, then others
-    if (currentStoreId) {
-      result = [...result].sort((a: any, b: any) => {
-        if (a.store_id === currentStoreId && b.store_id !== currentStoreId) return -1
-        if (a.store_id !== currentStoreId && b.store_id === currentStoreId) return 1
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      })
-    }
 
     return result
   } catch (fallbackErr) {
@@ -183,15 +174,29 @@ export async function fetchStoreServices(partnerId: string, storeId: string | nu
  * Fetch suppliers for a specific store
  */
 export async function fetchStoreSuppliers(partnerId: string, storeId: string | null) {
-  // supabase singleton imported directly
+  if (storeId) {
+    const { data: links } = await supabase
+      .from("store_suppliers")
+      .select("supplier_id")
+      .eq("store_id", storeId)
+    const ids = (links || []).map((l: { supplier_id: string }) => l.supplier_id)
+    if (ids.length === 0) return []
+
+    const { data, error } = await supabase
+      .from("suppliers")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .in("id", ids)
+      .order("name", { ascending: true })
+    if (error) throw error
+    return data || []
+  }
 
   const { data, error } = await supabase
     .from("suppliers")
     .select("*")
     .eq("partner_id", partnerId)
-    .eq("store_id", storeId)
     .order("name", { ascending: true })
-
   if (error) throw error
   return data || []
 }

@@ -86,6 +86,61 @@ export async function listStoreProductVariants(
 }
 
 /**
+ * Lista variantes de múltiplos produtos resolvidas para uma store específica.
+ * Única query batch para evitar N+1.
+ */
+export async function listStoreProductVariantsBatch(
+    productIds: string[],
+    storeId: string | null,
+    options?: {
+        isActive?: boolean
+    }
+): Promise<Map<string, ResolvedVariant[]>> {
+    if (productIds.length === 0) return new Map()
+
+    const supabase = createAdminClient()
+
+    let query = supabase
+        .from("product_variants")
+        .select(`
+            *,
+            store_overrides:store_product_variants!left(
+                id, override_stock_quantity, is_active, stock_reserved, stock_available
+            )
+        `)
+        .in("product_id", productIds)
+        .order("variant_name", { ascending: true })
+
+    if (options?.isActive !== undefined) {
+        query = query.eq("is_active", options.isActive)
+    }
+
+    if (storeId) {
+        query = query.filter("store_overrides.store_id", "eq", storeId)
+    }
+
+    const { data, error } = await query
+
+    const result = new Map<string, ResolvedVariant[]>()
+    if (error || !data) return result
+
+    for (const row of data as any[]) {
+        const overrides = (row.store_overrides as any[] | null) || []
+        const storeOverride = overrides[0] ? (overrides[0] as unknown as StoreVariantOverride) : undefined
+
+        const variant = { ...row } as unknown as ProductVariant
+        delete (variant as any).store_overrides
+
+        const resolved = buildResolvedVariant(variant, storeOverride || null)
+        const pid = variant.product_id
+        if (!result.has(pid)) result.set(pid, [])
+        result.get(pid)!.push(resolved)
+    }
+
+    return result
+}
+
+/**
  * Constrói um ResolvedVariant a partir da variante base e do override (opcional).
  * Centraliza toda a lógica de COALESCE.
  */

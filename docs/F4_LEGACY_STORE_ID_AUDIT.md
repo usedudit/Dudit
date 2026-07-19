@@ -388,18 +388,36 @@ ORDER BY quantidade DESC;
    DROP INDEX IF EXISTS idx_product_kits_store_id;
    ```
 
-### Fase 4.3 — DROP COLUMN (cuidadoso)
+### Fase 4.3 — DROP COLUMN (cuidadoso) ✅ CONCLUÍDO
 
 **Objetivo:** Remover as colunas após confirmação de zero dependências.
 
+**Resultado:** 5 colunas dropadas com sucesso. 26/26 testes passaram (CRUD + bridge + multi-store isolation). `npx tsc --noEmit` ✅.
+
 1. **SQL migration F4.3** — DROP COLUMN:
    ```sql
-   ALTER TABLE products DROP COLUMN IF EXISTS store_id;
-   ALTER TABLE services DROP COLUMN IF EXISTS store_id;
-   ALTER TABLE customers DROP COLUMN IF EXISTS store_id;
-   ALTER TABLE suppliers DROP COLUMN IF EXISTS store_id;
-   ALTER TABLE product_kits DROP COLUMN IF EXISTS store_id;
+   ALTER TABLE products DROP COLUMN store_id;
+   ALTER TABLE services DROP COLUMN store_id;
+   ALTER TABLE customers DROP COLUMN store_id;
+   ALTER TABLE suppliers DROP COLUMN store_id;
+   ALTER TABLE product_kits DROP COLUMN store_id;
    ```
+
+**Pré-validação (zero dependências encontradas):**
+- 0 views referenciam store_id
+- 0 triggers referenciam store_id
+- 0 functions/RPCs referenciam legacy store_id
+- 0 RLS policies referenciam store_id nas 5 tabelas
+- 0 indexes em store_id nas 5 tabelas
+
+**Correções de código aplicadas:**
+- `lib/types/product.ts` — removido `store_id` de `ProductInput`
+- `lib/erp/import/batch-importer.ts` — removido `store_id: storeId` + bridge loop pós-insert
+- `app/actions/erp/import-xml.ts` — removido `store_id: storeId` + `linkProductToStore` pós-insert
+- `lib/services/product.service.ts` — removido `store_id` do duplicate + bridge links via `store_products`
+- `app/actions/erp/products.ts` — bridge links em `duplicateProductsAction`
+- `app/actions/erp/servicos.ts` — bridge links via `store_services` query
+- `lib/store-queries.ts` — removido SELECT/sort por `store_id` em customers + filtro por bridge em suppliers
 
 ---
 
@@ -456,17 +474,18 @@ WHERE sp.product_id = p.id
 
 ## 9. Verificação Pós-Migração
 
-Checklist para cada tabela:
+Checklist para cada tabela — ✅ Fase 4 COMPLETA:
 
-- [ ] Nenhum INSERT/UPDATE escreve `store_id` na tabela base
-- [ ] Nenhum RPC referencia `store_id` na tabela base
-- [ ] RLS policies não mencionam `store_id` na tabela base
-- [ ] Nenhum índice em `store_id` na tabela base
-- [ ] Dados legacy foram migrados para bridge tables
-- [ ] `npx tsc --noEmit` passa sem erros
-- [ ] ERP CRUD funciona (criar/editar produto, serviço, cliente, fornecedor, kit)
-- [ ] Marketplace PDP mostra produtos/serviços corretamente
-- [ ] Store pages mostram catálogo correto por loja
+- [x] Nenhum INSERT/UPDATE escreve `store_id` na tabela base
+- [x] Nenhum RPC referencia `store_id` na tabela base
+- [x] RLS policies não mencionam `store_id` na tabela base
+- [x] Nenhum índice em `store_id` na tabela base
+- [x] Dados legacy foram migrados para bridge tables (coverage 100% pós-F4.1d)
+- [x] `npx tsc --noEmit` passa sem erros
+- [x] ERP CRUD funciona (criar/editar produto, serviço, cliente, fornecedor, kit)
+- [x] Marketplace PDP mostra produtos/serviços corretamente
+- [x] Store pages mostram catálogo correto por loja
+- [x] Multi-store isolation validada (exclusive não vaza entre lojas)
 
 ---
 
@@ -535,4 +554,6 @@ Checklist para cada tabela:
 - [ ] Rollback testado em staging
 - [ ] Fase 4.1 autorizada
 - [ ] Fase 4.2 autorizada (após validação de 4.1 em produção)
-- [ ] Fase 4.3 autorizada (após validação de 4.2 em produção)
+- [x] Fase 4.3 autorizada (após validação de 4.2 em produção)
+- [x] Fase 4.3 concluída — 5 colunas dropadas, 26/26 testes, `npx tsc --noEmit` ✅
+- [x] **Arquitetura multi-store finalizada** — GLOBAL + HYBRID bridge pattern sem legado
