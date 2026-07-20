@@ -1,4 +1,4 @@
-import { task, step } from "@trigger.dev/sdk/v3"
+import { task } from "@trigger.dev/sdk/v3"
 import { AccountDeletionService } from "@/lib/services/account-deletion.service"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { SecureLogger } from "@/lib/secure-logger"
@@ -45,29 +45,27 @@ export const accountDeletionTask = task({
       // ───────────────────────────────────────────────────────────────────────
       let plannedReport = deletion.checkpoints?.planned_report
       if (!plannedReport) {
-        plannedReport = await step.run("pre-delete-report", async () => {
-          const report = await AccountDeletionService.getPreDeleteReport(payload.partnerId, payload.userId)
-          
-          // Save planned report in DB
-          const { data: cur } = await admin
-            .from("account_deletions")
-            .select("checkpoints")
-            .eq("id", payload.deletionId)
-            .maybeSingle()
-          
-          const updatedCheckpoints = {
-            ...(cur?.checkpoints || {}),
-            planned_report: report
-          }
-          await admin
-            .from("account_deletions")
-            .update({
-              checkpoints: updatedCheckpoints
-            })
-            .eq("id", payload.deletionId)
+        const report = await AccountDeletionService.getPreDeleteReport(payload.partnerId, payload.userId)
 
-          return report
-        })
+        // Save planned report in DB
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", payload.deletionId)
+          .maybeSingle()
+
+        const updatedCheckpoints = {
+          ...(cur?.checkpoints || {}),
+          planned_report: report
+        }
+        await admin
+          .from("account_deletions")
+          .update({
+            checkpoints: updatedCheckpoints
+          })
+          .eq("id", payload.deletionId)
+
+        plannedReport = report
       }
 
       // ───────────────────────────────────────────────────────────────────────
@@ -82,9 +80,7 @@ export const accountDeletionTask = task({
           .update({ status: "deleting_storage" })
           .eq("id", payload.deletionId)
 
-        filesDeleted = await step.run("purge-cloudflare-r2", async () => {
-          return await AccountDeletionService.purgeCloudflareR2(payload.userId)
-        })
+        filesDeleted = await AccountDeletionService.purgeCloudflareR2(payload.userId)
 
         const { data: cur } = await admin
           .from("account_deletions")
@@ -113,18 +109,12 @@ export const accountDeletionTask = task({
           .update({ status: "deleting_external_services" })
           .eq("id", payload.deletionId)
 
-        whatsappDisconnected = await step.run("disconnect-whatsapp", async () => {
-          if (payload.partnerId) {
-            return await AccountDeletionService.disconnectWhatsApp(payload.partnerId)
-          }
-          return 0
-        })
-
-        await step.run("cancel-customer-subscriptions", async () => {
-          if (payload.partnerId) {
-            await AccountDeletionService.cancelCustomerSubscriptions(payload.partnerId)
-          }
-        })
+        if (payload.partnerId) {
+          whatsappDisconnected = await AccountDeletionService.disconnectWhatsApp(payload.partnerId)
+          await AccountDeletionService.cancelCustomerSubscriptions(payload.partnerId)
+        } else {
+          whatsappDisconnected = 0
+        }
 
         const { data: cur } = await admin
           .from("account_deletions")
@@ -152,9 +142,7 @@ export const accountDeletionTask = task({
           .update({ status: "deleting_marketplace" })
           .eq("id", payload.deletionId)
 
-        await step.run("purge-redis-cache", async () => {
-          await AccountDeletionService.purgeRedis(payload.partnerId, payload.userId)
-        })
+        await AccountDeletionService.purgeRedis(payload.partnerId, payload.userId)
 
         const { data: cur } = await admin
           .from("account_deletions")
@@ -184,21 +172,17 @@ export const accountDeletionTask = task({
           .update({ status: "deleting_database" })
           .eq("id", payload.deletionId)
 
-        dbRowsDeleted = await step.run("purge-database-records", async () => {
-          return await AccountDeletionService.purgeDatabase(payload.partnerId, payload.userId)
-        })
+        dbRowsDeleted = await AccountDeletionService.purgeDatabase(payload.partnerId, payload.userId)
 
-        ordersAnonymized = await step.run("anonymize-compliance-data", async () => {
-          return await AccountDeletionService.anonymizeOrdersAndLogs(
-            payload.userId,
-            payload.partnerId,
-            deletion.reason,
-            deletion.request_ip,
-            deletion.user_agent,
-            deletion.request_country,
-            deletion.requested_at
-          )
-        })
+        ordersAnonymized = await AccountDeletionService.anonymizeOrdersAndLogs(
+          payload.userId,
+          payload.partnerId,
+          deletion.reason,
+          deletion.request_ip,
+          deletion.user_agent,
+          deletion.request_country,
+          deletion.requested_at
+        )
 
         const { data: cur } = await admin
           .from("account_deletions")
@@ -226,9 +210,7 @@ export const accountDeletionTask = task({
           .update({ status: "deleting_auth" })
           .eq("id", payload.deletionId)
 
-        await step.run("delete-supabase-auth-user", async () => {
-          await AccountDeletionService.deleteAuthUser(payload.userId)
-        })
+        await AccountDeletionService.deleteAuthUser(payload.userId)
 
         const { data: cur } = await admin
           .from("account_deletions")
@@ -248,86 +230,84 @@ export const accountDeletionTask = task({
       // ───────────────────────────────────────────────────────────────────────
       // Step 6: Post-Delete Volumetry Report & Success
       // ───────────────────────────────────────────────────────────────────────
-      await step.run("post-delete-report-and-finalize", async () => {
-        const executionTime = Date.now() - startTime
+      const executionTime = Date.now() - startTime
 
-        const actualReport = {
-          productsDeleted: plannedReport.productsCount,
-          servicesDeleted: plannedReport.servicesCount,
-          ordersAnonymized: ordersAnonymized,
-          filesDeleted: filesDeleted,
-          whatsappDisconnected: whatsappDisconnected
-        }
+      const actualReport = {
+        productsDeleted: plannedReport.productsCount,
+        servicesDeleted: plannedReport.servicesCount,
+        ordersAnonymized: ordersAnonymized,
+        filesDeleted: filesDeleted,
+        whatsappDisconnected: whatsappDisconnected
+      }
 
-        // Compare reports and check for discrepancies
-        const discrepancies: string[] = []
-        if (filesDeleted !== plannedReport.filesCount) {
-          discrepancies.push(`File count mismatch: Planned ${plannedReport.filesCount}, deleted ${filesDeleted}`)
-        }
+      // Compare reports and check for discrepancies
+      const discrepancies: string[] = []
+      if (filesDeleted !== plannedReport.filesCount) {
+        discrepancies.push(`File count mismatch: Planned ${plannedReport.filesCount}, deleted ${filesDeleted}`)
+      }
 
-        const discrepancyReport = discrepancies.length > 0 ? discrepancies : null
+      const discrepancyReport = discrepancies.length > 0 ? discrepancies : null
 
-        // Fetch current checkpoints
-        const { data: currentDel } = await admin
-          .from("account_deletions")
-          .select("checkpoints")
-          .eq("id", payload.deletionId)
-          .maybeSingle()
+      // Fetch current checkpoints
+      const { data: currentDel } = await admin
+        .from("account_deletions")
+        .select("checkpoints")
+        .eq("id", payload.deletionId)
+        .maybeSingle()
 
-        const finalCheckpoints = {
-          ...(currentDel?.checkpoints || {}),
-          actual_report: actualReport,
-          discrepancy_report: discrepancyReport
-        }
+      const finalCheckpoints = {
+        ...(currentDel?.checkpoints || {}),
+        actual_report: actualReport,
+        discrepancy_report: discrepancyReport
+      }
 
-        // Finalize deletion status
-        await admin
-          .from("account_deletions")
-          .update({
-            status: "completed",
-            checkpoints: finalCheckpoints
-          })
-          .eq("id", payload.deletionId)
+      // Finalize deletion status
+      await admin
+        .from("account_deletions")
+        .update({
+          status: "completed",
+          checkpoints: finalCheckpoints
+        })
+        .eq("id", payload.deletionId)
 
-        // Generate and save Deletion Certificate in compliance_logs
-        const certificateMetrics = {
-          deletionId: payload.deletionId,
-          partnerId: payload.partnerId,
-          userId: payload.userId,
-          startedAt: deletion.requested_at,
-          finishedAt: new Date().toISOString(),
-          durationMs: executionTime,
-          dbRowsRemoved: dbRowsDeleted,
-          filesRemoved: filesDeleted,
-          redisKeysRemoved: plannedReport.redisKeysCount,
-          subscriptionsCancelled: plannedReport.whatsappCount,
-          whatsappInstancesRemoved: whatsappDisconnected,
-          complianceRetained: "Orders (Orders & Order Items) anonymized and retained for 5 years per Art. 27 CDC; audit logs anonymized and retained for 5 years for security forensics."
-        }
+      // Generate and save Deletion Certificate in compliance_logs
+      const certificateMetrics = {
+        deletionId: payload.deletionId,
+        partnerId: payload.partnerId,
+        userId: payload.userId,
+        startedAt: deletion.requested_at,
+        finishedAt: new Date().toISOString(),
+        durationMs: executionTime,
+        dbRowsRemoved: dbRowsDeleted,
+        filesRemoved: filesDeleted,
+        redisKeysRemoved: plannedReport.redisKeysCount,
+        subscriptionsCancelled: plannedReport.whatsappCount,
+        whatsappInstancesRemoved: whatsappDisconnected,
+        complianceRetained: "Orders (Orders & Order Items) anonymized and retained for 5 years per Art. 27 CDC; audit logs anonymized and retained for 5 years for security forensics."
+      }
 
-        const sha256Report = crypto
-          .createHash("sha256")
-          .update(JSON.stringify(certificateMetrics))
-          .digest("hex")
+      const sha256Report = crypto
+        .createHash("sha256")
+        .update(JSON.stringify(certificateMetrics))
+        .digest("hex")
 
-        const fullCertificate = {
-          ...certificateMetrics,
-          sha256Report
-        }
+      const fullCertificate = {
+        ...certificateMetrics,
+        sha256Report
+      }
 
-        // Update the compliance logs record with execution time and certificate
-        await admin
-          .from("compliance_logs")
-          .update({
-            execution_time_ms: executionTime,
-            certificate: fullCertificate
-          })
-          .eq("user_id", payload.userId)
-      })
+      // Update the compliance logs record with execution time and certificate
+      await admin
+        .from("compliance_logs")
+        .update({
+          execution_time_ms: executionTime,
+          certificate: fullCertificate
+        })
+        .eq("user_id", payload.userId)
 
     } catch (err: any) {
       SecureLogger.error("Failed executing account deletion workflow", { deletionId: payload.deletionId, error: err.message })
-      
+
       // Update DB record to failed with log
       await admin
         .from("account_deletions")

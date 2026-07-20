@@ -45,7 +45,7 @@ const t = (key: "termos" | "privacidade"): string => {
 }
 
 function AuthContent() {
-  const { user } = useSupabase()
+  const { user, supabase } = useSupabase()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -114,6 +114,16 @@ function AuthContent() {
     }
   }, [user, isPartnerMode, router])
 
+  // Forçar logout client-side se a conta estiver em exclusão ativa para evitar redirect loops
+  const errorParam = searchParams.get("error")
+  useEffect(() => {
+    if (errorParam === "account_deleting" && user) {
+      supabase.auth.signOut().then(() => {
+        router.refresh()
+      })
+    }
+  }, [errorParam, user, supabase, router])
+
   // Força tema light no modo parceiro
   useEffect(() => {
     if (pageMode === "partner") {
@@ -122,7 +132,7 @@ function AuthContent() {
     }
   }, [pageMode])
 
-  if (user && !isPartnerMode) {
+  if (user && !isPartnerMode && errorParam !== "account_deleting") {
     return <RedirectToHome />
   }
 
