@@ -12,7 +12,7 @@ export default async function ReturnsPageServer() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
 
-  const { partnerId, roleId } = context
+  const { partnerId, roleId, activeStoreId } = context
 
   // Delivery role has no access at all
   if (roleId === "delivery") {
@@ -30,6 +30,7 @@ export default async function ReturnsPageServer() {
         <ReturnsPage
           partnerId={partnerId}
           roleId={roleId}
+          storeId={activeStoreId || undefined}
           planGate={planGate}
         />
       </FadeIn>

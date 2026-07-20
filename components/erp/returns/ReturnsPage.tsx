@@ -29,6 +29,7 @@ type SortDirection = "asc" | "desc"
 interface ReturnsPageProps {
     partnerId: string
     roleId: string
+    storeId?: string
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }
 
@@ -85,7 +86,7 @@ function mapLegacyReason(reason: unknown) {
     return "other"
 }
 
-export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPageProps) {
+export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: ReturnsPageProps) {
     const { toast } = useToast()
     const { openPlanUpgrade } = usePlanUpgrade()
     const { exportData, isExporting, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport()
@@ -136,7 +137,7 @@ export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPage
     const [pendingProcessData, setPendingProcessData] = useState<Record<string, any> | null>(null)
 
     const { data: returnsData, isLoading: isReturnsLoading } = useQuery({
-        queryKey: ['erp', 'returns', partnerId],
+        queryKey: ['erp', 'returns', partnerId, storeId],
         queryFn: async () => {
             const res = await getReturnRequestsPageAction(partnerId, { limit: 100 })
             if (res.success) return res.items as ReturnRequest[]

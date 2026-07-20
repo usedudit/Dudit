@@ -294,13 +294,15 @@ export async function getReturnRequestsPageAction(
         const access = await requirePermission(partnerId, "orders", "view")
         assertRole(access.roleId, VIEW_ROLES)
         const supabase = createAdminClient()
+        const ctx = await getCurrentPartnerContext()
+        const storeId = ctx?.activeStoreId || ""
         const limit = Math.max(1, Math.min(100, Number(options?.limit || 50)))
         const fetchLimit = limit + 1
 
         let query = supabase
             .from("return_requests")
             .select(`
-        id, partner_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
+        id, partner_id, store_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
         reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
         eligibility_status, eligibility_details, policy_snapshot, sla_due_at, sla_status, sla_expired_at, reported_to_dudit_at, dudit_report_id,
@@ -315,6 +317,10 @@ export async function getReturnRequestsPageAction(
       `)
             .eq("partner_id", partnerId)
             .is("deleted_at", null)
+
+        if (storeId) {
+            query = query.eq("store_id", storeId)
+        }
 
         if (options?.status && RETURN_STATUS_SET.has(options.status)) {
             query = query.eq("status", options.status)
@@ -1393,8 +1399,10 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
         const access = await requirePermission(partnerId, "orders", "view")
         assertRole(access.roleId, VIEW_ROLES)
         const supabase = createAdminClient()
+        const ctx = await getCurrentPartnerContext()
+        const storeId = ctx?.activeStoreId || ""
 
-        const { data: orders, error } = await supabase
+        let query = supabase
             .from("orders")
             .select(`
         id,
@@ -1434,6 +1442,12 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
       `)
             .eq("partner_id", partnerId)
             .eq("situation", "paid")
+
+        if (storeId) {
+            query = query.eq("store_id", storeId)
+        }
+
+        const { data: orders, error } = await query
             .order("created_at", { ascending: false })
             .limit(200)
 
