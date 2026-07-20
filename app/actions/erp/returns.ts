@@ -480,6 +480,7 @@ export async function createReturnRequestAction(input: unknown) {
             }
         }
 
+        const ctx = await getCurrentPartnerContext()
         const { data: created, error } = await supabase.rpc("create_return_request", {
             p_partner_id: data.partnerId,
             p_order_id: data.orderId,
@@ -493,6 +494,7 @@ export async function createReturnRequestAction(input: unknown) {
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
             p_expires_at: data.expiresAt || null,
             p_request_type: data.resolution === "none" ? "return" : null,
+            p_store_id: ctx?.activeStoreId || null,
         })
 
         if (error) throw error
@@ -540,7 +542,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, situation, delivery_status, order_number")
+            .select("id, partner_id, buyer_id, store_id, situation, delivery_status, order_number")
             .eq("id", base.orderId)
             .single()
 
@@ -592,6 +594,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             p_idempotency_key: base.idempotencyKey || crypto.randomUUID(),
             p_expires_at: base.expiresAt || null,
             p_request_type: null,
+            p_store_id: order.store_id || null,
         })
 
         if (error) throw error
@@ -661,7 +664,7 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, situation, delivery_status, order_number")
+            .select("id, partner_id, buyer_id, store_id, situation, delivery_status, order_number")
             .eq("id", data.orderId)
             .single()
 
@@ -684,6 +687,7 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
             p_idempotency_key: data.idempotencyKey || `cancel:${data.orderId}:${user.id}`,
             p_expires_at: null,
             p_request_type: "cancellation",
+            p_store_id: order.store_id || null,
         })
 
         if (error) throw error

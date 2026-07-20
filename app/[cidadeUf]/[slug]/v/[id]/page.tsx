@@ -3,55 +3,48 @@ import type { Metadata } from 'next'
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
 
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
-import { getPartnerUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
 import {
-  getCachedPartnerProfile as getPartnerProfile,
-  getCachedPartnerProducts as getPartnerProducts,
-  getCachedPartnerServices as getPartnerServices,
-  getCachedPartnerReviews as getPartnerReviews,
-  getCachedPartnerStats as getPartnerStats,
-  getPartnerPublicCoupons,
-} from "@/app/actions/marketplace/partners"
+  getCachedStoreById,
+  getCachedStoreProducts,
+  getCachedStoreServices,
+  getCachedStoreReviews,
+  getCachedStoreStats,
+} from "@/app/actions/marketplace/stores"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { listMarketplaceRecurringPlansAction } from "@/app/actions/marketplace/recurring-subscriptions"
 
-// Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params
-  const partner = await getPartnerProfile(id)
+  const store = await getCachedStoreById(id)
 
-  if (!partner) {
+  if (!store) {
     return {
       title: 'Loja não encontrada | Dudit'
     }
   }
 
-  const address = partner.addresses?.[0] || partner.address || partner || {}
-  const city = address?.city || "Brasil"
-  const state = address?.state || "BR"
-
-  const storeName = partner.store_name || 'Loja Parceira'
-  const storeDescription = partner.store_description || `Conheça a loja ${storeName} na Dudit, sua conexão direta e sem taxas.`
-  const url = `https://dudit.com.br${getPartnerUrl(partner)}`
+  const storeName = store.name || 'Loja Parceira'
+  const storeDescription = store.description || `Conheça a loja ${storeName} na Dudit.`
+  const canonicalUrl = `https://dudit.com.br${getStoreUrl(store)}`
 
   return {
-    title: `${storeName} | Dudit em ${city} - ${state}`,
+    title: `${storeName} | Dudit`,
     description: storeDescription,
     alternates: {
-      canonical: url,
+      canonical: canonicalUrl,
     },
     openGraph: {
       title: `${storeName} | Dudit`,
       description: storeDescription,
-      url: url,
+      url: canonicalUrl,
       images: [
         {
-          url: partner.store_image_url || 'https://img.dudit.com.br/static/Logo.png',
+          url: store.logo_url || store.image_url || 'https://img.dudit.com.br/static/Logo.png',
           width: 800,
           height: 600,
           alt: `Capa da loja ${storeName}`,
@@ -65,33 +58,48 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function VendorPage({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
-  // PERFORMANCE: Busca TUDO em paralelo - incluindo auth
-  const [user, partner, products, services, reviews, statsBase, coupons, plan, plansRes] = await Promise.all([
+  const store = await getCachedStoreById(id)
+
+  if (!store) {
+    return notFound()
+  }
+
+  const partner = store.partners
+  const storeId = store.id
+  const partnerId = store.partner_id
+
+  const canonicalUrl = getStoreUrl(store)
+  const currentPath = `/${currentCidadeUf}/${currentSlug}/v/${id}`
+
+  if (currentPath !== canonicalUrl) {
+    redirect(canonicalUrl)
+  }
+
+  const [user, products, services, reviews, statsBase, plan, plansRes] = await Promise.all([
     getCurrentUser(),
-    getPartnerProfile(id),
-    getPartnerProducts(id),
-    getPartnerServices(id),
-    getPartnerReviews(id),
-    getPartnerStats(id),
-    getPartnerPublicCoupons(id),
-    getPartnerPlan(id),
-    listMarketplaceRecurringPlansAction(id),
+    getCachedStoreProducts(storeId, partnerId),
+    getCachedStoreServices(storeId, partnerId),
+    getCachedStoreReviews(storeId),
+    getCachedStoreStats(storeId),
+    getPartnerPlan(partnerId),
+    listMarketplaceRecurringPlansAction(partnerId),
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
   const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null } : null
   const cartCount = sessionData?.cartCount || 0
 
+  const filteredProducts = (products || []).filter((p: any) => p.store_is_active !== false)
+  const filteredServices = (services || []).filter((s: any) => s.store_is_active !== false)
+
   const plans = plansRes.success ? (plansRes.data || []) : []
   const normalizedPlans = plans.map((item: any) => {
     let computedPrice = 0
     let firstImage: string | null = null
-
     if (item.items && Array.isArray(item.items)) {
       for (const planItem of item.items) {
         const qty = Number(planItem.quantity || 1)
         let itemPrice = Number(planItem.unit_price || 0)
-
         if (itemPrice <= 0) {
           if (planItem.item_type === 'product' && planItem.products) {
             itemPrice = Number(planItem.products.price || 0)
@@ -100,7 +108,6 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
           }
         }
         computedPrice += qty * itemPrice
-
         if (!firstImage && planItem.item_type === 'product' && planItem.products?.images) {
           const imgs = planItem.products.images
           if (Array.isArray(imgs) && imgs.length > 0) {
@@ -109,9 +116,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
         }
       }
     }
-
-    const image = firstImage || partner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
-
+    const image = firstImage || store.logo_url || partner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
     return {
       id: item.id,
       name: item.name,
@@ -122,149 +127,119 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       partners: partner,
       frequency_type: item.frequency_type,
       frequency_interval: item.frequency_interval,
-      created_at: item.created_at
+      created_at: item.created_at,
     }
   })
 
-  // Se não achou o parceiro no cache/banco, retorna 404
-  if (!partner) {
-    return notFound()
-  }
+  normalizeBusinessInfo(partner?.business_info)
 
-  // business_info no longer uses channels; keep vitrine accessible by default
-  normalizeBusinessInfo(partner.business_info)
+  const productCategories = Array.from(new Set(filteredProducts?.map((p: any) => p.category).filter(Boolean))) as string[]
+  const serviceCategories = Array.from(new Set(filteredServices?.map((s: any) => s.category).filter(Boolean))) as string[]
 
-  // Extrai categorias únicas
-  const productCategories = Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))) as string[]
-  const serviceCategories = Array.from(new Set(services?.map((s: any) => s.category).filter(Boolean))) as string[]
-
-  // --- MÁGICA DE SEO (Canonical Redirect) ---
-  const correctUrl = getPartnerUrl(partner)
-  const currentPath = `/${currentCidadeUf}/${currentSlug}/v/${id}`
-
-  // Bugfix: Evita downgrade de slug informativo para 'vitrine' genérico (ou 'brasil')
-  const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'
-  const isNewOneGeneric = correctUrl.includes('/vitrine/v/') || correctUrl.includes('/brasil/v/')
-
-  if (currentPath !== correctUrl && !(isCurrentlyDetailed && isNewOneGeneric)) {
-    redirect(correctUrl)
-  }
-
-  // Calcula anos de plataforma
-  const createdDate = new Date(partner.created_at)
+  const createdDate = new Date(partner?.created_at || store.created_at)
   const yearsOnPlatform = new Date().getFullYear() - createdDate.getFullYear() || 1
 
-  // Monta objeto de estatísticas completo para o Client Component
   const stats = {
-    salesCount: statsBase?.salesCount || 0,
+    salesCount: Number(partner?.vendas_totais || 0),
     reviewsCount: statsBase?.reviewsCount || 0,
-    yearsOnPlatform: yearsOnPlatform,
-    itemsCount: (products?.length || 0) + (services?.length || 0),
+    yearsOnPlatform,
+    itemsCount: (filteredProducts?.length || 0) + (filteredServices?.length || 0),
   }
 
-  // Calcula distribuição de estrelas (5, 4, 3, 2, 1) baseado nos reviews cacheados
   const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
     star,
-    count: reviews?.filter((r: any) => Math.round(r.rating) === star).length || 0
+    count: reviews?.filter((r: any) => Math.round(r.rating) === star).length || 0,
   }))
+
+  const address = store.addresses?.[0]
+  const storeCity = address?.city || store.city || ""
+  const storeState = address?.state || store.state || ""
 
   const schemaJsonLd = {
     '@context': 'https://schema.org',
     '@type': ['Store', 'LocalBusiness', 'Organization'],
-    name: partner.store_name,
-    image: partner.store_image_url || 'https://img.dudit.com.br/static/Logo.png',
-    description: partner.store_description,
+    name: store.name || partner?.store_name,
+    image: store.logo_url || store.image_url || partner?.store_image_url || 'https://img.dudit.com.br/static/Logo.png',
+    description: store.description || partner?.store_description,
     address: {
       '@type': 'PostalAddress',
-      streetAddress: partner.addresses?.[0]?.street || '',
-      addressLocality: partner.addresses?.[0]?.city || '',
-      addressRegion: partner.addresses?.[0]?.state || '',
-      postalCode: partner.addresses?.[0]?.zip_code || '',
+      streetAddress: address?.street || '',
+      addressLocality: address?.city || '',
+      addressRegion: address?.state || '',
+      postalCode: address?.zip_code || '',
       addressCountry: 'BR',
     },
-    telephone: partner.phone || '',
-    aggregateRating: partner.rating ? {
+    telephone: store.phone || partner?.phone || '',
+    aggregateRating: partner?.rating ? {
       '@type': 'AggregateRating',
       ratingValue: Number(partner.rating).toFixed(1),
       reviewCount: statsBase?.reviewsCount || 1,
     } : undefined,
     makesOffer: [
-      ...(products || []).slice(0, 3).map((p: any) => ({
-        '@type': 'Offer',
-        itemOffered: {
-          '@type': 'Product',
-          name: p.name
-        },
-        price: p.price,
-        priceCurrency: 'BRL'
+      ...(filteredProducts || []).slice(0, 3).map((p: any) => ({
+        '@type': 'Offer', itemOffered: { '@type': 'Product', name: p.name }, price: p.price, priceCurrency: 'BRL'
       })),
-      ...(services || []).slice(0, 3).map((s: any) => ({
-        '@type': 'Offer',
-        itemOffered: {
-          '@type': 'Service',
-          name: s.name
-        },
-        price: s.price,
-        priceCurrency: 'BRL'
-      }))
-    ]
-  };
+      ...(filteredServices || []).slice(0, 3).map((s: any) => ({
+        '@type': 'Offer', itemOffered: { '@type': 'Service', name: s.name }, price: s.price, priceCurrency: 'BRL'
+      })),
+    ],
+  }
 
-  // Mapeia os dados do banco (snake_case) para o formato esperado pelo componente (camelCase)
-  // Endereço agora vem da tabela addresses via JOIN
   const partnerData = {
-    id: partner.id,
-    storeName: partner.store_name,
-    storeDescription: partner.store_description,
-    storeImageUrl: partner.store_image_url,
-    profile_image_url: partner.profile_image_url,
-    city: partner.addresses?.[0]?.city || partner.city || "",
-    state: partner.addresses?.[0]?.state || partner.state || "",
-    street: partner.addresses?.[0]?.street || partner.street || "",
-    number: partner.addresses?.[0]?.number || partner.number || "",
-    neighborhood: partner.addresses?.[0]?.neighborhood || partner.neighborhood || "",
-    zipCode: partner.addresses?.[0]?.zip_code || partner.zip_code || "",
-    rating: Number(partner.rating) || 0,
-    createdAt: partner.created_at,
-    offeringType: partner.offering_type,
-    openingHours: partner.opening_hours,
-    phone: partner.phone,
-    lat: partner.latitude,
-    lng: partner.longitude,
-    businessInfo: partner.business_info,
-    paymentMethods: partner.payment_methods,
-    banner_url: partner.banner_url,
-    banner_moderation_status: partner.banner_moderation_status || 'approved',
-    logo_moderation_status: partner.logo_moderation_status || 'approved',
-    gallery: partner.gallery || [],
+    id: store.id,
+    storeName: store.name || partner?.store_name || "Loja",
+    storeDescription: store.description || partner?.store_description || "",
+    storeImageUrl: store.logo_url || partner?.store_image_url || null,
+    profile_image_url: null,
+    city: address?.city || store.city || "",
+    state: address?.state || store.state || "",
+    street: address?.street || "",
+    number: address?.number || "",
+    neighborhood: address?.neighborhood || "",
+    zipCode: address?.zip_code || "",
+    rating: Number(partner?.rating || 0),
+    createdAt: store.created_at || partner?.created_at,
+    offeringType: null,
+    openingHours: store.opening_hours || partner?.opening_hours || null,
+    phone: store.phone || partner?.phone || "",
+    lat: null,
+    lng: null,
+    businessInfo: partner?.business_info,
+    paymentMethods: null,
+    banner_url: store.banner_url || partner?.banner_url || null,
+    banner_moderation_status: "approved",
+    logo_moderation_status: "approved",
+    gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',
+    isShowcaseActive: partner?.is_showcase_active !== false,
   }
 
   return (
     <div className="min-h-screen bg-white w-full max-w-[100vw] overflow-x-hidden flex flex-col">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}
-      />
-
-
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
+          { '@type': 'ListItem', position: 2, name: `${storeCity} - ${storeState}`, item: `https://dudit.com.br/explorar/${currentCidadeUf}` },
+          { '@type': 'ListItem', position: 3, name: store.name, item: `https://dudit.com.br${canonicalUrl}` },
+        ],
+      }) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }} />
       <main className="lg:pt-[120px] flex-grow">
         <VendorPageClient
           partner={partnerData}
-          products={products || []}
-          services={services || []}
+          products={filteredProducts || []}
+          services={filteredServices || []}
           plans={normalizedPlans}
           reviews={reviews || []}
           stats={stats}
           ratingDistribution={ratingDistribution}
           productCategories={productCategories}
           serviceCategories={serviceCategories}
-          coupons={coupons || []}
           userProfile={userProfile}
           cartCount={cartCount}
         />
       </main>
-
       <MarketplaceFooter />
     </div>
   )

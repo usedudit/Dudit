@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next'
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
 
 export const revalidate = 86400
 
@@ -57,7 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!supabase) return baseUrls
 
     try {
-        const [partnersResponse, productsResponse, citiesResponse] = await Promise.all([
+        const [partnersResponse, storesResponse, productsResponse, citiesResponse] = await Promise.all([
             // Top 200 partners
             supabase
                 .from("partners")
@@ -65,6 +65,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                 .eq("is_active", true)
                 .order("rating", { ascending: false })
                 .limit(200),
+
+            // Top 1000 stores
+            supabase
+                .from("stores")
+                .select("id, name, slug, updated_at, created_at, city, state, addresses(city, state)")
+                .eq("is_active", true)
+                .order("created_at", { ascending: false })
+                .limit(1000),
 
             // Top 500 most recent products in marketplace
             supabase
@@ -85,6 +93,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ])
 
         if (partnersResponse.error) console.error("Sitemap partners error:", partnersResponse.error)
+        if (storesResponse.error) console.error("Sitemap stores error:", storesResponse.error)
         if (productsResponse.error) console.error("Sitemap products error:", productsResponse.error)
         if (citiesResponse.error) console.error("Sitemap cities error:", citiesResponse.error)
 
@@ -97,13 +106,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             priority: 0.8,
         }))
 
+        // --- Stores ---
+        const stores = storesResponse.data || []
+        const storesSitemap: MetadataRoute.Sitemap = stores.map((s: any) => ({
+            url: `https://dudit.com.br${getStoreUrl(s)}`,
+            lastModified: new Date(s.updated_at || s.created_at),
+            changeFrequency: "daily",
+            priority: 0.7,
+        }))
+
         // --- Partners ---
         const partners = partnersResponse.data || []
         const partnersSitemap: MetadataRoute.Sitemap = partners.map((p: any) => ({
             url: `https://dudit.com.br${getPartnerUrl(p)}`,
             lastModified: new Date(p.updated_at || p.created_at),
             changeFrequency: "weekly",
-            priority: 0.7,
+            priority: 0.5,
         }))
 
         // --- City pages from DB: /explorar/{cidade-uf} ---
@@ -137,6 +155,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const completeSitemap: MetadataRoute.Sitemap = [
             ...baseUrls,
             ...productsSitemap,
+            ...storesSitemap,
             ...partnersSitemap,
             ...citiesSitemap,
         ]

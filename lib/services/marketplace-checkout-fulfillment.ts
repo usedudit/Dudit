@@ -289,7 +289,7 @@ export async function fulfillMarketplaceOrder(
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(`
-      id, partner_id, buyer_id, situation, checkout_fulfillment,
+      id, partner_id, buyer_id, store_id, situation, checkout_fulfillment,
       finance_account_id, customer_name, delivery_type, delivery_address, payment_method,
       paid_amount, amount_paid
     `)
@@ -393,6 +393,7 @@ export async function fulfillMarketplaceOrder(
     await supabase.from("checkout_fulfillments").insert({
       order_id: orderId,
       partner_id: order.partner_id,
+      store_id: order.store_id,
       idempotency_key: idempotencyKey,
       status: "pending",
     })

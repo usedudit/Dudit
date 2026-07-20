@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
-import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
+import { getProductUrl, getStoreUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
@@ -75,7 +75,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
 
     return (
         <Link
-            href={getPartnerUrl(partner)}
+            href={getStoreUrl(partner)}
             prefetch={false}
             className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
         >
@@ -512,9 +512,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                 <div className="flex overflow-x-auto gap-4 md:gap-6 px-4 lg:px-0 scrollbar-hide pb-4 snap-x snap-mandatory">
                     {products.map((store: any) => {
                         const storeSlug = store.slug || store.store_name?.toLowerCase().replace(/\s+/g, "-") || store.id
-                        const storeUrl = `/${store.partnerId ? store.id : ""}/v/${store.id}`
-                        const partnerForUrl = { id: store.id, slug: store.slug, store_name: store.store_name }
-                        const partnerUrl = getPartnerUrl(partnerForUrl)
+                        const storeUrl = getStoreUrl({ id: store.partner_id, slug: store.slug, store_name: store.store_name, city: store.city, state: store.state })
                         const storeImage = store.store_avatar || store.store_image_url
                         const imgUrl = storeImage
                             ? (storeImage.includes("Placeholder.png") || storeImage.includes("dudit.com.br/static")
@@ -525,7 +523,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                         return (
                             <Link
                                 key={store.id}
-                                href={partnerUrl}
+                                href={storeUrl}
                                 prefetch={false}
                                 className="w-[180px] md:w-[220px] shrink-0 snap-start block hover:no-underline"
                             >

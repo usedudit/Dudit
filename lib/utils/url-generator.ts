@@ -40,6 +40,7 @@ export function getProductUrl(product: any, partner?: any): string {
 /**
  * Gera a URL canonica do parceiro utilizando o novo formato com cidade e estado
  * /[cidade-uf]/[slug-da-loja]/v/[id]
+ * @deprecated Use getStoreUrl() para vitrines baseadas em loja.
  */
 export function getPartnerUrl(partner: any): string {
     if (!partner) return "/"
@@ -54,6 +55,23 @@ export function getPartnerUrl(partner: any): string {
     const cityStateSlug = formatCityStateSlug(city, state)
 
     return `/${cityStateSlug}/${partnerSlug}/v/${partnerId}`
+}
+
+/**
+ * Gera a URL canonica da loja (store-based vitrine)
+ * /[cidade-uf]/[slug-da-loja]
+ */
+export function getStoreUrl(store: any): string {
+    if (!store) return "/"
+
+    const storeSlug = store.slug || createSlug(store.name || store.store_name || "")
+    const address = store.addresses?.[0]
+    const city = store.city || address?.city
+    const state = store.state || address?.state
+
+    const cityStateSlug = formatCityStateSlug(city, state)
+
+    return `/${cityStateSlug}/${storeSlug}`
 }
 
 /**
