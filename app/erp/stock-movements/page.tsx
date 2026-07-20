@@ -10,8 +10,9 @@ export default async function StockMovementsPage() {
   const context = await getCurrentPartnerContext()
   if (!context) redirect("")
 
-  const partnerId = context.partnerId
-  const page = await getERPStockMovementsPageAction(partnerId, { cursor: null, limit: 100 })
+  const { partnerId, activeStoreId } = context
+  const storeId = activeStoreId || undefined
+  const page = await getERPStockMovementsPageAction(partnerId, { cursor: null, limit: 100, storeId })
   if (!page.success) {
     throw new Error(page.error || "Erro ao carregar movimentações de estoque.")
   }
@@ -22,6 +23,7 @@ export default async function StockMovementsPage() {
       <FadeIn className="p-4">
         <StockMovementPageContent
           partnerId={partnerId}
+          storeId={storeId}
           movements={page.items || []}
           initialNextCursor={page.nextCursor}
           initialHasMore={page.hasMore}

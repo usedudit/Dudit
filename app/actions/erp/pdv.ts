@@ -618,6 +618,19 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
     }
     const draftsRes = await draftsQuery.order("created_at", { ascending: false }).limit(20)
 
+    let accountsQuery = supabase
+        .from("finance_accounts")
+        .select("id, name, type, is_default, is_active")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
+        .eq("type", "cash")
+    if (storeId) {
+        accountsQuery = accountsQuery.eq("store_id", storeId)
+    } else {
+        accountsQuery = accountsQuery.is("store_id", null)
+    }
+    accountsQuery = accountsQuery.order("is_default", { ascending: false })
+
     const [customersRes, accountsRes, paymentMethodsRes] = await Promise.all([
         supabase
             .from("customers")
@@ -625,13 +638,7 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
             .eq("partner_id", partnerId)
             .order("name")
             .limit(120),
-        supabase
-            .from("finance_accounts")
-            .select("id, name, type, is_default, is_active")
-            .eq("partner_id", partnerId)
-            .eq("is_active", true)
-            .eq("type", "cash")
-            .order("is_default", { ascending: false }),
+        accountsQuery,
         supabase
             .from("payment_methods")
             .select("id, name, type, is_default, is_active, fee_percent, discount_percent, priority, store_id")

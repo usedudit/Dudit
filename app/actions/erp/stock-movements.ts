@@ -14,7 +14,7 @@ import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidateStockMovements } from "@/lib/utils/revalidation"
 
-export async function searchProductsForMovement(query: string) {
+export async function searchProductsForMovement(query: string, storeId?: string | null) {
     if (!query || query.trim().length < 2) return []
 
     try {
@@ -24,6 +24,32 @@ export async function searchProductsForMovement(query: string) {
         await requirePermission(ctx.partnerId, "stock_movements", "view")
         const supabase = createAdminClient()
         const searchTerm = `%${query}%`
+
+        if (storeId) {
+            const { data, error } = await supabase
+                .from("store_products")
+                .select(`
+                    product_id,
+                    products!inner(id, name, sku, stock_quantity, images)
+                `)
+                .eq("store_id", storeId)
+                .eq("products.is_active", true)
+                .or(`products.name.ilike.${searchTerm},products.sku.ilike.${searchTerm}`)
+                .limit(10)
+
+            if (error) {
+                console.error("Error searching products for movement:", error)
+                return []
+            }
+
+            return (data || []).map((sp: any) => ({
+                id: sp.product_id,
+                name: sp.products.name,
+                sku: sp.products.sku || 'N/A',
+                stock: sp.products.stock_quantity || 0,
+                image: sp.products.images && sp.products.images.length > 0 ? sp.products.images[0] : null
+            }))
+        }
 
         const { data, error } = await supabase
             .from("products")
@@ -84,7 +110,8 @@ export async function createStockMovementAction(data: {
             p_reason: data.reason,
                 p_notes: sanitizeNotes(data.notes),
             p_created_by: userId,
-            p_variant_id: data.variantId || null
+            p_variant_id: data.variantId || null,
+            p_store_id: ctx.activeStoreId || null
         })
 
         if (error) {
@@ -487,7 +514,7 @@ const ERP_STOCK_MOVEMENTS_PAGE_SIZE = 100
 
 export async function getERPStockMovementsPageAction(
     partnerId: string,
-    options?: { cursor?: ERPStockMovementListCursor | null; limit?: number },
+    options?: { cursor?: ERPStockMovementListCursor | null; limit?: number; storeId?: string | null },
 ): Promise<
     | { success: true; items: any[]; nextCursor: ERPStockMovementListCursor | null; hasMore: boolean }
     | { success: false; error: string }
@@ -513,10 +540,16 @@ export async function getERPStockMovementsPageAction(
                 reason,
                 notes,
                 created_by,
+                store_id,
                 orders(order_number),
                 stock_movement_items(quantity, products(name, sku))
             `)
             .eq("partner_id", partnerId)
+
+        const storeId = options?.storeId
+        if (storeId) {
+            q = q.eq("store_id", storeId)
+        }
 
         if (cursor) {
             q = q.or(buildStockMovementKeysetOrFilter(cursor))

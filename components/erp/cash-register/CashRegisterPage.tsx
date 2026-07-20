@@ -110,6 +110,7 @@ function resolvePaymentMethodVisual(row: any) {
 
 export default function CashRegisterPage({
     partnerId,
+    storeId,
     initialHistory,
     initialNextCursor,
     initialHasMore,
@@ -117,6 +118,7 @@ export default function CashRegisterPage({
     initialViewId,
 }: {
     partnerId: string
+    storeId?: string
     initialHistory: SessionItem[]
     initialNextCursor: ERPCashSessionListCursor | null
     initialHasMore: boolean
@@ -157,12 +159,12 @@ export default function CashRegisterPage({
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     const observerTarget = useRef<HTMLDivElement>(null)
-    const queryKey = useMemo(() => ["erp", "cash-sessions", partnerId] as const, [partnerId])
+    const queryKey = useMemo(() => ["erp", "cash-sessions", partnerId, storeId] as const, [partnerId, storeId])
     const { items: history, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteList<SessionItem, ERPCashSessionListCursor>({
         queryKey,
         initialPage: { items: initialHistory || [], nextCursor: initialNextCursor, hasMore: initialHasMore },
         fetchFn: async ({ cursor }) => {
-            const res = await getCashSessionsHistoryPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getCashSessionsHistoryPageAction(partnerId, { cursor, limit: 100, storeId })
             if (!res.success) throw new Error(res.error || "Erro ao carregar histórico do caixa.")
             return { items: res.items || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },

@@ -17,7 +17,8 @@ export default async function CashRegisterPageServer(props: { searchParams?: Pro
   if (!context) return <AccessDenied />
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
 
-  const partnerId = context.partnerId
+  const { partnerId, activeStoreId } = context
+  const storeId = activeStoreId || undefined
   const plan = await getPartnerPlan(partnerId)
   if (plan.slug.toLowerCase() === "free") {
     return (
@@ -29,7 +30,7 @@ export default async function CashRegisterPageServer(props: { searchParams?: Pro
     )
   }
   const [historyResult, activeSessionResult] = await Promise.all([
-    getCashSessionsHistoryPageAction(partnerId, { cursor: null, limit: 100 }),
+    getCashSessionsHistoryPageAction(partnerId, { cursor: null, limit: 100, storeId }),
     getActiveCashSessionAction(partnerId),
   ])
 
@@ -41,6 +42,7 @@ export default async function CashRegisterPageServer(props: { searchParams?: Pro
       <FadeIn className="p-4">
         <CashRegisterPage
           partnerId={partnerId}
+          storeId={storeId}
           initialHistory={historyResult.items || []}
           initialNextCursor={historyResult.nextCursor}
           initialHasMore={historyResult.hasMore}

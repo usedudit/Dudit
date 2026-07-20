@@ -37,6 +37,7 @@ import {
 
 interface StockMovementPageProps {
     partnerId: string;
+    storeId?: string;
     movements: any[];
     initialNextCursor: ERPStockMovementListCursor | null;
     initialHasMore: boolean;
@@ -57,11 +58,11 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
     'lost': 'Perda',
 };
 
-const StockMovementPageContent = ({ partnerId, movements: initialMovements, initialNextCursor, initialHasMore }: StockMovementPageProps) => {
+const StockMovementPageContent = ({ partnerId, storeId, movements: initialMovements, initialNextCursor, initialHasMore }: StockMovementPageProps) => {
     const { error: notifyError, success: notifySuccess } = useNotification();
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)");
 
-    const queryKey = useMemo(() => ['erp', 'stock-movements', partnerId] as const, [partnerId]);
+    const queryKey = useMemo(() => ['erp', 'stock-movements', partnerId, storeId] as const, [partnerId, storeId]);
 
     // ── Entity Page Hook (URL state + cache + infinite list) ──────────
     const entityPage = useEntityPage<any, any, ERPStockMovementListCursor>({
@@ -72,7 +73,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPStockMovementsPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getERPStockMovementsPageAction(partnerId, { cursor, limit: 100, storeId })
             if (!res.success) throw new Error(res.error || 'Erro ao carregar movimentações.')
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },

@@ -979,25 +979,33 @@ export async function closeCashSessionAction(input: {
   }
 }
 
-export async function getCashSessionsHistoryAction(partnerId: string) {
+export async function getCashSessionsHistoryAction(partnerId: string, storeId?: string | null) {
   await requirePermission(partnerId, "pdv", "view")
   const supabase = createAdminClient()
 
-  const { data: sessions, error: sessionError } = await supabase
+  let sessionsQuery = supabase
     .from("cash_sessions")
     .select("id, opened_by_user_id, closed_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
     .eq("partner_id", partnerId)
+  if (storeId) {
+    sessionsQuery = sessionsQuery.eq("store_id", storeId)
+  }
+  const { data: sessions, error: sessionError } = await sessionsQuery
     .order("opened_at", { ascending: false })
     .limit(400)
   if (sessionError) return { success: false as const, error: sessionError.message }
 
   const sessionIds = (sessions || []).map((s: { id: string }) => s.id)
+  const movementQuery = supabase
+    .from("cash_movements")
+    .select("cash_session_id, type, amount, reversed_at, payment_method_id")
+    .eq("partner_id", partnerId)
+    .in("cash_session_id", sessionIds)
+  if (storeId) {
+    movementQuery.eq("store_id", storeId)
+  }
   const { data: movementRows } = sessionIds.length > 0
-    ? await supabase
-      .from("cash_movements")
-      .select("cash_session_id, type, amount, reversed_at, payment_method_id")
-      .eq("partner_id", partnerId)
-      .in("cash_session_id", sessionIds)
+    ? await movementQuery
     : { data: [] as any[] }
 
   const userIds = Array.from(
@@ -1076,7 +1084,7 @@ const ERP_CASH_SESSIONS_PAGE_SIZE = 100
 
 export async function getCashSessionsHistoryPageAction(
   partnerId: string,
-  options?: { cursor?: ERPCashSessionListCursor | null; limit?: number },
+  options?: { cursor?: ERPCashSessionListCursor | null; limit?: number; storeId?: string | null },
 ) {
   await requirePermission(partnerId, "pdv", "view")
   // Read with admin client after authz so invited users can load history.
@@ -1090,6 +1098,11 @@ export async function getCashSessionsHistoryPageAction(
     .from("cash_sessions")
     .select("id, opened_by_user_id, closed_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
     .eq("partner_id", partnerId)
+
+  const storeId = options?.storeId
+  if (storeId) {
+    q = q.eq("store_id", storeId)
+  }
 
   if (cursor) q = q.or(buildCashSessionsKeysetOrFilter(cursor))
 
@@ -1105,12 +1118,16 @@ export async function getCashSessionsHistoryPageAction(
   const pageItems = hasMore ? rows.slice(0, limit) : rows
 
   const sessionIds = pageItems.map((s: { id: string }) => s.id)
+  let movementQ = supabase
+    .from("cash_movements")
+    .select("cash_session_id, type, amount, reversed_at, payment_method_id")
+    .eq("partner_id", partnerId)
+    .in("cash_session_id", sessionIds)
+  if (storeId) {
+    movementQ = movementQ.eq("store_id", storeId)
+  }
   const { data: movementRows } = sessionIds.length > 0
-    ? await supabase
-      .from("cash_movements")
-      .select("cash_session_id, type, amount, reversed_at, payment_method_id")
-      .eq("partner_id", partnerId)
-      .in("cash_session_id", sessionIds)
+    ? await movementQ
     : { data: [] as any[] }
 
   const userIds = Array.from(
