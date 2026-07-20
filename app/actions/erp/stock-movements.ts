@@ -110,8 +110,7 @@ export async function createStockMovementAction(data: {
             p_reason: data.reason,
                 p_notes: sanitizeNotes(data.notes),
             p_created_by: userId,
-            p_variant_id: data.variantId || null,
-            p_store_id: ctx.activeStoreId || null
+            p_variant_id: data.variantId || null
         })
 
         if (error) {

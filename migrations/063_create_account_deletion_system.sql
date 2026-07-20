@@ -70,6 +70,9 @@ DECLARE
   v_err_msg TEXT;
   v_err_detail TEXT;
 BEGIN
+  -- Bypass payment method protection during deletion
+  PERFORM set_config('dudit.bypass_payment_method_guard', 'true', true);
+
   -- 1. Lock the account_deletions row to prevent concurrent worker execution
   PERFORM 1 FROM public.account_deletions 
   WHERE user_id = p_user_id AND status != 'completed' 
