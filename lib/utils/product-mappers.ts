@@ -43,5 +43,22 @@ export function mapProductToFormData(initialProduct: Product | null | undefined)
     video_thumbnail: (initialProduct as any).video_thumbnail || null,
     video_duration: (initialProduct as any).video_duration || null,
     video_provider_id: (initialProduct as any).video_provider_id || null,
+    // F5.5c: Extract visibility_scope from store_products bridge
+    visibility_scope: extractVisibilityScope((initialProduct as any).store_products),
+    visibility_stores: extractVisibilityStores((initialProduct as any).store_products),
   }
+}
+
+function extractVisibilityScope(storeProducts: any[] | undefined): string {
+  if (!storeProducts || storeProducts.length === 0) return 'exclusive'
+  const nonExclusive = storeProducts.find((sp: any) => sp.visibility_scope && sp.visibility_scope !== 'exclusive')
+  if (nonExclusive) return nonExclusive.visibility_scope
+  return 'exclusive'
+}
+
+function extractVisibilityStores(storeProducts: any[] | undefined): string[] {
+  if (!storeProducts || storeProducts.length === 0) return []
+  return storeProducts
+    .filter((sp: any) => sp.visibility_scope === 'selected')
+    .map((sp: any) => sp.store_id)
 }

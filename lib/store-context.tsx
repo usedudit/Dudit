@@ -145,7 +145,7 @@ export function StoreProvider({
       queryClient.invalidateQueries()
 
       import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
-        setActiveStoreAction(storeId).then(() => {
+        setActiveStoreAction(storeId, store.partner_id).then(() => {
           router.refresh()
         }).catch((e) => console.warn("setActiveStoreAction failed", e))
       }).catch((e) => console.warn("dynamic import stores failed", e))

@@ -15,10 +15,10 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
  */
 const transactionsCacheMap = new Map<string, any>()
 
-export const getTransactionsCached = cache(async (partnerId: string, page: number = 1) => {
+export const getTransactionsCached = cache(async (partnerId: string, storeId: string, page: number = 1) => {
     const pageSize = 50
     const offset = (Math.max(1, page) - 1) * pageSize
-    const mapKey = `${partnerId}:${page}`
+    const mapKey = `${partnerId}:${storeId}:${page}`
 
     let cachedFn = transactionsCacheMap.get(mapKey)
     if (!cachedFn) {
@@ -54,12 +54,12 @@ export const getTransactionsCached = cache(async (partnerId: string, page: numbe
                 return { data: data || [], totalCount }
             },
             // Cache key: partnerId + page. Structure allows future extension (e.g. filters, sort)
-            [TAGS.transactions(partnerId), `page-${page}`],
+            [TAGS.transactions(partnerId), storeId, `page-${page}`],
             {
                 tags: [TAGS.transactions(partnerId)]
             }
         )
         transactionsCacheMap.set(mapKey, cachedFn)
     }
-    return cachedFn()
+    return cachedFn(partnerId, storeId, page)
 })

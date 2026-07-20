@@ -272,7 +272,7 @@ const topFromMap = (map: Map<string, number>, limit = 5) => {
     .map(([label, value]) => ({ label, value }))
 }
 
-async function getCachedGeneral(partnerId: string): Promise<GeneralDashboardData> {
+async function getCachedGeneral(partnerId: string, storeId = ""): Promise<GeneralDashboardData> {
   let cachedFn = generalDashboardCacheMap.get(partnerId)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -359,7 +359,7 @@ async function getCachedGeneral(partnerId: string): Promise<GeneralDashboardData
           })),
         }
       },
-      ["dashboard-general", partnerId],
+      ["dashboard-general", partnerId, storeId],
       { tags: [DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
     )
     generalDashboardCacheMap.set(partnerId, cachedFn)
@@ -367,7 +367,7 @@ async function getCachedGeneral(partnerId: string): Promise<GeneralDashboardData
   return cachedFn()
 }
 
-async function getCachedProducts(partnerId: string): Promise<ProductsDashboardData> {
+async function getCachedProducts(partnerId: string, storeId = ""): Promise<ProductsDashboardData> {
   let cachedFn = productsDashboardCacheMap.get(partnerId)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -416,7 +416,7 @@ async function getCachedProducts(partnerId: string): Promise<ProductsDashboardDa
           busyHours: topFromMap(hours, 8),
         }
       },
-      ["dashboard-products", partnerId],
+      ["dashboard-products", partnerId, storeId],
       { tags: [DASHBOARD_TAGS.products(partnerId)], revalidate: 120 },
     )
     productsDashboardCacheMap.set(partnerId, cachedFn)
@@ -424,7 +424,7 @@ async function getCachedProducts(partnerId: string): Promise<ProductsDashboardDa
   return cachedFn()
 }
 
-async function getCachedServices(partnerId: string): Promise<ServicesDashboardData> {
+async function getCachedServices(partnerId: string, storeId = ""): Promise<ServicesDashboardData> {
   let cachedFn = servicesDashboardCacheMap.get(partnerId)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -491,7 +491,7 @@ async function getCachedServices(partnerId: string): Promise<ServicesDashboardDa
           serviceRows: Array.from(byService.entries()).sort((a, b) => b[1].count - a[1].count).slice(0, 8).map(rowFrom),
         }
       },
-      ["dashboard-services", partnerId],
+      ["dashboard-services", partnerId, storeId],
       { tags: [DASHBOARD_TAGS.services(partnerId)], revalidate: 120 },
     )
     servicesDashboardCacheMap.set(partnerId, cachedFn)
@@ -499,7 +499,7 @@ async function getCachedServices(partnerId: string): Promise<ServicesDashboardDa
   return cachedFn()
 }
 
-async function getCachedFinancial(partnerId: string): Promise<FinancialDashboardData> {
+async function getCachedFinancial(partnerId: string, storeId = ""): Promise<FinancialDashboardData> {
   let cachedFn = financialDashboardCacheMap.get(partnerId)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -563,7 +563,7 @@ async function getCachedFinancial(partnerId: string): Promise<FinancialDashboard
           })),
         }
       },
-      ["dashboard-financial", partnerId],
+      ["dashboard-financial", partnerId, storeId],
       { tags: [DASHBOARD_TAGS.financial(partnerId)], revalidate: 120 },
     )
     financialDashboardCacheMap.set(partnerId, cachedFn)
@@ -571,7 +571,7 @@ async function getCachedFinancial(partnerId: string): Promise<FinancialDashboard
   return cachedFn()
 }
 
-async function getCachedOperations(partnerId: string): Promise<OperationsDashboardData> {
+async function getCachedOperations(partnerId: string, storeId = ""): Promise<OperationsDashboardData> {
   let cachedFn = operationsDashboardCacheMap.get(partnerId)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -620,7 +620,7 @@ async function getCachedOperations(partnerId: string): Promise<OperationsDashboa
           })),
         }
       },
-      ["dashboard-operations", partnerId],
+      ["dashboard-operations", partnerId, storeId],
       { tags: [DASHBOARD_TAGS.operations(partnerId)], revalidate: 120 },
     )
     operationsDashboardCacheMap.set(partnerId, cachedFn)
@@ -628,36 +628,36 @@ async function getCachedOperations(partnerId: string): Promise<OperationsDashboa
   return cachedFn()
 }
 
-export async function getDashboardGeneralData(partnerId: string) {
+export async function getDashboardGeneralData(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneral(partnerId)
+  return getCachedGeneral(partnerId, storeId)
 }
 
-export async function getDashboardProductsData(partnerId: string) {
+export async function getDashboardProductsData(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "products", "view")
-  return getCachedProducts(partnerId)
+  return getCachedProducts(partnerId, storeId)
 }
 
-export async function getDashboardServicesData(partnerId: string) {
+export async function getDashboardServicesData(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "appointments", "view")
-  return getCachedServices(partnerId)
+  return getCachedServices(partnerId, storeId)
 }
 
-export async function getDashboardFinancialData(partnerId: string) {
+export async function getDashboardFinancialData(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "financial", "view")
-  return getCachedFinancial(partnerId)
+  return getCachedFinancial(partnerId, storeId)
 }
 
-export async function getDashboardOperationsData(partnerId: string) {
+export async function getDashboardOperationsData(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "delivery", "view")
-  return getCachedOperations(partnerId)
+  return getCachedOperations(partnerId, storeId)
 }
 
 // ============================================================================
 // MODULAR GENERAL TAB - independent queries with granular cache tags
 // ============================================================================
 
-async function getCachedGeneralMetrics(partnerId: string, period: Period = "monthly", todayOverride?: string): Promise<{ metrics: Metric[] }> {
+async function getCachedGeneralMetrics(partnerId: string, storeId = "", period: Period = "monthly", todayOverride?: string): Promise<{ metrics: Metric[] }> {
   const mapKey = `${partnerId}:${period}:${todayOverride || ""}`
   let cachedFn = generalMetricsCacheMap.get(mapKey)
   if (!cachedFn) {
@@ -689,7 +689,7 @@ async function getCachedGeneralMetrics(partnerId: string, period: Period = "mont
           ],
         }
       },
-      ["dashboard-metrics", partnerId, period, todayOverride || ""],
+      ["dashboard-metrics", partnerId, storeId, period, todayOverride || ""],
       { tags: [DASHBOARD_TAGS.metrics(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 60 },
     )
     generalMetricsCacheMap.set(mapKey, cachedFn)
@@ -697,7 +697,7 @@ async function getCachedGeneralMetrics(partnerId: string, period: Period = "mont
   return cachedFn()
 }
 
-async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promise<{ alerts: AlertItem[] }> {
+async function getCachedGeneralAlerts(partnerId: string, storeId = "", sells: string[]): Promise<{ alerts: AlertItem[] }> {
   const mapKey = `${partnerId}:${sells.sort().join(",")}`
   let cachedFn = generalAlertsCacheMap.get(mapKey)
   if (!cachedFn) {
@@ -747,7 +747,7 @@ async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promi
 
         return { alerts }
       },
-      ["dashboard-alerts", partnerId, sells.sort().join(",")],
+      ["dashboard-alerts", partnerId, storeId, sells.sort().join(",")],
       { tags: [DASHBOARD_TAGS.alerts(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
     )
     generalAlertsCacheMap.set(mapKey, cachedFn)
@@ -755,7 +755,7 @@ async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promi
   return cachedFn()
 }
 
-async function getCachedGeneralRevenueChart(partnerId: string, period: Period = "monthly", todayOverride?: string): Promise<{ revenue: any[]; total: number; trend: string }> {
+async function getCachedGeneralRevenueChart(partnerId: string, storeId = "", period: Period = "monthly", todayOverride?: string): Promise<{ revenue: any[]; total: number; trend: string }> {
   const mapKey = `${partnerId}:${period}:${todayOverride || ""}`
   let cachedFn = generalRevenueChartCacheMap.get(mapKey)
   if (!cachedFn) {
@@ -788,7 +788,7 @@ async function getCachedGeneralRevenueChart(partnerId: string, period: Period = 
 
         return { revenue, total, trend }
       },
-      ["dashboard-revenue", partnerId, period, todayOverride || ""],
+      ["dashboard-revenue", partnerId, storeId, period, todayOverride || ""],
       { tags: [DASHBOARD_TAGS.revenue(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
     )
     generalRevenueChartCacheMap.set(mapKey, cachedFn)
@@ -796,7 +796,7 @@ async function getCachedGeneralRevenueChart(partnerId: string, period: Period = 
   return cachedFn()
 }
 
-async function getCachedGeneralRevenueOrigin(partnerId: string, period: Period = "monthly"): Promise<{ origins: ChartPoint[] }> {
+async function getCachedGeneralRevenueOrigin(partnerId: string, storeId = "", period: Period = "monthly"): Promise<{ origins: ChartPoint[] }> {
   const mapKey = `${partnerId}:${period}`
   let cachedFn = generalRevenueOriginCacheMap.get(mapKey)
   if (!cachedFn) {
@@ -820,7 +820,7 @@ async function getCachedGeneralRevenueOrigin(partnerId: string, period: Period =
         const origins = topFromMap(originMap).filter((p) => money(p.value) > 0)
         return { origins }
       },
-      ["dashboard-revenue-origin", partnerId, period],
+      ["dashboard-revenue-origin", partnerId, storeId, period],
       { tags: [DASHBOARD_TAGS.revenueOrigin(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
     )
     generalRevenueOriginCacheMap.set(mapKey, cachedFn)
@@ -828,7 +828,7 @@ async function getCachedGeneralRevenueOrigin(partnerId: string, period: Period =
   return cachedFn()
 }
 
-async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: ActivityItem[] }> {
+async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promise<{ activity: ActivityItem[] }> {
   let cachedFn = generalActivityCacheMap.get(partnerId)
   if (!cachedFn) {
     cachedFn = unstable_cache(
@@ -943,7 +943,7 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
 
         return { activity }
       },
-      ["dashboard-activity", partnerId],
+      ["dashboard-activity", partnerId, storeId],
       { tags: [DASHBOARD_TAGS.activity(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
     )
     generalActivityCacheMap.set(partnerId, cachedFn)
@@ -951,7 +951,7 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
   return cachedFn()
 }
 
-async function getCachedGeneralTopCategories(partnerId: string, sells: string[], period: Period = "monthly"): Promise<{ categories: ChartPoint[] }> {
+async function getCachedGeneralTopCategories(partnerId: string, storeId = "", sells: string[], period: Period = "monthly"): Promise<{ categories: ChartPoint[] }> {
   const mapKey = `${partnerId}:${sells.sort().join(",")}:${period}`
   let cachedFn = generalTopCategoriesCacheMap.get(mapKey)
   if (!cachedFn) {
@@ -994,7 +994,7 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[],
 
         return { categories: topFromMap(categoryMap) }
       },
-      ["dashboard-categories", partnerId, sells.sort().join(","), period],
+      ["dashboard-categories", partnerId, storeId, sells.sort().join(","), period],
       { tags: [DASHBOARD_TAGS.categories(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
     )
     generalTopCategoriesCacheMap.set(mapKey, cachedFn)
@@ -1006,32 +1006,32 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[],
 // PUBLIC EXPORTS - Modular General Tab
 // ============================================================================
 
-export async function getGeneralMetrics(partnerId: string, period: Period = "monthly", todayOverride?: string) {
+export async function getGeneralMetrics(partnerId: string, period: Period = "monthly", todayOverride?: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralMetrics(partnerId, period, todayOverride)
+  return getCachedGeneralMetrics(partnerId, storeId, period, todayOverride)
 }
 
-export async function getGeneralAlerts(partnerId: string, sells: string[]) {
+export async function getGeneralAlerts(partnerId: string, sells: string[], storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralAlerts(partnerId, sells)
+  return getCachedGeneralAlerts(partnerId, storeId, sells)
 }
 
-export async function getGeneralRevenueChart(partnerId: string, period: Period = "monthly", todayOverride?: string) {
+export async function getGeneralRevenueChart(partnerId: string, period: Period = "monthly", todayOverride?: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralRevenueChart(partnerId, period, todayOverride)
+  return getCachedGeneralRevenueChart(partnerId, storeId, period, todayOverride)
 }
 
-export async function getGeneralRevenueOrigin(partnerId: string, period: Period = "monthly") {
+export async function getGeneralRevenueOrigin(partnerId: string, period: Period = "monthly", storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralRevenueOrigin(partnerId, period)
+  return getCachedGeneralRevenueOrigin(partnerId, storeId, period)
 }
 
-export async function getGeneralActivity(partnerId: string) {
+export async function getGeneralActivity(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralActivity(partnerId)
+  return getCachedGeneralActivity(partnerId, storeId)
 }
 
-export async function getGeneralTopCategories(partnerId: string, sells: string[], period: Period = "monthly") {
+export async function getGeneralTopCategories(partnerId: string, sells: string[], period: Period = "monthly", storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneralTopCategories(partnerId, sells, period)
+  return getCachedGeneralTopCategories(partnerId, storeId, sells, period)
 }

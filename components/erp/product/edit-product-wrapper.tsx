@@ -49,7 +49,7 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
 
         try {
             // productData contains the full payload object from AddProductPage.tsx
-            const { partnerId, storeId, pending_variants, ...restData } = productData
+            const { partnerId, pending_variants, ...restData } = productData
 
             const result = await updateProductAction({
                 productId: product.id,

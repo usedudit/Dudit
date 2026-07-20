@@ -9,8 +9,8 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
  */
 const stockMovementsCacheMap = new Map<string, any>()
 
-export const getStockMovementsCached = cache(async (partnerId: string) => {
-    let cachedFn = stockMovementsCacheMap.get(partnerId)
+export const getStockMovementsCached = cache(async (partnerId: string, storeId: string, limit = 50) => {
+    let cachedFn = stockMovementsCacheMap.get(`${partnerId}:${storeId}`)
     if (!cachedFn) {
         cachedFn = unstable_cache(
             async () => {
@@ -37,12 +37,12 @@ export const getStockMovementsCached = cache(async (partnerId: string) => {
 
                 return data
             },
-            [TAGS.stockMovements(partnerId)],
+            [TAGS.stockMovements(partnerId), storeId, String(limit)],
             {
                 tags: [TAGS.stockMovements(partnerId)]
             }
         )
-        stockMovementsCacheMap.set(partnerId, cachedFn)
+        stockMovementsCacheMap.set(`${partnerId}:${storeId}`, cachedFn)
     }
-    return cachedFn()
+    return cachedFn(partnerId, storeId, limit)
 })

@@ -7,6 +7,9 @@ import { requireUser, requirePartnerAccess, requirePartnerAccessWithPermission, 
 import { setActiveStore } from "@/lib/auth/partner-context"
 import { logAudit } from "@/lib/observability/audit-log"
 import type { ActionResponse } from "@/lib/types/action-response"
+import { safeRevalidateTag } from "@/lib/utils/revalidation"
+import { TAGS } from "@/lib/utils/revalidation-tags"
+import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 
 export async function listStoresAction(partnerId: string) {
     await requireUser()
@@ -450,14 +453,50 @@ export async function createStoreWithInheritanceAction(input: CreateStoreWithInh
     }
 }
 
-export async function setActiveStoreAction(storeId: string): Promise<ActionResponse<void>> {
+export async function setActiveStoreAction(storeId: string, partnerId?: string): Promise<ActionResponse<void>> {
     try {
         await requireUser()
         await requireStoreAccess(storeId)
+
+        // Resolve partnerId for cache invalidation
+        // (if not provided, fetch from store)
+        let effectivePartnerId = partnerId
+        if (!effectivePartnerId) {
+            const admin = createAdminClient()
+            const { data: store } = await admin.from("stores").select("partner_id").eq("id", storeId).single()
+            effectivePartnerId = store?.partner_id
+        }
+        if (!effectivePartnerId) return { success: false, error: "Loja não encontrada" }
+
         await setActiveStore(storeId)
 
-        // F5.5a: Invalidate all store-dependent caches
+        // F5.5a + cache audit: Invalidate ALL store-dependent caches
+        // RevalidatePath handles Next.js Router Cache
         revalidatePath("/", "layout")
+
+        // RevalidateTag handles unstable_cache entries
+        safeRevalidateTag(TAGS.products(effectivePartnerId))
+        safeRevalidateTag(TAGS.orders(effectivePartnerId))
+        safeRevalidateTag(TAGS.customers(effectivePartnerId))
+        safeRevalidateTag(TAGS.suppliers(effectivePartnerId))
+        safeRevalidateTag(TAGS.quotes(effectivePartnerId))
+        safeRevalidateTag(TAGS.stockMovements(effectivePartnerId))
+        safeRevalidateTag(TAGS.transactions(effectivePartnerId))
+        safeRevalidateTag(TAGS.coupons(effectivePartnerId))
+        safeRevalidateTag(`payment-methods-${effectivePartnerId}`)
+        safeRevalidateTag(`suppliers-list-${effectivePartnerId}`)
+        safeRevalidateTag(DASHBOARD_TAGS.general(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.products(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.services(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.financial(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.operations(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.metrics(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.alerts(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.revenue(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.revenueOrigin(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.activity(effectivePartnerId))
+        safeRevalidateTag(DASHBOARD_TAGS.categories(effectivePartnerId))
+        safeRevalidateTag(`partner-${effectivePartnerId}`)
 
         logAudit("store.switched", {
             storeId,

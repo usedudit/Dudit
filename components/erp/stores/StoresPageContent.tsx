@@ -38,14 +38,14 @@ export function StoresPageContent({ partnerId }: { partnerId: string }) {
   const [isSaving, setIsSaving] = useState(false)
   const [showInheritance, setShowInheritance] = useState(false)
   const [inheritOptions, setInheritOptions] = useState({
-    inheritProducts: true,
-    inheritServices: true,
-    inheritCategories: true,
-    inheritPaymentMethods: true,
-    inheritFinancialSettings: true,
-    inheritLogistics: true,
-    inheritOpeningHours: true,
-    inheritShowcase: true,
+    inheritProducts: false,
+    inheritServices: false,
+    inheritCategories: false,
+    inheritPaymentMethods: false,
+    inheritFinancialSettings: false,
+    inheritLogistics: false,
+    inheritOpeningHours: false,
+    inheritShowcase: false,
   })
   const { selectStore, stores: contextStores } = useStore()
 
@@ -276,6 +276,30 @@ export function StoresPageContent({ partnerId }: { partnerId: string }) {
                     <p className="text-xs text-brand-inactive-text mb-2">
                       Origem: <strong>{sourceStore.name}</strong>
                     </p>
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setInheritOptions({
+                          inheritProducts: true, inheritServices: true, inheritCategories: true,
+                          inheritPaymentMethods: true, inheritFinancialSettings: true,
+                          inheritLogistics: true, inheritOpeningHours: true, inheritShowcase: true,
+                        })}
+                        className="text-xs text-brand-primary hover:underline"
+                      >
+                        Selecionar todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInheritOptions({
+                          inheritProducts: false, inheritServices: false, inheritCategories: false,
+                          inheritPaymentMethods: false, inheritFinancialSettings: false,
+                          inheritLogistics: false, inheritOpeningHours: false, inheritShowcase: false,
+                        })}
+                        className="text-xs text-brand-inactive-text hover:underline"
+                      >
+                        Limpar todos
+                      </button>
+                    </div>
                     {[
                       { key: "inheritProducts", label: "Produtos" },
                       { key: "inheritServices", label: "Serviços" },

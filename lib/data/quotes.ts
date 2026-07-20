@@ -10,8 +10,8 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
  */
 const partnerQuotesCacheMap = new Map<string, any>()
 
-export const getPartnerQuotesCached = cache(async (partnerId: string, limit: number = 50, offset: number = 0) => {
-    const mapKey = `${partnerId}:${limit}:${offset}`
+export const getPartnerQuotesCached = cache(async (partnerId: string, storeId: string, limit: number = 50, offset: number = 0) => {
+    const mapKey = `${partnerId}:${storeId}:${limit}:${offset}`
     let cachedFn = partnerQuotesCacheMap.get(mapKey)
     if (!cachedFn) {
         cachedFn = unstable_cache(
@@ -59,14 +59,14 @@ export const getPartnerQuotesCached = cache(async (partnerId: string, limit: num
 
                 return { data: mappedData, total: count || 0 }
             },
-            [TAGS.quotes(partnerId), String(limit), String(offset)],
+            [TAGS.quotes(partnerId), storeId, String(limit), String(offset)],
             {
                 tags: [TAGS.quotes(partnerId)]
             }
         )
         partnerQuotesCacheMap.set(mapKey, cachedFn)
     }
-    return cachedFn()
+    return cachedFn(partnerId, storeId, limit, offset)
 })
 
 /**

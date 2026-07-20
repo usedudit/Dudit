@@ -12,10 +12,11 @@ export async function fetchERPOrdersClient() {
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
+  const storeId = context.activeStoreId || ""
   const { allowed } = await checkPermission(partnerId, "orders", "view")
   if (!allowed) throw new Error("Forbidden")
 
-  return getPartnerOrdersCached(partnerId)
+  return getPartnerOrdersCached(partnerId, storeId)
 }
 
 import { getERPProductsPageData } from "@/app/actions/erp/products"
@@ -46,10 +47,11 @@ export async function fetchERPSuppliersClient() {
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
+  const storeId = context.activeStoreId || ""
   const { allowed } = await checkPartnerPermission(partnerId, "suppliers", "view")
   if (!allowed) throw new Error("Forbidden")
 
-  return getPartnerSuppliersCached(partnerId)
+  return getPartnerSuppliersCached(partnerId, storeId)
 }
 
 /**

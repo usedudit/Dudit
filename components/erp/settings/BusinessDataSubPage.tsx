@@ -104,12 +104,12 @@ export const BusinessDataSubPage = ({
         storeDescription: store?.description || partner.store_description || "",
         businessType: partner.business_type || "pf",
         cnpj: partner.cpf || partner.cnpj || "",
-        sells: effectiveBusinessInfo?.sells || ["products"],
-        mode: (effectiveBusinessInfo?.mode || "erp") as BusinessMode,
-        phone: formatE164ToDisplay(store?.phone || partner.phone) || "",
+        sells: store?.business_info?.sells || partnerBusinessInfo?.sells || ["products"],
+        mode: ((store?.business_info?.mode || partnerBusinessInfo?.mode || "erp")) as BusinessMode,
+        phone: store?.phone ? formatE164ToDisplay(store.phone) : "",
         category: partner.category || "",
-        categoryId: store?.category_id || partner.category_id || null,
-        subcategoryId: store?.subcategory_id || partner.subcategory_id || null,
+        categoryId: store?.category_id || null,
+        subcategoryId: store?.subcategory_id || null,
     })
 
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -130,15 +130,22 @@ export const BusinessDataSubPage = ({
 
     const partnerAddress = partner.addresses?.[0] || {};
     const storeAddress = store?.addresses?.[0] || {};
+    const effectiveZip = store?.zip_code || storeAddress.zip_code || "";
+    const effectiveStreet = store?.street || storeAddress.street || "";
+    const effectiveNumber = store?.number || storeAddress.number || "";
+    const effectiveComplement = store?.complement || storeAddress.complement || "";
+    const effectiveNeighborhood = store?.neighborhood || storeAddress.neighborhood || "";
+    const effectiveCity = store?.city || storeAddress.city || "";
+    const effectiveState = store?.state || storeAddress.state || "";
     const [addresses, setAddresses] = useState({
-        zipCode: store?.zip_code || storeAddress.zip_code || partner.zip_code || partnerAddress.zip_code || "",
-        street: store?.street || storeAddress.street || partner.street || partnerAddress.street || "",
-        number: store?.number || storeAddress.number || partner.number || partnerAddress.number || "",
-        complement: store?.complement || storeAddress.complement || partner.complement || partnerAddress.complement || "",
-        neighborhood: store?.neighborhood || storeAddress.neighborhood || partner.neighborhood || partnerAddress.neighborhood || "",
-        city: store?.city || storeAddress.city || partner.city || partnerAddress.city || "",
-        state: store?.state || storeAddress.state || partner.state || partnerAddress.state || "",
-        noNumber: (store?.number || storeAddress.number || partner.number || partnerAddress.number) === "S/N",
+        zipCode: effectiveZip,
+        street: effectiveStreet,
+        number: effectiveNumber,
+        complement: effectiveComplement,
+        neighborhood: effectiveNeighborhood,
+        city: effectiveCity,
+        state: effectiveState,
+        noNumber: effectiveNumber === "S/N",
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
@@ -149,7 +156,7 @@ export const BusinessDataSubPage = ({
         inscricaoMunicipal: partner.inscricao_municipal || "",
     })
 
-    const [hours, setHours] = useState(() => normalizeOpeningHours(store?.opening_hours || partner.opening_hours))
+    const [hours, setHours] = useState(() => store?.opening_hours ? normalizeOpeningHours(store.opening_hours) : {})
 
     const [initialState, setInitialState] = useState(() => ({
         generalInfo: { ...generalInfo },

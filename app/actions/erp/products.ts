@@ -1868,7 +1868,7 @@ export const getCachedProductById = async (productId: string) => {
             const supabase = getAdminClient()
             const { data: product, error } = await supabase
                 .from("products")
-                .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*)")
+                .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*), store_products(*)")
                 .eq("id", productId)
                 .single()
             if (error) throw error

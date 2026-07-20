@@ -94,6 +94,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     const [showAddStoreMemberModal, setShowAddStoreMemberModal] = useState(false)
     const [selectedStoreMemberUserId, setSelectedStoreMemberUserId] = useState<string | null>(null)
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
+    const [memberStoreMap, setMemberStoreMap] = useState<Record<string, string[]>>({})
     const [inviteToDelete, setInviteToDelete] = useState<string | null>(null)
     const { toast } = useToast()
     const [selectedMemberStats, setSelectedMemberStats] = useState<TeamMemberStats | null>(null)
@@ -141,6 +142,36 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     useEffect(() => {
         fetchStoreMembers()
     }, [fetchStoreMembers])
+
+    // Load store memberships for all stores to display badges
+    useEffect(() => {
+        if (!allStores.length) return
+        const fetchAllStoreMemberships = async () => {
+            const results = await Promise.allSettled(
+                allStores.map(store =>
+                    listStoreMembersAction(store.id, partnerId)
+                        .then(members => ({ storeId: store.id, members }))
+                        .catch(() => ({ storeId: store.id, members: [] }))
+                )
+            )
+            const map: Record<string, string[]> = {}
+            for (const result of results) {
+                if (result.status === "fulfilled") {
+                    const { storeId, members } = result.value
+                    const store = allStores.find(s => s.id === storeId)
+                    const storeName = store?.name || storeId
+                    for (const m of members) {
+                        if (!map[m.partner_user_id]) map[m.partner_user_id] = []
+                        if (!map[m.partner_user_id].includes(storeName)) {
+                            map[m.partner_user_id].push(storeName)
+                        }
+                    }
+                }
+            }
+            setMemberStoreMap(map)
+        }
+        fetchAllStoreMemberships()
+    }, [allStores, partnerId])
 
     const handleAddStoreMember = async (partnerUserId: string) => {
         if (!selectedStore) return
@@ -322,11 +353,6 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                         <TabsTrigger value="invites">
                                             Convites ({invitations.filter(i => !i.used_at && !i.revoked_at).length})
                                         </TabsTrigger>
-                                        {selectedStore && (
-                                            <TabsTrigger value="store">
-                                                Loja ({storeMembers.length})
-                                            </TabsTrigger>
-                                        )}
                                     </TabsList>
                                 </div>
                             </div>
@@ -368,7 +394,8 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                     <th className="py-3 px-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Membro</th>
                                                                     <th className="py-3 px-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Data de Entrada</th>
                                                                     <th className="py-3 px-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Função</th>
-                                                                    <th className="py-3 px-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-right">Ações</th>
+                                                                    <th className="py-3 px-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Lojas</th>
+                                                                    <th className="py-3 px-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-right">Ações</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="divide-y divide-brand-border dark:divide-dark-border">
@@ -405,6 +432,23 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                                 {ROLE_LABELS[member.role as PartnerRole] || member.role}
                                                                             </Badge>
                                                                         </td>
+                                                                        <td className="py-4 px-4 text-center">
+                                                                            <div className="flex flex-wrap gap-1 justify-center max-w-[200px]">
+                                                                                {(memberStoreMap[member.userId] || []).slice(0, 3).map((s: string) => (
+                                                                                    <Badge key={s} variant="gray" icon={null} className="text-[10px] whitespace-nowrap">
+                                                                                        {s}
+                                                                                    </Badge>
+                                                                                ))}
+                                                                                {(memberStoreMap[member.userId] || []).length > 3 && (
+                                                                                    <Badge variant="gray" icon={null} className="text-[10px]">
+                                                                                        +{(memberStoreMap[member.userId] || []).length - 3}
+                                                                                    </Badge>
+                                                                                )}
+                                                                                {(memberStoreMap[member.userId] || []).length === 0 && (
+                                                                                    <span className="text-[12px] text-brand-inactive-text">—</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
                                                                         <td className="py-4 px-6 text-right">
                                                                             <ActionsDropdown
                                                                                 onDelete={member.userId !== currentUserId ? () => setMemberToDelete(member.userId) : undefined}
@@ -420,6 +464,16 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                                                 <UserIcon size={16} /> Alterar para {ROLE_LABELS[role]}
                                                                                             </DropdownItem>
                                                                                         ))
+                                                                                )}
+                                                                                {currentUserRole && member.userId !== currentUserId && (member.role === "MANAGER" || member.role === "OPERATOR" || member.role === "DELIVERY") && canModifyUser(currentUserRole, member.role as PartnerRole) && (
+                                                                                    <DropdownItem
+                                                                                        onClick={() => {
+                                                                                            setShowAddStoreMemberModal(true)
+                                                                                            setSelectedStoreMemberUserId(member.userId)
+                                                                                        }}
+                                                                                    >
+                                                                                        Gerenciar lojas
+                                                                                    </DropdownItem>
                                                                                 )}
                                                                             </ActionsDropdown>
                                                                         </td>
@@ -593,118 +647,6 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                             )}
                                         </FadeIn>
                                     </TabsContent>
-
-                                    {selectedStore && (
-                                        <TabsContent value="store" className="mt-6">
-                                            <FadeIn>
-                                                <div className="flex items-center justify-between mb-6">
-                                                    <div>
-                                                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Membros da Loja</h2>
-                                                        <p className="text-sm text-brand-inactive-text">Membros com acesso à loja <strong>{selectedStore.name}</strong></p>
-                                                    </div>
-                                                    <Button leftIcon={<PlusIcon size={18} />} onClick={() => setShowAddStoreMemberModal(true)}>
-                                                        Adicionar membro
-                                                    </Button>
-                                                </div>
-
-                                                {isLoadingStoreMembers ? (
-                                                    <div className="flex justify-center p-12"><ThreeDotsLoader /></div>
-                                                ) : storeMembers.length === 0 ? (
-                                                    <div className="flex flex-col items-center justify-center text-center min-h-[200px]">
-                                                        <IconPlaceholder
-                                                            placeholderType="image"
-                                                            imageSrc="https://img.dudit.com.br/static/mascots/Equipe.png"
-                                                            imageAlt="Sem membros na loja"
-                                                            title="Nenhum membro nesta loja"
-                                                            subtitle="Adicione membros da equipe para gerenciar o acesso a esta loja."
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <div className="hidden md:block overflow-x-auto">
-                                                            <table className="w-full text-left border-separate border-spacing-0">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 px-6 rounded-l-lg text-[13px] font-medium text-gray-500">Membro</th>
-                                                                        <th className="py-3 px-6 text-[13px] font-medium text-gray-500 text-center">Função</th>
-                                                                        <th className="py-3 px-6 rounded-r-lg text-[13px] font-medium text-gray-500 text-right">Ações</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                                                    {storeMembers.map((sm) => {
-                                                                        const teamMember = teamMembers.find(tm => tm.id === sm.partner_user_id)
-                                                                        return (
-                                                                            <tr key={sm.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors">
-                                                                                <td className="py-4 px-6">
-                                                                                    <div className="flex items-center gap-4">
-                                                                                        <UserProfileImage
-                                                                                            fullName={teamMember?.fullName || "Usuário"}
-                                                                                            className="w-10 h-10 text-[14px]"
-                                                                                        />
-                                                                                        <div className="flex flex-col min-w-0">
-                                                                                            <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                                {teamMember?.fullName || "Usuário"}
-                                                                                            </span>
-                                                                                            <span className="text-xs font-medium text-brand-inactive-text truncate">
-                                                                                                {teamMember?.email || sm.partner_user_id}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="py-4 px-4 text-center">
-                                                                                    <Badge variant="blue">
-                                                                                        {sm.role ? (ROLE_LABELS[sm.role as PartnerRole] || sm.role) : "Operador"}
-                                                                                    </Badge>
-                                                                                </td>
-                                                                                <td className="py-4 px-6 text-right">
-                                                                                    <ActionsDropdown
-                                                                                        onDelete={() => setSelectedStoreMemberUserId(sm.id)}
-                                                                                    />
-                                                                                </td>
-                                                                            </tr>
-                                                                        )
-                                                                    })}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-
-                                                        <div className="md:hidden flex flex-col">
-                                                            {storeMembers.map((sm, idx) => {
-                                                                const teamMember = teamMembers.find(tm => tm.id === sm.partner_user_id)
-                                                                return (
-                                                                    <React.Fragment key={sm.id}>
-                                                                        <div className="py-5 flex items-start justify-between gap-4">
-                                                                            <div className="flex items-start gap-4 min-w-0 flex-1">
-                                                                                <UserProfileImage
-                                                                                    fullName={teamMember?.fullName || "Usuário"}
-                                                                                    className="w-12 h-12 text-[16px] shrink-0"
-                                                                                />
-                                                                                <div className="flex flex-col min-w-0">
-                                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                        {teamMember?.fullName || "Usuário"}
-                                                                                    </h3>
-                                                                                    <span className="text-sm text-brand-inactive-text font-medium truncate">
-                                                                                        {teamMember?.email || sm.partner_user_id}
-                                                                                    </span>
-                                                                                    <Badge variant="blue" className="mt-1 w-fit">
-                                                                                        {sm.role ? (ROLE_LABELS[sm.role as PartnerRole] || sm.role) : "Operador"}
-                                                                                    </Badge>
-                                                                                </div>
-                                                                            </div>
-                                                                            <ActionsDropdown
-                                                                                onDelete={() => setSelectedStoreMemberUserId(sm.id)}
-                                                                            />
-                                                                        </div>
-                                                                        {idx < storeMembers.length - 1 && <Separator className="opacity-50" />}
-                                                                    </React.Fragment>
-                                                                )
-                                                            })}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </FadeIn>
-                                        </TabsContent>
-                                    )}
                                 </div>
                             )}
                         </div>
@@ -862,33 +804,73 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
 
                     <DefaultModal
                         isOpen={showAddStoreMemberModal}
-                        onClose={() => setShowAddStoreMemberModal(false)}
-                        title="Adicionar membro à loja"
+                        onClose={() => { setShowAddStoreMemberModal(false); setSelectedStoreMemberUserId(null); }}
+                        title={selectedStoreMemberUserId ? "Gerenciar lojas do membro" : "Adicionar membro à loja atual"}
                     >
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {teamMembers.filter(tm => !storeMembers.some(sm => sm.partner_user_id === tm.id)).length === 0 ? (
-                                <p className="text-sm text-brand-inactive-text text-center py-8">Todos os membros da equipe já têm acesso a esta loja.</p>
-                            ) : (
-                                teamMembers
-                                    .filter(tm => !storeMembers.some(sm => sm.partner_user_id === tm.id))
-                                    .map(tm => (
-                                        <div
-                                            key={tm.id}
-                                            className="flex items-center justify-between p-3 rounded-xl hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
-                                            onClick={() => handleAddStoreMember(tm.id)}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <UserProfileImage fullName={tm.fullName || "Usuário"} className="w-10 h-10 text-[14px]" />
-                                                <div>
-                                                    <p className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">{tm.fullName || "Usuário"}</p>
-                                                    <p className="text-xs text-brand-inactive-text">{tm.email}</p>
+                        {selectedStoreMemberUserId ? (
+                            <div className="space-y-3">
+                                <p className="text-sm text-brand-inactive-text mb-3">
+                                    Selecione as lojas que este membro pode acessar:
+                                </p>
+                                {allStores.map((store) => {
+                                    const sm = storeMembers.find(s => s.partner_user_id === selectedStoreMemberUserId && s.store_id === store.id)
+                                    const hasAccess = !!sm
+                                    return (
+                                        <label key={store.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={hasAccess}
+                                                onChange={async (e) => {
+                                                    if (e.target.checked) {
+                                                        const res = await addStoreMemberAction(selectedStoreMemberUserId, store.id, partnerId, "OPERATOR")
+                                                        if (res.success) {
+                                                            toast({ title: "Sucesso", description: "Acesso adicionado.", variant: "success" })
+                                                        } else {
+                                                            toast({ title: "Erro", description: res.error || "Erro", variant: "destructive" })
+                                                        }
+                                                    } else if (sm) {
+                                                        const res = await removeStoreMemberAction(sm.id, store.id, partnerId)
+                                                        if (res.success) {
+                                                            toast({ title: "Sucesso", description: "Acesso removido.", variant: "success" })
+                                                        } else {
+                                                            toast({ title: "Erro", description: res.error || "Erro", variant: "destructive" })
+                                                        }
+                                                    }
+                                                    fetchStoreMembers()
+                                                }}
+                                                className="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent"
+                                            />
+                                            <span className="text-sm text-brand-dark dark:text-dark-heading font-medium">{store.name}</span>
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {teamMembers.filter(tm => !storeMembers.some(sm => sm.partner_user_id === tm.id)).length === 0 ? (
+                                    <p className="text-sm text-brand-inactive-text text-center py-8">Todos os membros da equipe já têm acesso a esta loja.</p>
+                                ) : (
+                                    teamMembers
+                                        .filter(tm => !storeMembers.some(sm => sm.partner_user_id === tm.id))
+                                        .map(tm => (
+                                            <div
+                                                key={tm.id}
+                                                className="flex items-center justify-between p-3 rounded-xl hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
+                                                onClick={() => handleAddStoreMember(tm.id)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <UserProfileImage fullName={tm.fullName || "Usuário"} className="w-10 h-10 text-[14px]" />
+                                                    <div>
+                                                        <p className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">{tm.fullName || "Usuário"}</p>
+                                                        <p className="text-xs text-brand-inactive-text">{tm.email}</p>
+                                                    </div>
                                                 </div>
+                                                <Badge variant="blue">{ROLE_LABELS[tm.role as PartnerRole] || tm.role}</Badge>
                                             </div>
-                                            <Badge variant="blue">{ROLE_LABELS[tm.role as PartnerRole] || tm.role}</Badge>
-                                        </div>
-                                    ))
-                            )}
-                        </div>
+                                        ))
+                                )}
+                            </div>
+                        )}
                     </DefaultModal>
 
                     {/* Member Stats Modal */}
