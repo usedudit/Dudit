@@ -148,7 +148,7 @@ BEGIN
 
     SELECT array_agg(id) INTO v_rec_plan_ids FROM public.recurring_plans WHERE partner_id = p_partner_id;
     IF v_rec_plan_ids IS NOT NULL AND array_length(v_rec_plan_ids, 1) > 0 THEN
-      DELETE FROM public.recurring_plan_items WHERE recurring_plan_id = ANY(v_rec_plan_ids);
+      DELETE FROM public.recurring_plan_items WHERE plan_id = ANY(v_rec_plan_ids);
       GET DIAGNOSTICS v_temp_rows = ROW_COUNT;
       v_affected_rows := v_affected_rows + v_temp_rows;
     END IF;

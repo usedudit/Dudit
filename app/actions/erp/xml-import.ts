@@ -992,7 +992,7 @@ export async function confirmImportAction(
           .from("transaction_contacts")
           .select("id")
           .eq("partner_id", partnerId)
-          .eq("type", "fornecedor")
+          .eq("type", "supplier")
           .eq("name", supplier.name)
           .maybeSingle()
 
@@ -1002,8 +1002,9 @@ export async function confirmImportAction(
             .insert({
               partner_id: partnerId,
               name: supplier.name,
-              type: "fornecedor",
+              type: "supplier",
               description: "Fornecedor (importado de XML NF-e)",
+              store_id: storeId,
             })
             .select("id")
             .single()
@@ -1016,6 +1017,7 @@ export async function confirmImportAction(
           const transactions = hasParcelas
             ? duplicatas.map((d: any) => ({
               partner_id: partnerId,
+              store_id: storeId,
               contact_id: contact.id,
               transaction_type: "expense" as const,
               category: "purchasing",
@@ -1027,6 +1029,7 @@ export async function confirmImportAction(
             }))
             : [{
               partner_id: partnerId,
+              store_id: storeId,
               contact_id: contact.id,
               transaction_type: "expense" as const,
               category: "purchasing",
