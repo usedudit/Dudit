@@ -9,7 +9,6 @@ import {
   markNotificationsReadAction,
 } from "@/app/actions/notifications"
 import type { NotificationPageCursor, NotificationRecord } from "@/lib/notifications/types"
-import { useNotificationsRealtime } from "./use-notifications-realtime"
 import { useSupabase } from "@/providers/supabase-provider"
 
 const READ_DELAY_MS = 2000
@@ -85,11 +84,7 @@ export function useNotifications() {
     queryClient.invalidateQueries({ queryKey: ["notifications", "list", user?.id] })
   }, [queryClient, user?.id])
 
-  useNotificationsRealtime({
-    userId: user?.id,
-    enabled: Boolean(user?.id),
-    onChange: invalidate,
-  })
+
 
   const allItems = useMemo(
     () => listQuery.data?.pages.flatMap((p) => p.items) ?? [],

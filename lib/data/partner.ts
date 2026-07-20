@@ -7,30 +7,31 @@ import { unstable_cache } from "next/cache"
  * Cross-request cached partner status check (uses unstable_cache for CDN/edge caching).
  * Used in ERP layout for the initial partner gate.
  */
-export const getPartnerStatus = async (userId: string) => {
-    const cachedFn = unstable_cache(
-        async () => {
-            try {
-                const supabase = createAdminClient()
-                const { data } = await supabase
-                    .from("partners")
-                    .select("id")
-                    .eq("user_id", userId)
-                    .maybeSingle()
-                return data
-            } catch (error) {
-                console.error("Error fetching partner status:", error)
-                return null
-            }
-        },
-        ['partner-status', userId],
-        {
-            revalidate: 10,  // Reduced from 60 to 10 seconds for faster updates
-            tags: ['partner-status']
+const getPartnerStatusCached = unstable_cache(
+    async (userId: string) => {
+        try {
+            const supabase = createAdminClient()
+            const { data } = await supabase
+                .from("partners")
+                .select("id")
+                .eq("user_id", userId)
+                .maybeSingle()
+            return data
+        } catch (error) {
+            console.error("Error fetching partner status:", error)
+            return null
         }
-    )
-    return cachedFn()
-}
+    },
+    ['partner-status'],
+    {
+        revalidate: 10,  // Reduced from 60 to 10 seconds for faster updates
+        tags: ['partner-status']
+    }
+)
+
+export const getPartnerStatus = cache(async (userId: string) => {
+    return getPartnerStatusCached(userId)
+})
 
 /**
  * Per-request cached full partner record lookup by user ID.

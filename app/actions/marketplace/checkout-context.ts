@@ -113,7 +113,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
   // para usar no cálculo do depósito, alinhado com o que o resolver do carrinho usa
   const originalServicesSubtotal = servicesSubtotal
 
-  const [{ data: partnerRow }, plan, deliveryConfig, pixMethodResult, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
+  const [{ data: partnerRow }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
     admin
       .from("partners")
       .select(
@@ -123,18 +123,11 @@ export async function getMarketplaceCheckoutContextAction(input: {
       .maybeSingle(),
     getPartnerPlan(resolved.partnerId),
     getPartnerDeliveryConfigAction(resolved.partnerId),
-    admin
-      .from("payment_methods")
-      .select("pix_key, pix_key_type")
-      .eq("partner_id", resolved.partnerId)
-      .eq("type", "pix")
-      .eq("is_active", true)
-      .maybeSingle(),
-      cachedListActivePromotionsInBatch([resolved.partnerId], user.id),
+    cachedListActivePromotionsInBatch([resolved.partnerId], user.id),
     admin
       .from("payment_methods")
       .select(
-        "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand"
+        "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, pix_key, pix_key_type"
       )
       .eq("partner_id", resolved.partnerId)
       .eq("is_active", true)
@@ -297,6 +290,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const partnerAddress = Array.isArray(addresses) ? addresses[0] : addresses
 
   const rawMethods = (storefrontPaymentMethodsResult as any)?.data || []
+  const pixMethod = rawMethods.find((m: any) => m.type === "pix") || null
   const bestByType = new Map<string, any>()
   const typeOrder = ["pix", "credit_card", "debit_card", "cash", "other"]
   for (const m of rawMethods) {
@@ -346,8 +340,8 @@ export async function getMarketplaceCheckoutContextAction(input: {
       store_name: partnerRow?.store_name || null,
       mpConnected,
       phone: partnerRow?.phone || null,
-      pixKey: pixMethodResult?.data?.pix_key || null,
-      pixKeyType: pixMethodResult?.data?.pix_key_type || null,
+      pixKey: pixMethod?.pix_key || null,
+      pixKeyType: pixMethod?.pix_key_type || null,
       pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",
       orderFlow: plan?.slug === "free" ? "whatsapp" : ((partnerRow as any)?.order_flow || "dudit"),
       planSlug: plan?.slug || "free",

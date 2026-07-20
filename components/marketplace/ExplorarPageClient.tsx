@@ -151,8 +151,9 @@ export function ExplorarPageClient({
         return dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES
     }, [dbCategories])
 
+    const categoriesLoadedRef = useRef(false)
+
     useEffect(() => {
-        const categoriesLoadedRef = { current: false }
         if (categoriesLoadedRef.current) return
         categoriesLoadedRef.current = true
 
@@ -190,6 +191,11 @@ export function ExplorarPageClient({
     const observerTarget = useRef<HTMLDivElement>(null)
     const MAX_ITEMS = 300 // Memory cap
     const fetchFnMountedRef = useRef(false) // Dev-mode strict-mode guard
+
+    const queryKeyString = `${query}:${currentType}:${selectedCitySlug}:${selectedRadius}:${selectedSection}`
+    useEffect(() => {
+        fetchFnMountedRef.current = false
+    }, [queryKeyString])
 
     const isLandingPage = false
 

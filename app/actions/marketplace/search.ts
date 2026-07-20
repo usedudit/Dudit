@@ -543,7 +543,8 @@ async function _searchMarketplaceInternal(
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active),
-                        show_price_in_store
+                        show_price_in_store,
+                        store_products(marketplace_visible, visibility_scope)
                     `)
                         .in("id", produtosIds)
                         .eq("is_active", true)
@@ -557,7 +558,8 @@ async function _searchMarketplaceInternal(
                         id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                         marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
-                        show_price_in_store
+                        show_price_in_store,
+                        store_services(marketplace_visible, visibility_scope)
                     `)
                         .in("id", servicosIds)
                         .eq("is_active", true)
@@ -591,12 +593,18 @@ async function _searchMarketplaceInternal(
             const results = await Promise.all(promises)
 
             if (_prodIdx !== -1 && results[_prodIdx]?.data?.length > 0) {
-                const visibleIds = await filterMarketplaceVisibleProducts(results[_prodIdx].data.map((p: any) => p.id))
-                results[_prodIdx].data = results[_prodIdx].data.filter((p: any) => visibleIds.has(p.id))
+                results[_prodIdx].data = results[_prodIdx].data.filter((p: any) => {
+                    const links = p.store_products || []
+                    if (links.length === 0) return true
+                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
+                })
             }
             if (_servIdx !== -1 && results[_servIdx]?.data?.length > 0) {
-                const visibleIds = await filterMarketplaceVisibleServices(results[_servIdx].data.map((s: any) => s.id))
-                results[_servIdx].data = results[_servIdx].data.filter((s: any) => visibleIds.has(s.id))
+                results[_servIdx].data = results[_servIdx].data.filter((s: any) => {
+                    const links = s.store_services || []
+                    if (links.length === 0) return true
+                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
+                })
             }
 
             let fallbackRecords: any[] = []
@@ -723,7 +731,8 @@ async function hydrateMarketplaceSearchHits(
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active),
-                show_price_in_store
+                show_price_in_store,
+                store_products(marketplace_visible, visibility_scope)
             `)
                 .in("id", produtosIds)
                 .eq("is_active", true)
@@ -737,7 +746,8 @@ async function hydrateMarketplaceSearchHits(
                 id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
-                show_price_in_store
+                show_price_in_store,
+                store_services(marketplace_visible, visibility_scope)
             `)
                 .in("id", servicosIds)
                 .eq("is_active", true)
@@ -771,12 +781,18 @@ async function hydrateMarketplaceSearchHits(
     const queryResults = await Promise.all(promises)
 
     if (_hydrateProdIdx !== -1 && queryResults[_hydrateProdIdx]?.data?.length > 0) {
-        const visibleIds = await filterMarketplaceVisibleProducts(queryResults[_hydrateProdIdx].data.map((p: any) => p.id))
-        queryResults[_hydrateProdIdx].data = queryResults[_hydrateProdIdx].data.filter((p: any) => visibleIds.has(p.id))
+        queryResults[_hydrateProdIdx].data = queryResults[_hydrateProdIdx].data.filter((p: any) => {
+            const links = p.store_products || []
+            if (links.length === 0) return true
+            return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
+        })
     }
     if (_hydrateServIdx !== -1 && queryResults[_hydrateServIdx]?.data?.length > 0) {
-        const visibleIds = await filterMarketplaceVisibleServices(queryResults[_hydrateServIdx].data.map((s: any) => s.id))
-        queryResults[_hydrateServIdx].data = queryResults[_hydrateServIdx].data.filter((s: any) => visibleIds.has(s.id))
+        queryResults[_hydrateServIdx].data = queryResults[_hydrateServIdx].data.filter((s: any) => {
+            const links = s.store_services || []
+            if (links.length === 0) return true
+            return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
+        })
     }
     const recordMap = new Map<string, any>()
 
@@ -942,53 +958,52 @@ async function searchMarketplaceByCity(
     const dbCity = resolved?.city
     const dbState = resolved?.state || state
 
-    let partnersQuery = supabase
-        .from("partners")
-        .select("id, latitude, longitude, addresses!inner(city, state)")
-        .eq("is_active", true)
-        .eq("addresses.state", dbState)
-
-    if (cidadeSlug.startsWith("estado-")) {
-        // Rota de estado: não filtra por cidade
-    } else if (dbCity) {
-        partnersQuery = partnersQuery.eq("addresses.city", dbCity)
-    } else {
-        partnersQuery = partnersQuery.ilike("addresses.city", targetCitySlug.replace(/-/g, ' '))
-    }
-
-    const partnersRes = await partnersQuery
-    if (partnersRes.error) {
-        console.error("[searchMarketplaceByCity] Partner fetch error:", partnersRes.error)
-    }
-    const allPartners = partnersRes.data || []
-    let partnerIds = allPartners.map((p: any) => p.id)
-
-    // Filtro por Raio
-    let centerCoords = limits.centerCoords || null
-    if (!centerCoords && limits.latitude && limits.longitude) {
-        centerCoords = { lat: limits.latitude, lng: limits.longitude }
-    }
-    if (!centerCoords && !cidadeSlug.startsWith("estado-")) {
-        centerCoords = await resolveCityCoordsFromSlug(cidadeSlug)
-    }
-
-    if (centerCoords && limits.radius && partnerIds.length > 0) {
-        const partnersInRadius = allPartners.filter((p: any) => {
-            if (p.latitude !== null && p.longitude !== null) {
-                const dist = calculateDistance(centerCoords!, { lat: p.latitude, lng: p.longitude })
-                return dist <= limits.radius!
-            }
-            return true // Fallback: mantém parceiros da cidade que não possuem coordenadas salvas
-        })
-        partnerIds = partnersInRadius.map((p: any) => p.id)
-    }
-
-    if (!partnerIds.length) {
-        return { results: [], filteredIds: [] }
-    }
-
-
     if (query.trim()) {
+        let partnersQuery = supabase
+            .from("partners")
+            .select("id, latitude, longitude, addresses!inner(city, state)")
+            .eq("is_active", true)
+            .eq("addresses.state", dbState)
+
+        if (cidadeSlug.startsWith("estado-")) {
+            // Rota de estado: não filtra por cidade
+        } else if (dbCity) {
+            partnersQuery = partnersQuery.eq("addresses.city", dbCity)
+        } else {
+            partnersQuery = partnersQuery.ilike("addresses.city", targetCitySlug.replace(/-/g, ' '))
+        }
+
+        const partnersRes = await partnersQuery
+        if (partnersRes.error) {
+            console.error("[searchMarketplaceByCity] Partner fetch error:", partnersRes.error)
+        }
+        const allPartners = partnersRes.data || []
+        let partnerIds = allPartners.map((p: any) => p.id)
+
+        // Filtro por Raio
+        let centerCoords = limits.centerCoords || null
+        if (!centerCoords && limits.latitude && limits.longitude) {
+            centerCoords = { lat: limits.latitude, lng: limits.longitude }
+        }
+        if (!centerCoords && !cidadeSlug.startsWith("estado-")) {
+            centerCoords = await resolveCityCoordsFromSlug(cidadeSlug)
+        }
+
+        if (centerCoords && limits.radius && partnerIds.length > 0) {
+            const partnersInRadius = allPartners.filter((p: any) => {
+                if (p.latitude !== null && p.longitude !== null) {
+                    const dist = calculateDistance(centerCoords!, { lat: p.latitude, lng: p.longitude })
+                    return dist <= limits.radius!
+                }
+                return true
+            })
+            partnerIds = partnersInRadius.map((p: any) => p.id)
+        }
+
+        if (!partnerIds.length) {
+            return { results: [], filteredIds: [] }
+        }
+
         return searchMarketplacePostgresFTS(query, type, {
             ...limits,
             partnerIds,
@@ -1025,9 +1040,15 @@ async function searchMarketplaceByCity(
             reviews(count)
         `)
         .eq("is_active", true)
-        .in("id", partnerIds)
-        .order("created_at", { ascending: false })
-        .limit(type === 'vitrines' || type === 'tudo' ? limitCount : 0)
+        .eq("addresses.state", dbState)
+
+    if (cidadeSlug.startsWith("estado-")) {
+        // Rota de estado
+    } else if (dbCity) {
+        partnerDetailsQuery = partnerDetailsQuery.eq("addresses.city", dbCity)
+    } else {
+        partnerDetailsQuery = partnerDetailsQuery.ilike("addresses.city", targetCitySlug.replace(/-/g, ' '))
+    }
 
     if (limits.cursor) {
         partnerDetailsQuery = partnerDetailsQuery.lt("created_at", new Date(limits.cursor).toISOString())
@@ -1038,7 +1059,37 @@ async function searchMarketplaceByCity(
     if (partnerDetailsRes.error) {
         console.error("[searchMarketplaceByCity] Partner details query error:", partnerDetailsRes.error)
     }
-    filteredPartners = partnerDetailsRes.data || []
+    const allPartners = partnerDetailsRes.data || []
+    let partnerIds = allPartners.map((p: any) => p.id)
+
+    // Filtro por Raio
+    let centerCoords = limits.centerCoords || null
+    if (!centerCoords && limits.latitude && limits.longitude) {
+        centerCoords = { lat: limits.latitude, lng: limits.longitude }
+    }
+    if (!centerCoords && !cidadeSlug.startsWith("estado-")) {
+        centerCoords = await resolveCityCoordsFromSlug(cidadeSlug)
+    }
+
+    if (centerCoords && limits.radius && partnerIds.length > 0) {
+        const partnersInRadius = allPartners.filter((p: any) => {
+            if (p.latitude !== null && p.longitude !== null) {
+                const dist = calculateDistance(centerCoords!, { lat: p.latitude, lng: p.longitude })
+                return dist <= limits.radius!
+            }
+            return true
+        })
+        partnerIds = partnersInRadius.map((p: any) => p.id)
+        filteredPartners = partnersInRadius
+    } else {
+        filteredPartners = allPartners
+    }
+
+    if (type === 'vitrines' || type === 'tudo') {
+        filteredPartners = filteredPartners.slice(0, limitCount)
+    } else {
+        filteredPartners = []
+    }
 
     if (partnerIds.length > 0) {
         const promises = []
@@ -1052,7 +1103,8 @@ async function searchMarketplaceByCity(
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
                     partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
                     product_variants(variant_options, price_adjustment, is_active),
-                    show_price_in_store
+                    show_price_in_store,
+                    store_products(marketplace_visible, visibility_scope)
                 `)
                 .eq("is_active", true)
                 .eq("show_in_marketplace", true)
@@ -1072,7 +1124,8 @@ async function searchMarketplaceByCity(
                     id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
-                    show_price_in_store
+                    show_price_in_store,
+                    store_services(marketplace_visible, visibility_scope)
                 `)
                 .eq("is_active", true)
                 .eq("show_in_marketplace", true)
@@ -1116,8 +1169,11 @@ async function searchMarketplaceByCity(
             if (res?.error) console.error("[searchMarketplaceByCity] Products query error:", res.error)
             rawProducts = res?.data || []
             if (rawProducts && rawProducts.length > 0) {
-                const visibleIds = await filterMarketplaceVisibleProducts(rawProducts.map((p: any) => p.id))
-                rawProducts = rawProducts.filter((p: any) => visibleIds.has(p.id))
+                rawProducts = rawProducts.filter((p: any) => {
+                    const links = p.store_products || []
+                    if (links.length === 0) return true
+                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
+                })
             }
         }
         if (type === 'tudo' || type === 'servicos') {
@@ -1125,8 +1181,11 @@ async function searchMarketplaceByCity(
             if (res?.error) console.error("[searchMarketplaceByCity] Services query error:", res.error)
             rawServices = res?.data || []
             if (rawServices && rawServices.length > 0) {
-                const visibleIds = await filterMarketplaceVisibleServices(rawServices.map((s: any) => s.id))
-                rawServices = rawServices.filter((s: any) => visibleIds.has(s.id))
+                rawServices = rawServices.filter((s: any) => {
+                    const links = s.store_services || []
+                    if (links.length === 0) return true
+                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
+                })
             }
         }
         if (type === 'tudo' || type === 'planos') {

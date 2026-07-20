@@ -7,35 +7,42 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
  * Fetches all stock movements for a partner, including product and order details.
  * Uses unstable_cache for cross-request caching + React cache() for per-request deduplication.
  */
-export const getStockMovementsCached = cache(async (partnerId: string) => {
-    return unstable_cache(
-        async () => {
-            const supabase = getAdminClient()
-            const { data } = await supabase
-                .from("stock_movements")
-                .select(`
-              id,
-              partner_id,
-              order_id,
-              movement_type,
-              reference_type,
-              reference_name,
-              reason,
-              notes,
-              created_at,
-              created_by,
-              orders(id, order_number),
-              stock_movement_items(id, product_id, quantity, previous_quantity, new_quantity, products(name, sku))
-            `)
-                .eq("partner_id", partnerId)
-                .order("created_at", { ascending: false })
-                .limit(100)
+const stockMovementsCacheMap = new Map<string, any>()
 
-            return data
-        },
-        [TAGS.stockMovements(partnerId)],
-        {
-            tags: [TAGS.stockMovements(partnerId)]
-        }
-    )()
+export const getStockMovementsCached = cache(async (partnerId: string) => {
+    let cachedFn = stockMovementsCacheMap.get(partnerId)
+    if (!cachedFn) {
+        cachedFn = unstable_cache(
+            async () => {
+                const supabase = getAdminClient()
+                const { data } = await supabase
+                    .from("stock_movements")
+                    .select(`
+                  id,
+                  partner_id,
+                  order_id,
+                  movement_type,
+                  reference_type,
+                  reference_name,
+                  reason,
+                  notes,
+                  created_at,
+                  created_by,
+                  orders(id, order_number),
+                  stock_movement_items(id, product_id, quantity, previous_quantity, new_quantity, products(name, sku))
+                `)
+                    .eq("partner_id", partnerId)
+                    .order("created_at", { ascending: false })
+                    .limit(100)
+
+                return data
+            },
+            [TAGS.stockMovements(partnerId)],
+            {
+                tags: [TAGS.stockMovements(partnerId)]
+            }
+        )
+        stockMovementsCacheMap.set(partnerId, cachedFn)
+    }
+    return cachedFn()
 })

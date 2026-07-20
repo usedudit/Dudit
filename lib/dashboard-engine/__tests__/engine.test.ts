@@ -41,8 +41,8 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
     it("should return completed = false for profile if category or phone is missing", () => {
       const ctx = createBaseContext({ hasPhone: false });
       const checklist = getChecklistItems(ctx);
-      const profileItem = checklist.find((item) => item.id === "profile");
-      expect(profileItem?.completed).toBe(false);
+      const businessDataItem = checklist.find((item) => item.id === "business-data");
+      expect(businessDataItem?.completed).toBe(false);
     });
 
     it("should return completed = false for items if catalogue is empty", () => {

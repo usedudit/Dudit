@@ -53,65 +53,72 @@ function mapPosSaleToOrderRow(sale: any, customerNameOverride?: string | null) {
 /**
  * Fetches orders + vendas PDV (tabela sales) para a lista de pedidos.
  */
+const partnerOrdersCacheMap = new Map<string, any>()
+
 export const getPartnerOrdersCached = cache(async (partnerId: string) => {
-  return unstable_cache(
-    async () => {
-      const supabase = getAdminClient()
-      const [ordersRes, salesRes] = await Promise.all([
-        supabase
-          .from("orders")
-          .select(`
-                    *,
-                    order_items(*),
-                    stores(name)
-                `)
-          .eq("partner_id", partnerId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("sales")
-          .select(`
-            id, partner_id, customer_id, sale_number, final_amount, paid_amount, discount_amount, payment_status, status, created_at, pre_sale_id, notes,
-            sale_items(id, product_id, variant_id, product_name, variant_name, unit_price, quantity, subtotal, total_price)
-          `)
-          .eq("partner_id", partnerId)
-          .order("created_at", { ascending: false }),
-      ])
+  let cachedFn = partnerOrdersCacheMap.get(partnerId)
+  if (!cachedFn) {
+    cachedFn = unstable_cache(
+      async () => {
+        const supabase = getAdminClient()
+        const [ordersRes, salesRes] = await Promise.all([
+          supabase
+            .from("orders")
+            .select(`
+                      *,
+                      order_items(*),
+                      stores(name)
+                  `)
+            .eq("partner_id", partnerId)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("sales")
+            .select(`
+              id, partner_id, customer_id, sale_number, final_amount, paid_amount, discount_amount, payment_status, status, created_at, pre_sale_id, notes,
+              sale_items(id, product_id, variant_id, product_name, variant_name, unit_price, quantity, subtotal, total_price)
+            `)
+            .eq("partner_id", partnerId)
+            .order("created_at", { ascending: false }),
+        ])
 
-      if (ordersRes.error) {
-        console.error("[getPartnerOrdersCached] orders error:", ordersRes.error)
-      }
-      if (salesRes.error) {
-        console.error("[getPartnerOrdersCached] sales error:", salesRes.error)
-      }
+        if (ordersRes.error) {
+          console.error("[getPartnerOrdersCached] orders error:", ordersRes.error)
+        }
+        if (salesRes.error) {
+          console.error("[getPartnerOrdersCached] sales error:", salesRes.error)
+        }
 
-      const orderRows = (ordersRes.data || []).map((o: any) => ({ ...o, is_pos_sale: false }))
-      const rawSales = salesRes.data || []
-      const saleCustomerIds = [...new Set(rawSales.map((s: any) => s.customer_id).filter(Boolean))]
-      const customerNameById = new Map<string, string>()
-      if (saleCustomerIds.length > 0) {
-        const { data: custRows } = await supabase
-          .from("customers")
-          .select("id, name")
-          .eq("partner_id", partnerId)
-          .in("id", saleCustomerIds)
-        for (const c of custRows || []) customerNameById.set(c.id, c.name || "Consumidor final")
-      }
-      const saleRows = rawSales.map((s: any) =>
-        mapPosSaleToOrderRow(s, s.customer_id ? customerNameById.get(s.customer_id) ?? null : null),
-      )
+        const orderRows = (ordersRes.data || []).map((o: any) => ({ ...o, is_pos_sale: false }))
+        const rawSales = salesRes.data || []
+        const saleCustomerIds = [...new Set(rawSales.map((s: any) => s.customer_id).filter(Boolean))]
+        const customerNameById = new Map<string, string>()
+        if (saleCustomerIds.length > 0) {
+          const { data: custRows } = await supabase
+            .from("customers")
+            .select("id, name")
+            .eq("partner_id", partnerId)
+            .in("id", saleCustomerIds)
+          for (const c of custRows || []) customerNameById.set(c.id, c.name || "Consumidor final")
+        }
+        const saleRows = rawSales.map((s: any) =>
+          mapPosSaleToOrderRow(s, s.customer_id ? customerNameById.get(s.customer_id) ?? null : null),
+        )
 
-      const merged = [...orderRows, ...saleRows].sort(
-        (a, b) => new Date(b.created_at || b.order_date).getTime() - new Date(a.created_at || a.order_date).getTime(),
-      )
+        const merged = [...orderRows, ...saleRows].sort(
+          (a, b) => new Date(b.created_at || b.order_date).getTime() - new Date(a.created_at || a.order_date).getTime(),
+        )
 
-      if (merged.length === 0) {
-        console.log(`[getPartnerOrdersCached] No orders/sales for partner ${partnerId}`)
-      }
-      return merged
-    },
-    [TAGS.orders(partnerId)],
-    {
-      tags: [TAGS.orders(partnerId)],
-    },
-  )()
+        if (merged.length === 0) {
+          console.log(`[getPartnerOrdersCached] No orders/sales for partner ${partnerId}`)
+        }
+        return merged
+      },
+      [TAGS.orders(partnerId)],
+      {
+        tags: [TAGS.orders(partnerId)],
+      },
+    )
+    partnerOrdersCacheMap.set(partnerId, cachedFn)
+  }
+  return cachedFn()
 })

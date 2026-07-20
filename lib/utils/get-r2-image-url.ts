@@ -45,20 +45,43 @@ export function getR2ImageUrl(
     return "https://img.dudit.com.br/static/Placeholder.png"
   }
 
-  // URL completa
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-    return imagePath
-  }
-
-  const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-
   // Fallback seguro usando CDN ou domain correto (client-safe, sem secrets)
   const baseUrl =
-    r2PublicConfig.publicDevUrl ||
     r2PublicConfig.cdnUrl ||
+    r2PublicConfig.publicDevUrl ||
     "https://img.dudit.com.br"
 
   const finalBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
+  let targetPath = imagePath
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    if (imagePath.startsWith(finalBaseUrl)) {
+      targetPath = imagePath.slice(finalBaseUrl.length)
+    } else if (imagePath.startsWith("https://img.dudit.com.br")) {
+      targetPath = imagePath.slice("https://img.dudit.com.br".length)
+    } else {
+      return imagePath
+    }
+  }
+
+  const cleanPath = targetPath.startsWith('/') ? targetPath.substring(1) : targetPath;
+
+  if (cleanPath.startsWith("cdn-cgi/image/")) {
+    return `${finalBaseUrl}/${cleanPath}`
+  }
+
+  let options = ""
+  if (size === "thumb" || size === "thumbnail") {
+    options = "width=150,height=150,fit=cover,format=auto,quality=80"
+  } else if (size === "medium") {
+    options = "width=400,height=400,fit=cover,format=auto,quality=85"
+  } else if (size === "large") {
+    options = "width=900,fit=contain,format=auto,quality=85"
+  }
+
+  if (options) {
+    return `${finalBaseUrl}/cdn-cgi/image/${options}/${cleanPath}`
+  }
 
   return `${finalBaseUrl}/${cleanPath}`
 }

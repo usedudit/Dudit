@@ -5,6 +5,7 @@ import { ERPHeader } from "@/components/erp/ERPHeader"
 import { SidebarProvider } from "@/lib/sidebar-context"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
+import { NotificationsRealtimeProvider } from "@/providers/notifications-realtime-provider"
 
 export const metadata: Metadata = {
   title: "Dudit - Gerenciamento",
@@ -107,28 +108,30 @@ export default async function ERPLayout({
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <ProductMetadataProvider>
-        <PermissionProvider
-          role={role}
-          routePermissions={routePermissions}
-          partnerId={context.partnerId}
-          businessInfo={context.businessInfo}
-          planSlug={partnerPlan.slug}
-        >
-          <PlanUpgradeProvider>
-            <StoreProvider partnerId={context.partnerId} activeStoreId={activeStoreId}>
-              <SidebarProvider initialExpanded={initialExpanded}>
-                <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
-                  <ERPSidebar />
-                  <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-                    <OfflineBanner variant="erp" />
-                    <ERPHeader userProfile={userProfile} />
-                    {children}
+        <NotificationsRealtimeProvider>
+          <PermissionProvider
+            role={role}
+            routePermissions={routePermissions}
+            partnerId={context.partnerId}
+            businessInfo={context.businessInfo}
+            planSlug={partnerPlan.slug}
+          >
+            <PlanUpgradeProvider>
+              <StoreProvider partnerId={context.partnerId} activeStoreId={activeStoreId}>
+                <SidebarProvider initialExpanded={initialExpanded}>
+                  <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
+                    <ERPSidebar />
+                    <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+                      <OfflineBanner variant="erp" />
+                      <ERPHeader userProfile={userProfile} />
+                      {children}
+                    </div>
                   </div>
-                </div>
-              </SidebarProvider>
-            </StoreProvider>
-          </PlanUpgradeProvider>
-        </PermissionProvider>
+                </SidebarProvider>
+              </StoreProvider>
+            </PlanUpgradeProvider>
+          </PermissionProvider>
+        </NotificationsRealtimeProvider>
       </ProductMetadataProvider>
     </ThemeProvider>
   )

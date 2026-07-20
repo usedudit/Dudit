@@ -7,39 +7,46 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
  * Fetches all customers for a partner.
  * Uses unstable_cache for cross-request caching + React cache() for per-request deduplication.
  */
+const customersCacheMap = new Map<string, any>()
+
 export const getPartnerCustomersCached = cache(async (partnerId: string) => {
-    return unstable_cache(
-        async () => {
-            const supabase = getAdminClient()
-            const { data, error } = await supabase
-                .from("customers")
-                .select("*")
-                .eq("partner_id", partnerId)
-                .order("created_at", { ascending: false })
+    let cachedFn = customersCacheMap.get(partnerId)
+    if (!cachedFn) {
+        cachedFn = unstable_cache(
+            async () => {
+                const supabase = getAdminClient()
+                const { data, error } = await supabase
+                    .from("customers")
+                    .select("*")
+                    .eq("partner_id", partnerId)
+                    .order("created_at", { ascending: false })
 
-            if (error) {
-                console.error("[getPartnerCustomersCached] Error:", error)
-                return []
-            }
-            if (!data) return []
-
-            const { decryptCPF } = await import("@/lib/crypto")
-            const processedData = []
-            for (const c of data) {
-                if (c.cpf && c.cpf.startsWith("v")) {
-                    try {
-                        c.cpf = await decryptCPF(c.cpf)
-                    } catch (e) {
-                        // Ignore if decryption fails
-                    }
+                if (error) {
+                    console.error("[getPartnerCustomersCached] Error:", error)
+                    return []
                 }
-                processedData.push(c)
+                if (!data) return []
+
+                const { decryptCPF } = await import("@/lib/crypto")
+                const processedData = []
+                for (const c of data) {
+                    if (c.cpf && c.cpf.startsWith("v")) {
+                        try {
+                            c.cpf = await decryptCPF(c.cpf)
+                        } catch (e) {
+                            // Ignore if decryption fails
+                        }
+                    }
+                    processedData.push(c)
+                }
+                return processedData
+            },
+            [TAGS.customers(partnerId)],
+            {
+                tags: [TAGS.customers(partnerId)]
             }
-            return processedData
-        },
-        [TAGS.customers(partnerId)],
-        {
-            tags: [TAGS.customers(partnerId)]
-        }
-    )()
+        )
+        customersCacheMap.set(partnerId, cachedFn)
+    }
+    return cachedFn()
 })

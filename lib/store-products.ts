@@ -25,7 +25,7 @@ export async function resolveProduct(
 ): Promise<ResolvedProduct | null> {
     const supabase = createAdminClient()
 
-    const [productRes, spRes, allSpRes] = await Promise.all([
+    const [productRes, allSpRes] = await Promise.all([
         supabase
             .from("products")
             .select(`*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name)`)
@@ -34,12 +34,6 @@ export async function resolveProduct(
         supabase
             .from("store_products")
             .select("*")
-            .eq("product_id", productId)
-            .eq("store_id", storeId)
-            .maybeSingle(),
-        supabase
-            .from("store_products")
-            .select("store_id, visibility_scope")
             .eq("product_id", productId),
     ])
 
@@ -52,8 +46,8 @@ export async function resolveProduct(
         location?: { name: string } | null
     }
 
-    const override = spRes.data as StoreProductOverride | null
-    const allLinks = (allSpRes.data || []) as { store_id: string; visibility_scope: string }[]
+    const allLinks = (allSpRes.data || []) as (StoreProductOverride & { store_id: string; visibility_scope: string })[]
+    const override = allLinks.find(l => l.store_id === storeId) || null
 
     if (!override) {
         if (allLinks.length > 0) {

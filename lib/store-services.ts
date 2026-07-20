@@ -21,7 +21,7 @@ export async function resolveService(
 ): Promise<ResolvedService | null> {
     const supabase = createAdminClient()
 
-    const [serviceRes, ssRes, allSsRes] = await Promise.all([
+    const [serviceRes, allSsRes] = await Promise.all([
         supabase
             .from("services")
             .select(`
@@ -34,12 +34,6 @@ export async function resolveService(
         supabase
             .from("store_services")
             .select("*")
-            .eq("service_id", serviceId)
-            .eq("store_id", storeId)
-            .maybeSingle(),
-        supabase
-            .from("store_services")
-            .select("store_id, visibility_scope")
             .eq("service_id", serviceId),
     ])
 
@@ -50,8 +44,8 @@ export async function resolveService(
         subcategory?: { name: string } | null
     }
 
-    const override = ssRes.data as StoreServiceOverride | null
-    const allLinks = (allSsRes.data || []) as { store_id: string; visibility_scope: string }[]
+    const allLinks = (allSsRes.data || []) as (StoreServiceOverride & { store_id: string; visibility_scope: string })[]
+    const override = allLinks.find(l => l.store_id === storeId) || null
 
     if (!override) {
         if (allLinks.length > 0) {
