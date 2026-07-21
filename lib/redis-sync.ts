@@ -173,7 +173,7 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("partners")
           .select(`
-            id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, marketplace_reputation, latitude, longitude, created_at, updated_at,
+            id, store_name, store_description, store_image_url, banner_url, rating, marketplace_reputation, latitude, longitude, created_at, updated_at,
             category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
             addresses(city, state),
             reviews(count)

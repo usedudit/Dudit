@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 
 interface Insight {
   message: string;
@@ -18,7 +18,11 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [insights, setInsights] = useState<Insight[] | null>(null);
-  const [exportHandler, setExportHandler] = useState<((format: "csv" | "xlsx") => Promise<void>) | null>(null);
+  const [exportHandler, setExportHandlerState] = useState<((format: "csv" | "xlsx") => Promise<void>) | null>(null);
+
+  const setExportHandler = useCallback((handler: ((format: "csv" | "xlsx") => Promise<void>) | null) => {
+    setExportHandlerState(() => handler);
+  }, []);
 
   return (
     <DashboardContext.Provider value={{ insights, setInsights, exportHandler, setExportHandler }}>

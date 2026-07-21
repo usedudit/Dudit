@@ -137,53 +137,7 @@ export async function getModerationQueue(
     const { data: videos } = await videoQuery.order("created_at", { ascending: false }).limit(10)
 
     // 2. Partners query
-    let partnerQuery = supabase
-        .from("partners")
-        .select(`
-            id, store_name, store_description, store_image_url, banner_url,
-            logo_moderation_status, banner_moderation_status, risk_score, created_at,
-            user_profiles!partners_user_id_fkey(full_name)
-        `)
-
-    if (statusFilter && statusFilter !== "all") {
-        partnerQuery = partnerQuery.or(`logo_moderation_status.eq.${statusFilter},banner_moderation_status.eq.${statusFilter}`)
-    } else {
-        partnerQuery = partnerQuery.or('logo_moderation_status.eq.pending_moderation,banner_moderation_status.eq.pending_moderation')
-    }
-
-    const { data: partners, error: partnerError } = await partnerQuery.order("created_at", { ascending: false }).limit(pageSize)
-
-    if (partnerError) {
-        console.error("[ADMIN_MODERATION] Failed to fetch partners queue:", partnerError.message)
-    }
-
-    const mappedProducts: ModerationItem[] = items.map((p: any) => ({
-        id: p.id,
-        type: "product" as const,
-        title: p.name,
-        description: p.description,
-        price: p.price,
-        images: p.images || [],
-        owner_store_name: p.partner?.store_name || "Desconhecido",
-        partner_id: p.partner?.id || "",
-        owner_user_name: ownerMap.get(p.partner?.user_id) || "",
-        moderation_status: p.moderation_status,
-        risk_score: p.partner?.risk_score || 0,
-        created_at: p.created_at,
-    }))
-
-    const mappedPartners: ModerationItem[] = (partners || []).map((p: any) => {
-        const images: string[] = []
-        if (p.store_image_url) images.push(p.store_image_url)
-        if (p.banner_url) images.push(p.banner_url)
-
-        // Determine consolidated status
-        let status = "approved"
-        if (p.logo_moderation_status === "pending_moderation" || p.banner_moderation_status === "pending_moderation") {
-            status = "pending_moderation"
-        } else if (p.logo_moderation_status === "rejected" || p.banner_moderation_status === "rejected") {
-            status = "rejected"
-        }
+    const mappedPartners: ModerationItem[] = []
 
         return {
             id: p.id,
@@ -377,7 +331,7 @@ export async function approveModeration(
 
     const { data: entity, error: fetchError } = await supabase
         .from(type === "product" ? "products" : "partners")
-        .select(type === "product" ? "id, name, moderation_status, images" : "id, store_name, logo_moderation_status, banner_moderation_status")
+        .select(type === "product" ? "id, name, moderation_status, images" : "id, store_name")
         .eq("id", entityId)
         .single()
 
@@ -397,16 +351,6 @@ export async function approveModeration(
             .eq("id", entityId)
 
         if (updateError) return { success: false, error: updateError.message }
-    } else {
-        const { error: updateError } = await supabase
-            .from("partners")
-            .update({
-                logo_moderation_status: "approved",
-                banner_moderation_status: "approved",
-            })
-            .eq("id", entityId)
-
-        if (updateError) return { success: false, error: updateError.message }
     }
 
     // Audit log (append-only, via service-role)
@@ -416,7 +360,7 @@ export async function approveModeration(
         targetType: type,
         targetId: entityId,
         metadata: {
-            previousStatus: type === "product" ? entity.moderation_status : { logo: entity.logo_moderation_status, banner: entity.banner_moderation_status },
+            previousStatus: type === "product" ? entity.moderation_status : "approved",
             name: type === "product" ? entity.name : entity.store_name
         },
     })
@@ -641,7 +585,7 @@ export async function rejectModeration(
     // Anti-IDOR
     const { data: entity, error: fetchError } = await supabase
         .from(type === "product" ? "products" : "partners")
-        .select(type === "product" ? "id, name, moderation_status, partner_id" : "id, store_name, logo_moderation_status, banner_moderation_status")
+        .select(type === "product" ? "id, name, moderation_status, partner_id" : "id, store_name")
         .eq("id", entityId)
         .single()
 
@@ -662,18 +606,6 @@ export async function rejectModeration(
             .eq("id", entityId)
 
         if (updateError) return { success: false, error: updateError.message }
-    } else {
-        const { error: updateError } = await supabase
-            .from("partners")
-            .update({
-                logo_moderation_status: "rejected",
-                banner_moderation_status: "rejected",
-                // For partners, we might not want to deactivate the whole partner, 
-                // just the specific fields. But for now, let's keep it simple.
-            })
-            .eq("id", entityId)
-
-        if (updateError) return { success: false, error: updateError.message }
     }
 
     // Risk score: +3 for full product rejection (admin-confirmed)
@@ -688,7 +620,7 @@ export async function rejectModeration(
         targetId: entityId,
         metadata: {
             reason: reason.trim(),
-            previousStatus: type === "product" ? entity.moderation_status : { logo: entity.logo_moderation_status, banner: entity.banner_moderation_status },
+            previousStatus: type === "product" ? entity.moderation_status : "approved",
             name: type === "product" ? entity.name : entity.store_name,
             riskScoreAdded: type === "product" ? 3 : 0
         },

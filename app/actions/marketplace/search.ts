@@ -567,7 +567,7 @@ async function _searchMarketplaceInternal(
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("partners").select(`
-                        id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
+                        id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
                     `).in("id", lojasIds)
                 )
             }
@@ -606,8 +606,6 @@ async function _searchMarketplaceInternal(
                             id: item.id, store_name: item.store_name,
                             store_avatar: item.store_image_url || item.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
                             banner_url: item.banner_url || null,
-                            logo_moderation_status: item.logo_moderation_status || "approved",
-                            banner_moderation_status: item.banner_moderation_status || "approved",
                             latitude: item.latitude, longitude: item.longitude,
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
                             reviewsCount: item.reviews?.[0]?.count || 0
@@ -738,7 +736,7 @@ async function hydrateMarketplaceSearchHits(
     if (lojasIds.length > 0) {
         promises.push(
             supabase.from("partners").select(`
-                id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, is_showcase_active, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
+                id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at, is_showcase_active, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
             `).in("id", lojasIds)
         )
     }
@@ -790,8 +788,6 @@ async function hydrateMarketplaceSearchHits(
                     store_name: item.store_name,
                     store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
                     banner_url: item.banner_url || null,
-                    logo_moderation_status: item.logo_moderation_status || "approved",
-                    banner_moderation_status: item.banner_moderation_status || "approved",
                     latitude: item.latitude,
                     longitude: item.longitude,
                     city: item.addresses?.[0]?.city || null,
@@ -998,7 +994,7 @@ async function searchMarketplaceByCity(
         .from("partners")
         .select(`
             id, store_name, store_description, store_image_url, banner_url,
-            logo_moderation_status, banner_moderation_status, rating, latitude, longitude,
+            rating, latitude, longitude,
             created_at,
             category_id,
             category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
@@ -1158,8 +1154,6 @@ async function searchMarketplaceByCity(
             store_name: item.store_name,
             store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
             banner_url: item.banner_url || null,
-            logo_moderation_status: item.logo_moderation_status || "approved",
-            banner_moderation_status: item.banner_moderation_status || "approved",
             latitude: item.latitude,
             longitude: item.longitude,
             city: item.addresses?.[0]?.city || null,

@@ -210,8 +210,7 @@ export async function fetchModerationTarget(
                     .from("partners")
                     .select(`
                         id, store_name, store_description, store_image_url, banner_url,
-                        gallery, logo_moderation_status, banner_moderation_status,
-                        risk_score, is_active, created_at, user_id
+                        gallery, risk_score, is_active, created_at, user_id
                     `)
                     .eq("id", id)
                     .single()

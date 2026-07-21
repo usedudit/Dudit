@@ -159,7 +159,7 @@ async function seedRedis() {
     const { data: vitrines } = await supabase
         .from("partners")
         .select(`
-            id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at,
+            id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at,
             category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
             addresses(city, state),
             reviews(count)
@@ -181,8 +181,6 @@ async function seedRedis() {
                     id: item.id, store_name: item.store_name,
                     store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
                     banner_url: item.banner_url || null,
-                    logo_moderation_status: item.logo_moderation_status || "approved",
-                    banner_moderation_status: item.banner_moderation_status || "approved",
                     latitude: item.latitude, longitude: item.longitude,
                     city, state, reviewsCount
                 }

@@ -3,7 +3,8 @@
 import { useCallback, useRef, useEffect } from "react"
 import { NotificationItem } from "./NotificationItem"
 import type { NotificationRecord } from "@/lib/notifications/types"
-import { Loader2 } from "lucide-react"
+import { Bell, Loader2 } from "lucide-react"
+import { IconPlaceholder, ThreeDotsLoader } from "../reusable"
 
 interface Group {
   label: string
@@ -53,17 +54,21 @@ export function NotificationPanel({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-10 text-brand-inactive-text">
-        <Loader2 className="w-5 h-5 animate-spin" />
+      <div className="flex items-center justify-center">
+        <ThreeDotsLoader />
       </div>
     )
   }
 
   if (grouped.length === 0) {
     return (
-      <div className="py-10 px-4 text-center text-sm text-brand-inactive-text dark:text-dark-body">
-        Nenhuma notificação por aqui.
-      </div>
+      <IconPlaceholder
+        placeholderType="image"
+        imageSrc="https://img.dudit.com.br/static/mascots/Notificacoes.png"
+        imageAlt="Nenhuma notificação por aqui"
+        title="Nenhuma notificação por aqui"
+        subtitle="Quando tiver novidades, elas aparecerão aqui"
+      />
     )
   }
 

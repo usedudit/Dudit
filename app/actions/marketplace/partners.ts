@@ -65,12 +65,11 @@ async function _getPartnerProfile(partnerId: string) {
     const bannerUrl = await getDefaultPartnerBannerUrl(data.store_name || "Vendedor", data.store_image_url)
     const { error: bannerError } = await supabase
       .from("partners")
-      .update({ banner_url: bannerUrl, banner_moderation_status: "approved" })
+      .update({ banner_url: bannerUrl })
       .eq("id", partnerId)
 
     if (!bannerError) {
       data.banner_url = bannerUrl
-      data.banner_moderation_status = "approved"
       await syncToExploreRedis({ id: partnerId, type: "loja", data: {}, silent: true })
     }
   }
@@ -578,8 +577,6 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.category !== undefined) updateData.category = data.category
   if (data.categoryId !== undefined) updateData.category_id = data.categoryId
   if (data.subcategoryId !== undefined) updateData.subcategory_id = data.subcategoryId
-  if (data.logoModerationStatus !== undefined) updateData.logo_moderation_status = data.logoModerationStatus
-  if (data.bannerModerationStatus !== undefined) updateData.banner_moderation_status = data.bannerModerationStatus
 
   if (data.gallery !== undefined) {
     if (!Array.isArray(data.gallery)) {

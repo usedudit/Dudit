@@ -207,8 +207,6 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     businessInfo: partner?.business_info,
     paymentMethods: null,
     banner_url: store.banner_url || partner?.banner_url || null,
-    banner_moderation_status: "approved",
-    logo_moderation_status: "approved",
     gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',
     isShowcaseActive: partner?.is_showcase_active !== false,

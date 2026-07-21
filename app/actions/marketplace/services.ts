@@ -37,8 +37,6 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         phone,
         rating,
         banner_url,
-        banner_moderation_status,
-        logo_moderation_status,
         opening_hours,
         mp_user_id,
         mp_public_key,

@@ -233,8 +233,6 @@ export interface FetchedPartner {
     store_image_url: string | null
     banner_url: string | null
     gallery: string[] | null
-    logo_moderation_status: string
-    banner_moderation_status: string
     risk_score: number
     is_active: boolean
     created_at: string

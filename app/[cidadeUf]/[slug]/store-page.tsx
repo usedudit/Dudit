@@ -52,8 +52,6 @@ export async function StorePage({ storeData }: { storeData: any }) {
         businessInfo: partner?.business_info,
         paymentMethods: null,
         banner_url: storeData.banner_url || partner?.banner_url || null,
-        banner_moderation_status: "approved",
-        logo_moderation_status: "approved",
         gallery: storeData.gallery || [],
         planSlug: "free",
         isShowcaseActive: partner?.is_showcase_active !== false,

@@ -42,9 +42,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
         id, store_name, store_description, rating, user_id, phone,
-        store_image_url, banner_url, max_installments, interest_rate_percent,
+        store_image_url, banner_url,
         opening_hours,
-        logo_moderation_status, banner_moderation_status,
         vendas_totais, created_at,
         addresses(city, state),
         payment_methods(*)
@@ -94,8 +93,6 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     } else {
       p.store_avatar = p.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
       p.banner_url = p.banner_url || null
-      p.logo_moderation_status = p.logo_moderation_status || "approved"
-      p.banner_moderation_status = p.banner_moderation_status || "approved"
       p.city = p.addresses?.[0]?.city || null
       p.state = p.addresses?.[0]?.state || null
     }
@@ -424,7 +421,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     .from("partners")
     .select(`
       id, store_name, store_description, store_image_url, banner_url,
-      logo_moderation_status, banner_moderation_status, rating, latitude, longitude,
+      rating, latitude, longitude,
       created_at,
       addresses!inner(city, state)
     `)
@@ -612,8 +609,6 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
         store_name: item.store_name,
         store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
         banner_url: item.banner_url || null,
-        logo_moderation_status: item.logo_moderation_status || "approved",
-        banner_moderation_status: item.banner_moderation_status || "approved",
         latitude: item.latitude,
         longitude: item.longitude,
         city: item.addresses?.[0]?.city || null,

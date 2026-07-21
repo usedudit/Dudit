@@ -83,7 +83,7 @@ export async function GET(request: Request) {
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("partners").select(`
-                        id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, created_at, addresses(city, state)
+                        id, store_name, store_description, store_image_url, banner_url, rating, created_at, addresses(city, state)
                     `).in("id", lojasIds)
                 )
             }
@@ -109,8 +109,6 @@ export async function GET(request: Request) {
                             id: item.id, store_name: item.store_name,
                             store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
                             banner_url: item.banner_url || null,
-                            logo_moderation_status: item.logo_moderation_status || "approved",
-                            banner_moderation_status: item.banner_moderation_status || "approved",
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                         }
                     }

@@ -214,8 +214,6 @@ export function ProductDetailsPageClient({
             store_avatar: p?.store_image_url || p?.store_avatar || p?.profile_image_url || "https://img.dudit.com.br/static/Placeholder.png",
             profile_image_url: p?.profile_image_url || null,
             banner_url: p?.banner_url || null,
-            logo_moderation_status: p?.logo_moderation_status || 'approved',
-            banner_moderation_status: p?.banner_moderation_status || 'approved',
             mp_user_id: p?.mp_user_id,
             mp_public_key: p?.mp_public_key,
             address: {
