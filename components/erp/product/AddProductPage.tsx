@@ -72,7 +72,7 @@ const getEmptyProduct = () => ({
     price: 0, costPrice: 0, stock: 0, minStock: 0, maxStock: 0, promotional_price: null, promotionTypeId: null,
     condicao: "Novo", unidade: "UN", localizacao: "", location_id: "", productType: "Físico",
     images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
-    is_active: true, show_in_marketplace: true, allow_sell_without_stock: false,     is_highlighted: false, show_price_in_store: true, visibility_scope: "exclusive", visibility_stores: [],
+    is_active: true, show_in_marketplace: true, allow_sell_without_stock: false,     is_highlighted: false, show_price_in_store: true,
     marketplace_category_id: null, availability_value: 0, availability_unit: "Dias",
     warranty_value: 0, warranty_period: "Meses",
     attributes: [], related_products: [],
@@ -119,7 +119,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const isEditing = useMemo(() => ["add", "edit", "duplicate"].includes(internalMode), [internalMode])
 
     const { error: notifyError, success: notifySuccess, info: notifyInfo, warning: notifyWarning } = useNotification()
-    const { selectedStore, stores: allStores } = useStore()
+    const { selectedStore } = useStore()
     const { setHeaderOverride } = useSidebar()
     const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -647,8 +647,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 availability_value: Number(d.availability_value) || 0,
                 availability_unit: d.availability_unit || "Dias",
                 tags: d.tags || [],
-                visibility_scope: d.visibility_scope || "exclusive",
-                visibility_stores: d.visibility_stores || [],
             }
 
             // Optional official category (allowed in all modes)
@@ -912,7 +910,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             onGenerateBarcode={handleGenerateBarcode}
                                             openAddItemModal={handleOpenMetadataModal}
                                             metadataPlanBlocked={metadataPlanBlocked}
-                                            allStores={allStores}
                                             isGeneratingDetails={isGeneratingDetails}
                                             onGenerateDetails={handleGenerateAiDetails}
                                         />

@@ -1205,6 +1205,7 @@ export async function createPOSQuickProductAction(input: {
         .from("products")
         .insert({
             partner_id: input.partnerId,
+            store_id: targetStoreId,
             name,
             sku,
             price,
@@ -1216,22 +1217,6 @@ export async function createPOSQuickProductAction(input: {
         .single()
 
     if (error) return { success: false as const, error: error.message }
-
-    // Link the product to the store via store_products
-    // NOTE: Variants created later must be backfilled to stores via store_product_variants
-    const { error: linkError } = await supabase
-        .from("store_products")
-        .upsert({
-            product_id: product.id,
-            store_id: targetStoreId,
-            partner_id: input.partnerId,
-            override_stock_quantity: stockQuantity,
-            is_active: true,
-        }, { onConflict: "product_id, store_id" })
-
-    if (linkError) {
-        console.error("[createPOSQuickProductAction] Failed to link product to store:", linkError)
-    }
 
     return { success: true as const, data: product }
 }

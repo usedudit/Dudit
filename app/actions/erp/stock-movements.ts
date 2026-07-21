@@ -27,14 +27,11 @@ export async function searchProductsForMovement(query: string, storeId?: string 
 
         if (storeId) {
             const { data, error } = await supabase
-                .from("store_products")
-                .select(`
-                    product_id,
-                    products!inner(id, name, sku, stock_quantity, images)
-                `)
+                .from("products")
+                .select("id, name, sku, stock_quantity, images")
                 .eq("store_id", storeId)
-                .eq("products.is_active", true)
-                .or(`products.name.ilike.${searchTerm},products.sku.ilike.${searchTerm}`)
+                .eq("is_active", true)
+                .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
                 .limit(10)
 
             if (error) {
@@ -42,12 +39,12 @@ export async function searchProductsForMovement(query: string, storeId?: string 
                 return []
             }
 
-            return (data || []).map((sp: any) => ({
-                id: sp.product_id,
-                name: sp.products.name,
-                sku: sp.products.sku || 'N/A',
-                stock: sp.products.stock_quantity || 0,
-                image: sp.products.images && sp.products.images.length > 0 ? sp.products.images[0] : null
+            return (data || []).map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                sku: p.sku || 'N/A',
+                stock: p.stock_quantity || 0,
+                image: p.images && p.images.length > 0 ? p.images[0] : null
             }))
         }
 

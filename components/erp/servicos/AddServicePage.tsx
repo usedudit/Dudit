@@ -45,7 +45,7 @@ const getEmptyService = () => ({
     price: null as unknown as number, promotional_price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
     duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
     images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
-    is_active: true, show_in_marketplace: true, highlight_service: false, show_price_in_store: true, visibility_scope: "exclusive", visibility_stores: [],
+    is_active: true, show_in_marketplace: true, highlight_service: false, show_price_in_store: true,
     fulfillment_modes: ["on_site"],
     warranty: "", technical_details: null,
     tags: [], resources: [], assigned_staff: { all: true, staff_ids: [] },
@@ -83,7 +83,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
 
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const { selectedStore, stores: allStores } = useStore()
+    const { selectedStore } = useStore()
     const { setHeaderOverride } = useSidebar()
     const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -444,8 +444,6 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 assigned_staff: serviceData.assigned_staff || { all: true, staff_ids: [] },
                 is_active: serviceData.is_active,
                 images: cleanedFinalImages,
-                visibility_scope: serviceData.visibility_scope || "exclusive",
-                visibility_stores: serviceData.visibility_stores || [],
             }
 
             const dbPromise = internalMode === "edit" && (initialService?.id || serviceId)
@@ -606,7 +604,6 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             metadataPlanBlocked={metadataPlanBlocked}
                                             isGeneratingDetails={isGeneratingDetails}
                                             onGenerateDetails={handleGenerateAiDetails}
-                                            allStores={allStores}
                                         />
                                     </FadeIn>
                                 )}

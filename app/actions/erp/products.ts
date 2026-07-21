@@ -27,7 +27,6 @@ import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
-import { linkProductToStore } from "@/lib/store-products"
 import { headers } from "next/headers"
 
 const _deleteFromR2 = async (url: string) => {
@@ -282,8 +281,6 @@ export async function createProductComprehensiveAction(data: {
     id?: string
     partnerId: string
     storeId: string
-    visibility_scope?: string
-    visibility_stores?: string[]
     name: string
     description?: string
     sku?: string
@@ -547,32 +544,6 @@ export async function createProductComprehensiveAction(data: {
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
 
-        // F5.2c: create bridge relations per visibility_scope
-        try {
-            const scope = data.visibility_scope || 'exclusive'
-
-            // G2: Only Owner/Admin can set scope != 'exclusive'
-            if (scope !== 'exclusive') {
-                const { resolveEffectivePermissions } = await import("@/lib/store-members")
-                const effective = await resolveEffectivePermissions(finalPartnerId, finalStoreId)
-                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
-                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do produto")
-                }
-            }
-
-            const targetStores = scope === 'all'
-                ? (await getAdminClient().from("stores").select("id").eq("partner_id", finalPartnerId)).data?.map((s: any) => s.id) || [finalStoreId]
-                : scope === 'selected' && data.visibility_stores?.length
-                    ? data.visibility_stores
-                    : [finalStoreId]
-
-            for (const sid of targetStores) {
-                await linkProductToStore(insertedProduct.id, sid, { visibility_scope: scope as any })
-            }
-        } catch (linkErr: any) {
-            return errorResponse("Produto criado, mas erro ao vincular à(s) loja(s): " + linkErr.message)
-        }
-
         const videoUpdate = {
             video_type: videoMetadata.video_type,
             video_url: videoMetadata.video_url,
@@ -671,8 +642,6 @@ interface UpdateProductData {
     height?: number
     length?: number
     variants?: any[]
-    visibility_scope?: string
-    visibility_stores?: string[]
     storeId?: string
 }
 
@@ -854,57 +823,6 @@ export async function updateProductComprehensiveAction(productId: string, data: 
                 _deleteFromR2(product.video_url),
                 product.video_thumbnail ? _deleteFromR2(product.video_thumbnail) : Promise.resolve(),
             ]).catch(console.error)
-        }
-
-        // F5.5b: Handle visibility_scope changes on update
-        if (data.visibility_scope !== undefined && data.storeId) {
-            const scope = data.visibility_scope || 'exclusive'
-
-            // Only Owner/Admin can set scope != 'exclusive'
-            if (scope !== 'exclusive') {
-                const { resolveEffectivePermissions } = await import("@/lib/store-members")
-                const effective = await resolveEffectivePermissions(product.partner_id, data.storeId)
-                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
-                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do produto")
-                }
-            }
-
-            const { linkProductToStore } = await import("@/lib/store-products")
-
-            if (scope === 'all') {
-                const { data: allStores } = await getAdminClient()
-                    .from("stores")
-                    .select("id")
-                    .eq("partner_id", product.partner_id)
-                for (const s of allStores || []) {
-                    await linkProductToStore(productId, s.id, { visibility_scope: 'all' })
-                }
-            } else if (scope === 'selected' && data.visibility_stores?.length) {
-                for (const sid of data.visibility_stores) {
-                    await linkProductToStore(productId, sid, { visibility_scope: 'selected' })
-                }
-                // Remove bridges for stores not in the selection
-                const { data: existingBridges } = await getAdminClient()
-                    .from("store_products")
-                    .select("store_id")
-                    .eq("product_id", productId)
-                    .not("store_id", "in", `(${data.visibility_stores.join(",")})`)
-                for (const b of existingBridges || []) {
-                    await getAdminClient().from("store_products").delete().eq("product_id", productId).eq("store_id", b.store_id)
-                }
-            } else {
-                // exclusive: link only to the current store
-                await linkProductToStore(productId, data.storeId, { visibility_scope: 'exclusive' })
-                // Remove bridges for other stores
-                const { data: otherBridges } = await getAdminClient()
-                    .from("store_products")
-                    .select("store_id")
-                    .eq("product_id", productId)
-                    .neq("store_id", data.storeId)
-                for (const b of otherBridges || []) {
-                    await getAdminClient().from("store_products").delete().eq("product_id", productId).eq("store_id", b.store_id)
-                }
-            }
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
@@ -1751,24 +1669,6 @@ export async function duplicateProductsAction(productIds: string[]) {
 
         if (insertError) return { success: false, error: insertError.message }
 
-        // Link copies to the same stores as the originals
-        try {
-          const supabase2 = await getSupabaseServerClient()
-          for (let i = 0; i < (inserted?.length || 0); i++) {
-            const originalId = productIds[i]
-            const copyId = inserted![i].id
-            const { data: storeLinks } = await supabase2
-              .from("store_products")
-              .select("store_id, visibility_scope")
-              .eq("product_id", originalId)
-            for (const link of storeLinks || []) {
-              await linkProductToStore(copyId, link.store_id, { visibility_scope: link.visibility_scope })
-            }
-          }
-        } catch (linkErr) {
-          console.error("Error linking duplicated products to stores:", linkErr)
-        }
-
         Promise.resolve().then(() => revalidateProducts(products[0].partner_id)).catch(console.error)
         return { success: true, count: inserted?.length || 0, products: inserted }
     } catch (error: any) {
@@ -1868,7 +1768,7 @@ export const getCachedProductById = async (productId: string) => {
             const supabase = getAdminClient()
             const { data: product, error } = await supabase
                 .from("products")
-                .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*), store_products(*)")
+                .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*)")
                 .eq("id", productId)
                 .single()
             if (error) throw error
@@ -2021,32 +1921,7 @@ export async function getERPProductsPageAction(
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {
-            // F5.5b: Use same logic as resolveProduct — products are visible if:
-            // 1. No bridges exist (legacy), OR
-            // 2. Any bridge has visibility_scope='all', OR
-            // 3. The current store has a bridge
-            const { data: allLinks } = await supabase
-                .from("store_products")
-                .select("product_id, store_id, visibility_scope")
-
-            if (allLinks && allLinks.length > 0) {
-                const restrictions = new Map<string, { hasAll: boolean; storeHasBridge: boolean }>()
-                for (const link of allLinks) {
-                    const r = restrictions.get(link.product_id) || { hasAll: false, storeHasBridge: false }
-                    if (link.visibility_scope === 'all') r.hasAll = true
-                    if (link.store_id === options.storeId) r.storeHasBridge = true
-                    restrictions.set(link.product_id, r)
-                }
-                const excludeIds: string[] = []
-                for (const [productId, r] of restrictions) {
-                    if (!r.hasAll && !r.storeHasBridge) {
-                        excludeIds.push(productId)
-                    }
-                }
-                if (excludeIds.length > 0) {
-                    q = q.not("id", "in", `(${excludeIds.join(',')})`)
-                }
-            }
+            q = q.eq("store_id", options.storeId)
         }
 
         if (!options?.filters?.includeArchived) {

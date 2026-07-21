@@ -1,7 +1,6 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { Product, ProductInput, ProductWithDetails } from "@/lib/types/product"
 import { buildSoftDeletePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
-import { linkProductToStore } from "@/lib/store-products"
 
 export class ProductService {
   private async getSupabase() {
@@ -156,36 +155,11 @@ export class ProductService {
 
     const result = await this.create(newProduct)
 
-    // Link the duplicate to the same stores as the original
-    if (result.success && result.product) {
-      try {
-        const supabase = await this.getSupabase()
-        const { data: storeLinks } = await supabase
-          .from("store_products")
-          .select("store_id")
-          .eq("product_id", productId)
-
-        for (const link of storeLinks || []) {
-          await linkProductToStore(result.product.id, link.store_id)
-        }
-      } catch (err) {
-        console.error("Error linking duplicate product to stores:", err)
-      }
-    }
-
     return result
   }
 
-  async updateStock(productId: string, partnerId: string, quantity: number, storeId?: string): Promise<{ success: boolean; error?: string }> {
+  async updateStock(productId: string, partnerId: string, quantity: number, _storeId?: string): Promise<{ success: boolean; error?: string }> {
     const supabase = await this.getSupabase()
-    if (storeId) {
-      const { data: sp } = await supabase.from("store_products").select("id").eq("product_id", productId).eq("store_id", storeId).maybeSingle()
-      if (sp) {
-        const { error } = await supabase.from("store_products").update({ override_stock_quantity: quantity }).eq("id", sp.id)
-        if (error) return { success: false, error: error.message }
-        return { success: true }
-      }
-    }
     const { error } = await supabase.from("products").update({ stock_quantity: quantity }).eq("id", productId).eq("partner_id", partnerId)
     if (error) {
       return { success: false, error: error.message }

@@ -347,43 +347,69 @@ export async function createStoreWithInheritanceAction(input: CreateStoreWithInh
             }
         }
 
-        // 3. Inherit products (visibility_scope bridge copies)
+        // 3. Inherit products (deep copy with new store_id)
         if (input.inheritProducts) {
-            const { data: productBridges } = await supabase
-                .from("store_products")
-                .select("product_id, visibility_scope")
+            const { data: sourceProducts } = await supabase
+                .from("products")
+                .select("*")
                 .eq("store_id", input.sourceStoreId)
 
-            if (productBridges?.length) {
-                const newBridges = productBridges.map((b: any) => ({
-                    store_id: newStoreId,
-                    product_id: b.product_id,
-                    visibility_scope: b.visibility_scope,
-                }))
-                await supabase.from("store_products").upsert(newBridges, {
-                    onConflict: "store_id,product_id",
-                    ignoreDuplicates: false,
-                })
+            if (sourceProducts?.length) {
+                for (const prod of sourceProducts) {
+                    const { id, created_at, updated_at, ...productData } = prod
+
+                    const { data: newProduct, error: pErr } = await supabase
+                        .from("products")
+                        .insert({
+                            ...productData,
+                            store_id: newStoreId,
+                            stock_quantity: 0,
+                            stock_reserved: 0,
+                            stock_available: 0,
+                        })
+                        .select("id")
+                        .single()
+
+                    if (pErr || !newProduct) {
+                        console.error("[StoreInherit] Error copying product:", prod.name, pErr)
+                        continue
+                    }
+
+                    const { data: variants } = await supabase
+                        .from("product_variants")
+                        .select("*")
+                        .eq("product_id", id)
+
+                    if (variants?.length) {
+                        const newVariants = variants.map((v: any) => {
+                            const { id: vId, created_at: vCa, updated_at: vUa, ...vData } = v
+                            return {
+                                ...vData,
+                                product_id: newProduct.id,
+                                stock_quantity: 0,
+                                stock_available: 0,
+                                stock_reserved: 0,
+                            }
+                        })
+                        await supabase.from("product_variants").insert(newVariants)
+                    }
+                }
             }
         }
 
-        // 4. Inherit services
+        // 4. Inherit services (deep copy with new store_id)
         if (input.inheritServices) {
-            const { data: serviceBridges } = await supabase
-                .from("store_services")
-                .select("service_id, visibility_scope")
+            const { data: sourceServices } = await supabase
+                .from("services")
+                .select("*")
                 .eq("store_id", input.sourceStoreId)
 
-            if (serviceBridges?.length) {
-                const newBridges = serviceBridges.map((b: any) => ({
-                    store_id: newStoreId,
-                    service_id: b.service_id,
-                    visibility_scope: b.visibility_scope,
-                }))
-                await supabase.from("store_services").upsert(newBridges, {
-                    onConflict: "store_id,service_id",
-                    ignoreDuplicates: false,
+            if (sourceServices?.length) {
+                const newServices = sourceServices.map((s: any) => {
+                    const { id, created_at, updated_at, ...serviceData } = s
+                    return { ...serviceData, store_id: newStoreId }
                 })
+                await supabase.from("services").insert(newServices)
             }
         }
 

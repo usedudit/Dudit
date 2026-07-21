@@ -20,7 +20,7 @@ import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
-import { linkServiceToStore } from "@/lib/store-services"
+
 import { headers } from "next/headers"
 
 const getBrasiliaTime = () => new Date(new Date().getTime() - 3 * 60 * 60 * 1000).toISOString()
@@ -90,21 +90,7 @@ export async function getERPServicesPageAction(
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {
-            const { data: myLinked } = await supabase
-                .from("store_services")
-                .select("service_id")
-                .eq("store_id", options.storeId)
-            const { data: allLinked } = await supabase
-                .from("store_services")
-                .select("service_id")
-
-            const mySet = new Set(myLinked?.map(x => x.service_id) || [])
-            const allSet = new Set(allLinked?.map(x => x.service_id) || [])
-            const excludeIds = [...allSet].filter(id => !mySet.has(id))
-
-            if (excludeIds.length > 0) {
-                q = q.not("id", "in", `(${excludeIds.join(',')})`)
-            }
+            q = q.eq("store_id", options.storeId)
         }
 
         if (!options?.filters?.includeArchived) {
@@ -262,32 +248,6 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
 
         if (insertError) return errorResponse(insertError.message)
 
-        // F5.2c: create bridge relations per visibility_scope
-        try {
-            const scope = data.visibility_scope || 'exclusive'
-
-            // G2: Only Owner/Admin can set scope != 'exclusive'
-            if (scope !== 'exclusive') {
-                const { resolveEffectivePermissions } = await import("@/lib/store-members")
-                const effective = await resolveEffectivePermissions(finalPartnerId, finalStoreId)
-                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
-                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do serviço")
-                }
-            }
-
-            const targetStores = scope === 'all'
-                ? (await getAdminClient().from("stores").select("id").eq("partner_id", finalPartnerId)).data?.map((s: any) => s.id) || [finalStoreId]
-                : scope === 'selected' && data.visibility_stores?.length
-                    ? data.visibility_stores
-                    : [finalStoreId]
-
-            for (const sid of targetStores) {
-                await linkServiceToStore(inserted.id, sid, { visibility_scope: scope as any })
-            }
-        } catch (linkErr: any) {
-            return errorResponse("Serviço criado, mas erro ao vincular à(s) loja(s): " + linkErr.message)
-        }
-
         revalidatePath("/erp/servicos")
         return successResponse(inserted)
     } catch (error: any) {
@@ -406,50 +366,6 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
                 if (key) await deleteFileFromR2(key)
             })
             Promise.all(cleanup).catch(console.error)
-        }
-
-        // F5.5b: Handle visibility_scope changes on update
-        if (data.visibility_scope !== undefined && data.storeId) {
-            const scope = data.visibility_scope || 'exclusive'
-
-            if (scope !== 'exclusive') {
-                const { resolveEffectivePermissions } = await import("@/lib/store-members")
-                const effective = await resolveEffectivePermissions(existing.partner_id, data.storeId)
-                if (!effective || (effective.role !== 'OWNER' && effective.role !== 'ADMIN')) {
-                    return errorResponse("Apenas proprietário e administrador podem alterar a visibilidade do serviço")
-                }
-            }
-
-            const { linkServiceToStore } = await import("@/lib/store-services")
-
-            if (scope === 'all') {
-                const { data: allStores } = await admin.from("stores").select("id").eq("partner_id", existing.partner_id)
-                for (const s of allStores || []) {
-                    await linkServiceToStore(serviceId, s.id, { visibility_scope: 'all' })
-                }
-            } else if (scope === 'selected' && data.visibility_stores?.length) {
-                for (const sid of data.visibility_stores) {
-                    await linkServiceToStore(serviceId, sid, { visibility_scope: 'selected' })
-                }
-                const { data: existingBridges } = await admin
-                    .from("store_services")
-                    .select("store_id")
-                    .eq("service_id", serviceId)
-                    .not("store_id", "in", `(${data.visibility_stores.join(",")})`)
-                for (const b of existingBridges || []) {
-                    await admin.from("store_services").delete().eq("service_id", serviceId).eq("store_id", b.store_id)
-                }
-            } else {
-                await linkServiceToStore(serviceId, data.storeId, { visibility_scope: 'exclusive' })
-                const { data: otherBridges } = await admin
-                    .from("store_services")
-                    .select("store_id")
-                    .eq("service_id", serviceId)
-                    .neq("store_id", data.storeId)
-                for (const b of otherBridges || []) {
-                    await admin.from("store_services").delete().eq("service_id", serviceId).eq("store_id", b.store_id)
-                }
-            }
         }
 
         revalidatePath("/erp/servicos")
@@ -700,19 +616,6 @@ export async function duplicateServiceAction(serviceId: string) {
         }
 
         if (insertError) return errorResponse(insertError.message)
-
-        // F4.1: preserve store relation via bridge instead of legacy store_id
-        try {
-            const { data: storeLinks } = await supabase
-                .from("store_services")
-                .select("store_id, visibility_scope")
-                .eq("service_id", serviceId)
-            for (const link of storeLinks || []) {
-                await linkServiceToStore(inserted.id, link.store_id, { visibility_scope: link.visibility_scope })
-            }
-        } catch (linkErr: any) {
-            return errorResponse("Serviço duplicado, mas erro ao vincular à loja: " + linkErr.message)
-        }
 
         revalidatePath("/erp/servicos")
         return successResponse({ newServiceId: inserted.id, product: inserted })

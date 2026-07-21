@@ -1,6 +1,6 @@
 "use server"
 
-import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
+
 import { getAdminClient } from "@/lib/supabase/admin"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -543,8 +543,7 @@ async function _searchMarketplaceInternal(
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active),
-                        show_price_in_store,
-                        store_products(marketplace_visible, visibility_scope)
+                        show_price_in_store
                     `)
                         .in("id", produtosIds)
                         .eq("is_active", true)
@@ -558,8 +557,7 @@ async function _searchMarketplaceInternal(
                         id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                         marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
-                        show_price_in_store,
-                        store_services(marketplace_visible, visibility_scope)
+                        show_price_in_store
                     `)
                         .in("id", servicosIds)
                         .eq("is_active", true)
@@ -591,21 +589,6 @@ async function _searchMarketplaceInternal(
             }
 
             const results = await Promise.all(promises)
-
-            if (_prodIdx !== -1 && results[_prodIdx]?.data?.length > 0) {
-                results[_prodIdx].data = results[_prodIdx].data.filter((p: any) => {
-                    const links = p.store_products || []
-                    if (links.length === 0) return true
-                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
-                })
-            }
-            if (_servIdx !== -1 && results[_servIdx]?.data?.length > 0) {
-                results[_servIdx].data = results[_servIdx].data.filter((s: any) => {
-                    const links = s.store_services || []
-                    if (links.length === 0) return true
-                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
-                })
-            }
 
             let fallbackRecords: any[] = []
 
@@ -731,8 +714,7 @@ async function hydrateMarketplaceSearchHits(
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active),
-                show_price_in_store,
-                store_products(marketplace_visible, visibility_scope)
+                show_price_in_store
             `)
                 .in("id", produtosIds)
                 .eq("is_active", true)
@@ -746,8 +728,7 @@ async function hydrateMarketplaceSearchHits(
                 id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
-                show_price_in_store,
-                store_services(marketplace_visible, visibility_scope)
+                show_price_in_store
             `)
                 .in("id", servicosIds)
                 .eq("is_active", true)
@@ -779,21 +760,6 @@ async function hydrateMarketplaceSearchHits(
     }
 
     const queryResults = await Promise.all(promises)
-
-    if (_hydrateProdIdx !== -1 && queryResults[_hydrateProdIdx]?.data?.length > 0) {
-        queryResults[_hydrateProdIdx].data = queryResults[_hydrateProdIdx].data.filter((p: any) => {
-            const links = p.store_products || []
-            if (links.length === 0) return true
-            return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
-        })
-    }
-    if (_hydrateServIdx !== -1 && queryResults[_hydrateServIdx]?.data?.length > 0) {
-        queryResults[_hydrateServIdx].data = queryResults[_hydrateServIdx].data.filter((s: any) => {
-            const links = s.store_services || []
-            if (links.length === 0) return true
-            return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
-        })
-    }
     const recordMap = new Map<string, any>()
 
     queryResults.forEach((res) => {
@@ -1103,8 +1069,7 @@ async function searchMarketplaceByCity(
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
                     partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
                     product_variants(variant_options, price_adjustment, is_active),
-                    show_price_in_store,
-                    store_products(marketplace_visible, visibility_scope)
+                    show_price_in_store
                 `)
                 .eq("is_active", true)
                 .eq("show_in_marketplace", true)
@@ -1124,8 +1089,7 @@ async function searchMarketplaceByCity(
                     id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
-                    show_price_in_store,
-                    store_services(marketplace_visible, visibility_scope)
+                    show_price_in_store
                 `)
                 .eq("is_active", true)
                 .eq("show_in_marketplace", true)
@@ -1168,25 +1132,11 @@ async function searchMarketplaceByCity(
             const res = resList[idx++]
             if (res?.error) console.error("[searchMarketplaceByCity] Products query error:", res.error)
             rawProducts = res?.data || []
-            if (rawProducts && rawProducts.length > 0) {
-                rawProducts = rawProducts.filter((p: any) => {
-                    const links = p.store_products || []
-                    if (links.length === 0) return true
-                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
-                })
-            }
         }
         if (type === 'tudo' || type === 'servicos') {
             const res = resList[idx++]
             if (res?.error) console.error("[searchMarketplaceByCity] Services query error:", res.error)
             rawServices = res?.data || []
-            if (rawServices && rawServices.length > 0) {
-                rawServices = rawServices.filter((s: any) => {
-                    const links = s.store_services || []
-                    if (links.length === 0) return true
-                    return links.some((l: any) => l.marketplace_visible === true && l.visibility_scope === 'all')
-                })
-            }
         }
         if (type === 'tudo' || type === 'planos') {
             const res = resList[idx++]
