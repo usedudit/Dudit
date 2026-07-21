@@ -970,7 +970,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             : paidAmount
 
     // Call atomic RPC — now store-aware via p_store_id
-    const { data: saleId, error: rpcError } = await supabase.rpc("finalize_pos_sale", {
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("finalize_pos_sale", {
         p_partner_id: input.partnerId,
         p_pre_sale_id: input.preSaleId,
         p_finance_account_id: input.financeAccountId || null,
@@ -983,11 +983,11 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     })
 
     if (rpcError) {
-        // Surface clean error messages from RAISE EXCEPTION
         const msg = rpcError.message || "Falha ao finalizar venda."
         return { success: false as const, error: msg }
     }
 
+    const saleId = rpcResult?.[0]?.sale_id
     if (!saleId) {
         return { success: false as const, error: "Falha ao finalizar venda - nenhum ID retornado." }
     }

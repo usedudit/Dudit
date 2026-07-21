@@ -182,7 +182,7 @@ BEGIN
   END IF;
 
   -- 7. Delete User Addresses and Profiles
-  DELETE FROM public.user_addresses WHERE user_id = p_user_id;
+  DELETE FROM public.addresses WHERE user_id = p_user_id;
   GET DIAGNOSTICS v_temp_rows = ROW_COUNT;
   v_affected_rows := v_affected_rows + v_temp_rows;
 
