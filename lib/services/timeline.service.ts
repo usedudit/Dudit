@@ -69,6 +69,11 @@ interface LogAuditEventInput {
   changeLines: string[]
   metadata?: Record<string, unknown> | null
   source?: "system" | "webhook" | "manual" | "marketplace"
+  storeId?: string | null
+  storeName?: string | null
+  partnerName?: string | null
+  actorName?: string | null
+  actorEmail?: string | null
 }
 
 function sanitizeChangeLines(lines: string[]): string[] {
@@ -196,6 +201,11 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       change_lines: changeLines,
       metadata: safeMetadata,
       source: input.source || "system",
+      store_id: input.storeId || null,
+      store_name: input.storeName || null,
+      partner_name: input.partnerName || null,
+      actor_name: input.actorName || null,
+      actor_email: input.actorEmail || null,
     }
 
     let insertResult = await supabase.from("audit_logs").insert(fullPayload)

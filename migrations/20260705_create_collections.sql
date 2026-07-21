@@ -94,18 +94,22 @@ CREATE POLICY "collection_items_delete"
 -- TRIGGER: atualiza items_count na collection
 -- ============================================================================
 CREATE OR REPLACE FUNCTION update_collection_items_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    UPDATE collections SET items_count = items_count + 1, updated_at = now() WHERE id = NEW.collection_id;
+    UPDATE public.collections SET items_count = items_count + 1, updated_at = now() WHERE id = NEW.collection_id;
     RETURN NEW;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE collections SET items_count = GREATEST(items_count - 1, 0), updated_at = now() WHERE id = OLD.collection_id;
+    UPDATE public.collections SET items_count = GREATEST(items_count - 1, 0), updated_at = now() WHERE id = OLD.collection_id;
     RETURN OLD;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS trg_collection_items_count ON collection_items;
 CREATE TRIGGER trg_collection_items_count
