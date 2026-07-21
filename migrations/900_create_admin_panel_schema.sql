@@ -65,6 +65,14 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  IF session_user = 'supabase_auth_admin' OR current_user = 'supabase_auth_admin' THEN
+    IF TG_OP = 'UPDATE' THEN
+      RETURN NEW;
+    ELSE
+      RETURN OLD;
+    END IF;
+  END IF;
+
   RAISE EXCEPTION 'admin_audit_logs is immutable. UPDATE and DELETE are forbidden.';
   RETURN NULL;
 END;

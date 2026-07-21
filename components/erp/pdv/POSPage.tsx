@@ -2346,27 +2346,26 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     >
                         <div className="space-y-6 pt-2">
                             <div>
-                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3 uppercase tracking-wider">Teclas de Atalho</h4>
                                 <div className="grid grid-cols-1 gap-3">
-                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                    <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Salvar pedido (Pré-venda)</span>
-                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F1</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F1</kbd>
                                     </div>
-                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                    <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Focar no campo de busca</span>
-                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F2</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F2</kbd>
                                     </div>
-                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                    <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Selecionar Cliente</span>
-                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F4</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F4</kbd>
                                     </div>
-                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                    <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Selecionar Vendedor</span>
-                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F5</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F5</kbd>
                                     </div>
-                                    <div className="flex items-center justify-between p-3 rounded-2xl border border-brand-border bg-brand-gray/30 dark:border-dark-border dark:bg-dark-surface/50">
+                                    <div className="flex items-center justify-between pb-4 border-b border-brand-border dark:border-dark-border">
                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Finalizar Venda (Pagamento)</span>
-                                        <kbd className="px-2.5 py-1 rounded-lg bg-white border border-brand-border text-xs font-mono font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading shadow-sm">F6</kbd>
+                                        <kbd className="px-2.5 py-2 rounded-lg bg-white border border-brand-border text-xs font-bold dark:bg-dark-border dark:border-dark-border dark:text-dark-heading">F6</kbd>
                                     </div>
                                 </div>
                             </div>

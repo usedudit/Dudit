@@ -14,11 +14,12 @@ export default async function OrdersPageServer() {
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId
+  const storeId = context.activeStoreId
 
   // Parallelize permission check and data fetch
   const [{ allowed }, page] = await Promise.all([
     checkPermission(partnerId, "orders", "view"),
-    getERPOrdersPageAction(partnerId, { cursor: null, limit: 100 }),
+    getERPOrdersPageAction(partnerId, { cursor: null, limit: 100, storeId: storeId || undefined }),
   ])
 
   if (!allowed) return <AccessDenied />

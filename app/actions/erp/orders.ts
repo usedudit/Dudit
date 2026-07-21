@@ -1661,6 +1661,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         partnerId,
         orderId: order.id,
         items: stockItems,
+        storeId: data.storeId,
     })
 
     if ("error" in reserveResult) {
@@ -1678,6 +1679,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             reason: "Venda de Produtos",
             notes: sanitizeNotes(data.notes) || undefined,
             items: stockItems,
+            storeId: data.storeId,
         })
 
         if ("error" in finalizeResult) {
@@ -1686,6 +1688,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
                 partnerId,
                 orderId: order.id,
                 items: stockItems,
+                storeId: data.storeId,
             })
             await supabase.from("order_items").delete().eq("order_id", order.id)
             await supabase.from("orders").delete().eq("id", order.id)
@@ -2471,6 +2474,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 reason: "Edicao de pedido",
                 notes: sanitizeNotes(data.notes) || undefined,
                 items: delta.incoming,
+                storeId: data.storeId,
             })
 
             if ("error" in movementResult) return { error: movementResult.error }
@@ -2486,6 +2490,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 reason: "Edicao de pedido",
                 notes: sanitizeNotes(data.notes) || undefined,
                 items: delta.outgoing,
+                storeId: data.storeId,
             })
 
             if ("error" in movementResult) return { error: movementResult.error }
@@ -2497,6 +2502,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 partnerId: data.partnerId,
                 orderId,
                 items: delta.incoming,
+                storeId: data.storeId,
             })
 
             if ("error" in releaseResult) return { error: releaseResult.error }
@@ -2508,6 +2514,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 partnerId: data.partnerId,
                 orderId,
                 items: delta.outgoing,
+                storeId: data.storeId,
             })
 
             if ("error" in reserveResult) return { error: reserveResult.error }
@@ -2519,6 +2526,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 partnerId: data.partnerId,
                 orderId,
                 items: stockItems,
+                storeId: data.storeId,
             })
 
             if ("error" in reserveResult) return { error: reserveResult.error }
@@ -2533,6 +2541,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 reason: "Venda de Produtos",
                 notes: sanitizeNotes(data.notes) || undefined,
                 items: stockItems,
+                storeId: data.storeId,
             })
 
             if ("error" in finalizeResult) return { error: finalizeResult.error }
@@ -2716,7 +2725,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     const { data: currentOrders } = await supabase
         .from("orders")
-        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, order_items(product_id, variant_id, quantity)")
+        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, store_id, order_items(product_id, variant_id, quantity)")
         .in("id", payload.orderIds)
         .eq("partner_id", payload.partnerId)
     const overallWarnings: string[] = []
@@ -2804,6 +2813,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         reason: "Cancelamento de pedido",
                         notes: nextNotes || undefined,
                         items: order.order_items || [],
+                        storeId: order.store_id,
                     })
 
                     if ("error" in restoreResult) {
@@ -2816,6 +2826,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         partnerId: payload.partnerId,
                         orderId: order.id,
                         items: order.order_items || [],
+                        storeId: order.store_id,
                     })
 
                     if ("error" in releaseResult) {
@@ -2923,6 +2934,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         type: "out",
                         reason: "Reabertura de pedido",
                         items: order.order_items || [],
+                        storeId: order.store_id,
                     })
 
                     if ("error" in movementResult) {
@@ -2934,6 +2946,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         partnerId: payload.partnerId,
                         orderId: order.id,
                         items: order.order_items || [],
+                        storeId: order.store_id,
                     })
 
                     if ("error" in reserveResult) {
@@ -3152,6 +3165,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 reason: "Venda de Produtos",
                 notes: normalizeOrderNotes(order.notes) || undefined,
                 items: order.order_items || [],
+                storeId: order.store_id,
             })
 
             if ("error" in finalizeResult) return { error: finalizeResult.error }
@@ -3621,7 +3635,7 @@ const ERP_ORDERS_PAGE_SIZE = 100
 
 export async function getERPOrdersPageAction(
     partnerId: string,
-    options?: { cursor?: ERPOrderListCursor | null; limit?: number },
+    options?: { cursor?: ERPOrderListCursor | null; limit?: number; storeId?: string },
 ): Promise<
     | { success: true; items: any[]; nextCursor: ERPOrderListCursor | null; hasMore: boolean }
     | { success: false; error: string }
@@ -3650,6 +3664,7 @@ export async function getERPOrdersPageAction(
                 delivery_type,
                 order_source,
                 created_at,
+                store_id,
                 stores(name),
                 return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                 order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
@@ -3670,6 +3685,10 @@ export async function getERPOrdersPageAction(
                 .from("orders")
                 .select(selectClause)
                 .eq("partner_id", partnerId)
+
+            if (options?.storeId) {
+                query = query.eq("store_id", options.storeId)
+            }
 
             if (cursor) {
                 query = query.or(buildOrdersKeysetOrFilter(cursor))

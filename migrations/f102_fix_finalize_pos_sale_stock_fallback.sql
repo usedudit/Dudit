@@ -384,18 +384,14 @@ BEGIN
     END IF;
   END IF;
 
-  UPDATE public.pre_sales
-  SET status = 'finalized', updated_at = NOW()
-  WHERE id = p_pre_sale_id;
-
   IF v_clamped_paid > 0 THEN
     INSERT INTO public.cash_movements (
       partner_id, store_id, cash_session_id, type, description,
-      payment_method_id, amount, reference_type, reference_id, created_by_user_id, created_at
+      payment_method_id, amount, reference_id, created_by_user_id, created_at
     ) VALUES (
       p_partner_id, p_store_id, p_cash_session_id, 'sale',
       'Venda PDV #' || v_sale_number,
-      NULL, v_clamped_paid, 'sale', v_sale_id, p_user_id, NOW()
+      NULL, v_clamped_paid, v_sale_id, p_user_id, NOW()
     ) RETURNING id INTO v_cash_movement_id;
   END IF;
 
@@ -404,19 +400,19 @@ BEGIN
     LOOP
       INSERT INTO public.cash_movements (
         partner_id, store_id, cash_session_id, type, description,
-        payment_method_id, amount, reference_type, reference_id, created_by_user_id, created_at
+        payment_method_id, amount, reference_id, created_by_user_id, created_at
       ) VALUES (
         p_partner_id, p_store_id, p_cash_session_id, 'sale',
         'Venda PDV #' || v_sale_number,
         (v_item->>'payment_method_id')::uuid,
         GREATEST((v_item->>'amount')::numeric, 0),
-        'sale', v_sale_id, p_user_id, NOW()
+        v_sale_id, p_user_id, NOW()
       );
     END LOOP;
   END IF;
 
   UPDATE public.pre_sales
-  SET sale_id = v_sale_id, updated_at = NOW()
+  SET status = 'completed', completed_sale_id = v_sale_id, updated_at = NOW()
   WHERE id = p_pre_sale_id;
 
   RETURN v_sale_id;

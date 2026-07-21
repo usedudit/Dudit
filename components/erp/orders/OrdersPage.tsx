@@ -172,7 +172,7 @@ export default function OrdersPage({
     const currentUserName = userProfile?.full_name || "Usuário"
 
     // ── Entity Page (URL-driven state + cache + infinite list) ─────────
-    const ordersQueryKey = useMemo(() => ['erp', 'orders', partnerId] as const, [partnerId])
+    const ordersQueryKey = useMemo(() => ['erp', 'orders', partnerId, selectedStore?.id] as const, [partnerId, selectedStore?.id])
 
     const entityPage = useEntityPage<any, any, ERPOrderListCursor>({
         entityType: 'orders',
@@ -182,7 +182,7 @@ export default function OrdersPage({
         initialNextCursor: initialNextCursor,
         initialHasMore: initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getERPOrdersPageAction(partnerId, { cursor, limit: 100 })
+            const res = await getERPOrdersPageAction(partnerId, { cursor, limit: 100, storeId: selectedStore?.id || undefined })
             if (!res.success) throw new Error(res.error || "Erro ao carregar pedidos.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
