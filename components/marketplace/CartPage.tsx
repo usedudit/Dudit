@@ -4,7 +4,7 @@ import { useState, useRef, Fragment, useEffect } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { getPartnerUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { TrashIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import { AnimatePresence, motion } from "framer-motion"
@@ -473,11 +473,11 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 src={getImageUrl(sellerImage) || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                 alt={data.partner?.store_name}
                                                                 className="bg-white border border-brand-border dark:border-dark-border w-6 h-6 rounded-full object-cover"
-                                                                onClick={e => { e.stopPropagation(); router.push(getPartnerUrl(data.partner)) }}
+                                                                onClick={e => { e.stopPropagation(); router.push(getStoreUrl(data.partner)) }}
                                                             />
                                                             <h3
                                                                 className="text-lg font-semibold text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors"
-                                                                onClick={e => { e.stopPropagation(); router.push(getPartnerUrl(data.partner)) }}
+                                                                onClick={e => { e.stopPropagation(); router.push(getStoreUrl(data.partner)) }}
                                                             >
                                                                 {data.partner?.store_name || "Loja"}
                                                             </h3>

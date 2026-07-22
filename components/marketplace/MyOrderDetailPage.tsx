@@ -15,7 +15,7 @@ import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/ac
 import { FileIcon } from '@/lib/icons';
 import { formatFileSize } from '@/components/erp/orders/OrderAttachmentsTab';
 import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
-import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
+import { getProductUrl, getStoreUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
 import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from '@/lib/returns/calculations';
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
@@ -1489,7 +1489,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Section 4: Vendedor */}
                                     <FormSection title="Vendedor">
-                                        <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                        <Link href={getStoreUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
                                             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                                 <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
                                             </div>

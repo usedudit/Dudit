@@ -86,6 +86,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   // Merge store data over partner data
   const rawStore: any = Array.isArray(data.stores) ? data.stores[0] : data.stores
   if (rawStore && rawPartner) {
+    rawPartner.store_id = rawStore.id
     rawPartner.store_name = rawStore.name || rawPartner.store_name
     rawPartner.store_description = rawStore.description || rawPartner.store_description
     rawPartner.store_image_url = rawStore.logo_url || rawStore.image_url || rawPartner.store_image_url

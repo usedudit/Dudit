@@ -568,9 +568,11 @@ async function _searchMarketplaceInternal(
             }
             if (lojasIds.length > 0) {
                 promises.push(
-                    supabase.from("partners").select(`
-                        id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
-                    `).in("id", lojasIds)
+                    supabase.from("stores").select(`
+                        id, name, description, logo_url, image_url, banner_url, phone, city, state, rating, is_showcase_active, partner_id,
+                        partners!inner(id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at, is_showcase_active, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count))
+                    `).in("partner_id", lojasIds)
+                    .eq("status", "ativo")
                 )
             }
             if (planosIds.length > 0) {
@@ -1002,7 +1004,8 @@ async function searchMarketplaceByCity(
             category_id,
             category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
             addresses!inner(city, state),
-            reviews(count)
+            reviews(count),
+            stores!inner(id, name, description, logo_url, image_url, banner_url, phone, city, state, is_showcase_active)
         `)
         .eq("is_active", true)
         .eq("addresses.state", dbState)
@@ -1089,6 +1092,7 @@ async function searchMarketplaceByCity(
                     id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    stores!inner(id, name, logo_url, image_url, banner_url, city, state),
                     show_price_in_store
                 `)
                 .eq("status", "ativo")
@@ -1145,37 +1149,56 @@ async function searchMarketplaceByCity(
         }
     }
 
-    const normalizedPartners = filteredPartners.map((item: any) => ({
-        id: item.id,
-        name: item.store_name,
-        description: item.store_description,
-        images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
-        rating: item.rating,
-        itemType: 'loja',
-        category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
-        partners: {
-            id: item.id,
-            store_name: item.store_name,
-            store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-            banner_url: item.banner_url || null,
-            latitude: item.latitude,
-            longitude: item.longitude,
-            city: item.addresses?.[0]?.city || null,
-            state: item.addresses?.[0]?.state || null,
-            reviewsCount: item.reviews?.[0]?.count || 0
-        },
-        created_at: item.created_at
-    }))
+    const normalizedPartners = filteredPartners.map((item: any) => {
+        const store = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        const storeName = store?.name || item.store_name || "Vendedor"
+        const storeImage = store?.logo_url || store?.image_url || item.store_image_url
+        const storeCity = store?.city || item.addresses?.[0]?.city || null
+        const storeState = store?.state || item.addresses?.[0]?.state || null
+        const storeId = store?.id || item.id
+        return {
+            id: storeId,
+            name: storeName,
+            description: store?.description || item.store_description,
+            images: [store?.banner_url || item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
+            rating: store?.rating ?? item.rating,
+            itemType: 'loja',
+            category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
+            partners: {
+                id: storeId,
+                store_id: storeId,
+                store_name: storeName,
+                store_image_url: storeImage,
+                store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                banner_url: store?.banner_url || item.banner_url || null,
+                latitude: item.latitude,
+                longitude: item.longitude,
+                city: storeCity,
+                state: storeState,
+                reviewsCount: item.reviews?.[0]?.count || 0
+            },
+            created_at: item.created_at
+        }
+    })
 
     const normalizedProducts = rawProducts.map((item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        const storeId = rawStore?.id || rawPartner?.id
+        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
         const partner = rawPartner ? {
             ...rawPartner,
-            store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+            store_id: storeId,
+            store_name: storeName,
+            store_image_url: storeImage,
+            store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
             latitude: rawPartner.latitude,
             longitude: rawPartner.longitude,
-            city: rawPartner.addresses?.[0]?.city || null,
-            state: rawPartner.addresses?.[0]?.state || null
+            city: storeCity,
+            state: storeState
         } : null
         const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
         const { product_variants, ...rest } = item
@@ -1191,13 +1214,22 @@ async function searchMarketplaceByCity(
 
     const normalizedServices = rawServices.map((item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        const storeId = rawStore?.id || rawPartner?.id
+        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
         const partner = rawPartner ? {
             ...rawPartner,
-            store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+            store_id: storeId,
+            store_name: storeName,
+            store_image_url: storeImage,
+            store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
             latitude: rawPartner.latitude,
             longitude: rawPartner.longitude,
-            city: rawPartner.addresses?.[0]?.city || null,
-            state: rawPartner.addresses?.[0]?.state || null
+            city: storeCity,
+            state: storeState
         } : null
         const categoryName = (item.marketplace_category?.parent?.name || item.marketplace_category?.name || null) as string | null
         const sanitizedCategoryName = categoryName && typeof categoryName === 'string' ? categoryName : null

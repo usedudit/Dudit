@@ -18,7 +18,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { addSubscriptionToCartAction } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
-import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 
 interface PlanDetailsPageClientProps {
@@ -865,7 +865,7 @@ export function PlanDetailsPageClient({
                                     return (
                                         <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
                                             {/* Banner Link to Partner Profile */}
-                                            <Link href={getPartnerUrl(partner)} className="block group">
+                                            <Link href={getStoreUrl(partner)} className="block group">
                                                 <div className="h-24 w-full relative bg-gray-100 overflow-hidden select-none">
                                                     <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
                                                     <div className="absolute inset-0 bg-black/10" />

@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next'
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { getStoreUrl, getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getProductUrl } from "@/lib/utils/url-generator"
 
 export const revalidate = 86400
 
@@ -115,15 +115,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             priority: 0.7,
         }))
 
-        // --- Partners ---
-        const partners = partnersResponse.data || []
-        const partnersSitemap: MetadataRoute.Sitemap = partners.map((p: any) => ({
-            url: `https://dudit.com.br${getPartnerUrl(p)}`,
-            lastModified: new Date(p.updated_at || p.created_at),
-            changeFrequency: "weekly",
-            priority: 0.5,
-        }))
-
         // --- City pages from DB: /explorar/{cidade-uf} ---
         const seenCities = new Set<string>()
         const citiesSitemap: MetadataRoute.Sitemap = []
@@ -156,7 +147,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             ...baseUrls,
             ...productsSitemap,
             ...storesSitemap,
-            ...partnersSitemap,
             ...citiesSitemap,
         ]
 

@@ -387,6 +387,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const partner = rawPartner
         ? {
             id: rawPartner.id,
+            store_id: rawStore?.id || rawPartner.id,
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -848,6 +849,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
             const partner = rawPartner ? {
                 id: rawPartner.id,
+                store_id: rawStore?.id || rawPartner.id,
                 store_name: storeName,
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -1460,6 +1462,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const partner = rawPartner
             ? {
                 id: rawPartner.id,
+                store_id: rawStore?.id || rawPartner.id,
                 store_name: storeName,
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
@@ -1505,10 +1508,14 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     }
 
     let { data, error } = await supabase
-        .from("partners")
-        .select(`id, store_name, store_image_url, banner_url, rating, latitude, longitude, is_showcase_active, addresses!inner(city, state)`)
-        .eq("is_active", true)
-        .in("id", allIds)
+        .from("stores")
+        .select(`
+            id, name, description, logo_url, image_url, banner_url,
+            phone, city, state, rating, is_showcase_active, partner_id,
+            partners!inner(store_name, store_image_url, latitude, longitude, is_showcase_active)
+        `)
+        .eq("status", "ativo")
+        .in("partner_id", allIds)
         .order("rating", { ascending: false, nulls: "last" })
         .limit(30)
 
@@ -1519,16 +1526,17 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     }
 
     if (!data || data.length === 0) {
-        dLog(`[Discover] SKIP topVitrines reason=no_partners_data`)
+        dLog(`[Discover] SKIP topVitrines reason=no_data`)
         return null
     }
 
-    const tagged = data.map((p: Record<string, any>) => {
-        const pid = p.id
+    const tagged = data.map((s: Record<string, any>) => {
+        const pid = s.partner_id
+        const p = Array.isArray(s.partners) ? s.partners[0] : s.partners
         const tier = pid && tiers.cityIds.has(pid) ? 0
             : pid && tiers.stateIds.has(pid) ? 1
                 : 2
-        return { ...p, _tier: tier }
+        return { ...s, partners: p, _tier: tier }
     }).sort((a: any, b: any) => {
         const tierDiff = a._tier - b._tier
         if (tierDiff !== 0) return tierDiff
@@ -1547,27 +1555,30 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const vitrineMapper = (partner: any) => {
-        const addr = Array.isArray(partner.addresses) ? partner.addresses[0] : partner.addresses
+    const vitrineMapper = (store: any) => {
+        const p = store.partners
+        const storeName = store.name || p?.store_name || "Vendedor"
+        const storeImage = store.logo_url || store.image_url || p?.store_image_url
         return {
-            id: partner.id,
-            name: partner.store_name,
-            store_name: partner.store_name,
-            store_image_url: partner.store_image_url,
-            banner_url: partner.banner_url || null,
-            images: partner.store_image_url ? [partner.store_image_url] : [],
-            rating: partner.rating,
+            id: store.id,
+            name: storeName,
+            store_name: storeName,
+            store_image_url: storeImage,
+            banner_url: store.banner_url || null,
+            images: storeImage ? [storeImage] : [],
+            rating: store.rating,
             reviewsCount: 0,
             partners: {
-                id: partner.id,
-                store_name: partner.store_name,
-                store_image_url: partner.store_image_url,
-                banner_url: partner.banner_url || null,
-                store_avatar: partner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                latitude: partner.latitude,
-                longitude: partner.longitude,
-                city: addr?.city || "",
-                state: addr?.state || "",
+                id: store.id,
+                store_id: store.id,
+                store_name: storeName,
+                store_image_url: storeImage,
+                banner_url: store.banner_url || null,
+                store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                latitude: p?.latitude || null,
+                longitude: p?.longitude || null,
+                city: store.city || "",
+                state: store.state || "",
             },
             itemType: "vitrine" as const,
         }

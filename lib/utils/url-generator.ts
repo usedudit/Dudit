@@ -65,13 +65,14 @@ export function getStoreUrl(store: any): string {
     if (!store) return "/"
 
     const storeSlug = store.slug || createSlug(store.name || store.store_name || "")
+    const storeId = store.store_id || store.id || ""
     const address = store.addresses?.[0]
     const city = store.city || address?.city
     const state = store.state || address?.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
-    return `/${cityStateSlug}/${storeSlug}`
+    return `/${cityStateSlug}/${storeSlug}/v/${storeId}`
 }
 
 /**

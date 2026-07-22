@@ -11,7 +11,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
-import { getPartnerUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
@@ -855,7 +855,7 @@ export function CheckoutPageClient() {
         const isFree = diff <= 0
         const percentage = Math.min(100, (current / threshold) * 100)
 
-        const storeUrl = checkoutContext?.partner ? getPartnerUrl(checkoutContext.partner) : "/"
+        const storeUrl = checkoutContext?.partner ? getStoreUrl(checkoutContext.partner) : "/"
 
         return (
             <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 bg-brand-slate/10 dark:bg-dark-border/10 space-y-3 shadow-sm mb-6">

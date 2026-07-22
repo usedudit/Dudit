@@ -50,7 +50,7 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
-import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { getStoreUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
@@ -1438,7 +1438,7 @@ export function ServiceDetailsPageClient({
                     return (
                         <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
                             {/* Top clickable block linking to partner profile */}
-                            <Link href={getPartnerUrl(partner)} className="block group">
+                            <Link href={getStoreUrl(partner)} className="block group">
                                 {/* Banner */}
                                 <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
                                     <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />

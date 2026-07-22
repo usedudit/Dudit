@@ -45,7 +45,7 @@ import {
 } from "@/lib/types/coupon"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { getPartnerUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl } from "@/lib/utils/url-generator"
 import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -1024,7 +1024,14 @@ export default function CouponsPage({
                 <ShareModal
                     isOpen={!!sharingCoupon}
                     onClose={() => setSharingCoupon(null)}
-                    url={typeof window !== 'undefined' ? `${window.location.origin}${getPartnerUrl(localPartner)}?cupom=${sharingCoupon.code}` : ""}
+                    url={typeof window !== 'undefined' ? `${window.location.origin}${getStoreUrl({
+                        id: storeId || localPartner?.id,
+                        slug: localPartner?.slug,
+                        store_name: localPartner?.store_name,
+                        city: localPartner?.city,
+                        state: localPartner?.state,
+                        addresses: localPartner?.addresses
+                    })}?cupom=${sharingCoupon.code}` : ""}
                     title={`Cupom ${sharingCoupon.code}`}
                     shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Entrega gratis" ? "entrega grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
                     label="Link com cupom"

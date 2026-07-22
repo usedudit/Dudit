@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getPartnerPlan } from "@/lib/services/subscription.service";
 import { normalizeBusinessInfo } from "@/lib/business-info";
 import { DashboardContext, DashboardLayout } from "./types";
-import { getPartnerUrl } from "@/lib/utils/url-generator";
+import { getStoreUrl } from "@/lib/utils/url-generator";
 import {
   getChecklistItems,
   getCards,
@@ -26,6 +26,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [
     partnerRes,
+    storeRes,
     addressRes,
     paymentMethodsRes,
     productsCountRes,
@@ -44,6 +45,13 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .select("store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active, mp_user_id, business_info")
       .eq("id", partnerId)
       .single(),
+    
+    // Loja associada (para URL pública com store_id)
+    supabase
+      .from("stores")
+      .select("id, name, slug, city, state, logo_url, image_url, banner_url, phone, is_showcase_active")
+      .eq("partner_id", partnerId)
+      .maybeSingle(),
     
     // Endereço Padrão (precisa de city/state para URL pública)
     supabase
@@ -219,12 +227,22 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   };
 
   // 7. Gera a URL pública do perfil do vendedor
-  const partnerForUrl = {
-    id: partnerId,
-    store_name: partner.store_name,
-    addresses: addressRes.data || [],
-  };
-  const partnerUrl = getPartnerUrl(partnerForUrl);
+  const store = storeRes.data
+  const partnerForUrl = store
+    ? {
+        id: store.id,
+        name: store.name,
+        slug: store.slug,
+        store_name: partner.store_name,
+        city: store.city,
+        state: store.state,
+      }
+    : {
+        id: partnerId,
+        store_name: partner.store_name,
+        addresses: addressRes.data || [],
+      };
+  const partnerUrl = getStoreUrl(partnerForUrl);
 
   return {
     storeName: partner.store_name,

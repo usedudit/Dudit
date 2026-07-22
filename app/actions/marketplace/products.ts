@@ -103,6 +103,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     const s: any = data.stores
     const store = Array.isArray(s) ? s[0] : s
     if (store) {
+      p.store_id = store.id
       p.store_name = store.name || p.store_name
       p.store_description = store.description || p.store_description
       p.store_image_url = store.logo_url || store.image_url || p.store_image_url

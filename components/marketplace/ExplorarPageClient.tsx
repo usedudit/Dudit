@@ -23,7 +23,7 @@ import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
-import { getPartnerUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import { SponsoredAdsSearchInline } from "@/components/marketplace/ads/SponsoredAdsSlot"
@@ -907,7 +907,7 @@ export function ExplorarPageClient({
     }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query])
 
     const getItemUrl = (item: any) => {
-        if (item.itemType === "loja") return getPartnerUrl(item.partners || item)
+        if (item.itemType === "loja") return getStoreUrl(item.partners || item)
         if (item.itemType === "plano") return getPlanUrl(item, item.partners)
         if (item.itemType === "servico") return getServiceUrl(item, item.partners)
         return getProductUrl(item, item.partners)
