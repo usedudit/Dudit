@@ -170,8 +170,38 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       reviewCount: statsBase?.reviewsCount || 1,
     } : undefined,
     makesOffer: [
-      ...(products || []).slice(0, 3).map((p: any) => ({ '@type': 'Offer', itemOffered: { '@type': 'Product', name: p.name }, price: p.price, priceCurrency: 'BRL' })),
-      ...(services || []).slice(0, 3).map((s: any) => ({ '@type': 'Offer', itemOffered: { '@type': 'Service', name: s.name }, price: s.price, priceCurrency: 'BRL' }))
+      ...(products || []).slice(0, 3).map((p: any) => ({
+        '@type': 'Offer',
+        price: p.price,
+        priceCurrency: 'BRL',
+        availability: 'https://schema.org/InStock',
+        itemOffered: {
+          '@type': 'Product',
+          name: p.name,
+          offers: {
+            '@type': 'Offer',
+            price: p.price,
+            priceCurrency: 'BRL',
+            availability: 'https://schema.org/InStock',
+          },
+        },
+      })),
+      ...(services || []).slice(0, 3).map((s: any) => ({
+        '@type': 'Offer',
+        price: s.price,
+        priceCurrency: 'BRL',
+        availability: 'https://schema.org/InStock',
+        itemOffered: {
+          '@type': 'Service',
+          name: s.name,
+          offers: {
+            '@type': 'Offer',
+            price: s.price,
+            priceCurrency: 'BRL',
+            availability: 'https://schema.org/InStock',
+          },
+        },
+      })),
     ]
   };
 

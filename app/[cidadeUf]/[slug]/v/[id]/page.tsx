@@ -1,13 +1,11 @@
 import { notFound, redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
-
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { getStoreUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { normalizeBusinessInfo } from "@/lib/business-info"
-
 import {
   getCachedStoreById,
   getCachedStoreProducts,
@@ -24,12 +22,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   if (!store) {
     return {
-      title: 'Loja não encontrada | Dudit'
+      title: 'Negócio não encontrado | Dudit'
     }
   }
 
-  const storeName = store.name || 'Loja Parceira'
-  const storeDescription = store.description || `Conheça a loja ${storeName} na Dudit.`
+  const storeName = store.name || 'Negócio Parceiro'
+  const storeDescription = store.description || `Conheça ${storeName} na Dudit.`
   const canonicalUrl = `https://dudit.com.br${getStoreUrl(store)}`
 
   return {
@@ -47,7 +45,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
           url: store.logo_url || store.image_url || 'https://img.dudit.com.br/static/Logo.png',
           width: 800,
           height: 600,
-          alt: `Capa da loja ${storeName}`,
+          alt: `Capa de ${storeName}`,
         },
       ],
       type: 'website',
@@ -177,10 +175,36 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     } : undefined,
     makesOffer: [
       ...(filteredProducts || []).slice(0, 3).map((p: any) => ({
-        '@type': 'Offer', itemOffered: { '@type': 'Product', name: p.name }, price: p.price, priceCurrency: 'BRL'
+        '@type': 'Offer',
+        price: p.price,
+        priceCurrency: 'BRL',
+        availability: 'https://schema.org/InStock',
+        itemOffered: {
+          '@type': 'Product',
+          name: p.name,
+          offers: {
+            '@type': 'Offer',
+            price: p.price,
+            priceCurrency: 'BRL',
+            availability: 'https://schema.org/InStock',
+          },
+        },
       })),
       ...(filteredServices || []).slice(0, 3).map((s: any) => ({
-        '@type': 'Offer', itemOffered: { '@type': 'Service', name: s.name }, price: s.price, priceCurrency: 'BRL'
+        '@type': 'Offer',
+        price: s.price,
+        priceCurrency: 'BRL',
+        availability: 'https://schema.org/InStock',
+        itemOffered: {
+          '@type': 'Service',
+          name: s.name,
+          offers: {
+            '@type': 'Offer',
+            price: s.price,
+            priceCurrency: 'BRL',
+            availability: 'https://schema.org/InStock',
+          },
+        },
       })),
     ],
   }
@@ -214,14 +238,16 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
 
   return (
     <div className="min-h-screen bg-white w-full max-w-[100vw] overflow-x-hidden flex flex-col">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        '@context': 'https://schema.org', '@type': 'BreadcrumbList',
-        itemListElement: [
-          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
-          { '@type': 'ListItem', position: 2, name: `${storeCity} - ${storeState}`, item: `https://dudit.com.br/explorar/${currentCidadeUf}` },
-          { '@type': 'ListItem', position: 3, name: store.name, item: `https://dudit.com.br${canonicalUrl}` },
-        ],
-      }) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{
+        __html: JSON.stringify({
+          '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
+            { '@type': 'ListItem', position: 2, name: `${storeCity} - ${storeState}`, item: `https://dudit.com.br/explorar/${currentCidadeUf}` },
+            { '@type': 'ListItem', position: 3, name: store.name, item: `https://dudit.com.br${canonicalUrl}` },
+          ],
+        })
+      }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }} />
       <main className="lg:pt-[120px] flex-grow">
         <VendorPageClient

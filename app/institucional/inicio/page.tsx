@@ -37,15 +37,15 @@ const Hero = () => {
                     >
                         <span className="text-brand-green text-sm font-bold tracking-[0.2em] uppercase mb-4 block">Dudit</span>
                         <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-brand-dark leading-[0.85] mb-6">
-                            Achou,<br />
-                            <span className="text-brand-green">anunciou,</span><br />
-                            resolveu.
+                            Descubra.<br />
+                            <span className="text-brand-green">Anuncie.</span><br />
+                            Organize.
                         </h1>
                         <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-                            Gerencie seu negócio, divulgue seus produtos e serviços e seja encontrado por clientes da sua região.
+                            Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas.
                         </p>
                         <div className="flex flex-wrap gap-4">
-                            <Button>Começar grátis</Button>
+                            <Button>Criar meu negócio</Button>
                             <Button variant="outline">Explorar a Dudit</Button>
                         </div>
                     </motion.div>
@@ -71,8 +71,8 @@ const Hero = () => {
                                         <ShoppingBag className="w-4 h-4 text-blue-600" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Achou</div>
-                                        <div className="text-xs text-brand-inactive-text">Encontrou o que precisava</div>
+                                        <div className="text-sm font-bold text-brand-dark">Descubra</div>
+                                        <div className="text-xs text-brand-inactive-text">Produtos, serviços e negócios perto de você</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
@@ -80,8 +80,8 @@ const Hero = () => {
                                         <Store className="w-4 h-4 text-green-600" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Anunciou</div>
-                                        <div className="text-xs text-brand-inactive-text">Divulgou para sua região</div>
+                                        <div className="text-sm font-bold text-brand-dark">Anuncie</div>
+                                        <div className="text-xs text-brand-inactive-text">Seja descoberto por mais pessoas</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
@@ -89,8 +89,8 @@ const Hero = () => {
                                         <CheckCircle2 className="w-4 h-4 text-purple-600" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Resolveu</div>
-                                        <div className="text-xs text-brand-inactive-text">Venda feita, cliente feliz</div>
+                                        <div className="text-sm font-bold text-brand-dark">Organize</div>
+                                        <div className="text-xs text-brand-inactive-text">Gestão simples para o seu dia a dia</div>
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-gray-100 flex items-center justify-between">

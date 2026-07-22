@@ -14,10 +14,10 @@ import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
     title: "Dudit | Descubra. Anuncie. Organize.",
-    description: "A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.",
+    description: "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas. A Dudit ajuda pessoas a encontrarem o que precisam e negócios a serem encontrados.",
     openGraph: {
         title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.",
+        description: "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas. A Dudit ajuda pessoas a encontrarem o que precisam e negócios a serem encontrados.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
         site: "@dudit",
         creator: "@dudit",
         title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.",
+        description: "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {

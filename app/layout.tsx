@@ -23,27 +23,23 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
     metadataBase: new URL("https://dudit.com.br"),
     title: {
-        default: "Dudit - Organize seu negócio e seja encontrado na sua cidade",
+        default: "Dudit | Descubra. Anuncie. Organize.",
         template: "%s | Dudit",
     },
     description:
-        "Cadastre produtos e serviços uma única vez. Organize tudo e apareça para clientes da sua cidade. Plataforma gratuita para pequenos negócios.",
+        "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas. A Dudit é o lugar onde pessoas descobrem o que precisam e negócios mostram tudo que têm a oferecer.",
     keywords: [
-        "sistema para pequeno negócio",
-        "sistema para comércio local",
-        "ERP gratuito pequena empresa",
+        "descobrir negócios locais",
+        "produtos perto de mim",
+        "serviços na minha cidade",
+        "anunciar produtos e serviços",
+        "comércio local brasil",
         "vitrine digital grátis",
-        "marketplace local brasil",
-        "vender online sem taxa",
-        "sistema para barbearia",
-        "sistema para salão de beleza",
-        "sistema para oficina mecânica",
+        "sistema para pequeno negócio",
         "ordem de serviço online",
         "agendamento online grátis",
         "catálogo online grátis",
         "controle de estoque gratuito",
-        "comprar perto de mim",
-        "serviços na minha cidade",
     ],
     authors: [{ name: "Dudit" }],
     creator: "Dudit",
@@ -64,15 +60,15 @@ export const metadata: Metadata = {
         locale: "pt_BR",
         url: "https://dudit.com.br",
         siteName: "Dudit",
-        title: "Dudit - Organize seu negócio e seja encontrado",
+        title: "Dudit | Descubra. Anuncie. Organize.",
         description:
-            "Cadastre produtos e serviços uma única vez. Organize tudo e apareça para clientes da sua cidade.",
+            "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas.",
         images: [
             {
                 url: "https://img.dudit.com.br/static/og-image.png",
                 width: 1200,
                 height: 630,
-                alt: "Dudit - Organize. Anuncie. Venda.",
+                alt: "Dudit - Descubra. Anuncie. Organize.",
             },
         ],
     },
@@ -80,9 +76,9 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         site: "@dudit",
         creator: "@dudit",
-        title: "Dudit - Organize seu negócio e seja encontrado",
+        title: "Dudit | Descubra. Anuncie. Organize.",
         description:
-            "Cadastre produtos e serviços uma única vez. Organize tudo e apareça para clientes da sua cidade.",
+            "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {
@@ -132,7 +128,7 @@ const jsonLd = {
             url: "https://dudit.com.br",
             logo: "https://img.dudit.com.br/static/Icon.png",
             description:
-                "Plataforma gratuita que une gestão de negócios, vitrine digital e marketplace local para pequenas empresas brasileiras.",
+                "A Dudit é o lugar onde pessoas descobrem o que precisam e onde negócios mostram tudo que têm para oferecer. Descubra. Anuncie. Organize.",
             sameAs: [
                 "https://instagram.com/usedudit",
                 "https://x.com/usedudit"
@@ -153,7 +149,7 @@ const jsonLd = {
             url: "https://dudit.com.br",
             name: "Dudit",
             description:
-                "Organize seu negócio e seja encontrado por clientes da sua cidade.",
+                "Descubra produtos, serviços e negócios perto de você e ajude seu negócio a ser encontrado.",
             publisher: {
                 "@id": "https://dudit.com.br/#organization",
             },
@@ -175,7 +171,7 @@ const jsonLd = {
             applicationCategory: "BusinessApplication",
             operatingSystem: "Web, Android, iOS",
             description:
-                "Gerencie pedidos, clientes e vendas e anuncie produtos e serviços de forma simples, sem taxas.",
+                "A Dudit ajuda pessoas a encontrarem o que precisam e ajuda negócios a serem encontrados. Cadastre produtos, serviços e organize sua rotina.",
             url: "https://dudit.com.br",
             offers: {
                 "@type": "Offer",
@@ -184,13 +180,12 @@ const jsonLd = {
                 description: "Plano gratuito disponível. Planos pagos a partir de R$ 19,90/mês.",
             },
             featureList: [
-                "Gestão de produtos e serviços",
-                "Ordem de serviço",
-                "Agendamento online",
-                "Controle de estoque",
-                "Vitrine digital",
-                "Marketplace local",
-                "CRM",
+                "Descoberta de produtos e serviços locais",
+                "Perfil público e vitrine online",
+                "Gestão de estoque e catálogo",
+                "Agendamentos online",
+                "Ordens de serviço",
+                "Controle financeiro simples",
             ],
         },
     ],
