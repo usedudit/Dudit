@@ -3,7 +3,7 @@ import "server-only"
 import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
-import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
+import { getTodayYmdSaoPaulo, formatQuantityWithUnit } from "@/lib/utils/formatters"
 import { getDateComponents } from "@/lib/date"
 import type { Period } from "@/lib/period-types"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
@@ -46,7 +46,7 @@ const loadRawProductsGeneralTab = cache(async (partnerId: string) => {
   const { data, error } = await scopeActiveOnly(
     supabase
       .from("products")
-      .select("id, name, stock_quantity, is_active, category_id, category:product_categories!category_id(name)")
+      .select("id, name, stock_quantity, unit, is_active, category_id, category:product_categories!category_id(name)")
   )
     .eq("partner_id", partnerId)
     .eq("status", "ativo")
@@ -354,7 +354,7 @@ async function getCachedGeneral(partnerId: string, storeId = ""): Promise<Genera
             id: p.id,
             title: p.name,
             subtitle: p.category || "Sem categoria",
-            value: `${p.stock_quantity || 0} un.`,
+            value: formatQuantityWithUnit(p.stock_quantity || 0, p.unit),
             tone: Number(p.stock_quantity || 0) <= 0 ? "red" : "orange",
           })),
         }
@@ -374,7 +374,7 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
       async () => {
         const supabase = createAdminClient()
         const [products, orders, items] = await Promise.all([
-          scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, category, price, is_active").eq("partner_id", partnerId)).limit(300),
+          scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, unit, category, price, is_active").eq("partner_id", partnerId)).limit(300),
           supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).order("created_at", { ascending: false }).limit(400),
           supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).limit(600),
         ])
@@ -407,9 +407,9 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
             { title: "Produtos com estoque baixo", value: String(low.length), detail: "até 5 unidades", tone: low.length ? "orange" : "green" },
             { title: "Produtos ativos", value: String(productRows.filter((p: any) => p.is_active).length), tone: "default" },
           ] as Metric[],
-          topProducts: topFromMap(sold).map((item, index) => ({ id: item.label, title: item.label, subtitle: `${index + 1}º em vendas`, value: `${item.value} un.`, tone: "blue" })) as DashboardListItem[],
+          topProducts: topFromMap(sold).map((item, index) => ({ id: item.label, title: item.label, subtitle: `${index + 1}º em vendas`, value: formatQuantityWithUnit(item.value, "UN"), tone: "blue" })) as DashboardListItem[],
           idleProducts: productRows.filter((p: any) => !sold.has(p.name)).slice(0, 6).map((p: any) => ({ id: p.id, title: p.name, subtitle: p.category || "Sem categoria", value: brl(p.price), tone: "default" })),
-          criticalStock: [...out, ...low].slice(0, 8).map((p: any) => ({ id: p.id, title: p.name, subtitle: p.category || "Sem categoria", value: `${p.stock_quantity || 0} un.`, tone: Number(p.stock_quantity || 0) <= 0 ? "red" : "orange" })) as DashboardListItem[],
+          criticalStock: [...out, ...low].slice(0, 8).map((p: any) => ({ id: p.id, title: p.name, subtitle: p.category || "Sem categoria", value: formatQuantityWithUnit(p.stock_quantity || 0, p.unit), tone: Number(p.stock_quantity || 0) <= 0 ? "red" : "orange" })) as DashboardListItem[],
           bestSellers: topFromMap(sold),
           categorySales: topFromMap(category),
           salesEvolution: bucketByDate(orderRows, "created_at", "total_amount"),

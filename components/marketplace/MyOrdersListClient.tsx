@@ -13,7 +13,7 @@ import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
-import { formatCurrency, formatFullDate } from "@/lib/utils";
+import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils";
 
 
 const getStatusConfig = (status: string) => {
@@ -26,19 +26,11 @@ const getStatusConfig = (status: string) => {
 };
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return `${qty} un.`;
-    }
-    return `${qty} ${unit}`;
+    return formatQuantityWithUnit(qty, unit);
 };
 
 const formatProductUnitPrice = (price: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return formatCurrency(price);
-    }
-    return `${formatCurrency(price)}/${unit}`;
+    return formatUnitPriceWithUnit(price, unit);
 };
 
 export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { orders: any[], reviewedItemsArray: any[], userId: string }) {

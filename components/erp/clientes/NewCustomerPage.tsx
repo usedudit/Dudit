@@ -477,6 +477,45 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="general" className="mt-0">
                                             <FadeIn key="general" className="space-y-10">
+                                                {/* Mobile/Tablet Image Header Card (< lg) */}
+                                                <div className="block lg:hidden">
+                                                    <div className="bg-white dark:bg-dark-surface p-4 rounded-2xl border border-brand-border dark:border-dark-border flex items-center gap-4">
+                                                        <label className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full shrink-0 flex items-center justify-center relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
+                                                            <input
+                                                                type="file"
+                                                                accept="image/png, image/jpeg, image/webp"
+                                                                className="hidden"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0]
+                                                                    if (file) {
+                                                                        setSelectedImageForCrop(file)
+                                                                        setShowImageCropper(true)
+                                                                    }
+                                                                    e.target.value = ""
+                                                                }}
+                                                            />
+                                                            {imagePreview ? (
+                                                                <img
+                                                                    src={imagePreview}
+                                                                    alt="Imagem do cliente"
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <EditIcon size={24} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
+                                                            )}
+                                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <span className="text-white text-[10px] font-bold uppercase tracking-wider">
+                                                                    {imagePreview ? "Alterar" : "Enviar"}
+                                                                </span>
+                                                            </div>
+                                                        </label>
+                                                        <div className="min-w-0 flex-1">
+                                                            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">Imagem do Cliente</h3>
+                                                            <p className="text-xs text-brand-inactive-text mt-0.5">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
                                                 {/* Identificação */}
                                                 <FormSection title="Identificação">
                                                     <div className="grid grid-cols-12 gap-5">
@@ -680,6 +719,41 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         />
                                                     </div>
                                                 </FormSection>
+
+                                                {/* Mobile/Tablet Informações adicionais (< lg) */}
+                                                <div className="block lg:hidden">
+                                                    <FormSection title="Informações adicionais" hasSeparator>
+                                                        <div className="space-y-5">
+                                                            <DatePicker
+                                                                label="Data de aniversário"
+                                                                value={birthDate}
+                                                                onChange={(date: Date | undefined) => {
+                                                                    if (!date) {
+                                                                        setBirthDate("")
+                                                                        return
+                                                                    }
+
+                                                                    const year = date.getFullYear()
+                                                                    const month = String(date.getMonth() + 1).padStart(2, "0")
+                                                                    const day = String(date.getDate()).padStart(2, "0")
+                                                                    setBirthDate(`${year}-${month}-${day}`)
+                                                                }}
+                                                            />
+                                                            <Input
+                                                                label="Nome da mãe"
+                                                                placeholder="Ex: Maria da Silva"
+                                                                value={motherName}
+                                                                onChange={(e) => setMotherName(e.target.value)}
+                                                            />
+                                                            <Input
+                                                                label="Nome do pai"
+                                                                placeholder="Ex: José da Silva"
+                                                                value={fatherName}
+                                                                onChange={(e) => setFatherName(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </FormSection>
+                                                </div>
                                             </FadeIn>
                                         </TabsContent>
 
@@ -819,11 +893,11 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                     </AnimatePresence>
                                 </div>
 
-                                {/* Sidebar Column */}
+                                 {/* Sidebar Column */}
                                 {activeTab !== 'notes' && (
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                         {activeTab === 'general' ? (
-                                            <>
+                                            <div className="hidden lg:block space-y-8">
                                                 <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
                                                     <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Imagem do Cliente</h3>
@@ -839,7 +913,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     setShowImageCropper(true)
                                                                 }
                                                                 e.target.value = ""
-                                                            }}
+                                                              }}
                                                         />
                                                         {imagePreview ? (
                                                             <img
@@ -892,7 +966,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         />
                                                     </div>
                                                 </div>
-                                             </>
+                                            </div>
                                         ) : activeTab === 'address' ? (
                                             <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />

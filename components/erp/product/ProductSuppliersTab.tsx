@@ -8,7 +8,7 @@ import { getProductSuppliersAction, linkProductSupplierAction, unlinkProductSupp
 import SelectSupplierSheet from "../fornecedores/SelectSupplierSheet"
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatUnit } from "@/lib/utils"
 import Pagination from "@/components/reusable/Pagination"
 import type { ProductSupplierWithDetails } from "@/lib/types/product"
 
@@ -592,7 +592,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                                         icon={Package}
                                         time={new Date(p.date).toLocaleDateString("pt-BR")}
                                         title={p.supplier_name}
-                                        subtitle={`${Number(p.quantity).toFixed(2)} ${productData.unit || "un"} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
+                                        subtitle={`${Number(p.quantity).toFixed(2)} ${formatUnit(productData.unit)} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
                                     />
                                 ))}
                             </div>

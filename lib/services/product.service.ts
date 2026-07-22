@@ -89,7 +89,8 @@ export class ProductService {
 
     // No checking needed on create since partner_id is part of input, 
     // but the caller must ensure partner_id belongs to the current user.
-    const { data, error } = await supabase.from("products").insert(input).select().single()
+    const { is_active, ...cleanInput } = input
+    const { data, error } = await supabase.from("products").insert(cleanInput).select().single()
 
     if (error) {
       return { success: false, error: error.message }
@@ -101,7 +102,8 @@ export class ProductService {
   // To prevent IDOR, we should require partnerId
   async update(productId: string, partnerId: string, input: Partial<ProductInput>): Promise<{ success: boolean; error?: string }> {
     const supabase = await this.getSupabase()
-    const { error } = await supabase.from("products").update(input).eq("id", productId).eq("partner_id", partnerId)
+    const { is_active, ...cleanInput } = input
+    const { error } = await supabase.from("products").update(cleanInput).eq("id", productId).eq("partner_id", partnerId)
 
     if (error) {
       return { success: false, error: error.message }

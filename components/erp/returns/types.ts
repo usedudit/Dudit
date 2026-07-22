@@ -8,6 +8,7 @@ export interface ReturnItem {
   productName: string
   sku?: string | null
   image?: string | null
+  unit?: string | null
   price: number
   netItemValue?: number
   quantity: number

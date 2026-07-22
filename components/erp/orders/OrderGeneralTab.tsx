@@ -22,7 +22,7 @@ import {
 } from "@/lib/icons"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
@@ -36,19 +36,11 @@ function formatLocalISODate(date: Date) {
 }
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return `${qty} un.`;
-    }
-    return `${qty} ${unit}`;
+    return formatQuantityWithUnit(qty, unit);
 };
 
 const formatProductUnitPrice = (price: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return formatCurrency(price);
-    }
-    return `${formatCurrency(price)}/${unit}`;
+    return formatUnitPriceWithUnit(price, unit);
 };
 
 interface OrderGeneralTabProps {

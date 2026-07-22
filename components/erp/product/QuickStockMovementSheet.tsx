@@ -8,6 +8,7 @@ import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { XIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 import { createBatchStockMovementAction } from "@/app/actions/erp/stock-movements"
 import { useNotification } from "@/hooks/use-notification"
 
@@ -21,6 +22,7 @@ type Props = {
         sku: string
         image?: string | null
         stock: number
+        unit?: string | null
     }
     variant?: {
         id: string
@@ -28,6 +30,7 @@ type Props = {
         sku: string
         image?: string | null
         stock: number
+        unit?: string | null
     } | null
     onClose: () => void
     onSaveSuccess: (newStock: number) => void
@@ -148,7 +151,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                         <h3 className="truncate text-base font-bold text-brand-dark dark:text-dark-heading">{displayName}</h3>
                         <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">SKU: {displaySku || "-"}</p>
                         <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                            Estoque atual: <span className="font-bold text-brand-primary">{currentStock}</span> unidades
+                            Estoque atual: <span className="font-bold text-brand-primary">{formatQuantityWithUnit(currentStock, variant?.unit || product?.unit, "full")}</span>
                         </p>
                     </div>
                 </div>

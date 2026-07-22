@@ -9,7 +9,6 @@ import {
     ChevronUpIcon,
     Package,
     FileIcon,
-    PlusIcon,
     TrashIcon,
     ArrowRightIcon,
     CameraIcon
@@ -34,6 +33,7 @@ import { Lock, Unlock } from 'lucide-react';
 import { CameraScannerModal } from '@/components/reusable/CameraScannerModal';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
+import { formatUnit } from '@/lib/utils/formatters';
 import { createBatchStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { fetchPartnerProductsBucket } from '@/app/actions/erp/client-loaders';
 import { useNotification } from '@/hooks/use-notification';
@@ -865,10 +865,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     <div className="h-8 w-px bg-brand-border dark:bg-dark-border shrink-0" />
 
                                                                     <div className="flex items-center gap-2 shrink-0">
-                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{itemStock} <span className="text-[10px] font-medium opacity-60">un</span></span>
+                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{itemStock} <span className="text-[10px] font-medium opacity-60">{formatUnit((item.variant as any)?.unit || (item.product as any)?.unit)}</span></span>
                                                                         <ArrowRightIcon size={14} className="text-brand-inactive-text" />
                                                                         <span className={`text-[15px] font-bold ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                                            {newStock} <span className="text-xs font-bold">un</span>
+                                                                            {newStock} <span className="text-xs font-bold">{formatUnit((item.variant as any)?.unit || (item.product as any)?.unit)}</span>
                                                                         </span>
                                                                     </div>
                                                                 </div>

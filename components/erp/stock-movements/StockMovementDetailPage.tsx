@@ -12,6 +12,7 @@ import { Badge } from '@/components/reusable/Badge';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { useNotification } from '@/hooks/use-notification';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
+import { formatQuantityWithUnit } from '@/lib/utils/formatters';
 import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
 
 interface MovementItemData {
@@ -23,6 +24,7 @@ interface MovementItemData {
         category: string;
         previousStock: number;
         currentStock: number;
+        unit?: string | null;
     };
     quantity: number;
     type: string;
@@ -266,7 +268,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                         <div className="flex items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0">
                                                             <div className="text-center md:text-left">
                                                                 <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
-                                                                <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{item.product.previousStock} un</div>
+                                                                <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(item.product.previousStock, item.product.unit)}</div>
                                                             </div>
 
                                                             <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body">
@@ -275,7 +277,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                                                             <div className="text-center md:text-left">
                                                                 <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
-                                                                <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{item.product.currentStock} un</div>
+                                                                <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
                                                             </div>
                                                         </div>
                                                     </div>

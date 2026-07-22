@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -36,11 +36,7 @@ import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAds
 import type { SponsoredAd } from "@/lib/ads/types"
 
 const getQuantityLabel = (qty: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return `${qty} unidade${qty !== 1 ? "s" : ""}`;
-    }
-    return `${qty} ${unit}`;
+    return formatQuantityWithUnit(qty, unit, "full");
 };
 
 interface ProductDetailsPageClientProps {

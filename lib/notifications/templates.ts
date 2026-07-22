@@ -1,5 +1,6 @@
 import type { NotificationAudience, NotificationType } from "./types"
 import type { WhatsappAutomationTrigger } from "@/lib/whatsapp/types"
+import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 
 interface TemplateContext {
     orderNumber?: string
@@ -14,6 +15,7 @@ interface TemplateContext {
     productName?: string
     stock?: string
     minStock?: string
+    unit?: string
     count?: string
     supplierName?: string
     cancellationNote?: string
@@ -508,7 +510,7 @@ export function buildNotificationContent(
             return {
                 title: "⚠️ Alerta: Estoque baixo!",
                 message: ctx.productName
-                    ? `Atenção! O produto "${ctx.productName}" está com estoque baixo (${ctx.stock || "0"} un.) - mínimo ${ctx.minStock || "0"} un. 📉`
+                    ? `Atenção! O produto "${ctx.productName}" está com estoque baixo (${formatQuantityWithUnit(ctx.stock || "0", ctx.unit)}) - mínimo ${formatQuantityWithUnit(ctx.minStock || "0", ctx.unit)} 📉`
                     : "Alguns produtos estão com estoque abaixo do mínimo.",
             }
         case "replenishment_suggested":

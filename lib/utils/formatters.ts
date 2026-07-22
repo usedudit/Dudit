@@ -268,3 +268,117 @@ export function getDefaultTimezone(): string {
 export function parseDateInTimezone(dateStr: string, timeStr: string, timezone?: string): Date {
   return dateTz.parseInTz(dateStr, timeStr, timezone)
 }
+
+/**
+ * Normaliza e formata a unidade de medida do produto.
+ * Exemplos:
+ *   formatUnit("UN") -> "un."
+ *   formatUnit("UN", 5, "full") -> "unidades"
+ *   formatUnit("KG") -> "kg"
+ *   formatUnit("PC", 2, "full") -> "peças"
+ */
+export function formatUnit(unit?: string | null, quantity = 1, style: "short" | "full" = "short"): string {
+  const raw = String(unit || "UN").trim()
+  const clean = raw.toUpperCase()
+  
+  if (style === "full") {
+    const isPlural = quantity !== 1
+    switch (clean) {
+      case "UN":
+      case "UNIDADE":
+      case "UND":
+        return isPlural ? "unidades" : "unidade"
+      case "PC":
+      case "PECA":
+      case "PEÇA":
+        return isPlural ? "peças" : "peça"
+      case "KG":
+      case "QUILO":
+        return isPlural ? "quilos" : "quilo"
+      case "LT":
+      case "LITRO":
+        return isPlural ? "litros" : "litro"
+      case "MT":
+      case "M":
+      case "METRO":
+        return isPlural ? "metros" : "metro"
+      case "CX":
+      case "CAIXA":
+        return isPlural ? "caixas" : "caixa"
+      case "PT":
+      case "PACOTE":
+      case "PCT":
+        return isPlural ? "pacotes" : "pacote"
+      case "DZ":
+      case "DUZIA":
+      case "DÚZIA":
+        return isPlural ? "dúzias" : "dúzia"
+      case "PAR":
+        return isPlural ? "pares" : "par"
+      default:
+        return raw.toLowerCase()
+    }
+  }
+
+  switch (clean) {
+    case "UN":
+    case "UNIDADE":
+    case "UND":
+      return "un."
+    case "PC":
+    case "PECA":
+    case "PEÇA":
+      return "pc."
+    case "KG":
+    case "QUILO":
+      return "kg"
+    case "LT":
+    case "LITRO":
+      return "lt."
+    case "MT":
+    case "M":
+    case "METRO":
+      return "m"
+    case "CX":
+    case "CAIXA":
+      return "cx."
+    case "PT":
+    case "PACOTE":
+    case "PCT":
+      return "pt."
+    case "DZ":
+    case "DUZIA":
+    case "DÚZIA":
+      return "dz."
+    case "PAR":
+      return "par"
+    default:
+      return raw.toLowerCase()
+  }
+}
+
+/**
+ * Formata a quantidade com sua unidade correspondente.
+ * Ex: formatQuantityWithUnit(10, "KG") -> "10 kg"
+ *     formatQuantityWithUnit(5, "UN", "full") -> "5 unidades"
+ */
+export function formatQuantityWithUnit(quantity: number | string, unit?: string | null, style: "short" | "full" = "short"): string {
+  const qtyNum = typeof quantity === "string" ? parseFloat(quantity) || 0 : quantity
+  const formattedUnit = formatUnit(unit, qtyNum, style)
+  return `${quantity} ${formattedUnit}`
+}
+
+/**
+ * Formata o preço unitário acompanhado da unidade (quando não for unidade padrão simples).
+ * Ex: formatUnitPriceWithUnit(50, "KG") -> "R$ 50,00 / kg"
+ *     formatUnitPriceWithUnit(50, "UN") -> "R$ 50,00"
+ */
+export function formatUnitPriceWithUnit(price: number | string, unit?: string | null): string {
+  const formattedPrice = formatCurrency(price)
+  const cleanUnit = formatUnit(unit, 1, "short")
+  if (cleanUnit === "un.") {
+    return formattedPrice
+  }
+  return `${formattedPrice} / ${cleanUnit}`
+}
+

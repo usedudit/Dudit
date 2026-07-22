@@ -1502,6 +1502,81 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
     }
 }
 
+export async function getStagnantProductsAction(partnerId: string) {
+    try {
+        const user = await requireUser()
+        await requirePermission(partnerId, "products", "view")
+        const admin = getAdminClient()
+
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+
+        const { data, error } = await admin
+            .from("products")
+            .select("id, name, sku, gtin, stock_quantity, price, cost_price, promotional_price, unit, images, created_at, updated_at")
+            .eq("partner_id", partnerId)
+            .eq("is_active", true)
+            .gt("stock_quantity", 0)
+            .lte("created_at", ninetyDaysAgo)
+            .order("created_at", { ascending: true })
+            .limit(200)
+
+        if (error) return { error: error.message }
+
+        const now = Date.now()
+        const products = (data || []).map((p: any) => {
+            const createdAtTime = new Date(p.created_at).getTime()
+            const daysStagnant = Math.max(90, Math.floor((now - createdAtTime) / (1000 * 60 * 60 * 24)))
+            return {
+                id: p.id,
+                name: p.name,
+                sku: p.sku,
+                gtin: p.gtin,
+                stock_quantity: Number(p.stock_quantity) || 0,
+                price: Number(p.price) || 0,
+                cost_price: p.cost_price != null ? Number(p.cost_price) : null,
+                promotional_price: p.promotional_price != null ? Number(p.promotional_price) : null,
+                unit: p.unit || "un",
+                image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null,
+                days_stagnant: daysStagnant,
+                created_at: p.created_at,
+            }
+        })
+
+        return { products, total: products.length }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function updateProductPromotionalPriceAction(params: {
+    productId: string
+    partnerId: string
+    promotionalPrice: number | null
+}) {
+    try {
+        const user = await requireUser()
+        await requirePermission(params.partnerId, "products", "edit")
+        const admin = getAdminClient()
+
+        const { error } = await admin
+            .from("products")
+            .update({
+                promotional_price: params.promotionalPrice,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", params.productId)
+            .eq("partner_id", params.partnerId)
+
+        if (error) return { error: error.message }
+
+        await invalidateProductCache(params.productId, params.partnerId, "update").catch(() => {})
+
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
 // ============================================================================
 // OPERAÇÕES EM LOTE E UTILS
 // ============================================================================
@@ -1652,7 +1727,9 @@ export async function duplicateProductsAction(productIds: string[]) {
                 })
             }
 
-            const result = await supabase.from("products").insert(duplicated).select()
+            const result = await supabase.from("products").insert(
+              duplicated.map((d: any) => { const { is_active, ...rest } = d; return rest })
+            ).select()
 
             if (!result.error) {
                 inserted = result.data

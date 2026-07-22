@@ -1,15 +1,20 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder, Spinner, Badge } from "@/components/reusable"
+import React, { useState, useEffect, useCallback } from "react"
+import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon } from "@/lib/icons"
+import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { getReplenishmentSuggestionsAction } from "@/app/actions/erp/products"
+import {
+    getReplenishmentSuggestionsAction,
+    getStagnantProductsAction,
+    updateProductPromotionalPriceAction,
+} from "@/app/actions/erp/products"
 import { notifyReplenishmentSuggestedAction } from "@/app/actions/erp/notifications"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatQuantityWithUnit, formatUnit } from "@/lib/utils"
 import { useRouter } from "next/navigation"
+import { useNotification } from "@/hooks/use-notification"
 
 interface Suggestion {
     id: string
@@ -26,6 +31,21 @@ interface Suggestion {
     supplier_cost: number | null
 }
 
+interface StagnantProduct {
+    id: string
+    name: string
+    sku: string | null
+    gtin: string | null
+    stock_quantity: number
+    price: number
+    cost_price: number | null
+    promotional_price: number | null
+    unit: string
+    image: string | null
+    days_stagnant: number
+    created_at: string
+}
+
 interface ReplenishmentSheetProps {
     isOpen: boolean
     onClose: () => void
@@ -33,135 +53,504 @@ interface ReplenishmentSheetProps {
 }
 
 export function ReplenishmentSheet({ isOpen, onClose, partnerId }: ReplenishmentSheetProps) {
-    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const router = useRouter()
-    const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const { success: notifySuccess, error: notifyError } = useNotification()
 
-    useEffect(() => {
-        if (!isOpen) { setSuggestions([]); setError(null); return }
-        setLoading(true)
+    const [activeTab, setActiveTab] = useState<"reposicao" | "parados">("reposicao")
+
+    // Replenishment suggestions
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+
+    // Stagnant products (>90d)
+    const [stagnantProducts, setStagnantProducts] = useState<StagnantProduct[]>([])
+    const [loadingStagnant, setLoadingStagnant] = useState(false)
+
+    // Second Sheet (Promotional Price for Stagnant Product)
+    const [selectedStagnant, setSelectedStagnant] = useState<StagnantProduct | null>(null)
+    const [isDiscountSheetOpen, setIsDiscountSheetOpen] = useState(false)
+    const [promoPriceInput, setPromoPriceInput] = useState<number>(0)
+    const [isSavingPromo, setIsSavingPromo] = useState(false)
+
+    const fetchSuggestions = useCallback(() => {
+        setLoadingSuggestions(true)
         getReplenishmentSuggestionsAction(partnerId).then((res) => {
-            if (res.error) setError(res.error)
-            else {
-                setSuggestions(res.suggestions || [])
-                if (res.suggestions && res.suggestions.length > 0) {
+            if (res.suggestions) {
+                setSuggestions(res.suggestions)
+                if (res.suggestions.length > 0) {
                     notifyReplenishmentSuggestedAction().catch(() => {})
                 }
             }
-            setLoading(false)
+            setLoadingSuggestions(false)
         })
-    }, [isOpen, partnerId])
+    }, [partnerId])
 
-    const content = (
-        <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between p-4 border-b border-brand-border dark:border-dark-border">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center">
-                        <ShoppingCartIcon size={16} className="text-brand-orange" />
+    const fetchStagnant = useCallback(() => {
+        setLoadingStagnant(true)
+        getStagnantProductsAction(partnerId).then((res) => {
+            if (res.products) {
+                setStagnantProducts(res.products)
+            }
+            setLoadingStagnant(false)
+        })
+    }, [partnerId])
+
+    useEffect(() => {
+        if (!isOpen) {
+            setSuggestions([])
+            setStagnantProducts([])
+            setIsDiscountSheetOpen(false)
+            setSelectedStagnant(null)
+            return
+        }
+        fetchSuggestions()
+        fetchStagnant()
+    }, [isOpen, fetchSuggestions, fetchStagnant])
+
+    const openDiscountSheet = (product: StagnantProduct) => {
+        setSelectedStagnant(product)
+        const initialPromo = product.promotional_price || Math.round(product.price * 0.85 * 100) / 100
+        setPromoPriceInput(initialPromo)
+        setIsDiscountSheetOpen(true)
+    }
+
+    const handleSavePromoPrice = async () => {
+        if (!selectedStagnant) return
+        setIsSavingPromo(true)
+
+        const res = await updateProductPromotionalPriceAction({
+            productId: selectedStagnant.id,
+            partnerId,
+            promotionalPrice: promoPriceInput > 0 ? promoPriceInput : null,
+        })
+
+        setIsSavingPromo(false)
+
+        if (res.error) {
+            notifyError(res.error)
+        } else {
+            notifySuccess("Preço promocional atualizado com sucesso!")
+            setIsDiscountSheetOpen(false)
+            setSelectedStagnant(null)
+            fetchStagnant()
+            router.refresh()
+        }
+    }
+
+    // --- CONTEÚDO DA SHEET PRINCIPAL ---
+    const mainContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            {/* Header */}
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-orange/10 flex items-center justify-center">
+                        <SparklesIcon size={18} className="text-brand-orange" />
                     </div>
-                    <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                        Sugestões de Reposição
-                    </h2>
+                    <div>
+                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                            Sugestões & Oportunidades
+                        </h2>
+                        <p className="text-xs text-brand-inactive-text">inteligência de estoque do seu negócio</p>
+                    </div>
                 </div>
-                <button onClick={onClose} className="p-1 hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg">
-                    <XIcon size={20} className="text-brand-inactive-text" />
+                <Button variant="filled" onClick={onClose} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            {/* Navigation Tabs */}
+            <div className="flex border-b border-brand-border bg-white px-6 dark:border-dark-border dark:bg-dark-surface">
+                <button
+                    onClick={() => setActiveTab("reposicao")}
+                    className={`flex items-center gap-2 py-3 px-3 border-b-2 font-bold text-sm transition-colors ${
+                        activeTab === "reposicao"
+                            ? "border-brand-orange text-brand-orange"
+                            : "border-transparent text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                    }`}
+                >
+                    <ShoppingCartIcon size={16} />
+                    Reposição ({suggestions.length})
+                </button>
+                <button
+                    onClick={() => setActiveTab("parados")}
+                    className={`flex items-center gap-2 py-3 px-3 border-b-2 font-bold text-sm transition-colors ${
+                        activeTab === "parados"
+                            ? "border-brand-orange text-brand-orange"
+                            : "border-transparent text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                    }`}
+                >
+                    <ClockIcon size={16} />
+                    Parados +90d ({stagnantProducts.length})
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-                {loading ? (
-                    <div className="flex items-center justify-center py-16"><Spinner size={28} /></div>
-                ) : error ? (
-                    <div className="p-6 text-center">
-                        <p className="text-sm text-brand-red font-medium">{error}</p>
-                    </div>
-                ) : suggestions.length === 0 ? (
-                    <IconPlaceholder
-                        icon={Package}
-                        title="Tudo ok!"
-                        subtitle="Nenhum produto precisa de reposição no momento."
-                    />
-                ) : (
-                    <div className="p-4 space-y-3">
-                        <p className="text-sm text-brand-inactive-text font-medium px-1">
-                            {suggestions.length} produto(s) abaixo do estoque mínimo
-                        </p>
-                        {suggestions.map((s) => (
-                            <div
-                                key={s.id}
-                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-4 hover:shadow-sm transition-shadow cursor-pointer"
-                                onClick={() => { onClose(); router.push(`/erp/products?view=${s.id}`) }}
-                            >
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden">
-                                        {s.image ? (
-                                            <img src={s.image} alt={s.name} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <Package size={18} className="text-brand-inactive-text" />
-                                        )}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{s.name}</p>
-                                        <p className="text-xs text-brand-inactive-text">{s.sku || s.gtin || "Sem código"}</p>
-                                    </div>
-                                    <Badge variant="orange">{s.suggestion} {s.unit}</Badge>
-                                </div>
-
-                                <div className="mt-3 flex items-center gap-4 text-xs">
-                                    <div>
-                                        <span className="text-brand-inactive-text">Atual: </span>
-                                        <span className="font-bold text-brand-red">{s.stock_quantity}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-brand-inactive-text">Mínimo: </span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{s.min_stock}</span>
-                                    </div>
-                                    {s.supplier_name && (
-                                        <div className="ml-auto text-right">
-                                            <span className="text-brand-inactive-text block">{s.supplier_name}</span>
-                                            {s.supplier_cost != null && (
-                                                <span className="font-medium text-brand-dark dark:text-dark-heading">{formatCurrency(s.supplier_cost)}</span>
+            {/* Content List */}
+            <div className="custom-scrollbar flex-1 overflow-y-auto p-4">
+                {activeTab === "reposicao" ? (
+                    loadingSuggestions ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Spinner size={28} />
+                        </div>
+                    ) : suggestions.length === 0 ? (
+                        <div className="py-12">
+                            <IconPlaceholder
+                                icon={Package}
+                                title="Estoque em dia!"
+                                subtitle="Nenhum produto está abaixo do nível mínimo de estoque no momento."
+                            />
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <p className="text-xs font-semibold text-brand-inactive-text px-1">
+                                {suggestions.length} produto(s) necessitando de compra ou reposição
+                            </p>
+                            {suggestions.map((s) => (
+                                <div
+                                    key={s.id}
+                                    className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-orange/40 hover:shadow-sm transition-all cursor-pointer"
+                                    onClick={() => {
+                                        onClose()
+                                        router.push(`/erp/products?view=${s.id}`)
+                                    }}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                            {s.image ? (
+                                                <img src={s.image} alt={s.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Package size={20} className="text-brand-inactive-text" />
                                             )}
                                         </div>
-                                    )}
-                                </div>
-
-                                {s.suggestion > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-brand-border/50 dark:border-dark-border/50 flex items-center gap-1.5">
-                                        <AlertTriangleIcon size={12} className="text-brand-orange shrink-0" />
-                                        <span className="text-xs text-brand-orange font-medium">
-                                            Sugerimos comprar {s.suggestion} {s.unit}(s)
-                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                {s.name}
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text font-mono mt-0.5">
+                                                {s.sku || s.gtin || "Sem SKU"}
+                                            </p>
+                                        </div>
+                                        <Badge variant="orange">Comprar {s.suggestion} {s.unit}</Badge>
                                     </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
+
+                                    <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-brand-border/60 dark:border-dark-border/60">
+                                        <div className="flex items-center gap-3">
+                                            <div>
+                                                <span className="text-brand-inactive-text">Atual: </span>
+                                                <span className="font-bold text-brand-red">{s.stock_quantity}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-brand-inactive-text">Mínimo: </span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{s.min_stock}</span>
+                                            </div>
+                                        </div>
+                                        {s.supplier_name && (
+                                            <div className="text-right">
+                                                <span className="text-brand-inactive-text block truncate max-w-[140px]">
+                                                    {s.supplier_name}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                ) : (
+                    loadingStagnant ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Spinner size={28} />
+                        </div>
+                    ) : stagnantProducts.length === 0 ? (
+                        <div className="py-12">
+                            <IconPlaceholder
+                                icon={ClockIcon}
+                                title="Nenhum produto estagnado!"
+                                subtitle="Todos os seus produtos possuem movimentação ou foram cadastrados há menos de 90 dias."
+                            />
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <p className="text-xs font-semibold text-brand-inactive-text px-1">
+                                {stagnantProducts.length} produto(s) sem giro há mais de 90 dias
+                            </p>
+                            {stagnantProducts.map((p) => {
+                                const hasPromo = p.promotional_price && p.promotional_price > 0 && p.promotional_price < p.price
+                                return (
+                                    <div
+                                        key={p.id}
+                                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-primary/40 hover:shadow-sm transition-all cursor-pointer"
+                                        onClick={() => openDiscountSheet(p)}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                {p.image ? (
+                                                    <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Package size={20} className="text-brand-inactive-text" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                        {p.name}
+                                                    </p>
+                                                </div>
+                                                <p className="text-xs text-brand-inactive-text font-mono mt-0.5">
+                                                    {p.sku || p.gtin || "Sem SKU"} • {p.stock_quantity} em estoque
+                                                </p>
+                                            </div>
+                                            <Badge variant="blue">Parado há {p.days_stagnant}d</Badge>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-brand-border/60 dark:border-dark-border/60">
+                                            <div>
+                                                <span className="text-xs text-brand-inactive-text block">Preço de Venda</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-sm font-bold ${hasPromo ? "line-through text-brand-inactive-text text-xs" : "text-brand-dark dark:text-dark-heading"}`}>
+                                                        {formatCurrency(p.price)}
+                                                    </span>
+                                                    {hasPromo && (
+                                                        <span className="text-sm font-bold text-brand-green">
+                                                            {formatCurrency(p.promotional_price!)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 text-xs gap-1.5"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    openDiscountSheet(p)
+                                                }}
+                                            >
+                                                <TagIcon size={14} className="text-brand-primary" />
+                                                Aplicar Desconto
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )
                 )}
             </div>
+
+            {/* Footer */}
+            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+                <Button variant="outline" className="w-full h-11" onClick={onClose}>
+                    Fechar
+                </Button>
+            </footer>
         </div>
     )
 
+    // --- CONTEÚDO DA SEGUNDA SHEET (PREÇO PROMOCIONAL) ---
+    const discountContent = selectedStagnant ? (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            {/* Header */}
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsDiscountSheetOpen(false)}
+                        className="p-1.5 hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg transition-colors"
+                    >
+                        <ArrowLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                    </button>
+                    <div>
+                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                            Preço Promocional
+                        </h2>
+                        <p className="text-xs text-brand-inactive-text">Girar estoque parado por +90 dias</p>
+                    </div>
+                </div>
+                <Button variant="filled" onClick={() => setIsDiscountSheetOpen(false)} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            {/* Scroll Body */}
+            <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Resumo do Produto */}
+                <div className="bg-brand-gray/40 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-white dark:bg-dark-surface shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                        {selectedStagnant.image ? (
+                            <img src={selectedStagnant.image} alt={selectedStagnant.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <Package size={24} className="text-brand-inactive-text" />
+                        )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                            {selectedStagnant.name}
+                        </p>
+                        <p className="text-xs text-brand-inactive-text mt-0.5">
+                            Estoque: <strong className="text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(selectedStagnant.stock_quantity, selectedStagnant.unit, "full")}</strong> • Parado há {selectedStagnant.days_stagnant} dias
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-3 text-xs">
+                            <span>Preço normal: <strong>{formatCurrency(selectedStagnant.price)}</strong></span>
+                            {selectedStagnant.cost_price != null && selectedStagnant.cost_price > 0 && (
+                                <span className="text-brand-inactive-text">Custo: {formatCurrency(selectedStagnant.cost_price)}</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* InfoCard Sugestão Inteligente */}
+                <InfoCard
+                    title="Sugestão de Giro de Estoque"
+                    color="blue"
+                    message={`Este produto possui ${formatQuantityWithUnit(selectedStagnant.stock_quantity, selectedStagnant.unit, "short")} empacadas há ${selectedStagnant.days_stagnant} dias. Aplicar um desconto promocional atrai clientes e libera ${formatCurrency(selectedStagnant.price * selectedStagnant.stock_quantity)} em capital de giro.`}
+                />
+
+                {/* Atalhos Rápidos de Desconto */}
+                <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-brand-inactive-text mb-2.5">
+                        Sugestões de Desconto Rápido
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        {[15, 20, 30, 50].map((pct) => {
+                            const calculatedPrice = Math.round(selectedStagnant.price * (1 - pct / 100) * 100) / 100
+                            const isSelected = Math.abs(promoPriceInput - calculatedPrice) < 0.05
+                            return (
+                                <button
+                                    key={pct}
+                                    type="button"
+                                    onClick={() => setPromoPriceInput(calculatedPrice)}
+                                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                                        isSelected
+                                            ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
+                                            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-primary/50"
+                                    }`}
+                                >
+                                    -{pct}%
+                                </button>
+                            )
+                        })}
+
+                        {selectedStagnant.cost_price != null && selectedStagnant.cost_price > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setPromoPriceInput(selectedStagnant.cost_price!)}
+                                className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all col-span-3 sm:col-span-1 ${
+                                    Math.abs(promoPriceInput - selectedStagnant.cost_price) < 0.05
+                                        ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
+                                        : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-orange/50"
+                                }`}
+                            >
+                                No Custo
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Input de Preço Promocional */}
+                <div className="space-y-2">
+                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">
+                        Preço Promocional (R$)
+                    </label>
+                    <MoneyInput
+                        name="promo_price"
+                        value={promoPriceInput}
+                        onChange={(val) => setPromoPriceInput(typeof val === "number" ? val : parseFloat(val) || 0)}
+                        placeholder="0,00"
+                    />
+                    {promoPriceInput > 0 && selectedStagnant.price > 0 && (
+                        <div className="flex items-center justify-between text-xs pt-1 px-1">
+                            {promoPriceInput < selectedStagnant.price ? (
+                                <span className="font-bold text-brand-green">
+                                    Desconto de {Math.round(((selectedStagnant.price - promoPriceInput) / selectedStagnant.price) * 100)}%
+                                    ({formatCurrency(selectedStagnant.price - promoPriceInput)} de redução)
+                                </span>
+                            ) : (
+                                <span className="text-brand-inactive-text">Preço promocional igual ou superior ao original</span>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Footer */}
+            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        className="h-12 flex-1"
+                        onClick={() => setIsDiscountSheetOpen(false)}
+                        disabled={isSavingPromo}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        className="h-12 flex-1"
+                        onClick={handleSavePromoPrice}
+                        isLoading={isSavingPromo}
+                    >
+                        Salvar Oferta
+                    </Button>
+                </div>
+            </footer>
+        </div>
+    ) : null
+
+    // --- RENDERIZADOR RESPONSIVO (DESKTOP SHEET VS BOTTOM SHEET) ---
     if (isMobile) {
         return (
-            <BottomSheet isOpen={isOpen} onClose={onClose}>
-                {content}
-            </BottomSheet>
+            <>
+                <BottomSheet isOpen={isOpen} onClose={onClose}>
+                    {mainContent}
+                </BottomSheet>
+                <BottomSheet isOpen={isDiscountSheetOpen} onClose={() => setIsDiscountSheetOpen(false)}>
+                    {discountContent}
+                </BottomSheet>
+            </>
         )
     }
 
     return (
-        <Portal>
-            {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-                    <div className="relative bg-white dark:bg-dark-surface rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
-                        {content}
+        <>
+            <Portal>
+                <div
+                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${
+                        isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                    }`}
+                    onClick={onClose}
+                >
+                    <div
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${
+                            isOpen
+                                ? isDiscountSheetOpen
+                                    ? "-translate-x-10 scale-[0.97] opacity-70"
+                                    : "translate-x-0 opacity-100"
+                                : "translate-x-[120%] opacity-100"
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {mainContent}
                     </div>
                 </div>
-            )}
-        </Portal>
+            </Portal>
+
+            <Portal>
+                <div
+                    className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${
+                        isDiscountSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                    }`}
+                    onClick={() => setIsDiscountSheetOpen(false)}
+                >
+                    <div
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${
+                            isDiscountSheetOpen ? "translate-x-0" : "translate-x-[120%]"
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {discountContent}
+                    </div>
+                </div>
+            </Portal>
+        </>
     )
 }

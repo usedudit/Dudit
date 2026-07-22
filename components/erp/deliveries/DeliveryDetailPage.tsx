@@ -9,7 +9,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction } from "@/app/actions/erp/deliveries"
-import { formatCurrency, formatDateTime, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDateTime, formatDate, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
@@ -721,7 +721,7 @@ export default function DeliveryDetailPage({
                                                                         SKU: {itemSku}
                                                                     </div>
                                                                     <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                        {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                                         {formatQuantityWithUnit(item.quantity, item.unit)} • {formatUnitPriceWithUnit(itemPrice, item.unit)}
                                                                     </div>
                                                                 </div>
                                                             </div>

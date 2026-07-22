@@ -73,6 +73,7 @@ interface RawProduct {
     condition?: string
     created_at?: string
     partners?: any
+    stores?: any
 }
 
 // ─── Gatilhos psicológicos ──────────────────────────────────────────────────
@@ -368,22 +369,31 @@ const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days,
 const PARTNER_JOIN = `partners!inner(
     id, store_name, store_image_url, latitude, longitude, is_showcase_active,
     addresses!inner(city, state)
+),
+stores!inner(
+    id, name, description, logo_url, image_url, banner_url,
+    phone, city, state, is_showcase_active
 )`
 
 // ─── Process product into ItemCard shape ────────────────────────────────────
 
 function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
+    const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+    const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+    const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
+    const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
     const partner = rawPartner
         ? {
             id: rawPartner.id,
-            store_name: rawPartner.store_name || "Vendedor",
-            store_image_url: rawPartner.store_image_url,
-            store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            store_name: storeName,
+            store_image_url: storeImage,
+            store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
             latitude: rawPartner.latitude,
             longitude: rawPartner.longitude,
-            city: rawPartner.city ?? rawPartner.addresses?.[0]?.city ?? null,
-            state: rawPartner.state ?? rawPartner.addresses?.[0]?.state ?? null,
+            city: storeCity,
+            state: storeState,
         }
         : null
 
@@ -831,15 +841,20 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     const recentMapper = (item: any) => {
         if (item._itemType === "servico") {
             const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+            const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
+            const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+            const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+            const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
+            const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
             const partner = rawPartner ? {
                 id: rawPartner.id,
-                store_name: rawPartner.store_name || "Vendedor",
-                store_image_url: rawPartner.store_image_url,
-                store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                store_name: storeName,
+                store_image_url: storeImage,
+                store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                 latitude: rawPartner.latitude,
                 longitude: rawPartner.longitude,
-                city: rawPartner.addresses?.[0]?.city ?? null,
-                state: rawPartner.addresses?.[0]?.state ?? null,
+                city: storeCity,
+                state: storeState,
             } : null
             return {
                 id: item.id,
@@ -1437,16 +1452,21 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const serviceMapper = (item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+        const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
+        const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
         const partner = rawPartner
             ? {
                 id: rawPartner.id,
-                store_name: rawPartner.store_name || "Vendedor",
-                store_image_url: rawPartner.store_image_url,
-                store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                store_name: storeName,
+                store_image_url: storeImage,
+                store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                 latitude: rawPartner.latitude,
                 longitude: rawPartner.longitude,
-                city: rawPartner.addresses?.[0]?.city ?? null,
-                state: rawPartner.addresses?.[0]?.state ?? null,
+                city: storeCity,
+                state: storeState,
             }
             : null
 

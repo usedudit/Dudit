@@ -260,7 +260,7 @@ async function importProductBatch(
       product_type: row["product_type"] || null,
       condition: row["condition"] || null,
       promotional_price: cleanNumber(row["promotional_price"] ?? ""),
-      is_active: true,
+      status: "ativo",
       show_in_marketplace: true,
     }
 
@@ -610,7 +610,7 @@ async function importServiceBatch(
       duration_minutes: cleanNumber(row["duration_minutes"] ?? "60") ?? 60,
       sku: sku || null,
       unit: row["unit"] || "Serviço",
-      is_active: true,
+      status: "ativo",
     }
 
     if (row["category"]) {

@@ -220,182 +220,345 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
             {/* --- COLUNA DIREITA (SIDEBAR) --- */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-
-                {/* Card de Configurações */}
-                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                    <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
-
-                    <div className="space-y-5">
-                        <FormDropdown
-                            label="Destacar Produto"
-                            options={[
-                                { value: "true", label: "Sim" },
-                                { value: "false", label: "Não" },
-                            ]}
-                            value={String(productData?.is_highlighted || "false")}
-                            setValue={(v) => manualChange("is_highlighted", v === "true")}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
-
-                        <FormDropdown
-                            label="Tipo de Produto"
-                            options={[
-                                { value: "Físico", label: "Físico" },
-                                { value: "Digital", label: "Digital" },
-                            ]}
-                            value={productData?.productType || "Físico"}
-                            setValue={(v) => manualChange("productType", v)}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
-
-                        {isDigital ? (
+                {/* --- MOBILE / TABLET (< lg): FormSections --- */}
+                <div className="block lg:hidden space-y-8">
+                    <FormSection title="Configurações" hasSeparator>
+                        <div className="space-y-5">
                             <FormDropdown
-                                label="Formato de Entrega"
+                                label="Destacar Produto"
                                 options={[
-                                    { value: "Download", label: "Arquivo p/ Download" },
-                                    { value: "Key", label: "Chave/Serial" },
-                                    { value: "Link", label: "Link Externo" },
-                                    { value: "Service", label: "Serviço" },
+                                    { value: "true", label: "Sim" },
+                                    { value: "false", label: "Não" },
                                 ]}
-                                value={productData?.digital_format || "Download"}
-                                setValue={(v) => manualChange("digital_format", v)}
+                                value={String(productData?.is_highlighted || "false")}
+                                setValue={(v) => manualChange("is_highlighted", v === "true")}
                                 disabled={!isEditing}
                                 width="w-full"
                             />
-                        ) : (
-                            <FormDropdown
-                                label="Condição"
-                                options={[
-                                    { value: "Novo", label: "Novo" },
-                                    { value: "Usado", label: "Usado" },
-                                    { value: "Recondicionado", label: "Recondicionado" },
-                                ]}
-                                value={productData?.condicao || "Novo"}
-                                setValue={(v) => manualChange("condicao", v)}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                        )}
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <Input
-                                label="Disponibilidade"
-                                name="availability_value"
-                                value={productData?.availability_value || ""}
-                                onChange={handleInputChange}
-                                disabled={!isEditing}
-                                type="number"
-                                placeholder="0"
-                                className="w-full"
-                            />
                             <FormDropdown
-                                label="Período"
+                                label="Tipo de Produto"
                                 options={[
-                                    { value: "Minutos", label: "Minutos" },
-                                    { value: "Horas", label: "Horas" },
-                                    { value: "Dias", label: "Dias" },
+                                    { value: "Físico", label: "Físico" },
+                                    { value: "Digital", label: "Digital" },
                                 ]}
-                                value={productData?.availability_unit || "Dias"}
-                                setValue={(v) => manualChange("availability_unit", v)}
+                                value={productData?.productType || "Físico"}
+                                setValue={(v) => manualChange("productType", v)}
                                 disabled={!isEditing}
                                 width="w-full"
                             />
+
+                            {isDigital ? (
+                                <FormDropdown
+                                    label="Formato de Entrega"
+                                    options={[
+                                        { value: "Download", label: "Arquivo p/ Download" },
+                                        { value: "Key", label: "Chave/Serial" },
+                                        { value: "Link", label: "Link Externo" },
+                                        { value: "Service", label: "Serviço" },
+                                    ]}
+                                    value={productData?.digital_format || "Download"}
+                                    setValue={(v) => manualChange("digital_format", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            ) : (
+                                <FormDropdown
+                                    label="Condição"
+                                    options={[
+                                        { value: "Novo", label: "Novo" },
+                                        { value: "Usado", label: "Usado" },
+                                        { value: "Recondicionado", label: "Recondicionado" },
+                                    ]}
+                                    value={productData?.condicao || "Novo"}
+                                    setValue={(v) => manualChange("condicao", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Disponibilidade"
+                                    name="availability_value"
+                                    value={productData?.availability_value || ""}
+                                    onChange={handleInputChange}
+                                    disabled={!isEditing}
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                                <FormDropdown
+                                    label="Período"
+                                    options={[
+                                        { value: "Minutos", label: "Minutos" },
+                                        { value: "Horas", label: "Horas" },
+                                        { value: "Dias", label: "Dias" },
+                                    ]}
+                                    value={productData?.availability_unit || "Dias"}
+                                    setValue={(v) => manualChange("availability_unit", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Garantia"
+                                    name="warranty_value"
+                                    value={productData?.warranty_value || ""}
+                                    onChange={handleInputChange}
+                                    disabled={!isEditing}
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                                <FormDropdown
+                                    label="Período"
+                                    options={[
+                                        { value: "Dias", label: "Dias" },
+                                        { value: "Meses", label: "Meses" },
+                                        { value: "Anos", label: "Anos" },
+                                    ]}
+                                    value={productData?.warranty_period || "Meses"}
+                                    setValue={(v) => manualChange("warranty_period", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
                         </div>
+                    </FormSection>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <Input
-                                label="Garantia"
-                                name="warranty_value"
-                                value={productData?.warranty_value || ""}
-                                onChange={handleInputChange}
-                                disabled={!isEditing}
-                                type="number"
-                                placeholder="0"
-                                className="w-full"
-                            />
-                            <FormDropdown
-                                label="Período"
-                                options={[
-                                    { value: "Dias", label: "Dias" },
-                                    { value: "Meses", label: "Meses" },
-                                    { value: "Anos", label: "Anos" },
-                                ]}
-                                value={productData?.warranty_period || "Meses"}
-                                setValue={(v) => manualChange("warranty_period", v)}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* ================================================================= */}
-                {/* CARD DE CATEGORIA OFICIAL (Movido para a direita)                 */}
-                {/* ================================================================= */}
-                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                            <Package className="w-5 h-5 text-brand-green" />
-                            Categoria Oficial
-                        </h3>
-                        {categoryPath && (
-                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                            </span>
-                        )}
-                    </div>
-
-                    <p className="text-sm text-gray-500 mb-4">
-                        Selecione onde seu produto será exibido na árvore de categorias.
-                    </p>
-
-                    <div
-                        onClick={() => isEditing && setIsCategoryModalOpen(true)}
-                        className={`
-                    group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
-                    ${categoryPath
-                                ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
-                                : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
-                            }
-                    ${!isEditing && "opacity-60 pointer-events-none"}
-                `}
+                    <FormSection
+                        title={
+                            <div className="flex items-center justify-between w-full">
+                                <span className="flex items-center gap-2">
+                                    <Package className="w-5 h-5 text-brand-green" />
+                                    Categoria Oficial
+                                </span>
+                                {categoryPath && (
+                                    <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+                                        <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                                    </span>
+                                )}
+                            </div>
+                        }
+                        description="Selecione onde seu produto será exibido na árvore de categorias."
+                        hasSeparator
                     >
-                        <div className="flex flex-col">
-                            <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
-                                {categoryPath || "Selecionar categoria..."}
-                            </span>
-                            {categoryPath && <span className="text-xs text-brand-green font-medium mt-1">Clique para alterar</span>}
-                        </div>
+                        <div
+                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
+                            className={`
+                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
+                                ${categoryPath
+                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
+                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
+                                }
+                                ${!isEditing && "opacity-60 pointer-events-none"}
+                            `}
+                        >
+                            <div className="flex flex-col">
+                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
+                                    {categoryPath || "Selecionar categoria..."}
+                                </span>
+                                {categoryPath && <span className="text-xs text-brand-green font-medium mt-1">Clique para alterar</span>}
+                            </div>
 
-                        <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
-                            {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
+                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
+                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
+                            </div>
+                        </div>
+                    </FormSection>
+
+                    <FormSection
+                        title="Palavras-chave de busca"
+                        description="Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace."
+                        hasSeparator
+                    >
+                        <TagsInput
+                            tags={tags}
+                            onChange={(t) => manualChange("tags", t)}
+                            disabled={!isEditing}
+                            placeholder="Adicionar tag..."
+                        />
+                    </FormSection>
+                </div>
+
+                {/* --- DESKTOP (>= lg): CARDS NA SIDEBAR --- */}
+                <div className="hidden lg:block">
+                    {/* Card de Configurações */}
+                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
+                        <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
+
+                        <div className="space-y-5">
+                            <FormDropdown
+                                label="Destacar Produto"
+                                options={[
+                                    { value: "true", label: "Sim" },
+                                    { value: "false", label: "Não" },
+                                ]}
+                                value={String(productData?.is_highlighted || "false")}
+                                setValue={(v) => manualChange("is_highlighted", v === "true")}
+                                disabled={!isEditing}
+                                width="w-full"
+                            />
+
+                            <FormDropdown
+                                label="Tipo de Produto"
+                                options={[
+                                    { value: "Físico", label: "Físico" },
+                                    { value: "Digital", label: "Digital" },
+                                ]}
+                                value={productData?.productType || "Físico"}
+                                setValue={(v) => manualChange("productType", v)}
+                                disabled={!isEditing}
+                                width="w-full"
+                            />
+
+                            {isDigital ? (
+                                <FormDropdown
+                                    label="Formato de Entrega"
+                                    options={[
+                                        { value: "Download", label: "Arquivo p/ Download" },
+                                        { value: "Key", label: "Chave/Serial" },
+                                        { value: "Link", label: "Link Externo" },
+                                        { value: "Service", label: "Serviço" },
+                                    ]}
+                                    value={productData?.digital_format || "Download"}
+                                    setValue={(v) => manualChange("digital_format", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            ) : (
+                                <FormDropdown
+                                    label="Condição"
+                                    options={[
+                                        { value: "Novo", label: "Novo" },
+                                        { value: "Usado", label: "Usado" },
+                                        { value: "Recondicionado", label: "Recondicionado" },
+                                    ]}
+                                    value={productData?.condicao || "Novo"}
+                                    setValue={(v) => manualChange("condicao", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Disponibilidade"
+                                    name="availability_value"
+                                    value={productData?.availability_value || ""}
+                                    onChange={handleInputChange}
+                                    disabled={!isEditing}
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                                <FormDropdown
+                                    label="Período"
+                                    options={[
+                                        { value: "Minutos", label: "Minutos" },
+                                        { value: "Horas", label: "Horas" },
+                                        { value: "Dias", label: "Dias" },
+                                    ]}
+                                    value={productData?.availability_unit || "Dias"}
+                                    setValue={(v) => manualChange("availability_unit", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Garantia"
+                                    name="warranty_value"
+                                    value={productData?.warranty_value || ""}
+                                    onChange={handleInputChange}
+                                    disabled={!isEditing}
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                                <FormDropdown
+                                    label="Período"
+                                    options={[
+                                        { value: "Dias", label: "Dias" },
+                                        { value: "Meses", label: "Meses" },
+                                        { value: "Anos", label: "Anos" },
+                                    ]}
+                                    value={productData?.warranty_period || "Meses"}
+                                    setValue={(v) => manualChange("warranty_period", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <MarketplaceCategoryModal
-                        isOpen={isCategoryModalOpen}
-                        onClose={() => setIsCategoryModalOpen(false)}
-                        onSelect={handleCategorySelect}
-                    />
+                    {/* Card de Categoria Oficial */}
+                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm mb-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                <Package className="w-5 h-5 text-brand-green" />
+                                Categoria Oficial
+                            </h3>
+                            {categoryPath && (
+                                <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                                </span>
+                            )}
+                        </div>
+
+                        <p className="text-sm text-gray-500 mb-4">
+                            Selecione onde seu produto será exibido na árvore de categorias.
+                        </p>
+
+                        <div
+                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
+                            className={`
+                        group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
+                        ${categoryPath
+                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
+                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
+                                }
+                        ${!isEditing && "opacity-60 pointer-events-none"}
+                    `}
+                        >
+                            <div className="flex flex-col">
+                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
+                                    {categoryPath || "Selecionar categoria..."}
+                                </span>
+                                {categoryPath && <span className="text-xs text-brand-green font-medium mt-1">Clique para alterar</span>}
+                            </div>
+
+                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
+                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Card de Tags */}
+                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                        <h3 className="text-lg font-bold mb-2 text-brand-dark dark:text-dark-heading">Palavras-chave de busca</h3>
+                        <p className="text-sm text-brand-inactive-text mb-4">
+                            Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace.
+                        </p>
+                        <TagsInput
+                            tags={tags}
+                            onChange={(t) => manualChange("tags", t)}
+                            disabled={!isEditing}
+                            placeholder="Adicionar tag..."
+                        />
+                    </div>
                 </div>
 
-                {/* Card de Tags / Palavras-chave de busca */}
-                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                    <h3 className="text-lg font-bold mb-2 text-brand-dark dark:text-dark-heading">Palavras-chave de busca</h3>
-                    <p className="text-sm text-brand-inactive-text mb-4">
-                        Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace.
-                    </p>
-                    <TagsInput
-                        tags={tags}
-                        onChange={(t) => manualChange("tags", t)}
-                        disabled={!isEditing}
-                        placeholder="Adicionar tag..."
-                    />
-                </div>
-
+                <MarketplaceCategoryModal
+                    isOpen={isCategoryModalOpen}
+                    onClose={() => setIsCategoryModalOpen(false)}
+                    onSelect={handleCategorySelect}
+                />
             </div>
         </div >
     )

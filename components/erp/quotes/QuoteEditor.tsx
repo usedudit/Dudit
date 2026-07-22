@@ -19,7 +19,7 @@ import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection, Badge, FormTextarea } from '@/components/reusable';
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
 import { FadeIn } from '@/components/animations/FadeIn';
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine";
@@ -481,7 +481,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
-                                                        {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.qty} un • {formatCurrency(item.price)}
+                                                        {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{formatQuantityWithUnit(item.qty, item.unit)} • {formatCurrency(item.price)}
                                                     </p>
                                                     {!itemsLocked && (
                                                         <div className="flex items-center gap-1">

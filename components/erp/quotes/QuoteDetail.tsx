@@ -26,7 +26,7 @@ import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/l
 import { hasMinimumPlan, PLAN_UPGRADE_MASCOTS } from "@/lib/subscription/plan-tier";
 import { useRouter } from "next/navigation";
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh";
-import { formatCurrency, formatDate, formatDayMonth, formatTime } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDayMonth, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { useStore } from '@/lib/store-context';
 import QuotePreview from './QuotePreview';
@@ -58,19 +58,11 @@ const getStatusInfo = (s: string) => {
 };
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return `${qty} un.`;
-    }
-    return `${qty} ${unit}`;
+    return formatQuantityWithUnit(qty, unit);
 };
 
 const formatProductUnitPrice = (price: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return formatCurrency(price);
-    }
-    return `${formatCurrency(price)}/${unit}`;
+    return formatUnitPriceWithUnit(price, unit);
 };
 
 const QuoteItem = ({ image, name, sku, qty, price, total, unit }: any) => (

@@ -32,7 +32,7 @@ import { OrderHistoryTab } from "./OrderHistoryTab"
 import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
 import { useNotification } from "@/hooks/use-notification"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency, formatDateTime, formatTime, formatDayMonth } from "@/lib/utils"
+import { formatCurrency, formatDateTime, formatTime, formatDayMonth, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -45,19 +45,11 @@ import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financ
 import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return `${qty} un.`;
-    }
-    return `${qty} ${unit}`;
+    return formatQuantityWithUnit(qty, unit);
 };
 
 const formatProductUnitPrice = (price: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return formatCurrency(price);
-    }
-    return `${formatCurrency(price)}/${unit}`;
+    return formatUnitPriceWithUnit(price, unit);
 };
 
 const getServiceScheduleInfo = (item: any, order: any) => {
@@ -871,7 +863,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                                     <div key={idx} className="py-1.5 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-2 text-xs">
                                                                                                         <div className="flex items-center gap-2">
                                                                                                             <span className="font-medium text-brand-inactive-text">
-                                                                                                                Qtd: <strong className="text-brand-dark dark:text-dark-heading">{ret.quantity} un.</strong>
+                                                                                                                Qtd: <strong className="text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(ret.quantity, ret.unit)}</strong>
                                                                                                             </span>
                                                                                                             <span className="text-gray-300">&bull;</span>
                                                                                                             <span className="text-brand-inactive-text">Condição: {ret.condition === "sealed" || ret.condition === "lacrado" ? "Lacrado" : ret.condition === "damaged" || ret.condition === "danificado" ? "Danificado" : "Aberto"}</span>

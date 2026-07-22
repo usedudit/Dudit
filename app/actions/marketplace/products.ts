@@ -47,6 +47,11 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
         vendas_totais, created_at,
         addresses(city, state),
         payment_methods(*)
+      ),
+      stores!inner(
+        id, name, description, logo_url, image_url, banner_url,
+        phone, city, state, opening_hours, gallery,
+        is_showcase_active, latitude, longitude, business_info
       )
     `)
     .eq("id", id)
@@ -94,13 +99,32 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     let p: any = data.partners
     if (Array.isArray(p)) p = p[0]
 
+    // Merge store data over partner data (store fields take precedence)
+    const s: any = data.stores
+    const store = Array.isArray(s) ? s[0] : s
+    if (store) {
+      p.store_name = store.name || p.store_name
+      p.store_description = store.description || p.store_description
+      p.store_image_url = store.logo_url || store.image_url || p.store_image_url
+      p.banner_url = store.banner_url || p.banner_url
+      p.phone = store.phone || p.phone
+      p.city = store.addresses?.[0]?.city || store.city || p.addresses?.[0]?.city || null
+      p.state = store.addresses?.[0]?.state || store.state || p.addresses?.[0]?.state || null
+      p.opening_hours = store.opening_hours || p.opening_hours
+      p.latitude = store.latitude || p.latitude
+      p.longitude = store.longitude || p.longitude
+      p.business_info = store.business_info || p.business_info
+      p.gallery = store.gallery || p.gallery
+      p.is_showcase_active = store.is_showcase_active !== false
+    }
+
     if (!p) {
       p = { store_name: "Vendedor", store_avatar: null, banner_url: null, city: null, state: null }
     } else {
       p.store_avatar = p.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
       p.banner_url = p.banner_url || null
-      p.city = p.addresses?.[0]?.city || null
-      p.state = p.addresses?.[0]?.state || null
+      p.city = p.city || p.addresses?.[0]?.city || null
+      p.state = p.state || p.addresses?.[0]?.state || null
     }
     data.partners = p
 

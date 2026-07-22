@@ -4,7 +4,7 @@ import React from "react"
 import type { ProductsDashboardData } from "@/lib/data/dashboard"
 import { SummaryCards } from "../LeftColumn"
 import { DashboardPieChart, DashboardLineChart, DashboardBarChart, CHART_COLORS } from "../charts/DashboardCharts"
-import { formatCurrency as brl } from "@/lib/utils"
+import { formatCurrency as brl, formatQuantityWithUnit } from "@/lib/utils"
 import { Dropdown, DropdownItem, Button } from "@/components/reusable"
 import { ShoppingBagIcon, TagIcon, TrendingUpIcon, AwardIcon, PackageIcon, AlertCircleIcon } from "@/lib/icons"
 import { useRouter } from "next/navigation"
@@ -78,7 +78,7 @@ export function ProductsTab({ data }: { data: ProductsDashboardData }) {
                         <div className="flex items-center space-x-3">
                           <div className="w-[14px] h-[14px] rounded-[4px] shrink-0" style={{ backgroundColor: color }} />
                           <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading leading-none">
-                            {item.label} <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {item.value} un.
+                            {item.label} <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {formatQuantityWithUnit(item.value, (item as any).unit || "UN")}
                           </span>
                         </div>
                         <div className="text-xs font-bold text-brand-dark dark:text-dark-heading bg-brand-green-light dark:bg-dark-border/40 px-2 py-1 rounded-full border border-brand-border dark:border-dark-border">

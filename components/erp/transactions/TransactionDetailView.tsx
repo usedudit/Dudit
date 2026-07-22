@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard, DropdownItem, FormSection } from "@/components/reusable"
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard, FormSection } from "@/components/reusable"
 import { getTransactionHistoryAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
@@ -10,7 +10,7 @@ import { TransactionGoalCard } from "./TransactionGoalCard"
 import { useNotification } from "@/hooks/use-notification"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import { ListItem } from "@/components/reusable"
@@ -401,7 +401,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                             <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku}</div>
                                                                             <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
                                                                                 <span>
-                                                                                    {item.quantity} un. • {formatCurrency(item.unitPrice)} / un.
+                                                                                    {formatQuantityWithUnit(item.quantity, (item as any).unit || (item as any).product?.unit)} • {formatUnitPriceWithUnit(item.unitPrice, (item as any).unit || (item as any).product?.unit)}
                                                                                 </span>
                                                                             </div>
                                                                         </>

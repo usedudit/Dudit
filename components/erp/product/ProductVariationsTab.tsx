@@ -15,6 +15,7 @@ import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/B
 import { useNotification } from "@/hooks/use-notification"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
 import {
     getProductVariantsAction,
     deleteProductVariantAction,
@@ -36,8 +37,6 @@ import {
     MoneyIcon,
     InfoIcon
 } from "@/lib/icons"
-import { formatCurrency } from "@/lib/utils"
-
 // --- Utils & Constants ---
 const SPLIT_SEPARATOR = " / "
 const ITEMS_PER_PAGE_DESKTOP = 8
@@ -108,7 +107,7 @@ const VariationRow = React.memo(({ item, isSelected, isEditing, onSelect, onTogg
             </td>
             <td className="p-3 border-b border-brand-border dark:border-dark-border">
                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                    {item.stock || 0} {item.unit || "UN"}
+                    {formatQuantityWithUnit(item.stock || 0, item.unit)}
                 </span>
             </td>
             <td className="p-3 border-b border-brand-border dark:border-dark-border text-center">
@@ -181,7 +180,7 @@ const VariationMobileItem = React.memo(({ item, isSelected, isEditing, onSelect,
                             </span>
                             <span className="text-brand-inactive-text dark:text-dark-border">•</span>
                             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                {item.stock || 0} {item.unit || "un"}
+                                {formatQuantityWithUnit(item.stock || 0, item.unit)}
                             </span>
                         </div>
 

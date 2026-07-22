@@ -542,6 +542,7 @@ async function _searchMarketplaceInternal(
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                        stores!inner(id, name, logo_url, image_url, banner_url, city, state),
                         product_variants(variant_options, price_adjustment, is_active),
                         show_price_in_store
                     `)
@@ -557,6 +558,7 @@ async function _searchMarketplaceInternal(
                         id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                         marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                        stores!inner(id, name, logo_url, image_url, banner_url, city, state),
                         show_price_in_store
                     `)
                         .in("id", servicosIds)
@@ -726,6 +728,7 @@ async function hydrateMarketplaceSearchHits(
                 id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                stores!inner(id, name, logo_url, image_url, banner_url, city, state),
                 show_price_in_store
             `)
                 .in("id", servicosIds)
@@ -1064,6 +1067,7 @@ async function searchMarketplaceByCity(
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
                     partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    stores!inner(id, name, logo_url, image_url, banner_url, city, state),
                     product_variants(variant_options, price_adjustment, is_active),
                     show_price_in_store
                 `)

@@ -24,6 +24,7 @@ import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIco
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 import { AnimatePresence, motion } from "framer-motion"
 import {
     createRecurringPlanAction,
@@ -820,7 +821,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                                     {item.name}
                                                                 </span>
                                                                 <span className="block text-xs font-semibold text-brand-primary dark:text-dark-body">
-                                                                    {item.itemType === "product" ? "Produto" : "Serviço"} • {item.quantity} un
+                                                                    {item.itemType === "product" ? "Produto" : "Serviço"} • {formatQuantityWithUnit(item.quantity, item.unit)}
                                                                 </span>
                                                             </div>
                                                             <div className="shrink-0 flex items-center gap-2">

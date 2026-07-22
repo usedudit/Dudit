@@ -25,7 +25,7 @@ import {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon } from "@/lib/icons"
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
@@ -1053,7 +1053,7 @@ export default function CreateReturnPage({
                                                                             <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "Sem SKU"}</div>
                                                                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-inactive-text dark:text-dark-body">
                                                                                 <span>
-                                                                                    Qtd devolvida: <strong className="text-brand-dark dark:text-dark-heading">{item.quantity}</strong> de {item.maxQuantity} un.
+                                                                                    Qtd devolvida: <strong className="text-brand-dark dark:text-dark-heading">{item.quantity}</strong> de {item.maxQuantity} {formatUnit(item.unit)}
                                                                                 </span>
                                                                                 <span>•</span>
                                                                                 <span>

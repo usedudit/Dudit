@@ -23,6 +23,7 @@ import {
 } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
+import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 
 type TabType = "all" | "pending" | "completed" | "failed"
 
@@ -1276,7 +1277,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                         </span>{' '}
                                                                         {m.stock_movement_items?.map((smi: any, j: number) => (
                                                                             <span key={j}>
-                                                                                {smi.quantity > 0 ? "+" : ""}{smi.quantity} un
+                                                                                {smi.quantity > 0 ? "+" : ""}{formatQuantityWithUnit(smi.quantity, smi.unit || smi.raw_unit)}
                                                                             </span>
                                                                         ))}
                                                                     </div>

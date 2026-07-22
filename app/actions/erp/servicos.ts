@@ -603,7 +603,8 @@ export async function duplicateServiceAction(serviceId: string) {
             if (attempt > 0) {
                 serviceData.sku = generateSKUWithSuffix(generateSKUBase(service.name + ' Copy'), attempt)
             }
-            const { data: result, error } = await supabase.from("services").insert(serviceData).select().single()
+            const { is_active, ...cleanData } = serviceData
+            const { data: result, error } = await supabase.from("services").insert(cleanData).select().single()
             if (!error) {
                 inserted = result
                 insertError = null

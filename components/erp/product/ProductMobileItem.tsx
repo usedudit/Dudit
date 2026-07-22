@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Badge, Tooltip, Checkbox } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getStockStatus, formatCurrency } from "./product-utils"
+import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 import type { Product } from "@/lib/types/product"
 
 interface ProductMobileItemProps {
@@ -89,7 +90,7 @@ const ProductMobileItem = React.memo(
                                             </span>
                                             <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
                                             <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
-                                                {effectiveStock} un
+                                                {formatQuantityWithUnit(effectiveStock, product.unit)}
                                             </span>
                                             <span className="mx-2"></span>
                                             <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
@@ -107,7 +108,7 @@ const ProductMobileItem = React.memo(
                                                 </span>
                                                 <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
                                                 <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
-                                                    {effectiveStock} un
+                                                    {formatQuantityWithUnit(effectiveStock, product.unit)}
                                                 </span>
                                                 <span className="mx-2"></span>
                                                 <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
@@ -132,7 +133,7 @@ const ProductMobileItem = React.memo(
                                             </span>
                                             <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
                                             <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
-                                                {effectiveStock} un
+                                                {formatQuantityWithUnit(effectiveStock, product.unit)}
                                             </span>
                                             <span className="mx-2"></span>
                                             <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
@@ -147,7 +148,7 @@ const ProductMobileItem = React.memo(
                                         </span>
                                         <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
                                         <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
-                                            {effectiveStock} un
+                                            {formatQuantityWithUnit(effectiveStock, product.unit)}
                                         </span>
                                         <span className="mx-2"></span>
                                         <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">

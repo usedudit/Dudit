@@ -11,7 +11,7 @@ import {
 } from "@/components/erp/dashboard/charts/DashboardCharts"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
 
-import { formatCurrency as brl } from "@/lib/utils"
+import { formatCurrency as brl, formatQuantityWithUnit } from "@/lib/utils"
 import {
     AnalyticsIcon, PackageIcon, WrenchIcon, TruckIcon, FileTextIcon,
     MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
@@ -757,7 +757,7 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
                     {returnsData.topReturnedProducts.length > 0 ? (
                         <ReportRankingCard
                             title="Produtos Mais Devolvidos"
-                            items={returnsData.topReturnedProducts.slice(0, 6).map(p => ({ id: String(p.productName), label: p.productName, value: `${p.count}x`, subtitle: `${p.totalQuantity} un.` }))}
+                            items={returnsData.topReturnedProducts.slice(0, 6).map(p => ({ id: String(p.productName), label: p.productName, value: `${p.count}x`, subtitle: formatQuantityWithUnit(p.totalQuantity, (p as any).unit) }))}
                             variant="compact"
                         />
                     ) : (
@@ -1318,7 +1318,7 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
                                     {subscriptionData.projectedProducts.map((p) => (
                                         <tr key={p.id} className="hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                             <td className="py-3 font-medium text-brand-dark dark:text-dark-heading">{p.name}</td>
-                                            <td className="py-3 text-right font-bold text-brand-dark dark:text-dark-heading">{p.quantity} un</td>
+                                            <td className="py-3 text-right font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(p.quantity, (p as any).unit)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

@@ -42,7 +42,7 @@ import {
 } from "@/lib/icons"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 
@@ -844,7 +844,7 @@ export default function CreateDeliveryPage({
                                                                     SKU: {itemSku}
                                                                 </div>
                                                                 <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                    {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                                    {formatQuantityWithUnit(item.quantity, item.unit)} • {formatUnitPriceWithUnit(itemPrice, item.unit)}
                                                                 </div>
                                                             </div>
                                                         </div>

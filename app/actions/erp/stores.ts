@@ -356,7 +356,7 @@ export async function createStoreWithInheritanceAction(input: CreateStoreWithInh
 
             if (sourceProducts?.length) {
                 for (const prod of sourceProducts) {
-                    const { id, created_at, updated_at, ...productData } = prod
+                    const { id, created_at, updated_at, is_active, ...productData } = prod
 
                     const { data: newProduct, error: pErr } = await supabase
                         .from("products")
@@ -406,7 +406,7 @@ export async function createStoreWithInheritanceAction(input: CreateStoreWithInh
 
             if (sourceServices?.length) {
                 const newServices = sourceServices.map((s: any) => {
-                    const { id, created_at, updated_at, ...serviceData } = s
+                    const { id, created_at, updated_at, is_active, ...serviceData } = s
                     return { ...serviceData, store_id: newStoreId }
                 })
                 await supabase.from("services").insert(newServices)

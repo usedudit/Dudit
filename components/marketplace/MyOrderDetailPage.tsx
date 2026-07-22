@@ -21,7 +21,7 @@ import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency, formatDate, formatFullDate, formatTime } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit, getEligibilityLabel, getSlaStatusLabel } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
@@ -151,19 +151,14 @@ const getReturnRequestStatusConfig = (request: any) => {
 };
 
 const formatProductQuantity = (qty: number, unit?: string | null, hidePrefix = false) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return hidePrefix ? `${qty} un.` : `x${qty}`;
+    if (!hidePrefix && (!unit || String(unit).trim().toUpperCase() === "UN")) {
+        return `x${qty}`;
     }
-    return `${qty} ${unit}`;
+    return formatQuantityWithUnit(qty, unit);
 };
 
 const formatProductUnitPrice = (price: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return formatCurrency(price);
-    }
-    return `${formatCurrency(price)}/${unit}`;
+    return formatUnitPriceWithUnit(price, unit);
 };
 
 const getItemKindLabel = (item: any) => {

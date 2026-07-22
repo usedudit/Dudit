@@ -7,6 +7,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
 import { IconPlaceholder } from "@/components/reusable"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
+import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 
 interface ReviewItem {
     id: string
@@ -55,11 +56,7 @@ function formatReviewDate(dateStr: string) {
 }
 
 const formatQty = (qty: number, unit?: string | null) => {
-    const cleanUnit = String(unit || "").trim().toLowerCase();
-    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
-        return `${qty} un.`;
-    }
-    return `${qty} ${unit}`;
+    return formatQuantityWithUnit(qty, unit);
 };
 
 function getVariantLabel(v: any): string | null {

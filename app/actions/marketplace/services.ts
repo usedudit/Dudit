@@ -47,7 +47,12 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         payment_methods (*)
       ),
       service_categories:service_categories!category_id (name),
-      marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name))
+      marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
+      stores!inner(
+        id, name, description, logo_url, image_url, banner_url,
+        phone, city, state, opening_hours, gallery,
+        is_showcase_active, latitude, longitude, business_info
+      )
     `)
     .eq("id", serviceId)
 
@@ -77,6 +82,25 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
 
   const user = await getCurrentUser()
   const rawPartner = Array.isArray(data.partners) ? data.partners[0] : data.partners
+
+  // Merge store data over partner data
+  const rawStore: any = Array.isArray(data.stores) ? data.stores[0] : data.stores
+  if (rawStore && rawPartner) {
+    rawPartner.store_name = rawStore.name || rawPartner.store_name
+    rawPartner.store_description = rawStore.description || rawPartner.store_description
+    rawPartner.store_image_url = rawStore.logo_url || rawStore.image_url || rawPartner.store_image_url
+    rawPartner.banner_url = rawStore.banner_url || rawPartner.banner_url
+    rawPartner.phone = rawStore.phone || rawPartner.phone
+    const addr = Array.isArray(rawStore.addresses) ? rawStore.addresses[0] : null
+    rawPartner.city = addr?.city || rawStore.city || rawPartner.addresses?.[0]?.city || null
+    rawPartner.state = addr?.state || rawStore.state || rawPartner.addresses?.[0]?.state || null
+    rawPartner.opening_hours = rawStore.opening_hours || rawPartner.opening_hours
+    rawPartner.latitude = rawStore.latitude || rawPartner.latitude
+    rawPartner.longitude = rawStore.longitude || rawPartner.longitude
+    rawPartner.business_info = rawStore.business_info || rawPartner.business_info
+    rawPartner.gallery = rawStore.gallery || rawPartner.gallery
+  }
+
   const partnerId = rawPartner?.id || data.partner_id
   const isOwner = !!(user && rawPartner?.user_id === user.id)
   let isTeamMember = false
