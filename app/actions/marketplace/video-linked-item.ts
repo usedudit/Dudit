@@ -27,11 +27,11 @@ export interface LinkedItemData {
   itemsCount?: number
 }
 
-async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemData | null> {
+async function _getLinkedItemData(type: string, id: string, storeId?: string): Promise<LinkedItemData | null> {
   const supabase = getAdminClient()
 
   if (type === "product") {
-    const { data: product } = await supabase
+    let q = supabase
       .from("products")
       .select(`
         id, name, price, promotional_price, images, rating, show_price_in_store,
@@ -39,7 +39,8 @@ async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemD
         partners!partner_id(id, store_name, store_image_url)
       `)
       .eq("id", id)
-      .maybeSingle()
+    if (storeId) q = q.eq("store_id", storeId)
+    const { data: product } = await q.maybeSingle()
 
     if (!product) return null
 
@@ -74,7 +75,7 @@ async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemD
   }
 
   if (type === "service") {
-    const { data: service } = await supabase
+    let q = supabase
       .from("services")
       .select(`
         id, name, price, promotional_price, images, rating, show_price_in_store,
@@ -82,7 +83,8 @@ async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemD
         partners!partner_id(id, store_name, store_image_url)
       `)
       .eq("id", id)
-      .maybeSingle()
+    if (storeId) q = q.eq("store_id", storeId)
+    const { data: service } = await q.maybeSingle()
 
     if (!service) return null
 
@@ -149,4 +151,6 @@ async function _getLinkedItemData(type: string, id: string): Promise<LinkedItemD
   return null
 }
 
-export const getLinkedItemData = cache(_getLinkedItemData)
+export const getLinkedItemData = cache(
+  (type: string, id: string, storeId?: string) => _getLinkedItemData(type, id, storeId)
+)

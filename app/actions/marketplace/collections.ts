@@ -318,7 +318,7 @@ export async function getCommunityCollections(cursor?: string, limit = 20) {
   return { items, nextCursor, hasMore }
 }
 
-export async function getCollectionItems(collectionId: string) {
+export async function getCollectionItems(collectionId: string, storeId?: string) {
   const supabase = await getSupabaseServerClient()
 
   const { data: links } = await supabase
@@ -334,20 +334,26 @@ export async function getCollectionItems(collectionId: string) {
 
   let [productsData, servicesData] = await Promise.all([
     productIds.length > 0
-      ? supabase
-          .from("products")
-          .select("id, name, price, promotional_price, images, rating, condition, created_at, partners!inner(store_name, store_image_url)")
-          .in("id", productIds)
-          .eq("is_active", true)
-          .then((r: any) => r.data || [])
+      ? (() => {
+          let q = supabase
+            .from("products")
+            .select("id, name, price, promotional_price, images, rating, condition, created_at, partners!inner(store_name, store_image_url)")
+            .in("id", productIds)
+            .eq("is_active", true)
+          if (storeId) q = q.eq("store_id", storeId)
+          return q.then((r: any) => r.data || [])
+        })()
       : Promise.resolve([]),
     serviceIds.length > 0
-      ? supabase
-          .from("services")
-          .select("id, name, price, images, rating, created_at, partners!inner(store_name, store_image_url)")
-          .in("id", serviceIds)
-          .eq("is_active", true)
-          .then((r: any) => r.data || [])
+      ? (() => {
+          let q = supabase
+            .from("services")
+            .select("id, name, price, images, rating, created_at, partners!inner(store_name, store_image_url)")
+            .in("id", serviceIds)
+            .eq("is_active", true)
+          if (storeId) q = q.eq("store_id", storeId)
+          return q.then((r: any) => r.data || [])
+        })()
       : Promise.resolve([]),
   ])
 

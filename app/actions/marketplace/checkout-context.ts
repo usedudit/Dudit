@@ -81,6 +81,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
   partnerId: string
   cartItemIds: string[]
   mpConnected?: boolean
+  storeId?: string
 }): Promise<MarketplaceCheckoutContextResult> {
   const user = await requireUser()
   if (!user) return { success: false, error: "Não autenticado" }
@@ -135,16 +136,20 @@ export async function getMarketplaceCheckoutContextAction(input: {
       .order("priority", { ascending: false })
       .order("discount_percent", { ascending: false }),
     getCachedAddresses(user.id, "user"),
-    admin
-      .from("products")
-      .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
-      .eq("partner_id", resolved.partnerId)
-      .eq("is_active", true)
-      .eq("moderation_status", "approved")
-      .eq("show_in_marketplace", true)
-      .gt("stock_available", 0)
-      .order("created_at", { ascending: false })
-      .limit(5),
+    (() => {
+      let q = admin
+        .from("products")
+        .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
+        .eq("partner_id", resolved.partnerId)
+        .eq("is_active", true)
+        .eq("moderation_status", "approved")
+        .eq("show_in_marketplace", true)
+        .gt("stock_available", 0)
+        .order("created_at", { ascending: false })
+        .limit(5)
+      if (input.storeId) q = q.eq("store_id", input.storeId)
+      return q
+    })(),
   ])
 
   const partnerPromotions = promosMap?.[resolved.partnerId] || []
@@ -206,14 +211,16 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const giftIds = pricingResult.appliedGiftProductIds || []
   if (giftIds.length > 0) {
     const [productsRes, servicesRes] = await Promise.all([
-      admin
-        .from("products")
-        .select("id, name, price, images")
-        .in("id", giftIds),
-      admin
-        .from("services")
-        .select("id, name, price, images")
-        .in("id", giftIds),
+      (() => {
+        let q = admin.from("products").select("id, name, price, images").in("id", giftIds)
+        if (input.storeId) q = q.eq("store_id", input.storeId)
+        return q
+      })(),
+      (() => {
+        let q = admin.from("services").select("id, name, price, images").in("id", giftIds)
+        if (input.storeId) q = q.eq("store_id", input.storeId)
+        return q
+      })(),
     ])
 
     if (productsRes.data && productsRes.data.length > 0) {

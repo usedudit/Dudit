@@ -183,6 +183,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         const serviceData: any = {
             ...(data.id ? { id: data.id } : {}),
             partner_id: finalPartnerId,
+            store_id: finalStoreId,
             name: data.name,
             description: data.description || null,
             sku,

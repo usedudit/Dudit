@@ -26,7 +26,8 @@ interface FavoriteItem {
 
 export async function toggleFavoriteAction(
     itemId: string,
-    itemType: FavoriteItemType
+    itemType: FavoriteItemType,
+    storeId?: string
 ): Promise<ToggleFavoriteResult> {
     try {
         const user = await getCurrentUser()
@@ -42,11 +43,14 @@ export async function toggleFavoriteAction(
         // Validate item existence
         const admin = getAdminClient()
         const tableName = itemType === "produto" ? "products" : itemType === "servico" ? "services" : "partners"
-        const { data: itemExists } = await admin
+        let existenceQuery = admin
             .from(tableName)
             .select("id")
             .eq("id", itemId)
-            .maybeSingle()
+        if (storeId && (itemType === "produto" || itemType === "servico")) {
+            existenceQuery = existenceQuery.eq("store_id", storeId)
+        }
+        const { data: itemExists } = await existenceQuery.maybeSingle()
 
         if (!itemExists) {
             return { success: false, isFavorited: false, error: "Item não encontrado" }
@@ -148,6 +152,7 @@ export async function getUserFavoritesAction(params?: {
     type?: "todos" | "produtos" | "servicos"
     page?: number
     pageSize?: number
+    storeId?: string
 }): Promise<{
     success: boolean
     items: any[]
@@ -197,29 +202,39 @@ export async function getUserFavoritesAction(params?: {
         const productIds = favorites.filter((f: any) => f.item_type === "produto").map((f: any) => f.item_id)
         const serviceIds = favorites.filter((f: any) => f.item_type === "servico").map((f: any) => f.item_id)
 
+        const storeId = params?.storeId
+
         const [productsRes, servicesRes] = await Promise.all([
             productIds.length > 0
-                ? admin
-                    .from("products")
-                    .select(`
-                        id, name, price, promotional_price, images, rating, is_active, show_in_marketplace,
-                        stock_available, stock_quantity,
-                        category_id, category:product_categories!category_id(name),
-                        partners(id, store_name, store_image_url, addresses(city, state)),
-                        product_variants(variant_options, price_adjustment, is_active),
-                        show_price_in_store
-                    `)
-                    .in("id", productIds)
+                ? (() => {
+                    let q = admin
+                        .from("products")
+                        .select(`
+                            id, name, price, promotional_price, images, rating, is_active, show_in_marketplace,
+                            stock_available, stock_quantity,
+                            category_id, category:product_categories!category_id(name),
+                            partners(id, store_name, store_image_url, addresses(city, state)),
+                            product_variants(variant_options, price_adjustment, is_active),
+                            show_price_in_store
+                        `)
+                        .in("id", productIds)
+                    if (storeId) q = q.eq("store_id", storeId)
+                    return q
+                  })()
                 : Promise.resolve({ data: [] }),
             serviceIds.length > 0
-                ? admin
-                    .from("services")
-                    .select(`
-                        id, name, price, images, rating, is_active, billing_unit, price_type,
-                        partners(id, store_name, store_image_url, addresses(city, state)),
-                        show_price_in_store
-                    `)
-                    .in("id", serviceIds)
+                ? (() => {
+                    let q = admin
+                        .from("services")
+                        .select(`
+                            id, name, price, images, rating, is_active, billing_unit, price_type,
+                            partners(id, store_name, store_image_url, addresses(city, state)),
+                            show_price_in_store
+                        `)
+                        .in("id", serviceIds)
+                    if (storeId) q = q.eq("store_id", storeId)
+                    return q
+                  })()
                 : Promise.resolve({ data: [] }),
         ])
 
@@ -329,7 +344,7 @@ export async function getUserFavoritesAction(params?: {
 
 // ─── Get Favorites Count ────────────────────────────────────────────────────
 
-export async function getFavoritesCountAction(): Promise<{
+export async function getFavoritesCountAction(storeId?: string): Promise<{
     total: number
     produtos: number
     servicos: number
@@ -352,10 +367,18 @@ export async function getFavoritesCountAction(): Promise<{
 
         const [existingProducts, existingServices] = await Promise.all([
             produtoIds.length > 0
-                ? admin.from("products").select("id").in("id", produtoIds)
+                ? (() => {
+                    let q = admin.from("products").select("id").in("id", produtoIds)
+                    if (storeId) q = q.eq("store_id", storeId)
+                    return q
+                  })()
                 : Promise.resolve({ data: [] }),
             servicoIds.length > 0
-                ? admin.from("services").select("id").in("id", servicoIds)
+                ? (() => {
+                    let q = admin.from("services").select("id").in("id", servicoIds)
+                    if (storeId) q = q.eq("store_id", storeId)
+                    return q
+                  })()
                 : Promise.resolve({ data: [] }),
         ])
 

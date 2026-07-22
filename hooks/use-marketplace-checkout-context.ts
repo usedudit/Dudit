@@ -10,6 +10,7 @@ export function useMarketplaceCheckoutContext(params: {
   partnerId: string
   cartItemIds: string[]
   mpConnected?: boolean
+  storeId?: string
   enabled?: boolean
   refreshTrigger?: number
 }) {
@@ -35,6 +36,7 @@ export function useMarketplaceCheckoutContext(params: {
       partnerId: params.partnerId,
       cartItemIds: params.cartItemIds,
       mpConnected: params.mpConnected,
+      storeId: params.storeId,
     })
       .then((result) => {
         if (!active) return

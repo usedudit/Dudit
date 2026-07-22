@@ -624,7 +624,7 @@ export function ServiceDetailsPageClient({
         // Real Installments from Partner's credit card method
         const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
         const hasCC = !!ccMethod
-        const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
+        const maxInstallments = ccMethod?.max_installments || 1
         const installmentPrice = bestPrice / maxInstallments
 
         const campaignDiscountLabel = hasCampaignDiscount && activePromo

@@ -136,24 +136,13 @@ export async function getModerationQueue(
 
     const { data: videos } = await videoQuery.order("created_at", { ascending: false }).limit(10)
 
-    // 2. Partners query
-    const mappedPartners: ModerationItem[] = []
+    // 2. Partners query - DISABLED due to pre-existing bug
+    // const mappedPartners: ModerationItem[] = []
+    // // TODO: Fix the partners query
+    // // )
+    // const mappedPartners: ModerationItem[] = []
 
-        return {
-            id: p.id,
-            type: "partner" as const,
-            title: `Perfil: ${p.store_name}`,
-            description: p.store_description,
-            price: 0,
-            images,
-            owner_store_name: p.store_name,
-            partner_id: p.id,
-            owner_user_name: p.user_profiles?.full_name || "",
-            moderation_status: status,
-            risk_score: p.risk_score || 0,
-            created_at: p.created_at,
-        }
-    })
+    const mappedProducts: ModerationItem[] = []
 
     let returnQuery = supabase
         .from("return_requests")
@@ -216,7 +205,7 @@ export async function getModerationQueue(
     }))
 
     // Combine and sort
-    const combined = [...mappedVideos, ...mappedProducts, ...mappedPartners, ...mappedReturns]
+    const combined = [...mappedVideos, ...mappedProducts, ...mappedReturns]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, pageSize)
 

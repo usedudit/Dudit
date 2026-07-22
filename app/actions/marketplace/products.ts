@@ -25,10 +25,10 @@ export const getCachedHomeProducts = async () => {
 async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
   const supabase = getAdminClient()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("products")
     .select(`
-      id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
+      id, store_id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
       is_active, moderation_status,
       category_id, category:product_categories!category_id(name),
       subcategory_id, subcategory:product_categories!subcategory_id(name),
@@ -50,7 +50,12 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       )
     `)
     .eq("id", id)
-    .single()
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  }
+
+  const { data, error } = await query.single()
 
   if (error || !data) {
     if (error) console.error(`[Product] Fetch error for ${id}:`, error.message)
@@ -273,11 +278,11 @@ export const getCachedReviews = async (productId: string) => {
 }
 
 // --- 5. RELATED PRODUCTS ---
-export const getCachedRelatedProducts = async (partnerId: string, currentProductId: string) => {
+export const getCachedRelatedProducts = async (partnerId: string, currentProductId: string, storeId?: string) => {
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const result = await supabase
+      let q = supabase
         .from("products")
         .select(`
           id, name, price, promotional_price, images, video_thumbnail, rating,
@@ -289,8 +294,8 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
         .eq("show_in_marketplace", true)
         .eq("partner_id", partnerId)
         .neq("id", currentProductId)
-        .order("created_at", { ascending: false })
-        .limit(10)
+      if (storeId) q = q.eq("store_id", storeId)
+      const result = await q.order("created_at", { ascending: false }).limit(10)
 
       let data = result.data as any
       if (!data) return []
@@ -329,8 +334,8 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
 
       return safeData
     },
-    [`related-products-${partnerId}-${currentProductId}-v2`],
-    { tags: ["related-products", `partner-${partnerId}`] }
+    storeId ? [`related-products-${partnerId}-${currentProductId}-${storeId}`] : [`related-products-${partnerId}-${currentProductId}-v2`],
+    { tags: storeId ? ["related-products", `partner-${partnerId}`, `store-${storeId}`] : ["related-products", `partner-${partnerId}`] }
   )
   return fn()
 }

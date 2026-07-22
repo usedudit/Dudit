@@ -1,6 +1,7 @@
 export interface Service {
   id: string
   partner_id: string
+  store_id: string
   name: string
   description: string | null
   price: number

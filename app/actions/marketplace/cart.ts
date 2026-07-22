@@ -263,7 +263,7 @@ export async function getCachedCart(userId: string) {
 
 // --- ACTIONS DE ESCRITA (Adicionar/Remover/Checkout) ---
 
-export async function addToCartAction(productId: string, quantity = 1, csrf_token?: string, variantId?: string) {
+export async function addToCartAction(productId: string, quantity = 1, csrf_token?: string, variantId?: string, storeId?: string) {
   // 1. Otimização Primeira Fase: Paralelizar carregamentos estáticos e Auth
   const [{ requireCSRF }] = await Promise.all([
     import("@/lib/security/csrf-action-wrapper"),
@@ -308,17 +308,19 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
   // 2.C - Busca detalhes de quem é o dono do produto/variante
   let productPromise
   if (variantId) {
-    productPromise = adminClient
+    let query = adminClient
       .from("product_variants")
-      .select("id, product_id, products(partner_id, partners(user_id))")
+      .select("id, product_id, products!inner(partner_id, partners!inner(user_id))")
       .eq("id", variantId)
-      .single()
+    if (storeId) query = query.eq("products.store_id", storeId)
+    productPromise = query.single()
   } else {
-    productPromise = adminClient
+    let query = adminClient
       .from("products")
-      .select("partner_id, partners(user_id)")
+      .select("partner_id, partners!inner(user_id)")
       .eq("id", productId)
-      .single()
+    if (storeId) query = query.eq("store_id", storeId)
+    productPromise = query.single()
   }
 
   const [
@@ -746,7 +748,7 @@ export async function checkoutCartAction(
       .eq("user_id", user.id)
       .single(),
     productIds.length
-      ? adminClient.from("products").select("*").in("id", productIds)
+      ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", storeId)
       : Promise.resolve({ data: [] as any[] }),
     adminClient
       .from("partners")

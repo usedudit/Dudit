@@ -38,6 +38,7 @@ export async function addServiceBookingToCartAction(
     booking: ServiceBookingMetadata
     payDepositOnly?: boolean
     csrf_token?: string
+    storeId?: string
   },
 ) {
   await requireRateLimit(RateLimitCategory.CART)
@@ -51,12 +52,13 @@ export async function addServiceBookingToCartAction(
   if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
-  const { data: service } = await admin
+  let serviceQuery = admin
     .from("services")
     .select("id, is_active, partner_id")
     .eq("id", input.serviceId)
     .eq("partner_id", input.partnerId)
-    .maybeSingle()
+  if (input.storeId) serviceQuery = serviceQuery.eq("store_id", input.storeId)
+  const { data: service } = await serviceQuery.maybeSingle()
 
   if (!service?.is_active) return { error: "Serviço indisponível." }
 
@@ -88,12 +90,14 @@ export async function prepareProductBuyNowCheckoutAction(input: {
   quantity?: number
   variantId?: string
   csrf_token?: string
+  storeId?: string
 }) {
   const addResult = await addToCartAction(
     input.productId,
     input.quantity ?? 1,
     input.csrf_token,
     input.variantId,
+    input.storeId,
   )
   if (addResult.error) return { error: addResult.error }
 
@@ -199,7 +203,7 @@ export async function addSubscriptionToCartAction(
 }
 
 export async function addPurchasableServiceToCartAction(
-  input: { serviceId: string; partnerId: string; quantity?: number; csrf_token?: string },
+  input: { serviceId: string; partnerId: string; quantity?: number; csrf_token?: string; storeId?: string },
 ) {
   await requireRateLimit(RateLimitCategory.CART)
   const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
@@ -212,12 +216,13 @@ export async function addPurchasableServiceToCartAction(
   if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
-  const { data: service } = await admin
+  let serviceQuery = admin
     .from("services")
     .select("id, name, price, is_active")
     .eq("id", input.serviceId)
     .eq("partner_id", input.partnerId)
-    .maybeSingle()
+  if (input.storeId) serviceQuery = serviceQuery.eq("store_id", input.storeId)
+  const { data: service } = await serviceQuery.maybeSingle()
 
   if (!service?.is_active) return { error: "Serviço indisponível." }
   return { error: "Este serviço requer agendamento. Selecione data e horário." }
@@ -246,26 +251,29 @@ export async function addPurchasableServiceToCartAction(
 export async function getGiftItemDetailsAction(input: {
   itemId: string
   itemType: "product" | "service"
+  storeId?: string
 }) {
   const admin = getAdminClient()
   if (input.itemType === "product") {
-    const { data } = await admin
+    let q = admin
       .from("products")
       .select("name, image_url, images")
       .eq("id", input.itemId)
       .eq("is_active", true)
       .eq("show_in_marketplace", true)
-      .single()
+    if (input.storeId) q = q.eq("store_id", input.storeId)
+    const { data } = await q.single()
     if (!data) return null
     return { name: data.name, image_url: data.image_url || (data.images?.[0]) || null, isProduct: true as const }
   }
-  const { data } = await admin
+  let q = admin
     .from("services")
     .select("name, images")
     .eq("id", input.itemId)
     .eq("is_active", true)
     .eq("show_in_marketplace", true)
-    .single()
+  if (input.storeId) q = q.eq("store_id", input.storeId)
+  const { data } = await q.single()
   if (!data) return null
   return { name: data.name, image_url: (data.images?.[0]) || null, isProduct: false as const }
 }

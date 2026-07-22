@@ -67,6 +67,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         rating: product.rating || 0,
         created_at: product.created_at,
         partner_id: product.partner_id,
+        store_id: product.store_id || "",
         updated_at: product.updated_at || undefined,
         purchase_count: product.purchase_count || 0,
         views: product.views || 0,

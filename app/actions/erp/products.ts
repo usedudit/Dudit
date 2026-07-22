@@ -428,9 +428,10 @@ export async function createProductComprehensiveAction(data: {
         if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do produto é obrigatório para upload de vídeo")
         if (data.id) await assertUploadVideoOwnership(videoMetadata, _user.id, "products", data.id)
 
-        const productData = {
+const productData = {
             id: data.id || undefined,
             partner_id: finalPartnerId,
+            store_id: finalStoreId,
             name: data.name,
             description: data.description || null,
             sku,
@@ -1798,12 +1799,16 @@ export async function getProductWithDetailsAction(productId: string) {
     }
 }
 
-export async function getProducts(partnerId: string) {
+export async function getProducts(partnerId: string, storeId?: string) {
     try {
         const user = await requireUser()
         await requirePermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
-        const { data } = await scopeActiveOnly(supabase.from("products").select("*").eq("partner_id", partnerId)).order("created_at", { ascending: false }).limit(100)
+        
+        let q = supabase.from("products").select("*").eq("partner_id", partnerId)
+        if (storeId) q = q.eq("store_id", storeId)
+        
+        const { data } = await scopeActiveOnly(q).order("created_at", { ascending: false }).limit(100)
         return data || []
     } catch (error) {
         console.error("[getProducts] Error fetching products:", error)

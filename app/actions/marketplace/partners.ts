@@ -88,7 +88,7 @@ import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } fr
 
 // ... (existing code)
 
-async function _getPartnerProducts(partnerId: string) {
+async function _getPartnerProducts(partnerId: string, storeId?: string) {
   const supabase = getAdminClient()
   const user = await getCurrentUser()
 
@@ -107,6 +107,8 @@ async function _getPartnerProducts(partnerId: string) {
       product_variants(variant_options, price_adjustment, is_active)
     `)
     .eq("partner_id", partnerId)
+
+  if (storeId) query = query.eq("store_id", storeId)
 
   // If NOT owner, apply visibility filters
   if (!isOwner) {
@@ -153,7 +155,7 @@ async function _getPartnerProducts(partnerId: string) {
   return safeData
 }
 
-async function _getPartnerServices(partnerId: string) {
+async function _getPartnerServices(partnerId: string, storeId?: string) {
   const supabase = getAdminClient()
   const user = await getCurrentUser()
 
@@ -164,6 +166,8 @@ async function _getPartnerServices(partnerId: string) {
     .from("services")
     .select("*")
     .eq("partner_id", partnerId)
+
+  if (storeId) query = query.eq("store_id", storeId)
 
   if (!isOwner) {
     query = query.eq("is_active", true).eq("show_in_marketplace", true)
@@ -326,11 +330,11 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
   return fn()
 }
 
-export const getCachedPartnerProducts = async (partnerId: string) => {
+export const getCachedPartnerProducts = async (partnerId: string, storeId?: string) => {
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const { data: rawData } = await supabase
+      let q = supabase
         .from("products")
         .select(`
           *,
@@ -342,8 +346,8 @@ export const getCachedPartnerProducts = async (partnerId: string) => {
         `)
         .eq("partner_id", partnerId)
         .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(100)
+      if (storeId) q = q.eq("store_id", storeId)
+      const { data: rawData } = await q.order("created_at", { ascending: false }).limit(100)
 
       let resultData = rawData || []
       if (resultData.length > 0) {
@@ -379,22 +383,23 @@ export const getCachedPartnerProducts = async (partnerId: string) => {
 
       return safeData
     },
-    [`partner-products-${partnerId}-v2`],
-    { tags: ["partner-products", `partner-${partnerId}`] }
+    storeId ? [`partner-products-${partnerId}-${storeId}`] : [`partner-products-${partnerId}-v2`],
+    { tags: storeId ? ["partner-products", `partner-${partnerId}`, `store-${storeId}`] : ["partner-products", `partner-${partnerId}`] }
   )
   return fn()
 }
 
-export const getCachedPartnerServices = async (partnerId: string) => {
+export const getCachedPartnerServices = async (partnerId: string, storeId?: string) => {
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const { data: rawData } = await supabase
+      let q = supabase
         .from("services")
         .select("*")
         .eq("partner_id", partnerId)
         .eq("is_active", true)
-        .order("created_at", { ascending: false })
+      if (storeId) q = q.eq("store_id", storeId)
+      const { data: rawData } = await q.order("created_at", { ascending: false })
 
       let services = rawData || []
       if (services.length > 0) {
@@ -403,8 +408,8 @@ export const getCachedPartnerServices = async (partnerId: string) => {
       }
       return services
     },
-    [`partner-services-${partnerId}`],
-    { tags: ["partner-services", `partner-${partnerId}`] }
+    storeId ? [`partner-services-${partnerId}-${storeId}`] : [`partner-services-${partnerId}`],
+    { tags: storeId ? ["partner-services", `partner-${partnerId}`, `store-${storeId}`] : ["partner-services", `partner-${partnerId}`] }
   )
   return fn()
 }
@@ -911,9 +916,9 @@ export async function registerPartner(data: any) {
   }
 }
 
-export async function getPartnerOrderBumps(partnerId: string, limit = 5) {
+export async function getPartnerOrderBumps(partnerId: string, limit = 5, storeId?: string) {
   const supabase = getAdminClient()
-  const { data: rawData, error } = await supabase
+  let q = supabase
     .from("products")
     .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
     .eq("partner_id", partnerId)
@@ -923,6 +928,8 @@ export async function getPartnerOrderBumps(partnerId: string, limit = 5) {
     .gt("stock_available", 0)
     .order("created_at", { ascending: false })
     .limit(limit)
+  if (storeId) q = q.eq("store_id", storeId)
+  const { data: rawData, error } = await q
 
   if (error) {
     console.error("Error fetching order bumps:", error)

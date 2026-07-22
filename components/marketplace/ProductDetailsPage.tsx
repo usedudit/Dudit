@@ -790,7 +790,7 @@ export function ProductDetailsPageClient({
         setLoading(true)
         try {
             const token = await fetchCSRFTokenSingleton() || ""
-            const result = await addToCartAction(product.id, quantity, token, selectedVariant?.id)
+            const result = await addToCartAction(product.id, quantity, token, selectedVariant?.id, product.store_id)
             if (result.error) {
                 notifyError("Erro ao adicionar à sacola", result.error)
             } else {
@@ -819,6 +819,7 @@ export function ProductDetailsPageClient({
                 quantity,
                 variantId: selectedVariant?.id,
                 csrf_token: token,
+                storeId: product.store_id,
             })
             if ("error" in prep && prep.error) {
                 notifyError("Erro", prep.error)

@@ -22,6 +22,7 @@ export interface Product {
   video_provider_id?: string | null
   created_at: string
   partner_id: string
+  store_id: string
   brand: string | null
   brand_id: string | null
   product_type: string | null

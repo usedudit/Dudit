@@ -24,7 +24,8 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   if (!serviceId) return null
 
   const supabase = getAdminClient()
-  const { data, error } = await supabase
+
+  let query = supabase
     .from("services")
     .select(`
       *,
@@ -49,7 +50,12 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name))
     `)
     .eq("id", serviceId)
-    .maybeSingle()
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  }
+
+  const { data, error } = await query.maybeSingle()
 
   if (error || !data) {
     console.error("[Service] Fetch error:", error?.message)
