@@ -14,7 +14,7 @@ export function formatPaymentMethodLabel(
   const normType = rawType.toLowerCase();
 
   if (normName === "exchange" || normName === "store_credit" || normName === "store-credit" || normName.includes("vale-compra") || normName.includes("vale_compra")) {
-    rawName = normName === "exchange" ? "Crédito de troca" : "Vale-compra utilizado";
+    rawName = normName === "exchange" ? "Crédito de troca" : "Vale-compra";
   }
   if (normType === "exchange" || normType === "store_credit" || normType === "store-credit" || normType.includes("vale-compra") || normType.includes("vale_compra")) {
     rawType = normType === "exchange" ? "exchange" : "store_credit";
@@ -24,7 +24,7 @@ export function formatPaymentMethodLabel(
   const getFriendlyTypeLabel = (typeOrName: string): string => {
     const norm = typeOrName.toLowerCase().trim()
     if (norm === "exchange") return "Crédito de troca"
-    if (norm === "store_credit" || norm === "store-credit" || norm.includes("vale-compra") || norm.includes("vale_compra")) return "Vale-compra utilizado"
+    if (norm === "store_credit" || norm === "store-credit" || norm.includes("vale-compra") || norm.includes("vale_compra")) return "Vale-compra"
     if (norm.includes("pix")) return "Pix"
     if (norm.includes("credito") || norm.includes("crédito") || norm.includes("credit")) return "Cartão de Crédito"
     if (norm.includes("debito") || norm.includes("débito") || norm.includes("debit")) return "Cartão de Débito"

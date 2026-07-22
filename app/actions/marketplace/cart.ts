@@ -642,6 +642,7 @@ export async function checkoutCartAction(
   checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null,
   isPickupPayment?: boolean,
   storeId?: string,
+  useStoreCredit?: boolean,
 ) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -1043,6 +1044,89 @@ export async function checkoutCartAction(
   // For marketplace orders (customer-initiated), seller_commission_amount is 0
   const sellerCommissionAmount = 0
 
+  let appliedStoreCredit = 0
+  if (useStoreCredit) {
+    let creditQuery = adminClient
+      .from("store_credits")
+      .select("remaining_amount")
+      .eq("partner_id", partnerId)
+      .eq("status", "ACTIVE")
+      .gt("remaining_amount", 0)
+
+    if (resolvedCustomerId) {
+      creditQuery = creditQuery.or(`customer_id.eq.${resolvedCustomerId},customer_user_id.eq.${user.id}`)
+    } else {
+      creditQuery = creditQuery.eq("customer_user_id", user.id)
+    }
+
+    const { data: creditRows } = await creditQuery
+    const availableCredit = (creditRows || []).reduce((sum: number, c: any) => sum + Number(c.remaining_amount || 0), 0)
+    appliedStoreCredit = Math.min(availableCredit, persistedTotal)
+  }
+
+  const remainingBalanceToPay = Math.max(0, Number((persistedTotal - appliedStoreCredit).toFixed(2)))
+  const isFullyPaidWithStoreCredit = appliedStoreCredit > 0 && remainingBalanceToPay <= 0.009
+
+  const finalPaymentBreakdown: any[] = []
+  if (appliedStoreCredit > 0) {
+    finalPaymentBreakdown.push({
+      method: "store_credit",
+      amount: appliedStoreCredit,
+      effectiveAmount: appliedStoreCredit,
+      netAmount: appliedStoreCredit,
+    })
+  }
+
+  if (remainingBalanceToPay > 0 && !useMercadoPago && bestMethod) {
+    finalPaymentBreakdown.push({
+      method: chosenType,
+      amount: remainingBalanceToPay,
+      paymentMethodId: bestMethod.id,
+      installmentNumber: Math.max(1, Number(installments || 1)),
+      checkoutPricing: persistedCheckoutPricing,
+      feeBearer: pmtConfig?.feeBearer || "merchant",
+      interestAmount: pricingResult.paymentMethodInterestAmount || 0,
+      feeAmount: pricingResult.paymentMethodFeeAmount || 0,
+      fixedFeeAmount: pricingResult.paymentMethodFixedFeeAmount || 0,
+      effectiveAmount: remainingBalanceToPay,
+      netAmount: pmtConfig?.feeBearer === "merchant"
+        ? Math.max(0, remainingBalanceToPay - (pricingResult.paymentMethodInterestAmount || 0) - (pricingResult.paymentMethodFeeAmount || 0) - (pricingResult.paymentMethodFixedFeeAmount || 0))
+        : remainingBalanceToPay,
+      ...(payDepositOnly ? (() => {
+        const serviceDepositTotal = resolvedLines
+          .filter((l) => l.itemType === "service_booking" && l.payDepositOnly && l.depositAmount != null)
+          .reduce((sum, l) => sum + Number(l.depositAmount || 0) * l.quantity, 0)
+        const fullServiceTotal = resolvedLines
+          .filter((l) => l.itemType === "service_booking")
+          .reduce((sum, l) => sum + Number(l.fullPrice || l.unitPrice) * l.quantity, 0)
+        return {
+          isDeposit: true,
+          depositPercent: Math.round((serviceDepositTotal / (fullServiceTotal || 1)) * 100),
+          depositAmount: serviceDepositTotal,
+          fullOrderTotal: resolvedLines.reduce((sum, l) => sum + Number(l.fullPrice || l.unitPrice) * l.quantity, 0) + deliveryFee,
+          remainingAfterDeposit: Math.max(0, fullServiceTotal - serviceDepositTotal),
+        }
+      })() : {}),
+      ...(chosenType === "cash" && deliveryType === "delivery" ? {
+        wantsChange,
+        payWithAmount: wantsChange ? payWithAmount : null,
+        changeAmount: wantsChange ? Number((payWithAmount! - remainingBalanceToPay).toFixed(2)) : 0
+      } : {})
+    })
+  }
+
+  let finalPaymentMethodLabel = useMercadoPago ? "Mercado Pago" : paymentMethodName
+  if (isFullyPaidWithStoreCredit) {
+    finalPaymentMethodLabel = "Vale-compra"
+  } else if (appliedStoreCredit > 0) {
+    finalPaymentMethodLabel = `Vale-compra (R$ ${appliedStoreCredit.toFixed(2).replace('.', ',')}) + ${finalPaymentMethodLabel}`
+  }
+
+  let finalSituation = paymentMethodName === "Assinatura (Créditos)" ? "paid" : (isPickupPayment && orderDelivery === "pickup" ? "awaiting_pickup_payment" : "pending")
+  if (isFullyPaidWithStoreCredit) {
+    finalSituation = "paid"
+  }
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -1056,48 +1140,12 @@ export async function checkoutCartAction(
       delivery_breakdown: deliveryBreakdown,
       delivery_type: orderDelivery,
       delivery_address: hasDeliveryLines ? deliveryAddress : deliveryAddress || null,
-      payment_method: useMercadoPago ? "Mercado Pago" : paymentMethodName,
+      payment_method: finalPaymentMethodLabel,
       delivery_payer: deliveryPayer,
       seller_commission_amount: sellerCommissionAmount,
-      payment_breakdown: useMercadoPago
-        ? []
-        : [{
-          method: chosenType,
-          amount: persistedTotal,
-          paymentMethodId: bestMethod.id,
-          installmentNumber: Math.max(1, Number(installments || 1)),
-          checkoutPricing: persistedCheckoutPricing,
-          feeBearer: pmtConfig?.feeBearer || "merchant",
-          interestAmount: pricingResult.paymentMethodInterestAmount || 0,
-          feeAmount: pricingResult.paymentMethodFeeAmount || 0,
-          fixedFeeAmount: pricingResult.paymentMethodFixedFeeAmount || 0,
-          effectiveAmount: persistedTotal,
-          netAmount: pmtConfig?.feeBearer === "merchant"
-            ? Math.max(0, persistedTotal - (pricingResult.paymentMethodInterestAmount || 0) - (pricingResult.paymentMethodFeeAmount || 0) - (pricingResult.paymentMethodFixedFeeAmount || 0))
-            : persistedTotal,
-          ...(payDepositOnly ? (() => {
-            const serviceDepositTotal = resolvedLines
-              .filter((l) => l.itemType === "service_booking" && l.payDepositOnly && l.depositAmount != null)
-              .reduce((sum, l) => sum + Number(l.depositAmount || 0) * l.quantity, 0)
-            const fullServiceTotal = resolvedLines
-              .filter((l) => l.itemType === "service_booking")
-              .reduce((sum, l) => sum + Number(l.fullPrice || l.unitPrice) * l.quantity, 0)
-            return {
-              isDeposit: true,
-              depositPercent: Math.round((serviceDepositTotal / (fullServiceTotal || 1)) * 100),
-              depositAmount: serviceDepositTotal,
-              fullOrderTotal: resolvedLines.reduce((sum, l) => sum + Number(l.fullPrice || l.unitPrice) * l.quantity, 0) + deliveryFee,
-              remainingAfterDeposit: Math.max(0, fullServiceTotal - serviceDepositTotal),
-            }
-          })() : {}),
-          ...(chosenType === "cash" && deliveryType === "delivery" ? {
-            wantsChange,
-            payWithAmount: wantsChange ? payWithAmount : null,
-            changeAmount: wantsChange ? Number((payWithAmount! - persistedTotal).toFixed(2)) : 0
-          } : {})
-        }],
-      payment_provider: useMercadoPago ? "Mercado Pago" : null,
-      situation: paymentMethodName === "Assinatura (Créditos)" ? "paid" : (isPickupPayment && orderDelivery === "pickup" ? "awaiting_pickup_payment" : "pending"),
+      payment_breakdown: finalPaymentBreakdown,
+      payment_provider: isFullyPaidWithStoreCredit ? null : (useMercadoPago ? "Mercado Pago" : null),
+      situation: finalSituation,
       notes: sanitizeNotes(notes),
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
@@ -1327,5 +1375,50 @@ export async function deleteCartItemsAction(cartItemIds: string[]) {
 
   await revalidateCart(user.id)
   return { success: true }
+}
+
+export async function getMarketplaceCustomerStoreCreditAction(partnerId: string) {
+  const user = await requireUser()
+  if (!user) return { success: false, availableCredit: 0 }
+
+  const admin = getAdminClient()
+
+  // Buscar cliente por marketplace_user_id ou email para este parceiro
+  const { data: customer } = await admin
+    .from("customers")
+    .select("id, store_credit")
+    .eq("partner_id", partnerId)
+    .or(`marketplace_user_id.eq.${user.id},email.eq.${user.email}`)
+    .maybeSingle()
+
+  const customerId = customer?.id || null
+
+  let query = admin
+    .from("store_credits")
+    .select("remaining_amount")
+    .eq("partner_id", partnerId)
+    .eq("status", "ACTIVE")
+    .gt("remaining_amount", 0)
+
+  if (customerId) {
+    query = query.or(`customer_id.eq.${customerId},customer_user_id.eq.${user.id}`)
+  } else {
+    query = query.eq("customer_user_id", user.id)
+  }
+
+  const { data: credits, error } = await query
+
+  if (error) {
+    console.error("Erro ao buscar store_credits do cliente:", error)
+    return { success: false, availableCredit: Number(customer?.store_credit || 0) }
+  }
+
+  const totalCredit = (credits || []).reduce((sum: number, c: any) => sum + Number(c.remaining_amount || 0), 0)
+
+  return {
+    success: true,
+    availableCredit: totalCredit,
+    customerId,
+  }
 }
 

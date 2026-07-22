@@ -4,10 +4,10 @@ export async function fetchStoreProducts(partnerId: string, storeId: string | nu
   if (!storeId) return fetchAllPartnerProducts(partnerId)
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, category_id, created_at, partner_id, has_variants, store_id")
+    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, status, category_id, created_at, partner_id, has_variants, store_id")
     .eq("partner_id", partnerId)
     .eq("store_id", storeId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
     .order("created_at", { ascending: false })
     .limit(500)
   if (error) throw error
@@ -17,9 +17,9 @@ export async function fetchStoreProducts(partnerId: string, storeId: string | nu
 export async function fetchAllPartnerProducts(partnerId: string) {
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, category_id, created_at, partner_id, has_variants")
+    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, status, category_id, created_at, partner_id, has_variants")
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
     .order("created_at", { ascending: false })
     .limit(500)
   if (error) throw error
@@ -29,9 +29,9 @@ export async function fetchAllPartnerProducts(partnerId: string) {
 export async function fetchMarketplacePartnerProducts(partnerId: string) {
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, category_id, created_at, partner_id, has_variants, show_in_marketplace")
+    .select("id, name, price, promotional_price, stock_quantity as stock, sku, image_url, is_active, status, category_id, created_at, partner_id, has_variants, show_in_marketplace")
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
     .eq("show_in_marketplace", true)
     .order("created_at", { ascending: false })
     .limit(500)
@@ -99,7 +99,7 @@ export async function fetchStoreServices(partnerId: string, storeId: string | nu
     .from("services")
     .select("*")
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
     .order("created_at", { ascending: false })
 
   if (storeId) {

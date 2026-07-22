@@ -252,7 +252,7 @@ export async function syncPartnerItemsToExploreRedis(partnerId: string): Promise
     .from("products")
     .select("id")
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
     .neq("show_in_marketplace", false)
 
   // Buscar serviços ativos
@@ -260,7 +260,7 @@ export async function syncPartnerItemsToExploreRedis(partnerId: string): Promise
     .from("services")
     .select("id")
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
     .eq("show_in_marketplace", true)
 
   const promises: Promise<void>[] = []

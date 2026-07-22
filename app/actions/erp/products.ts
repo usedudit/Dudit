@@ -458,6 +458,7 @@ const productData = {
             max_stock: data.maxStock || 0,
             stock_quantity: data.stockQuantity || 0,
             is_active: data.isActive !== false,
+            status: data.isActive !== false ? "ativo" : "inativo",
             is_on_promotion: data.isOnPromotion || false,
             show_price_in_store: data.showPriceInStore !== false,
             images: data.images || [],
@@ -716,7 +717,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.stockQuantity !== undefined) payload.stock_quantity = data.stockQuantity
         if (data.minStock !== undefined) payload.min_stock = data.minStock
         if (data.maxStock !== undefined) payload.max_stock = data.maxStock
-        if (data.isActive !== undefined) payload.is_active = data.isActive
+        if (data.isActive !== undefined) { payload.is_active = data.isActive; payload.status = data.isActive ? "ativo" : "inativo" }
         if (data.productType !== undefined) payload.product_type = data.productType
         if ((data as any).fulfillment_modes !== undefined) payload.fulfillment_modes = (data as any).fulfillment_modes
         if ((data as any).fulfillmentModes !== undefined) payload.fulfillment_modes = (data as any).fulfillmentModes
@@ -1107,7 +1108,7 @@ export async function updateProductVariantAction(variantId: string, data: {
         if (data.sku !== undefined) payload.sku = data.sku
         if (data.price !== undefined) payload.price_adjustment = data.price
         if (data.stockQuantity !== undefined) payload.stock_quantity = data.stockQuantity
-        if (data.isActive !== undefined) payload.is_active = data.isActive
+        if (data.isActive !== undefined) { payload.is_active = data.isActive; payload.status = data.isActive ? "ativo" : "inativo" }
         if (data.image !== undefined) {
             if (data.image !== null && variant.variant_options?.image && variant.variant_options.image !== data.image) {
                 await _deleteFromR2(variant.variant_options.image)
@@ -1513,7 +1514,7 @@ export async function toggleProductStatusAction(productIds: string[], isActive: 
         await requirePermission(partnerId, "products", "edit", user)
         const admin = getAdminClient()
 
-        const { error } = await admin.from("products").update({ is_active: isActive }).in("id", sanitized)
+        const { error } = await admin.from("products").update({ is_active: isActive, status: isActive ? "ativo" : "inativo" }).in("id", sanitized)
         if (error) return { error: error.message }
 
         if (partnerId) {

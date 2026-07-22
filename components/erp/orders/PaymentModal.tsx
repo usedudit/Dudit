@@ -2620,6 +2620,35 @@ const PaymentModal = ({
                                                                 onClick={() => setSplitSelectedType("bank_transfer")}
                                                             />
                                                         )}
+                                                        {availableMethodTypes.has("store_credit") && (
+                                                            <PaymentMethodCard
+                                                                icon={TagIcon}
+                                                                label="Vale-compra"
+                                                                disabled={isMarketplaceOrder}
+                                                                onClick={() => {
+                                                                    const customerCredit = Number(customer?.store_credit || customer?.storeCredit || 0);
+                                                                    const remainingToPay = Math.max(0, chargeTarget - splitBaseSum);
+                                                                    const defaultAmt = Math.min(customerCredit, remainingToPay);
+                                                                    const newLeg = {
+                                                                        id: Date.now(),
+                                                                        method: "store_credit",
+                                                                        paymentMethodId: null,
+                                                                        amount: defaultAmt,
+                                                                        installmentNumber: 1,
+                                                                    };
+                                                                    if (editingPaymentIndex !== null && editingPaymentIndex >= 0) {
+                                                                        const copy = [...payments];
+                                                                        copy[editingPaymentIndex] = newLeg;
+                                                                        setPayments(copy);
+                                                                    } else {
+                                                                        setPayments((prev: any) => [...prev, newLeg]);
+                                                                    }
+                                                                    setEditingPaymentIndex(null);
+                                                                    setSplitSelectedType(null);
+                                                                    setView("split");
+                                                                }}
+                                                            />
+                                                        )}
                                                         {availableMethodTypes.has("other") && (
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}

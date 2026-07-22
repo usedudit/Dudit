@@ -512,7 +512,7 @@ export default function DeliveryDetailPage({
                     const getPaymentTypeLabel = (o: any) => {
                         const pm = String(o.payment_method || "").toLowerCase();
                         if (pm === "exchange") return "Crédito de troca";
-                        if (pm === "store_credit" || pm === "store-credit") return "Vale-compra utilizado";
+                        if (pm === "store_credit" || pm === "store-credit") return "Vale-compra";
                         if (pm === "pix" || pm === "bank_transfer") return "Pix";
                         if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
                         if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
@@ -806,7 +806,7 @@ export default function DeliveryDetailPage({
                                             <div className="flex justify-between items-center text-sm">
                                                  <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                                                      {order.payment_method === "exchange" ? "Crédito de troca" :
-                                                      order.payment_method === "store_credit" ? "Vale-compra utilizado" :
+                                                      order.payment_method === "store_credit" ? "Vale-compra" :
                                                       "Desconto do Método"}
                                                  </span>
                                                 <span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>

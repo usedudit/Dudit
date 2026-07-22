@@ -72,6 +72,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
     data.price = resolvedService.resolved_price
     data.sku = resolvedService.resolved_sku
     data.is_active = resolvedService.store_is_active
+    data.status = resolvedService.store_is_active ? "ativo" : "inativo"
   }
 
   const user = await getCurrentUser()

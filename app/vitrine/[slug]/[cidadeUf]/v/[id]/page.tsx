@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
-import { getPartnerUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { normalizeBusinessInfo } from "@/lib/business-info"
@@ -15,8 +15,14 @@ import {
   getCachedPartnerStats as getPartnerStats,
   getPartnerPublicCoupons,
 } from "@/app/actions/marketplace/partners"
+import {
+  getCachedStoreById,
+  getCachedStoreProducts as getStoreProducts,
+  getCachedStoreServices as getStoreServices,
+} from "@/app/actions/marketplace/stores"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { listMarketplaceRecurringPlansAction } from "@/app/actions/marketplace/recurring-subscriptions"
+import { createAdminClient } from "@/lib/supabase/server"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -60,19 +66,29 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function VendorPage({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }) {
-  const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
+  const { id: partnerId, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
+
+  // Look up the store for this partner
+  const supabase = createAdminClient()
+  const { data: storeRow } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .maybeSingle()
+  const storeId = storeRow?.id || undefined
 
   // PERFORMANCE: Busca TUDO em paralelo - incluindo auth
   const [user, partner, products, services, reviews, statsBase, coupons, plan, plansRes] = await Promise.all([
     getCurrentUser(),
-    getPartnerProfile(id),
-    getPartnerProducts(id),
-    getPartnerServices(id),
-    getPartnerReviews(id),
-    getPartnerStats(id),
-    getPartnerPublicCoupons(id),
-    getPartnerPlan(id),
-    listMarketplaceRecurringPlansAction(id),
+    getPartnerProfile(partnerId),
+    storeId ? getStoreProducts(storeId, partnerId) : getPartnerProducts(partnerId),
+    storeId ? getStoreServices(storeId, partnerId) : getPartnerServices(partnerId),
+    getPartnerReviews(partnerId),
+    getPartnerStats(partnerId),
+    getPartnerPublicCoupons(partnerId),
+    getPartnerPlan(partnerId),
+    listMarketplaceRecurringPlansAction(partnerId),
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
@@ -123,7 +139,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     }
   })
 
-  // Se não achou o parceiro no cache/banco, retorna 404
+  // If partner not found, return 404
   if (!partner) {
     return notFound()
   }
@@ -135,9 +151,15 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const productCategories = Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))) as string[]
   const serviceCategories = Array.from(new Set(services?.map((s: any) => s.category).filter(Boolean))) as string[]
 
-  // --- MÁGICA DE SEO (Canonical Redirect) ---
-  const correctUrl = getPartnerUrl(partner)
-  const currentPath = `/vitrine/${currentSlug}/${currentCidadeUf}/v/${id}`
+  // Build canonical store URL if store exists
+  let correctUrl: string
+  if (storeId) {
+    const storeData = await getCachedStoreById(storeId)
+    correctUrl = storeData ? getStoreUrl(storeData) : `/vitrine/${currentSlug}/${currentCidadeUf}/v/${partnerId}`
+  } else {
+    correctUrl = `/vitrine/${currentSlug}/${currentCidadeUf}/v/${partnerId}`
+  }
+  const currentPath = `/vitrine/${currentSlug}/${currentCidadeUf}/v/${partnerId}`
 
   // Bugfix: Evita downgrade de slug informativo para 'vitrine' genérico (ou 'brasil')
   const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'
@@ -165,7 +187,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     count: reviews?.filter((r: any) => Math.round(r.rating) === star).length || 0
   }))
 
-  const url = `https://dudit.com.br${getPartnerUrl(partner)}`
+  const canonicalUrl = `https://dudit.com.br${correctUrl}`
   const partnerCity = partner.addresses?.[0]?.city || "Brasil"
   const partnerState = partner.addresses?.[0]?.state || "BR"
 
@@ -175,7 +197,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dudit.com.br' },
       { '@type': 'ListItem', position: 2, name: `${partnerCity} - ${partnerState}`, item: `https://dudit.com.br/explorar/${currentCidadeUf}` },
-      { '@type': 'ListItem', position: 3, name: partner.store_name, item: url },
+      { '@type': 'ListItem', position: 3, name: partner.store_name, item: canonicalUrl },
     ],
   }
 

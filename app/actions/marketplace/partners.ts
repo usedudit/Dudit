@@ -113,7 +113,7 @@ async function _getPartnerProducts(partnerId: string, storeId?: string) {
   // If NOT owner, apply visibility filters
   if (!isOwner) {
     query = query
-      .eq("is_active", true)
+      .eq("status", "ativo")
       .eq("moderation_status", "approved")
       .eq("show_in_marketplace", true)
   }
@@ -170,9 +170,9 @@ async function _getPartnerServices(partnerId: string, storeId?: string) {
   if (storeId) query = query.eq("store_id", storeId)
 
   if (!isOwner) {
-    query = query.eq("is_active", true).eq("show_in_marketplace", true)
+    query = query.eq("status", "ativo").eq("show_in_marketplace", true)
   } else {
-    query = query.eq("is_active", true)
+    query = query.eq("status", "ativo")
   }
 
   const { data } = await query.order("created_at", { ascending: false })
@@ -345,7 +345,7 @@ export const getCachedPartnerProducts = async (partnerId: string, storeId?: stri
           product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("partner_id", partnerId)
-        .eq("is_active", true)
+        .eq("status", "ativo")
       if (storeId) q = q.eq("store_id", storeId)
       const { data: rawData } = await q.order("created_at", { ascending: false }).limit(100)
 
@@ -397,7 +397,7 @@ export const getCachedPartnerServices = async (partnerId: string, storeId?: stri
         .from("services")
         .select("*")
         .eq("partner_id", partnerId)
-        .eq("is_active", true)
+        .eq("status", "ativo")
       if (storeId) q = q.eq("store_id", storeId)
       const { data: rawData } = await q.order("created_at", { ascending: false })
 
@@ -805,6 +805,19 @@ export async function registerPartner(data: any) {
       throw error
     }
 
+    // Auto-create default store for the partner
+    const { error: storeError } = await supabaseAdmin
+      .from("stores")
+      .insert({
+        partner_id: newPartner.id,
+        name: data.storeName,
+        slug: data.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+        is_active: true,
+      })
+    if (storeError) {
+      console.error("[registerPartner] Failed to create default store:", storeError.message)
+    }
+
     // 3. Inserir o Endereço na tabela ADDRESSES (Usando o ID do novo parceiro)
     // Os dados vêm do frontend como data.zipCode, data.street, etc (conforme seu PartnerWizard)
     if (data.zipCode || data.street || data.city) {
@@ -920,9 +933,9 @@ export async function getPartnerOrderBumps(partnerId: string, limit = 5, storeId
   const supabase = getAdminClient()
   let q = supabase
     .from("products")
-    .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
+    .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit, status")
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
     .eq("moderation_status", "approved")
     .eq("show_in_marketplace", true)
     .gt("stock_available", 0)

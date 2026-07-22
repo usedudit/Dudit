@@ -88,7 +88,7 @@ export async function listStoreProducts(
     }
 
     if (options?.isActive !== undefined) {
-        query = query.eq("is_active", options.isActive)
+        query = query.eq("status", options.isActive ? "ativo" : "inativo")
     }
 
     if (options?.search) {

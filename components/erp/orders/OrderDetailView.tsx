@@ -996,7 +996,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 <PaymentRow
                                                                     label={
                                                                         order.payment_method === "exchange" ? "Crédito de troca" :
-                                                                            order.payment_method === "store_credit" ? "Vale-compra utilizado" :
+                                                                            order.payment_method === "store_credit" ? "Vale-compra" :
                                                                                 "Desconto do Método"
                                                                     }
                                                                     value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />

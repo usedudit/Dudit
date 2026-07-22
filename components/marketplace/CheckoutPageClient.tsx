@@ -203,6 +203,22 @@ export function CheckoutPageClient() {
     const [pageLoading, setPageLoading] = useState(true)
     const [userCredits, setUserCredits] = useState<any[]>([])
     const [loadingCredits, setLoadingCredits] = useState(false)
+    const [availableStoreCredit, setAvailableStoreCredit] = useState<number>(0)
+    const [useStoreCredit, setUseStoreCredit] = useState<boolean>(false)
+
+    useEffect(() => {
+        const fetchStoreCredit = async () => {
+            const pId = sessionData?.partnerId
+            if (!user?.id || !pId) return
+            const { getMarketplaceCustomerStoreCreditAction } = await import("@/app/actions/marketplace/cart")
+            const res = await getMarketplaceCustomerStoreCreditAction(pId)
+            if (res.success && res.availableCredit > 0) {
+                setAvailableStoreCredit(res.availableCredit)
+                setUseStoreCredit(true)
+            }
+        }
+        void fetchStoreCredit()
+    }, [user?.id, sessionData?.partnerId])
 
     useEffect(() => {
         const fetchUserCredits = async () => {
@@ -1078,6 +1094,19 @@ export function CheckoutPageClient() {
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
         ? Number(paymentPreview.finalAmount || checkoutChargeTotal)
         : checkoutChargeTotal
+
+    const appliedStoreCredit = useMemo(() => {
+        if (!useStoreCredit || availableStoreCredit <= 0) return 0
+        return Math.min(availableStoreCredit, checkoutTotalToCharge)
+    }, [useStoreCredit, availableStoreCredit, checkoutTotalToCharge])
+
+    const remainingBalanceToCharge = useMemo(() => {
+        return Math.max(0, Number((checkoutTotalToCharge - appliedStoreCredit).toFixed(2)))
+    }, [checkoutTotalToCharge, appliedStoreCredit])
+
+    const isFullyCoveredByStoreCredit = useMemo(() => {
+        return useStoreCredit && availableStoreCredit > 0 && remainingBalanceToCharge <= 0.009
+    }, [useStoreCredit, availableStoreCredit, remainingBalanceToCharge])
     const checkoutPricingSnapshot = useMemo(() => {
         const chargedBase = checkoutChargeTotal
         const methodDiscount = paymentOption === "traditional" && paymentPreview?.success
@@ -1503,13 +1532,26 @@ export function CheckoutPageClient() {
                         <span>+{formatCurrency(paymentPreview.feeAmount)}</span>
                     </div>
                 )}
+                {appliedStoreCredit > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-brand-green font-bold">
+                        <span>Crédito em loja</span>
+                        <span>-{formatCurrency(appliedStoreCredit)}</span>
+                    </div>
+                )}
             </div>
 
             <Separator className="mb-4" />
 
-            <div className="flex justify-between items-end mb-4">
-                <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">Total a cobrar</span>
-                <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(checkoutTotalToCharge)}</span>
+            <div className="flex flex-col gap-1 mb-4">
+                <div className="flex justify-between items-end">
+                    <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">Total a cobrar</span>
+                    <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(remainingBalanceToCharge)}</span>
+                </div>
+                {appliedStoreCredit > 0 && (
+                    <span className="text-xs text-brand-inactive-text text-right">
+                        (Total original: {formatCurrency(checkoutTotalToCharge)} · Crédito: -{formatCurrency(appliedStoreCredit)})
+                    </span>
+                )}
             </div>
 
             {showSubmitButton && (
@@ -1834,7 +1876,7 @@ export function CheckoutPageClient() {
             }
         }
 
-        if (requirements && paymentOption && paymentOption !== "subscription_credits") {
+        if (requirements && paymentOption && paymentOption !== "subscription_credits" && !isFullyCoveredByStoreCredit) {
             const clientPayCheck = validateMarketplaceCheckoutPayment({
                 requirements,
                 paymentOption,
@@ -1876,6 +1918,50 @@ export function CheckoutPageClient() {
                 setIsLoading(false)
                 router.push("/")
                 return
+            }
+
+            if (isFullyCoveredByStoreCredit) {
+                const token = csrfToken || await fetchCSRFTokenSingleton() || ""
+                if (sessionData && sessionData.source === "cart") {
+                    const items = sessionData.cartItems || []
+                    const result = await checkoutCartAction(
+                        items.map(item => {
+                            const matchedLine = checkoutContext?.lines?.find(l => l.lineId === item.cartItemId);
+                            return {
+                                cartItemId: item.cartItemId,
+                                productId: item.productId || "",
+                                variantId: item.variantId,
+                                quantity:
+                                    quantities[item.cartItemId]
+                                    || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
+                                    || item.quantity,
+                                fulfillmentMode: matchedLine?.fulfillmentMode || undefined,
+                            }
+                        }),
+                        formData.deliveryType,
+                        formData.deliveryAddress,
+                        "Vale-compra",
+                        1,
+                        formData.notes,
+                        couponCode || null,
+                        false,
+                        token,
+                        false,
+                        undefined,
+                        payDepositOnly,
+                        checkoutPricingSnapshot,
+                        false,
+                        undefined,
+                        true,
+                    )
+                    if (result.error) throw new Error(result.error)
+                    invalidateCartCache()
+                    sessionStorage.removeItem("checkout_session")
+                    notifySuccess("Pedido realizado!", "Seu pedido foi pago integralmente com seu crédito na loja.")
+                    setIsLoading(false)
+                    router.push("/minhas-compras")
+                    return
+                }
             }
 
             if (paymentOption === "subscription_credits") {
@@ -2000,7 +2086,7 @@ export function CheckoutPageClient() {
                 }
                 const isPickupPayment = isPickup && checkoutContext?.partner?.pickupPaymentPolicy === "allow_pickup_payment" && paymentOption === "traditional"
                 const token = csrfToken || await fetchCSRFTokenSingleton() || ""
-                if (sessionData?.source === "cart") {
+                if (sessionData && sessionData.source === "cart") {
                     const items = sessionData.cartItems || []
                     const result = await checkoutCartAction(
                         items.map(item => {
@@ -2029,6 +2115,8 @@ export function CheckoutPageClient() {
                         payDepositOnly,
                         checkoutPricingSnapshot,
                         isPickupPayment,
+                        undefined,
+                        useStoreCredit && availableStoreCredit > 0,
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -2294,6 +2382,44 @@ export function CheckoutPageClient() {
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
+                                    {availableStoreCredit > 0 && (
+                                        <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 space-y-3 transition-all">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                                                        <TagIcon size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                            Crédito em Loja
+                                                        </div>
+                                                        <div className="text-xs text-brand-inactive-text">
+                                                            Você possui <strong className="text-emerald-600 dark:text-emerald-400">{formatCurrency(availableStoreCredit)}</strong> disponível nesta loja.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={useStoreCredit}
+                                                        onChange={(e) => setUseStoreCredit(e.target.checked)}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-dark-border peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-emerald-500"></div>
+                                                </label>
+                                            </div>
+                                            {useStoreCredit && (
+                                                <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 text-xs text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1.5">
+                                                    <CheckCircleIcon size={14} className="shrink-0" />
+                                                    {appliedStoreCredit >= checkoutTotalToCharge ? (
+                                                        <span>Seu crédito cobre 100% do valor do pedido. Nenhuma cobrança adicional será feita.</span>
+                                                    ) : (
+                                                        <span>Serão abatidos {formatCurrency(appliedStoreCredit)}. Selecione como pagar o saldo restante ({formatCurrency(remainingBalanceToCharge)}) abaixo.</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                     {hasSubscriptionCreditsForCheckout && (
                                         <ListItem
                                             icon={CrownIcon}

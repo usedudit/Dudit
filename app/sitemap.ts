@@ -77,8 +77,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             // Top 500 most recent products in marketplace
             supabase
                 .from("products")
-                .select("id, name, updated_at, created_at, partners(id, store_name, addresses(city, state))")
-                .eq("is_active", true)
+                .select("id, name, updated_at, created_at, status, partners(id, store_name, addresses(city, state))")
+                .eq("status", "ativo")
                 .eq("show_in_marketplace", true)
                 .order("created_at", { ascending: false })
                 .limit(500),

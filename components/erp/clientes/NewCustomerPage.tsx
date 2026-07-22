@@ -369,7 +369,6 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 city: city,
                 state: uf,
                 csrf_token: token,
-                store_credit: storeCredit,
                 status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado",
                 notes: observacoes,
                 birthDate: birthDate || null,
@@ -893,19 +892,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         />
                                                     </div>
                                                 </div>
-
-                                                <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl space-y-3 mt-8">
-                                                    <MoneyInput
-                                                        label="Crédito em loja"
-                                                        value={storeCredit}
-                                                        onChange={setStoreCredit}
-                                                        placeholder="0,00"
-                                                    />
-                                                    <p className="text-[11px] text-brand-inactive-text leading-tight">
-                                                        É o valor disponível para o cliente usar em compras futuras.
-                                                    </p>
-                                                </div>
-                                            </>
+                                             </>
                                         ) : activeTab === 'address' ? (
                                             <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />

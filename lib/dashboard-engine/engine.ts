@@ -64,14 +64,14 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .from("products")
       .select("id", { count: "exact", head: true })
       .eq("partner_id", partnerId)
-      .eq("is_active", true),
+      .eq("status", "ativo"),
 
     // Contagem de serviços
     supabase
       .from("services")
       .select("id", { count: "exact", head: true })
       .eq("partner_id", partnerId)
-      .eq("is_active", true),
+      .eq("status", "ativo"),
 
     // Contagem total de pedidos
     supabase

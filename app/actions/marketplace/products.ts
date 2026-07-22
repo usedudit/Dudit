@@ -29,7 +29,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     .from("products")
     .select(`
       id, store_id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
-      is_active, moderation_status,
+      is_active, status,
       category_id, category:product_categories!category_id(name),
       subcategory_id, subcategory:product_categories!subcategory_id(name),
       brand_id, brand:brands!brand_id(name),
@@ -75,6 +75,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     data.stock_quantity = resolvedProduct.resolved_stock_quantity
     data.sku = resolvedProduct.resolved_sku
     data.is_active = resolvedProduct.store_is_active
+    data.status = resolvedProduct.store_is_active ? "ativo" : "inativo"
     data.marketplace_visible = resolvedProduct.marketplace_visible
   }
 
@@ -290,10 +291,9 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
           partners(id, store_name, store_image_url, addresses(city, state)),
           product_variants(variant_options, price_adjustment, is_active)
         `)
-        .eq("is_active", true)
+        .eq("status", "ativo")
         .eq("show_in_marketplace", true)
         .eq("partner_id", partnerId)
-        .neq("id", currentProductId)
       if (storeId) q = q.eq("store_id", storeId)
       const result = await q.order("created_at", { ascending: false }).limit(10)
 
@@ -479,7 +479,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
         ),
         product_variants(variant_options, price_adjustment, is_active)
       `)
-      .eq("is_active", true)
+      .eq("status", "ativo")
       .eq("show_in_marketplace", true)
       .in("partner_id", partnerIds)
 

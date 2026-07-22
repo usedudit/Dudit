@@ -53,7 +53,7 @@ export async function fetchProductsExport(
       let query = supabase.from("products").select(PRODUCT_SELECT).eq("partner_id", partnerId)
 
       if (statusLabels.length === 1) {
-        query = query.eq("is_active", statusLabels[0] === "Ativo")
+        query = query.eq("status", statusLabels[0] === "Ativo" ? "ativo" : "inativo")
       }
 
       if (categoryIds.length) query = query.in("category_id", categoryIds)

@@ -12,6 +12,7 @@ export interface Product {
   subcategory: string | null
   subcategory_id: string | null
   is_active: boolean
+  status?: "ativo" | "inativo" | "arquivado" | "excluido"
   sku: string | null
   rating: number
   images: string[] | null
@@ -54,7 +55,6 @@ export interface ProductDisplay extends Product {
   icon?: React.ComponentType<{ className?: string }>
   productId?: string
   stock?: number
-  status?: "Active" | "Inactive"
   visibility?: "Published" | "Unpublished"
   dateAdded?: string
   stockNum?: number

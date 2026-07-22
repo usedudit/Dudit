@@ -133,6 +133,22 @@ export async function createPartnerAction(data: CreatePartnerData) {
       return { success: false, error: `Erro ao criar parceria: ${partnerError.message}` }
     }
 
+    // Auto-create default store for the partner
+    const { data: store, error: storeError } = await supabaseAdmin
+      .from("stores")
+      .insert({
+        partner_id: partner.id,
+        name: data.storeName,
+        slug: data.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+        is_active: true,
+      })
+      .select("id")
+      .single()
+
+    if (storeError) {
+      console.error("[createPartnerAction] Failed to create default store:", storeError.message)
+    }
+
     // Inserir endereço na tabela addresses (se houver dados de endereço)
     if (data.city || data.street || data.zipCode) {
       await supabaseAdmin.from("addresses").insert({

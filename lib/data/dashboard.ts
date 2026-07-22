@@ -49,7 +49,7 @@ const loadRawProductsGeneralTab = cache(async (partnerId: string) => {
       .select("id, name, stock_quantity, is_active, category_id, category:product_categories!category_id(name)")
   )
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
+    .eq("status", "ativo")
   if (error) throw error
   return data || []
 })
@@ -434,7 +434,7 @@ async function getCachedServices(partnerId: string, storeId = ""): Promise<Servi
         const from = addDays(today, -29)
         const [appointments, services] = await Promise.all([
           supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, staff_name, status, price, source").eq("partner_id", partnerId).gte("start_date", from).order("start_date", { ascending: false }).order("start_time").limit(400),
-          scopeActiveOnly(supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, service_categories(name)").eq("partner_id", partnerId).eq("is_active", true)).limit(300),
+          scopeActiveOnly(supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, status, service_categories(name)").eq("partner_id", partnerId).eq("status", "ativo")).limit(300),
         ])
         if (appointments.error) throw appointments.error
         if (services.error) throw services.error

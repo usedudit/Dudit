@@ -846,7 +846,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <PaymentRow
                                         label={
                                             originalPaymentMethod === "exchange" ? "Crédito de troca" :
-                                            originalPaymentMethod === "store_credit" ? "Vale-compra utilizado" :
+                                            originalPaymentMethod === "store_credit" ? "Vale-compra" :
                                             "Desconto do Método"
                                         }
                                         value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}

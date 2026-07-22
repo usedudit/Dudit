@@ -1,4 +1,4 @@
-"use server"
+﻿"use server"
 
 
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -538,7 +538,7 @@ async function _searchMarketplaceInternal(
                 _prodIdx = promises.length
                 promises.push(
                     supabase.from("products").select(`
-                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
+                        id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
@@ -546,7 +546,7 @@ async function _searchMarketplaceInternal(
                         show_price_in_store
                     `)
                         .in("id", produtosIds)
-                        .eq("is_active", true)
+                        .eq("status", "ativo")
                         .eq("show_in_marketplace", true)
                 )
             }
@@ -554,13 +554,13 @@ async function _searchMarketplaceInternal(
                 _servIdx = promises.length
                 promises.push(
                     supabase.from("services").select(`
-                        id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                        id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                         marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                         show_price_in_store
                     `)
                         .in("id", servicosIds)
-                        .eq("is_active", true)
+                        .eq("status", "ativo")
                         .eq("show_in_marketplace", true)
                 )
             }
@@ -706,7 +706,7 @@ async function hydrateMarketplaceSearchHits(
         _hydrateProdIdx = promises.length
         promises.push(
             supabase.from("products").select(`
-                id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
@@ -715,7 +715,7 @@ async function hydrateMarketplaceSearchHits(
                 show_price_in_store
             `)
                 .in("id", produtosIds)
-                .eq("is_active", true)
+                .eq("status", "ativo")
                 .eq("show_in_marketplace", true)
         )
     }
@@ -723,13 +723,13 @@ async function hydrateMarketplaceSearchHits(
         _hydrateServIdx = promises.length
         promises.push(
             supabase.from("services").select(`
-                id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
                 show_price_in_store
             `)
                 .in("id", servicosIds)
-                .eq("is_active", true)
+                .eq("status", "ativo")
                 .eq("show_in_marketplace", true)
         )
     }
@@ -1059,7 +1059,7 @@ async function searchMarketplaceByCity(
             let pq = supabase
                 .from("products")
                 .select(`
-                    id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                    id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                     category_id, category:product_categories!category_id(name), created_at,
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
@@ -1067,7 +1067,7 @@ async function searchMarketplaceByCity(
                     product_variants(variant_options, price_adjustment, is_active),
                     show_price_in_store
                 `)
-                .eq("is_active", true)
+                .eq("status", "ativo")
                 .eq("show_in_marketplace", true)
                 .in("partner_id", partnerIds)
                 .order("created_at", { ascending: false })
@@ -1082,12 +1082,12 @@ async function searchMarketplaceByCity(
             let sq = supabase
                 .from("services")
                 .select(`
-                    id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                    id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
                     show_price_in_store
                 `)
-                .eq("is_active", true)
+                .eq("status", "ativo")
                 .eq("show_in_marketplace", true)
                 .in("partner_id", partnerIds)
                 .order("created_at", { ascending: false })

@@ -78,13 +78,13 @@ async function seedRedis() {
     const { data: produtos } = await supabase
         .from("products")
         .select(`
-            id, name, description, price, promotional_price, images, rating,
+            id, name, description, price, promotional_price, images, rating, status,
             category_id, category:product_categories!category_id(name), created_at,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
-        .eq("is_active", true)
+        .eq("status", "ativo")
         .eq("show_in_marketplace", true)
 
     if (produtos) {
@@ -128,7 +128,7 @@ async function seedRedis() {
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
         `)
-        .eq("is_active", true)
+        .eq("status", "ativo")
 
     if (servicos) {
         for (const item of servicos) {

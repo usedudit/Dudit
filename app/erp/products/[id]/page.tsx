@@ -47,7 +47,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         costPrice: Number(product.cost_price || 0),
         stock: product.stock_quantity,
         dateAdded: new Date(product.created_at).toLocaleDateString("pt-BR"),
-        status: product.is_active ? ("Active" as const) : ("Inactive" as const),
+        status: product.is_active ? ("ativo" as const) : ("inativo" as const),
         visibility: product.visibility_status === "visible" ? ("Published" as const) : ("Unpublished" as const),
         sku: product.sku || "",
         description: product.description || "",
