@@ -1,18 +1,23 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useStore } from "@/lib/store-context"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { NewStoreModal } from "./store-switcher-modal"
+import { StoreModal } from "@/components/erp/stores/StoreModal"
 import { useRouter } from "next/navigation"
 import { PlusIcon, SettingsIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 export function StoreSwitcher() {
     const { selectedStore, stores, isLoading, selectStore, refreshStores } = useStore()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [partnerId, setPartnerId] = useState<string>("")
     const router = useRouter()
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
 
     useEffect(() => {
         if (selectedStore?.partner_id) {
@@ -25,6 +30,22 @@ export function StoreSwitcher() {
     }
 
     const storeLogo = getR2ImageUrl(selectedStore.image_url)
+
+    const handleCreateClick = () => {
+        if (!hasMinimumPlan(planSlug, "escalar")) {
+            openPlanUpgrade("escalar")
+            return
+        }
+        setIsModalOpen(true)
+    }
+
+    const handleManageClick = () => {
+        if (!hasMinimumPlan(planSlug, "escalar")) {
+            openPlanUpgrade("escalar")
+            return
+        }
+        router.push("/erp/stores")
+    }
 
     return (
         <>
@@ -75,7 +96,7 @@ export function StoreSwitcher() {
                 <div className="my-1 border-t border-brand-border dark:border-dark-border" />
 
                 <DropdownItem
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={handleCreateClick}
                     className="text-brand-primary hover:bg-brand-primary/10 flex items-center gap-2"
                 >
                     <PlusIcon className="w-4 h-4" />
@@ -83,7 +104,7 @@ export function StoreSwitcher() {
                 </DropdownItem>
 
                 <DropdownItem
-                    onClick={() => router.push("/erp/stores")}
+                    onClick={handleManageClick}
                     className="flex items-center gap-2"
                 >
                     <SettingsIcon className="w-4 h-4" />
@@ -91,14 +112,17 @@ export function StoreSwitcher() {
                 </DropdownItem>
             </Dropdown>
 
-            <NewStoreModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                partnerId={partnerId}
-                onStoreCreated={() => {
-                    refreshStores()
-                }}
-            />
+            {partnerId && (
+                <StoreModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    partnerId={partnerId}
+                    sourceStore={selectedStore}
+                    onSaved={() => {
+                        refreshStores()
+                    }}
+                />
+            )}
         </>
     )
 }

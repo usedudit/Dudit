@@ -137,6 +137,7 @@ const navItems: NavItem[] = [
 ]
 
 const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
+    "/erp/stores": "escalar",
     "/erp/logistics": "crescer",
     "/erp/transactions": "crescer",
     "/erp/contas-a-pagar": "crescer",

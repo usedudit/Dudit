@@ -11,6 +11,7 @@ export default async function SuppliersRoute() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
+  const activeStoreId = context.activeStoreId || null
 
   const plan = await getPartnerPlan(partnerId)
   const isFreePlan = plan.slug.toLowerCase() === "free"
@@ -18,7 +19,7 @@ export default async function SuppliersRoute() {
 
   const [{ allowed }, page] = await Promise.all([
     checkPermission(partnerId, "suppliers", "view"),
-    !isFreePlan ? getERPSuppliersPageAction(partnerId, { cursor: null, limit: 100 }) : { success: true as const, items: [] as any[], error: undefined as string | undefined },
+    !isFreePlan ? getERPSuppliersPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId || undefined }) : { success: true as const, items: [] as any[], error: undefined as string | undefined },
   ])
 
   if (!allowed) return <AccessDenied />

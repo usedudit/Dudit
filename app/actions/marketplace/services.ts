@@ -168,14 +168,26 @@ export async function getServiceReviews(serviceId: string, storeId?: string | nu
 }
 
 /**
- * Fetch staff members (partner_users) for a given partner.
+ * Fetch staff members (partner_users) for a given store's partner.
  * Used to let the customer pick a professional when booking.
  * No ERP auth - public data only (names and IDs).
  */
-export async function getServiceStaffMembers(partnerId: string) {
+export async function getServiceStaffMembers(partnerId: string, storeId?: string) {
   if (!partnerId) return []
 
   const supabase = getAdminClient()
+
+  // If storeId provided, verify store belongs to partner
+  if (storeId) {
+    const { data: store } = await supabase
+      .from("stores")
+      .select("partner_id")
+      .eq("id", storeId)
+      .single()
+    if (store?.partner_id !== partnerId) {
+      console.warn(`[getServiceStaffMembers] Store ${storeId} does not belong to partner ${partnerId}`)
+    }
+  }
 
   // Get partner owner
   const { data: partner } = await supabase
@@ -219,14 +231,15 @@ export async function getServiceStaffMembers(partnerId: string) {
 /**
  * Public version of getAvailableTimeSlotsAction.
  * Same algorithm as the ERP version but no ERP auth required.
- * Uses opening_hours from the partner if available, otherwise DEFAULT_BUSINESS_HOURS.
+ * Uses opening_hours from the store if available, otherwise from partner.
  */
 export async function getPublicAvailableTimeSlots(
   partnerId: string,
   staffId: string,
   date: string,
   serviceDurationMinutes: number,
-  bufferMinutes: number = 0
+  bufferMinutes: number = 0,
+  storeId?: string
 ) {
   try {
     if (!partnerId || !staffId || !date) {
@@ -235,15 +248,22 @@ export async function getPublicAvailableTimeSlots(
 
     const supabase = getAdminClient()
 
-    // Fetch existing appointments for this staff on this date
-    const { data: existingAppts, error } = await supabase
+    // Fetch existing appointments for this staff on this date (by store if available, otherwise by partner)
+    let apptQuery = supabase
       .from("appointments")
       .select("start_time, end_time, duration_minutes")
-      .eq("partner_id", partnerId)
       .eq("staff_partner_user_id", staffId)
       .eq("start_date", date)
       .neq("status", "Cancelado")
       .order("start_time", { ascending: true })
+
+    if (storeId) {
+      apptQuery = apptQuery.eq("store_id", storeId)
+    } else {
+      apptQuery = apptQuery.eq("partner_id", partnerId)
+    }
+
+    const { data: existingAppts, error } = await apptQuery
 
     if (error) throw error
 
@@ -264,16 +284,26 @@ export async function getPublicAvailableTimeSlots(
       return { start: startMin, end: endMin + bufferMinutes }
     })
 
-    // Fetch partner opening hours
-    const { data: partnerData, error: partnerErr } = await supabase
-      .from("partners")
-      .select("opening_hours")
-      .eq("id", partnerId)
-      .single()
+    // Fetch opening hours: store first, then partner
+    let rawOpeningHours = null
 
-    if (partnerErr) throw partnerErr
+    if (storeId) {
+      const { data: storeData } = await supabase
+        .from("stores")
+        .select("opening_hours")
+        .eq("id", storeId)
+        .single()
+      rawOpeningHours = storeData?.opening_hours
+    }
 
-    const rawOpeningHours = partnerData?.opening_hours
+    if (!rawOpeningHours) {
+      const { data: partnerData } = await supabase
+        .from("partners")
+        .select("opening_hours")
+        .eq("id", partnerId)
+        .single()
+      rawOpeningHours = partnerData?.opening_hours
+    }
 
     // Determine day of the week
     const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
@@ -344,6 +374,7 @@ export async function createPublicAppointment(data: {
   price: number
   durationMinutes: number
   notes?: string
+  storeId?: string
 }) {
   try {
     const user = await getCurrentUser()
@@ -382,7 +413,7 @@ export async function createPublicAppointment(data: {
 
     // Idempotency guard: reject duplicates within 30 seconds
     const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
-    const { data: recentDup } = await supabase
+    let dupQuery = supabase
       .from("appointments")
       .select("id")
       .eq("partner_id", data.partnerId)
@@ -394,6 +425,12 @@ export async function createPublicAppointment(data: {
       .gte("created_at", thirtySecondsAgo)
       .limit(1)
 
+    if (data.storeId) {
+      dupQuery = dupQuery.eq("store_id", data.storeId)
+    }
+
+    const { data: recentDup } = await dupQuery
+
     if (recentDup && recentDup.length > 0) {
       return { success: false, error: "Agendamento duplicado detectado. Aguarde alguns segundos." }
     }
@@ -403,6 +440,7 @@ export async function createPublicAppointment(data: {
       .from("appointments")
       .insert({
         partner_id: data.partnerId,
+        store_id: data.storeId || null,
         customer_id: customerId,
         customer_name: customerName,
         service_name: data.serviceName,

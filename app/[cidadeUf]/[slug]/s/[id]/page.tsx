@@ -107,7 +107,7 @@ export default async function ServiceDetailsPage({
     // Fetch staff + reviews in parallel
     const partner = Array.isArray(service.partners) ? service.partners[0] : service.partners
     const [staff, reviews, detailAds] = await Promise.all([
-        getServiceStaffMembers(partner?.id || service.partner_id),
+        getServiceStaffMembers(partner?.id || service.partner_id, storeId),
         getServiceReviews(id, storeId),
         getSponsoredAdsForSlot("detail", {
             lat: userProfile?.latitude ?? null,

@@ -12,9 +12,10 @@ export default async function ServicesPageServer() {
     const context = await getCurrentPartnerContext()
     if (!context) return <AccessDenied />
     const partnerId = context.partnerId
+    const activeStoreId = context.activeStoreId || null
 
     const [page, partner] = await Promise.all([
-        getERPServicesPageAction(partnerId, { cursor: null, limit: 100 }),
+        getERPServicesPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId || undefined }),
         getPartnerProfile(partnerId)
     ])
     if (!page.success) {

@@ -214,6 +214,7 @@ export async function getUserFavoritesAction(params?: {
                             stock_available, stock_quantity,
                             category_id, category:product_categories!category_id(name),
                             partners(id, store_name, store_image_url, addresses(city, state)),
+                            stores!inner(id, name, description, logo_url, image_url, banner_url, phone, city, state, is_showcase_active),
                             product_variants(variant_options, price_adjustment, is_active),
                             show_price_in_store
                         `)
@@ -229,6 +230,7 @@ export async function getUserFavoritesAction(params?: {
                         .select(`
                             id, name, price, images, rating, is_active, billing_unit, price_type,
                             partners(id, store_name, store_image_url, addresses(city, state)),
+                            stores!inner(id, name, description, logo_url, image_url, banner_url, phone, city, state, is_showcase_active),
                             show_price_in_store
                         `)
                         .in("id", serviceIds)
@@ -254,12 +256,21 @@ export async function getUserFavoritesAction(params?: {
         if (productsRes.data) {
             for (const p of productsRes.data as any[]) {
                 const rawPartner = Array.isArray(p.partners) ? p.partners[0] : p.partners
+                const rawStore = Array.isArray(p.stores) ? p.stores[0] : p.stores
+                const storeId = rawStore?.id || rawPartner?.id
+                const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+                const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+                const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+                const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
                 const partner = rawPartner
                     ? {
                         ...rawPartner,
-                        store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                        city: rawPartner.addresses?.[0]?.city || null,
-                        state: rawPartner.addresses?.[0]?.state || null,
+                        store_id: storeId,
+                        store_name: storeName,
+                        store_image_url: storeImage,
+                        store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                        city: storeCity,
+                        state: storeState,
                     }
                     : null
 
@@ -286,12 +297,21 @@ export async function getUserFavoritesAction(params?: {
         if (servicesRes.data) {
             for (const s of servicesRes.data as any[]) {
                 const rawPartner = Array.isArray(s.partners) ? s.partners[0] : s.partners
+                const rawStore = Array.isArray(s.stores) ? s.stores[0] : s.stores
+                const storeId = rawStore?.id || rawPartner?.id
+                const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+                const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+                const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+                const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
                 const partner = rawPartner
                     ? {
                         ...rawPartner,
-                        store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                        city: rawPartner.addresses?.[0]?.city || null,
-                        state: rawPartner.addresses?.[0]?.state || null,
+                        store_id: storeId,
+                        store_name: storeName,
+                        store_image_url: storeImage,
+                        store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                        city: storeCity,
+                        state: storeState,
                     }
                     : null
 

@@ -141,14 +141,20 @@ export function StoreProvider({
       setSelectedStore(store)
       localStorage.setItem("selectedStoreId", storeId)
 
-      // F5.5a: Invalidate all React Query caches that depend on storeId
-      queryClient.invalidateQueries()
-
       import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
         setActiveStoreAction(storeId, store.partner_id).then(() => {
+          queryClient.invalidateQueries()
           router.refresh()
-        }).catch((e) => console.warn("setActiveStoreAction failed", e))
-      }).catch((e) => console.warn("dynamic import stores failed", e))
+        }).catch((e) => {
+          console.warn("setActiveStoreAction failed", e)
+          queryClient.invalidateQueries()
+          router.refresh()
+        })
+      }).catch((e) => {
+        console.warn("dynamic import stores failed", e)
+        queryClient.invalidateQueries()
+        router.refresh()
+      })
     }
   }
 

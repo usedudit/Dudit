@@ -1489,7 +1489,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Section 4: Vendedor */}
                                     <FormSection title="Vendedor">
-                                        <Link href={getStoreUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                        <Link href={getStoreUrl({ ...order.partners, id: order.partners?.store_id || order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
                                             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                                 <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
                                             </div>

@@ -226,6 +226,7 @@ export function ServiceDetailsPageClient({
         const address = p?.addresses?.[0] || {}
         return {
             id: p?.id || service.partner_id,
+            store_id: p?.store_id,
             user_id: p?.user_id,
             phone: p?.phone,
             store_name: p?.store_name || "Profissional",
@@ -734,7 +735,7 @@ export function ServiceDetailsPageClient({
 
     // ─── Fetch slots on date/staff change ─────────────────────────────────────
 
-    useEffect(() => {
+useEffect(() => {
         if (!selectedDate || !selectedStaffId || !partner.id) return
 
         setIsLoadingSlots(true)
@@ -744,7 +745,8 @@ export function ServiceDetailsPageClient({
             selectedStaffId,
             selectedDate,
             durationMinutes,
-            bufferMinutes
+            bufferMinutes,
+            partner.store_id
         ).then((result) => {
             if (result.success) {
                 setAvailableSlots(result.slots)
@@ -753,7 +755,7 @@ export function ServiceDetailsPageClient({
             }
             setIsLoadingSlots(false)
         })
-    }, [selectedDate, selectedStaffId, partner.id, durationMinutes, bufferMinutes])
+    }, [selectedDate, selectedStaffId, partner.id, partner.store_id, durationMinutes, bufferMinutes])
 
     // Auto-select first date
     useEffect(() => {
@@ -767,6 +769,7 @@ export function ServiceDetailsPageClient({
     const buildBookingPayload = useCallback(() => ({
         serviceId: service.id,
         partnerId: partner.id,
+        storeId: partner.store_id,
         booking: {
             staffId: selectedStaffId,
             staffName: selectedStaff?.name || "Profissional",
@@ -775,6 +778,7 @@ export function ServiceDetailsPageClient({
             serviceName: service.name,
             price: pricing.bestPrice,
             durationMinutes,
+            storeId: partner.store_id,
         },
     }), [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, pricing.bestPrice, durationMinutes])
 

@@ -393,7 +393,7 @@ const ERP_SUPPLIERS_PAGE_SIZE = 100
 
 export async function getERPSuppliersPageAction(
   partnerId: string,
-  options?: { cursor?: ERPSupplierListCursor | null; limit?: number },
+  options?: { cursor?: ERPSupplierListCursor | null; limit?: number; storeId?: string },
 ): Promise<
   | { success: true; items: any[]; nextCursor: ERPSupplierListCursor | null; hasMore: boolean }
   | { success: false; error: string }

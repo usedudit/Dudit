@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { requireUser, requirePartnerAccess, requirePartnerAccessWithPermission, requireStorePermission, requireStoreAccess } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccess, requirePartnerAccessWithPermission, requireStorePermission, requireStoreAccess, requireMinimumPlan } from "@/lib/auth/authorization"
 import { setActiveStore } from "@/lib/auth/partner-context"
 import { logAudit } from "@/lib/observability/audit-log"
 import type { ActionResponse } from "@/lib/types/action-response"
@@ -48,19 +48,29 @@ interface CreateStoreInput {
     slug?: string
     description?: string
     phone?: string
+    whatsapp_phone?: string
     city?: string
     state?: string
     opening_hours?: Record<string, unknown>
     logo_url?: string
     image_url?: string
+    // Address fields
+    zip_code?: string
+    street?: string
+    number?: string
+    complement?: string
+    neighborhood?: string
+    noNumber?: boolean
 }
 
 export async function createStoreAction(input: CreateStoreInput): Promise<ActionResponse<{ id: string }>> {
     try {
         await requireUser()
         await requirePartnerAccessWithPermission(input.partnerId, "stores" as any, "create")
+        await requireMinimumPlan(input.partnerId, "escalar")
 
         const supabase = await getSupabaseServerClient()
+        const admin = createAdminClient()
 
         const slug = input.slug || generateSlug(input.name)
 
@@ -72,6 +82,7 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
                 slug,
                 description: input.description || null,
                 phone: input.phone || null,
+                whatsapp_phone: input.whatsapp_phone || null,
                 city: input.city || null,
                 state: input.state || null,
                 opening_hours: input.opening_hours || null,
@@ -83,6 +94,31 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
             .single()
 
         if (error) throw new Error(error.message)
+
+        // Handle address creation if address fields are provided
+        const hasAddressFields = input.zip_code || input.street || input.number || input.neighborhood || input.city || input.state
+        if (hasAddressFields) {
+            const numberVal = input.noNumber ? "S/N" : (input.number || "")
+            const { data: newAddr } = await admin
+                .from("addresses")
+                .insert({
+                    zip_code: input.zip_code || null,
+                    street: input.street || null,
+                    number: numberVal,
+                    complement: input.complement || null,
+                    neighborhood: input.neighborhood || null,
+                    city: input.city || null,
+                    state: input.state || null,
+                    country: "BR",
+                    store_id: data.id,
+                })
+                .select("id")
+                .single()
+
+            if (newAddr?.id) {
+                await supabase.from("stores").update({ address_id: newAddr.id }).eq("id", data.id)
+            }
+        }
 
         logAudit("store.created", {
             partnerId: input.partnerId,
@@ -293,6 +329,7 @@ export async function createStoreWithInheritanceAction(input: CreateStoreWithInh
     try {
         await requireUser()
         await requirePartnerAccessWithPermission(input.partnerId, "stores" as any, "create")
+        await requireMinimumPlan(input.partnerId, "escalar")
         await requireStorePermission(input.sourceStoreId, input.partnerId, "stores", "edit")
 
         const supabase = await getSupabaseServerClient()

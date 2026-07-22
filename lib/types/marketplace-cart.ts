@@ -11,6 +11,8 @@ export type ServiceBookingMetadata = {
   notes?: string | null
   /** Non-scheduled service purchase (no appointment row). */
   instantPurchase?: boolean
+  /** Store ID for multi-store bookings. */
+  storeId?: string
 }
 
 export type LineFulfillmentMode = "delivery" | "pickup" | "on_site" | "customer_location"
