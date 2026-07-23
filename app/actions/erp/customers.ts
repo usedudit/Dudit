@@ -567,9 +567,13 @@ export async function getCustomerByIdAction(customerId: string) {
   ;(customer as any).mobile = customer.phone
 
   // Aggregate order stats for KPI display (by buyer_id AND customer_id)
-  const buyerIds = [customer.user_id, customer.marketplace_user_id].filter(Boolean)
-  const conditions = [`customer_id.eq.${customer.id}`]
-  if (buyerIds.length > 0) conditions.push(`buyer_id.in.(${buyerIds.join(",")})`)
+  const allCustomerIds = Array.from(
+    new Set([customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean))
+  ) as string[]
+  const conditions = [
+    `customer_id.in.(${allCustomerIds.join(",")})`,
+    `buyer_id.in.(${allCustomerIds.join(",")})`,
+  ]
   const { data: orderAgg } = await supabase
     .from("orders")
     .select("total_amount, created_at")
@@ -617,10 +621,14 @@ export async function getCustomerOrdersAction(customerId: string) {
     return { orders: [] }
   }
 
-  const buyerIds = [customer.user_id, customer.marketplace_user_id].filter(Boolean)
+  const allCustomerIds = Array.from(
+    new Set([customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean))
+  ) as string[]
 
-  const orderConditions = [`customer_id.eq.${customer.id}`]
-  if (buyerIds.length > 0) orderConditions.push(`buyer_id.in.(${buyerIds.join(",")})`)
+  const orderConditions = [
+    `customer_id.in.(${allCustomerIds.join(",")})`,
+    `buyer_id.in.(${allCustomerIds.join(",")})`,
+  ]
 
   const { data: orders, error } = await adminDb
     .from("orders")
@@ -649,13 +657,10 @@ export async function getCustomerOrdersAction(customerId: string) {
   }
 
   // Aggregate stats across ALL orders (no limit) for accurate KPIs
-  const statsConditions = [`customer_id.eq.${customer.id}`]
-  if (buyerIds.length > 0) statsConditions.push(`buyer_id.in.(${buyerIds.join(",")})`)
-
   const { data: statsRaw } = await adminDb
     .from("orders")
     .select("total_amount, created_at, situation")
-    .or(statsConditions.join(","))
+    .or(orderConditions.join(","))
     .neq("situation", "cancelled")
 
   let stats = null

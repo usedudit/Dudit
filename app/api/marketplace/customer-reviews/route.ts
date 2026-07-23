@@ -12,14 +12,71 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient()
 
+  // 1. Fetch customer details including email and phone for auto-linking if needed
   const { data: customer } = await supabase
     .from("customers")
-    .select("user_id, marketplace_user_id")
+    .select("id, partner_id, user_id, marketplace_user_id, email, phone")
     .eq("id", customerId)
     .maybeSingle()
 
-  const userIds = [customer?.user_id, customer?.marketplace_user_id].filter(Boolean)
-  if (userIds.length === 0) {
+  if (!customer) {
+    return NextResponse.json({ reviews: [] })
+  }
+
+  let marketplaceUserId = customer.marketplace_user_id
+  let userId = customer.user_id
+
+  // 2. If marketplace_user_id / user_id is missing, attempt auto-linking via email
+  if (!marketplaceUserId && !userId && customer.email) {
+    try {
+      const { data: authUserRes } = await supabase.auth.admin.getUserByEmail(customer.email)
+      if (authUserRes?.user?.id) {
+        const foundId = authUserRes.user.id
+        marketplaceUserId = foundId
+        await supabase
+          .from("customers")
+          .update({ marketplace_user_id: foundId })
+          .eq("id", customer.id)
+      }
+    } catch (e) {
+      console.error("[customer-reviews] Auto-link error:", e)
+    }
+  }
+
+  // 3. Find any orders for this customer under the current store (partner_id)
+  const allCustomerIds = Array.from(
+    new Set([customer.id, userId, marketplaceUserId].filter(Boolean))
+  ) as string[]
+
+  const orderConditions = [
+    `customer_id.in.(${allCustomerIds.join(",")})`,
+    `buyer_id.in.(${allCustomerIds.join(",")})`,
+  ]
+
+  const { data: customerOrders } = await supabase
+    .from("orders")
+    .select("id, buyer_id")
+    .eq("partner_id", customer.partner_id)
+    .or(orderConditions.join(","))
+
+  const orderIds = (customerOrders || []).map((o: any) => o.id).filter(Boolean)
+  const orderBuyerIds = (customerOrders || []).map((o: any) => o.buyer_id).filter(Boolean)
+
+  // 4. Collect all candidate user IDs (excluding customer.id UUID)
+  const candidateUserIds = Array.from(
+    new Set([userId, marketplaceUserId, ...orderBuyerIds].filter(Boolean))
+  ) as string[]
+
+  // 5. Build OR conditions for querying reviews (by user_id OR by order_id), strictly scoped to customer.partner_id
+  const orConditions: string[] = []
+  if (candidateUserIds.length > 0) {
+    orConditions.push(`user_id.in.(${candidateUserIds.join(",")})`)
+  }
+  if (orderIds.length > 0) {
+    orConditions.push(`order_id.in.(${orderIds.join(",")})`)
+  }
+
+  if (orConditions.length === 0) {
     return NextResponse.json({ reviews: [] })
   }
 
@@ -37,7 +94,8 @@ export async function GET(request: NextRequest) {
       products(name, images, slug, unit),
       services(name, images, slug, unit)
     `)
-    .in("user_id", userIds)
+    .eq("partner_id", customer.partner_id)
+    .or(orConditions.join(","))
     .order("created_at", { ascending: false })
     .limit(50)
 
@@ -45,17 +103,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const orderIds = Array.from(new Set((reviews || []).map((r: any) => r.order_id).filter(Boolean)))
+  const reviewOrderIds = Array.from(new Set((reviews || []).map((r: any) => r.order_id).filter(Boolean)))
   let orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
 
-  if (orderIds.length > 0) {
+  if (reviewOrderIds.length > 0) {
     const { data: itemsData } = await supabase
       .from("order_items")
       .select(`
         id, order_id, quantity, product_id, service_id,
         product_variants(id, variant_name, variant_options)
       `)
-      .in("order_id", orderIds)
+      .in("order_id", reviewOrderIds)
 
     if (itemsData) {
       itemsData.forEach((item: any) => {

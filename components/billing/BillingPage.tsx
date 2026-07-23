@@ -382,7 +382,7 @@ export function BillingPage({ initialPartnerId, hidePartnerColumn, showTitle }: 
                     hasActiveFilters={hasActiveFilters}
                 />
 
-                <div className="px-4 md:px-8 pb-8">
+                <div className={showTitle ? "px-4 md:px-8 pb-8" : "px-0 pb-8"}>
                     {loading && data.length === 0 ? (
                         <div className="flex justify-center py-20">
                             <ThreeDotsLoader />

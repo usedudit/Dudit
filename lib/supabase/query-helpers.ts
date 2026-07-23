@@ -7,12 +7,14 @@ export interface SoftDeletePayload {
   deleted_at: string
   deleted_by: string
   deleted_reason: string | null
+  status: string
 }
 
 export interface RestorePayload {
   deleted_at: null
   deleted_by: null
   deleted_reason: null
+  status: string
 }
 
 /**
@@ -47,6 +49,7 @@ export function buildSoftDeletePayload(userId: string, reason?: string | null): 
     deleted_at: new Date().toISOString(),
     deleted_by: userId,
     deleted_reason: reason || null,
+    status: "archived",
   }
 }
 
@@ -58,5 +61,6 @@ export function buildRestorePayload(): RestorePayload {
     deleted_at: null,
     deleted_by: null,
     deleted_reason: null,
+    status: "active",
   }
 }

@@ -32,7 +32,6 @@ import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 
-
 type ERPItemPayload = {
     productId: string | null
     variantId?: string | null
@@ -795,8 +794,8 @@ export async function createFinancialTransactionsForReceivedAmount(
 
             const newReceived = Number(newEntry.amount ?? newEntry.amountReceived ?? newEntry.effectiveAmount ?? 0)
 
-            const oldEntry = oldBreakdown.find((old: any) => 
-                old?.method === newEntry.method && 
+            const oldEntry = oldBreakdown.find((old: any) =>
+                old?.method === newEntry.method &&
                 old?.paymentMethodId === newEntry.paymentMethodId
             ) || oldBreakdown[i]
 
@@ -1513,6 +1512,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     const orderInsertPayload: Record<string, unknown> = {
         partner_id: partnerId,
+        customer_id: data.customerId || null,
         buyer_id: data.customerId || null,
         customer_name: data.customerName || null,
         source_quote_id: data.sourceQuoteId || null,
@@ -2322,6 +2322,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const updateServerShipping = updatePricingResult.shipping
 
     const orderUpdatePayload: Record<string, unknown> = {
+        customer_id: data.customerId || null,
         buyer_id: data.customerId || null,
         customer_name: data.customerName || null,
         order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
@@ -3017,7 +3018,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             return { success: true, warning: processingWarnings.join(" | ") }
         }
         return { success: true, orderNumber: currentOrders?.[0]?.order_number }
-}
+    }
 
     const paymentStatusMap: Record<string, ERPOrderPayload["paymentStatus"]> = {
         pending: "unpaid",
@@ -3985,294 +3986,294 @@ export async function getAppointmentOrderNumberAction(orderId: string, partnerId
 }
 
 export async function getOrderPresignedUploadUrlAction(
-  partnerId: string,
-  fileName: string,
-  fileType: string,
-  fileSize: number,
+    partnerId: string,
+    fileName: string,
+    fileType: string,
+    fileSize: number,
 ): Promise<
-  | { success: true; uploadUrl: string; publicUrl: string; key: string }
-  | { success: false; error: string }
+    | { success: true; uploadUrl: string; publicUrl: string; key: string }
+    | { success: false; error: string }
 > {
-  try {
-    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requirePermission(partnerId, "orders", "edit")
-    const user = await requireUser()
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        await requirePermission(partnerId, "orders", "edit")
+        const user = await requireUser()
 
-    const { getUploadKindFromMimeType, getUploadValidationRules } = await import("@/lib/r2/config")
-    const kind = getUploadKindFromMimeType(fileType) || "image"
+        const { getUploadKindFromMimeType, getUploadValidationRules } = await import("@/lib/r2/config")
+        const kind = getUploadKindFromMimeType(fileType) || "image"
 
-    if (kind === "document") {
-      const { getPartnerPlan } = await import("@/lib/services/subscription.service")
-      const plan = await getPartnerPlan(partnerId)
-      if (plan.slug !== "crescer" && plan.slug !== "escalar") {
-        return { success: false, error: "Upload de documentos não permitido no seu plano. Faça upgrade para Crescer ou Escalar." }
-      }
+        if (kind === "document") {
+            const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+            const plan = await getPartnerPlan(partnerId)
+            if (plan.slug !== "crescer" && plan.slug !== "escalar") {
+                return { success: false, error: "Upload de documentos não permitido no seu plano. Faça upgrade para Crescer ou Escalar." }
+            }
+        }
+
+        const rules = getUploadValidationRules(kind)
+        if (fileSize > rules.maxSize) {
+            const maxMB = (rules.maxSize / (1024 * 1024)).toFixed(0)
+            return { success: false, error: `Arquivo muito grande. Máximo: ${maxMB}MB.` }
+        }
+
+        const { R2_PREFIXES } = await import("@/lib/r2/config")
+        const { generateSignedUploadUrl } = await import("@/lib/r2/server")
+
+        const result = await generateSignedUploadUrl({
+            fileName,
+            fileType,
+            userId: user.id,
+            prefix: R2_PREFIXES.orderAttachments,
+            kind,
+        })
+
+        return {
+            success: true,
+            uploadUrl: result.uploadUrl,
+            publicUrl: result.publicUrl,
+            key: result.key,
+        }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao gerar URL de upload" }
     }
-
-    const rules = getUploadValidationRules(kind)
-    if (fileSize > rules.maxSize) {
-      const maxMB = (rules.maxSize / (1024 * 1024)).toFixed(0)
-      return { success: false, error: `Arquivo muito grande. Máximo: ${maxMB}MB.` }
-    }
-
-    const { R2_PREFIXES } = await import("@/lib/r2/config")
-    const { generateSignedUploadUrl } = await import("@/lib/r2/server")
-
-    const result = await generateSignedUploadUrl({
-      fileName,
-      fileType,
-      userId: user.id,
-      prefix: R2_PREFIXES.orderAttachments,
-      kind,
-    })
-
-    return {
-      success: true,
-      uploadUrl: result.uploadUrl,
-      publicUrl: result.publicUrl,
-      key: result.key,
-    }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao gerar URL de upload" }
-  }
 }
 
 export async function saveOrderAttachmentAction(
-  partnerId: string,
-  orderId: string,
-  fileKey: string,
-  fileName: string,
-  fileType: string,
-  fileSize: number,
-  fileHash?: string,
+    partnerId: string,
+    orderId: string,
+    fileKey: string,
+    fileName: string,
+    fileType: string,
+    fileSize: number,
+    fileHash?: string,
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
-  try {
-    await requirePermission(partnerId, "orders", "edit")
-    const user = await requireUser()
-    const { getAdminClient } = await import("@/lib/supabase/admin")
-    const admin = getAdminClient()
+    try {
+        await requirePermission(partnerId, "orders", "edit")
+        const user = await requireUser()
+        const { getAdminClient } = await import("@/lib/supabase/admin")
+        const admin = getAdminClient()
 
-    // Enforce plan-based attachment count limits: Max 2 for crescer, Max 5 for escalar
-    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
-    const plan = await getPartnerPlan(partnerId)
-    const limit = plan.slug === "crescer" ? 2 : plan.slug === "escalar" ? 5 : 0
+        // Enforce plan-based attachment count limits: Max 2 for crescer, Max 5 for escalar
+        const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+        const plan = await getPartnerPlan(partnerId)
+        const limit = plan.slug === "crescer" ? 2 : plan.slug === "escalar" ? 5 : 0
 
-    const { count, error: countErr } = await admin
-      .from("order_attachments")
-      .select("id", { count: "exact", head: true })
-      .eq("order_id", orderId)
+        const { count, error: countErr } = await admin
+            .from("order_attachments")
+            .select("id", { count: "exact", head: true })
+            .eq("order_id", orderId)
 
-    if (countErr) throw countErr
+        if (countErr) throw countErr
 
-    if ((count || 0) >= limit) {
-      return { success: false, error: `Limite de anexos excedido para o seu plano (${limit} arquivo(s)). Faça upgrade para enviar mais.` }
-    }
-
-    // 1. Compute/verify hash on server if not provided (fallback for small files)
-    let finalHash = fileHash || ""
-    if (!finalHash && fileSize < 5 * 1024 * 1024) {
-      try {
-        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
-        const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
-        const serverConfig = getR2ServerConfig()
-        const s3 = new S3Client({
-          region: "auto",
-          credentials: {
-            accessKeyId: serverConfig.accessKeyId,
-            secretAccessKey: serverConfig.secretAccessKey,
-          },
-          endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
-        })
-        const obj = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
-        if (obj.Body) {
-          const bytes = await obj.Body.transformToByteArray()
-          const crypto = await import("crypto")
-          finalHash = crypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex")
+        if ((count || 0) >= limit) {
+            return { success: false, error: `Limite de anexos excedido para o seu plano (${limit} arquivo(s)). Faça upgrade para enviar mais.` }
         }
-        s3.destroy()
-      } catch (e) {
-        console.error("Erro ao calcular hash do R2 no fallback:", e)
-      }
+
+        // 1. Compute/verify hash on server if not provided (fallback for small files)
+        let finalHash = fileHash || ""
+        if (!finalHash && fileSize < 5 * 1024 * 1024) {
+            try {
+                const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+                const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
+                const serverConfig = getR2ServerConfig()
+                const s3 = new S3Client({
+                    region: "auto",
+                    credentials: {
+                        accessKeyId: serverConfig.accessKeyId,
+                        secretAccessKey: serverConfig.secretAccessKey,
+                    },
+                    endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+                })
+                const obj = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+                if (obj.Body) {
+                    const bytes = await obj.Body.transformToByteArray()
+                    const crypto = await import("crypto")
+                    finalHash = crypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex")
+                }
+                s3.destroy()
+            } catch (e) {
+                console.error("Erro ao calcular hash do R2 no fallback:", e)
+            }
+        }
+
+        // 2. Resolve safe Content-Type based on extension (ignore browser Content-Type)
+        const { ALL_MIME_TO_EXT } = await import("@/lib/r2/config")
+        const extension = fileKey.substring(fileKey.lastIndexOf(".")).toLowerCase()
+        const canonicalMime = Object.entries(ALL_MIME_TO_EXT).find(([_, ext]) => `.${ext}` === extension)?.[0]
+        const validatedFileType = canonicalMime || "application/octet-stream"
+
+        // 3. Save to database
+        const { data, error } = await admin
+            .from("order_attachments")
+            .insert({
+                order_id: orderId,
+                file_key: fileKey,
+                file_name: fileName,
+                file_type: validatedFileType,
+                file_size: fileSize,
+                uploaded_by: user.id,
+                file_hash: finalHash,
+            })
+            .select("*")
+            .single()
+
+        if (error) throw error
+
+        // 4. Audit Log
+        const { auditLog } = await import("@/lib/security/audit-logger")
+        await auditLog({
+            action: "document.uploaded",
+            actorUserId: user.id,
+            partnerId,
+            metadata: {
+                documentType: "Anexo de Pedido",
+                fileName,
+                fileSize,
+                orderId,
+                fileKey,
+                fileHash: finalHash,
+                fileType: validatedFileType,
+            },
+        })
+
+        // 5. Timeline Audit Log (Order History)
+        const { logAuditEvent } = await import("@/lib/services/timeline.service")
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: orderId,
+            actionType: "attachment_created",
+            source: "manual",
+            changeLines: [`Anexo adicionado: ${fileName}`],
+        })
+
+        const { revalidatePath } = await import("next/cache")
+        revalidatePath("/erp/orders")
+        return { success: true, data }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao salvar anexo" }
     }
-
-    // 2. Resolve safe Content-Type based on extension (ignore browser Content-Type)
-    const { ALL_MIME_TO_EXT } = await import("@/lib/r2/config")
-    const extension = fileKey.substring(fileKey.lastIndexOf(".")).toLowerCase()
-    const canonicalMime = Object.entries(ALL_MIME_TO_EXT).find(([_, ext]) => `.${ext}` === extension)?.[0]
-    const validatedFileType = canonicalMime || "application/octet-stream"
-
-    // 3. Save to database
-    const { data, error } = await admin
-      .from("order_attachments")
-      .insert({
-        order_id: orderId,
-        file_key: fileKey,
-        file_name: fileName,
-        file_type: validatedFileType,
-        file_size: fileSize,
-        uploaded_by: user.id,
-        file_hash: finalHash,
-      })
-      .select("*")
-      .single()
-
-    if (error) throw error
-
-    // 4. Audit Log
-    const { auditLog } = await import("@/lib/security/audit-logger")
-    await auditLog({
-      action: "document.uploaded",
-      actorUserId: user.id,
-      partnerId,
-      metadata: {
-        documentType: "Anexo de Pedido",
-        fileName,
-        fileSize,
-        orderId,
-        fileKey,
-        fileHash: finalHash,
-        fileType: validatedFileType,
-      },
-    })
-
-    // 5. Timeline Audit Log (Order History)
-    const { logAuditEvent } = await import("@/lib/services/timeline.service")
-    await logAuditEvent({
-      partnerId,
-      actorUserId: user.id,
-      entityType: "order",
-      entityId: orderId,
-      actionType: "attachment_created",
-      source: "manual",
-      changeLines: [`Anexo adicionado: ${fileName}`],
-    })
-
-    const { revalidatePath } = await import("next/cache")
-    revalidatePath("/erp/orders")
-    return { success: true, data }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao salvar anexo" }
-  }
 }
 
 export async function getOrderAttachmentUrlAction(
-  orderId: string,
-  fileKey: string,
-  partnerId?: string
+    orderId: string,
+    fileKey: string,
+    partnerId?: string
 ): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
-  try {
-    const user = await requireUser()
-    const { getAdminClient } = await import("@/lib/supabase/admin")
-    const admin = getAdminClient()
+    try {
+        const user = await requireUser()
+        const { getAdminClient } = await import("@/lib/supabase/admin")
+        const admin = getAdminClient()
 
-    let allowed = false
+        let allowed = false
 
-    if (partnerId) {
-      // ERP access: check permission
-      await requirePermission(partnerId, "orders", "view")
-      allowed = true
-    } else {
-      // Buyer side (marketplace) access: verify if the logged-in user is the buyer of the order
-      const { data: order, error } = await admin
-        .from("orders")
-        .select("buyer_id")
-        .eq("id", orderId)
-        .maybeSingle()
+        if (partnerId) {
+            // ERP access: check permission
+            await requirePermission(partnerId, "orders", "view")
+            allowed = true
+        } else {
+            // Buyer side (marketplace) access: verify if the logged-in user is the buyer of the order
+            const { data: order, error } = await admin
+                .from("orders")
+                .select("buyer_id")
+                .eq("id", orderId)
+                .maybeSingle()
 
-      if (order && order.buyer_id === user.id) {
-        allowed = true
-      }
+            if (order && order.buyer_id === user.id) {
+                allowed = true
+            }
+        }
+
+        if (!allowed) {
+            return { success: false, error: "Acesso negado. Sem permissão para visualizar o anexo deste pedido." }
+        }
+
+        const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+        const downloadUrl = await generateSignedDownloadUrl(fileKey)
+        return { success: true, downloadUrl }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao obter URL de download" }
     }
-
-    if (!allowed) {
-      return { success: false, error: "Acesso negado. Sem permissão para visualizar o anexo deste pedido." }
-    }
-
-    const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
-    const downloadUrl = await generateSignedDownloadUrl(fileKey)
-    return { success: true, downloadUrl }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao obter URL de download" }
-  }
 }
 
 export async function deleteOrderAttachmentAction(
-  partnerId: string,
-  attachmentId: string,
-  orderId: string
+    partnerId: string,
+    attachmentId: string,
+    orderId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  try {
-    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requirePermission(partnerId, "orders", "edit")
-    const user = await requireUser()
-    const { getAdminClient } = await import("@/lib/supabase/admin")
-    const admin = getAdminClient()
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        await requirePermission(partnerId, "orders", "edit")
+        const user = await requireUser()
+        const { getAdminClient } = await import("@/lib/supabase/admin")
+        const admin = getAdminClient()
 
-    const { data: attachment } = await admin
-      .from("order_attachments")
-      .select("file_key, file_name")
-      .eq("id", attachmentId)
-      .eq("order_id", orderId)
-      .maybeSingle()
+        const { data: attachment } = await admin
+            .from("order_attachments")
+            .select("file_key, file_name")
+            .eq("id", attachmentId)
+            .eq("order_id", orderId)
+            .maybeSingle()
 
-    if (!attachment) {
-      return { success: false, error: "Anexo não encontrado" }
+        if (!attachment) {
+            return { success: false, error: "Anexo não encontrado" }
+        }
+
+        const { deleteFileFromR2 } = await import("@/lib/r2/server")
+        await deleteFileFromR2(attachment.file_key)
+
+        await admin.from("order_attachments").delete().eq("id", attachmentId)
+
+        // Audit Log
+        const { auditLog } = await import("@/lib/security/audit-logger")
+        await auditLog({
+            action: "document.deleted",
+            actorUserId: user.id,
+            partnerId,
+            metadata: {
+                documentType: "Anexo de Pedido",
+                attachmentId,
+                orderId,
+                fileKey: attachment.file_key,
+            },
+        })
+
+        // Timeline Audit Log (Order History)
+        const { logAuditEvent } = await import("@/lib/services/timeline.service")
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: orderId,
+            actionType: "attachment_deleted",
+            source: "manual",
+            changeLines: [`Anexo removido: ${attachment.file_name || "Documento"}`],
+        })
+
+        const { revalidatePath } = await import("next/cache")
+        revalidatePath("/erp/orders")
+        return { success: true }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao deletar anexo" }
     }
-
-    const { deleteFileFromR2 } = await import("@/lib/r2/server")
-    await deleteFileFromR2(attachment.file_key)
-
-    await admin.from("order_attachments").delete().eq("id", attachmentId)
-
-    // Audit Log
-    const { auditLog } = await import("@/lib/security/audit-logger")
-    await auditLog({
-      action: "document.deleted",
-      actorUserId: user.id,
-      partnerId,
-      metadata: {
-        documentType: "Anexo de Pedido",
-        attachmentId,
-        orderId,
-        fileKey: attachment.file_key,
-      },
-    })
-
-    // Timeline Audit Log (Order History)
-    const { logAuditEvent } = await import("@/lib/services/timeline.service")
-    await logAuditEvent({
-      partnerId,
-      actorUserId: user.id,
-      entityType: "order",
-      entityId: orderId,
-      actionType: "attachment_deleted",
-      source: "manual",
-      changeLines: [`Anexo removido: ${attachment.file_name || "Documento"}`],
-    })
-
-    const { revalidatePath } = await import("next/cache")
-    revalidatePath("/erp/orders")
-    return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao deletar anexo" }
-  }
 }
 
 export async function getOrderAttachmentsAction(orderId: string): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
-  try {
-    const user = await requireUser()
-    const supabase = await getSupabaseServerClient()
+    try {
+        const user = await requireUser()
+        const supabase = await getSupabaseServerClient()
 
-    const { data, error } = await supabase
-      .from("order_attachments")
-      .select("*")
-      .eq("order_id", orderId)
-      .order("created_at", { ascending: false })
+        const { data, error } = await supabase
+            .from("order_attachments")
+            .select("*")
+            .eq("order_id", orderId)
+            .order("created_at", { ascending: false })
 
-    if (error) throw error
+        if (error) throw error
 
-    return { success: true, data: data || [] }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao listar anexos" }
-  }
+        return { success: true, data: data || [] }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao listar anexos" }
+    }
 }

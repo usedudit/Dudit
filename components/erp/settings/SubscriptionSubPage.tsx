@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Button, DefaultModal, RadioButton, FormTextarea, InfoCard, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
+import { Button, DefaultModal, FormTextarea, InfoCard } from "@/components/reusable"
 import { Input as FormInput } from "@/components/reusable/Input"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -17,10 +17,6 @@ import {
     Loader2,
     ArrowUpRight,
     ShieldCheck,
-    Calendar,
-    Users as UsersIcon,
-    FileText,
-    AlertOctagon,
 } from "lucide-react"
 import {
     Dialog,
@@ -40,47 +36,8 @@ import {
 } from "@/app/actions/erp/subscriptions"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { buildFeaturesDisplay, getHardcodedPlan } from "@/lib/subscription/feature-labels"
+import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { BillingPage } from "@/components/billing/BillingPage"
-
-function formatLimitValue(val: number | string): string {
-    if (val === "unlimited" || val === -1) return "Ilimitado"
-    return String(val)
-}
-
-function buildLimitsDisplay(limits: Record<string, any>): string[] {
-    const lines: string[] = []
-    if (limits.items != null) {
-        const v = formatLimitValue(limits.items)
-        lines.push(v === "Ilimitado" ? "Itens ilimitados" : `Até ${v} itens`)
-    }
-    if (limits.images_per_item != null) {
-        lines.push(`Até ${limits.images_per_item} imagens por item`)
-    }
-    if (limits.monthly_orders != null) {
-        const v = formatLimitValue(limits.monthly_orders)
-        lines.push(v === "Ilimitado" ? "Pedidos ilimitados" : `Até ${v} pedidos/mês`)
-    }
-    if (limits.monthly_appointments != null) {
-        const v = formatLimitValue(limits.monthly_appointments)
-        lines.push(v === "Ilimitado" ? "Agendamentos ilimitados" : `Até ${v} agendamentos/mês`)
-    }
-    if (limits.monthly_quotes != null) {
-        const v = formatLimitValue(limits.monthly_quotes)
-        lines.push(v === "Ilimitado" ? "Orçamentos ilimitados" : `Até ${v} orçamentos/mês`)
-    }
-    if (limits.monthly_service_orders != null) {
-        const v = formatLimitValue(limits.monthly_service_orders)
-        lines.push(v === "Ilimitado" ? "Ordens de serviço ilimitadas" : `Até ${v} ordens de serviço/mês`)
-    }
-    if (limits.users != null) {
-        const v = formatLimitValue(limits.users)
-        lines.push(v === "Ilimitado" ? "Usuários ilimitados" : `Até ${v} ${Number(limits.users) === 1 ? "usuário" : "usuários"}`)
-    }
-    return lines
-}
-
-// Removed local formatPrice in favor of formatCurrency
 
 // ─── Plan Card ─────────────────────────────────────────────────────────────
 
@@ -229,9 +186,10 @@ const PlanCardSkeleton = () => (
 // ─── Billing Toggle ────────────────────────────────────────────────────────
 
 const BillingToggle = ({ value, onChange }: { value: "monthly" | "annually", onChange: (v: "monthly" | "annually") => void }) => (
-    <div className="flex justify-center mb-10">
+    <div className="flex justify-center mb-8">
         <div className="bg-brand-gray dark:bg-dark-surface p-1 rounded-2xl border border-brand-border dark:border-dark-border flex items-center shadow-sm">
             <button
+                type="button"
                 onClick={() => onChange("monthly")}
                 className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${value === "monthly"
                     ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-md"
@@ -241,6 +199,7 @@ const BillingToggle = ({ value, onChange }: { value: "monthly" | "annually", onC
                 Mensal
             </button>
             <button
+                type="button"
                 onClick={() => onChange("annually")}
                 className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 ${value === "annually"
                     ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-md"
@@ -248,7 +207,7 @@ const BillingToggle = ({ value, onChange }: { value: "monthly" | "annually", onC
                     }`}
             >
                 Anual
-                <span className="bg-brand-green/10 text-brand-green text-[10px] px-2 py-0.5 rounded-full">
+                <span className="bg-brand-green/10 text-brand-green text-[10px] px-2 py-0.5 rounded-full font-extrabold">
                     20% OFF
                 </span>
             </button>
@@ -285,9 +244,10 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     const [plans, setPlans] = useState<any[]>([])
     const [subData, setSubData] = useState<SubscriptionData | null>(null)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState("general")
     const [actionLoading, setActionLoading] = useState<string | null>(null)
-    const [billingTab, setBillingTab] = useState<"plan" | "invoices" | "payments" | "history">("plan")
+
+    // Modal state for Upgrade Plan
+    const [plansModalOpen, setPlansModalOpen] = useState(false)
 
     // Account deletion states
     const [userId, setUserId] = useState<string | null>(null)
@@ -298,7 +258,6 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     const [loadingDryRun, setLoadingDryRun] = useState(false)
     const [confirmText, setConfirmText] = useState("")
     const [activeSubModalOpen, setActiveSubModalOpen] = useState(false)
-    const [isCancellingSubscription, setIsCancellingSubscription] = useState(false)
 
     const handleContinueToConfirm = async () => {
         setLoadingDryRun(true)
@@ -373,25 +332,6 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
             toast.error("Ocorreu um erro ao excluir a conta.")
         } finally {
             setIsDeleting(false)
-        }
-    }
-
-    const handleCancelActiveSubscription = async () => {
-        setIsCancellingSubscription(true)
-        try {
-            const { cancelSubscriptionAction } = await import("@/app/actions/erp/subscriptions")
-            const result = await cancelSubscriptionAction()
-            if (result.success) {
-                toast.success("Assinatura cancelada com sucesso. Você já pode excluir sua conta.")
-                setActiveSubModalOpen(false)
-                await loadData()
-            } else {
-                toast.error(result.error || "Erro ao cancelar assinatura.")
-            }
-        } catch (e) {
-            toast.error("Ocorreu um erro ao cancelar a assinatura.")
-        } finally {
-            setIsCancellingSubscription(false)
         }
     }
 
@@ -588,782 +528,570 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
-                        {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                    {/* Sticky Header */}
+                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white/90 dark:bg-dark-surface/90 backdrop-blur-md border-b transition-all duration-500 ease-in-out mb-6">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-4">
 
-                                {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                    </Button>
-                                </div>
+                            {/* Back button - desktop only */}
+                            <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                </Button>
+                            </div>
 
-                                {/* Title row */}
-                                <div className="hidden md:flex items-start justify-between">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">Minha Assinatura</span>
-                                        </h1>
+                            {/* Title row */}
+                            <div className="flex items-start justify-between">
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                        <span className="truncate">Minha Assinatura</span>
+                                    </h1>
 
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Gerencie sua assinatura e visualize o histórico de pagamentos.
-                                        </div>
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        Gerencie seu plano atual e acompanhe o histórico de faturas.
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
 
-                                {/* Tabs */}
-                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="plan">Plano Atual</TabsTrigger>
-                                        <TabsTrigger value="invoices">Faturas</TabsTrigger>
-                                        <TabsTrigger value="payments">Pagamentos</TabsTrigger>
-                                        <TabsTrigger value="history">Histórico</TabsTrigger>
-                                    </TabsList>
+                    {/* Main Content Body */}
+                    <div className="px-3 md:px-6 max-w-[1300px] mx-auto min-h-[400px]">
+
+                        {/* Top 2 Cards: Current Plan & Next Invoices (Equal Size & Side-by-Side) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-stretch">
+
+                            {/* Card 1: Current Plan */}
+                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between shadow-sm relative">
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
+                                            Current Plan
+                                        </span>
+                                        {subData?.subscription?.status === "active" && (
+                                            <span className="bg-brand-green/10 text-brand-green text-xs font-bold px-3 py-1 rounded-full">
+                                                Ativo
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <h2 className="text-2xl md:text-3xl font-extrabold text-brand-dark dark:text-dark-heading mb-2">
+                                        {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "Carregando..."}
+                                    </h2>
+
+                                    <p className="text-xs md:text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-6">
+                                        {subData ? getHardcodedPlan(subData.plan.slug).objective || "Recursos essenciais para gerenciar e impulsionar seu negócio." : "..."}
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-2xl md:text-3xl font-extrabold text-brand-dark dark:text-dark-heading">
+                                            {subData ? (currentPlanPrice > 0 ? formatCurrency(currentPlanPrice) : "Grátis") : "..."}
+                                        </span>
+                                        {currentPlanPrice > 0 && (
+                                            <span className="text-xs text-brand-inactive-text font-normal">/month</span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        {hasActivePaidSub && !subData?.subscription?.cancel_at_period_end && (
+                                            <Button
+                                                variant="outline"
+                                                className="text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20 text-xs md:text-sm h-11 px-4 font-semibold"
+                                                onClick={() => setCancelModal(true)}
+                                            >
+                                                Cancel Plan
+                                            </Button>
+                                        )}
+
+                                        <Button
+                                            variant="default"
+                                            className="bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-bold h-11 px-6"
+                                            onClick={() => setPlansModalOpen(true)}
+                                        >
+                                            Upgrade Plan
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Next Invoices */}
+                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between shadow-sm relative">
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
+                                            Next Invoices
+                                        </span>
+                                    </div>
+
+                                    <h2 className="text-3xl md:text-4xl font-extrabold text-brand-dark dark:text-dark-heading mb-6">
+                                        {subData ? (currentPlanPrice > 0 ? formatCurrency(currentPlanPrice) : "R$ 0,00") : "..."}
+                                    </h2>
+                                </div>
+
+                                <div className="space-y-3 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
+                                    <div className="flex items-center justify-between text-xs md:text-sm">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plan Type</span>
+                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                            {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name} (${billingCycle === "annually" ? "Anual" : "Mensal"})` : "—"}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs md:text-sm">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Next Invoice</span>
+                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                            {subData?.subscription?.current_period_end ? formatDate(subData.subscription.current_period_end) : "—"}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Content Body */}
-                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            <AnimatePresence mode="wait">
-                                <TabsContent value="plan" className="mt-0 focus-visible:outline-none">
-                                    <BillingPage showTitle={false} />
-                                </TabsContent>
-                            </AnimatePresence>
+                        {/* Billing History Section */}
+                        <div className="mb-10">
+                            <h3 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 px-1">
+                                Billing History
+                            </h3>
+                            <BillingPage showTitle={false} />
+                        </div>
 
-                            {billingTab !== "plan" ? (
-                                <div className="overflow-hidden">
-                                    <BillingPage showTitle={false} />
+                        {/* Excluir Conta Section */}
+                        {!loading && subData && (
+                            <div className="mt-12 p-6 rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <h4 className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                                        Excluir conta definitivamente
+                                    </h4>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        Esta ação inicia o processo de exclusão de todos os seus dados e encerramento da empresa na Dudit.
+                                    </p>
                                 </div>
-                            ) : (
+                                <Button
+                                    variant="outline"
+                                    className="text-red-600 border-red-200 hover:bg-red-600 hover:text-white dark:border-red-900 dark:hover:bg-red-950 text-sm font-bold shrink-0"
+                                    onClick={() => setDeleteStep("reason")}
+                                >
+                                    Excluir conta
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ─── Upgrade Plan Modal (DefaultModal) ───────────────────────── */}
+                <DefaultModal
+                    isOpen={plansModalOpen}
+                    onClose={() => setPlansModalOpen(false)}
+                    title="Planos de Assinatura"
+                >
+                    <div className="py-2">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center mb-6">
+                            Escolha o plano ideal para as necessidades do seu negócio. Cancele ou altere a qualquer momento.
+                        </p>
+
+                        {/* Billing Toggle */}
+                        <BillingToggle value={billingCycle} onChange={setBillingCycle} />
+
+                        {/* Plans Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch my-6 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
+                            {loading ? (
                                 <>
-                                    {/* Current Plan Info Bar */}
-                                    {!loading && subData && (
-                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center">
-                                                    <Crown size={20} className="text-brand-green" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        Plano {getHardcodedPlan(subData.plan.slug).name}
-                                                    </p>
-                                                    <p className="text-xs text-brand-inactive-text">
-                                                        {subData.subscription?.status === "active" && "Ativo"}
-                                                        {subData.subscription?.status === "trialing" && "Período de teste"}
-                                                        {subData.subscription?.status === "past_due" && "Pagamento pendente"}
-                                                        {subData.subscription?.cancel_at_period_end && " · Cancelamento agendado"}
-                                                        {!subData.subscription && "Plano gratuito"}
-                                                        {subData.subscription?.current_period_end && (
-                                                            <> · Renova em {formatDate(subData.subscription.current_period_end)}</>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {hasActivePaidSub && !subData.subscription?.cancel_at_period_end && (
-                                                <Button
-                                                    variant="outline"
-                                                    className="text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20 text-sm"
-                                                    onClick={() => setCancelModal(true)}
-                                                >
-                                                    Cancelar assinatura
-                                                </Button>
-                                            )}
-                                        </motion.div>
-                                    )}
-
-                                    {/* Billing Toggle */}
-                                    <BillingToggle value={billingCycle} onChange={setBillingCycle} />
-
-                                    {/* Plans Grid */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12 items-stretch">
-                                        {loading ? (
-                                            <>
-                                                <PlanCardSkeleton />
-                                                <PlanCardSkeleton />
-                                                <PlanCardSkeleton />
-                                            </>
-                                        ) : (
-                                            plans.map((plan) => {
-                                                const isCurrent = subData?.plan?.id === plan.id
-                                                const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
-                                                const isPopular = plan.slug === "crescer"
-
-                                                return (
-                                                    <PlanCard
-                                                        key={plan.id}
-                                                        slug={plan.slug}
-                                                        name={getHardcodedPlan(plan.slug).name}
-                                                        objective={getHardcodedPlan(plan.slug).objective}
-                                                        price={plan.price}
-                                                        features={getHardcodedPlan(plan.slug).features}
-                                                        limits={getHardcodedPlan(plan.slug).limits}
-                                                        popular={isPopular}
-                                                        isCurrent={isCurrent}
-                                                        isDowngrade={isDowngrade}
-                                                        isLoading={actionLoading === plan.id}
-                                                        billingCycle={billingCycle}
-                                                        onAction={() => handlePlanAction(plan)}
-                                                    />
-                                                )
-                                            })
-                                        )}
-                                    </div>
-
-                                    {/* ─── Subscribe Dialog ─────────────────────────────────── */}
-                                    <Dialog
-                                        open={subscribeModal.open}
-                                        onOpenChange={(open) => {
-                                            if (!open && !actionLoading) setSubscribeModal({ open: false, planId: "", planName: "" })
-                                        }}
-                                    >
-                                        <DialogContent className="sm:max-w-md">
-                                            <DialogHeader>
-                                                <DialogTitle className="flex items-center gap-2">
-                                                    <Zap size={20} className="text-brand-green" />
-                                                    Assinar {subscribeModal.planName}
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Insira seu email de faturamento para prosseguir. Você será redirecionado para o Mercado Pago para finalizar o pagamento de forma segura.
-                                                </DialogDescription>
-                                            </DialogHeader>
-
-                                            <div className="py-4 space-y-4">
-                                                <FormInput
-                                                    label="Email de faturamento"
-                                                    name="billing_email"
-                                                    type="email"
-                                                    placeholder="seuemail@exemplo.com"
-                                                    value={billingEmail}
-                                                    onChange={(e) => {
-                                                        setBillingEmail(e.target.value)
-                                                        setEmailError("")
-                                                    }}
-                                                    className="mb-0"
-                                                />
-                                                {emailError && (
-                                                    <p className="text-sm text-red-500 flex items-center gap-1">
-                                                        <AlertTriangleIcon size={14} /> {emailError}
-                                                    </p>
-                                                )}
-
-                                                <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50 text-xs text-brand-inactive-text">
-                                                    <ShieldCheck size={14} className="text-brand-green shrink-0 mt-0.5" />
-                                                    <span>
-                                                        Pagamento processado com segurança pelo Mercado Pago. Seus dados financeiros nunca passam pela Dudit.
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <DialogFooter>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => setSubscribeModal({ open: false, planId: "", planName: "" })}
-                                                    disabled={!!actionLoading}
-                                                >
-                                                    Cancelar
-                                                </Button>
-                                                <Button
-                                                    className="bg-brand-green text-white hover:bg-brand-green/90"
-                                                    onClick={handleSubscribe}
-                                                    disabled={!!actionLoading}
-                                                >
-                                                    {actionLoading ? (
-                                                        <>
-                                                            <Loader2 size={16} className="animate-spin mr-2" />
-                                                            Processando...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <ArrowUpRight size={16} className="mr-2" />
-                                                            Ir para o pagamento
-                                                        </>
-                                                    )}
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-
-                                    {/* ─── Downgrade Confirmation Dialog ────────────────────── */}
-                                    <Dialog
-                                        open={downgradeModal.open}
-                                        onOpenChange={(open) => {
-                                            if (!open && !actionLoading) setDowngradeModal({ open: false, planId: "", planName: "" })
-                                        }}
-                                    >
-                                        <DialogContent className="sm:max-w-md">
-                                            <DialogHeader>
-                                                <DialogTitle className="flex items-center gap-2">
-                                                    <AlertTriangleIcon size={20} className="text-amber-500" />
-                                                    Confirmar downgrade
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Você está rebaixando seu plano para <strong>{downgradeModal.planName}</strong>. A mudança será aplicada no final do ciclo de faturamento atual. Até lá, você continua com todos os recursos do plano atual.
-                                                </DialogDescription>
-                                            </DialogHeader>
-
-                                            <div className="py-2">
-                                                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-300">
-                                                    <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
-                                                    <span>
-                                                        Recursos exclusivos do plano atual podem ficar indisponíveis após o downgrade. Verifique se seus dados estão dentro dos limites do novo plano.
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <DialogFooter>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => setDowngradeModal({ open: false, planId: "", planName: "" })}
-                                                    disabled={!!actionLoading}
-                                                >
-                                                    Manter plano atual
-                                                </Button>
-                                                <Button
-                                                    className="bg-amber-500 text-white hover:bg-amber-600"
-                                                    onClick={handleDowngrade}
-                                                    disabled={!!actionLoading}
-                                                >
-                                                    {actionLoading ? (
-                                                        <>
-                                                            <Loader2 size={16} className="animate-spin mr-2" />
-                                                            Agendando...
-                                                        </>
-                                                    ) : (
-                                                        "Confirmar downgrade"
-                                                    )}
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-
-                                    {/* ─── Cancel Subscription Dialog ──────────────────────── */}
-                                    <Dialog
-                                        open={cancelModal}
-                                        onOpenChange={(open) => {
-                                            if (!open && !actionLoading) setCancelModal(false)
-                                        }}
-                                    >
-                                        <DialogContent className="sm:max-w-md">
-                                            <DialogHeader>
-                                                <DialogTitle className="flex items-center gap-2 text-red-600">
-                                                    <XIcon size={20} />
-                                                    Cancelar assinatura
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Tem certeza? Ao cancelar sua assinatura do plano <strong>{subData?.plan.name}</strong>, você voltará para o plano Grátis e perderá acesso aos recursos premium.
-                                                </DialogDescription>
-                                            </DialogHeader>
-
-                                            <div className="py-2">
-                                                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-xs text-red-600 dark:text-red-300">
-                                                    <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
-                                                    <span>
-                                                        Esta ação não pode ser desfeita instantaneamente. Para reativar, será necessário criar uma nova assinatura.
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <DialogFooter>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => setCancelModal(false)}
-                                                    disabled={!!actionLoading}
-                                                >
-                                                    Não, manter plano
-                                                </Button>
-                                                <Button
-                                                    className="bg-red-600 text-white hover:bg-red-700"
-                                                    onClick={handleCancel}
-                                                    disabled={!!actionLoading}
-                                                >
-                                                    {actionLoading === "cancel" ? (
-                                                        <>
-                                                            <Loader2 size={16} className="animate-spin mr-2" />
-                                                            Cancelando...
-                                                        </>
-                                                    ) : (
-                                                        "Sim, cancelar assinatura"
-                                                    )}
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-
-                                    {/* Excluir Conta Section */}
-                                    {!loading && subData && (
-                                        <div className="mt-12 p-6 rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                            <div className="space-y-1">
-                                                <h4 className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
-                                                    Excluir conta definitivamente
-                                                </h4>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    Esta ação inicia o processo de exclusão de todos os seus dados e encerramento da empresa na Dudit.
-                                                </p>
-                                            </div>
-                                            <Button
-                                                variant="outline"
-                                                className="text-red-600 border-red-200 hover:bg-red-600 hover:text-white dark:border-red-900 dark:hover:bg-red-950 text-sm font-bold shrink-0"
-                                                onClick={() => setDeleteStep("reason")}
-                                            >
-                                                Excluir conta
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {/* Account Deletion Flow Modal */}
-                                    <DefaultModal
-                                        isOpen={deleteStep !== "none" && deleteStep !== "success"}
-                                        onClose={() => {
-                                            if (!isDeleting) {
-                                                setDeleteStep("none")
-                                                setCustomReason("")
-                                            }
-                                        }}
-                                        title={deleteStep === "confirm" ? "Confirmar encerramento da conta" : "O que fez você decidir encerrar sua conta?"}
-                                    >
-                                        {deleteStep === "reason" && (
-                                            <div className="space-y-6 pt-2 pb-4">
-                                                <p className="text-sm text-brand-dark dark:text-dark-body">
-                                                    Antes de continuar, queremos apenas garantir que você saiba exatamente o que acontecerá. Ao confirmar, iniciaremos o processo de encerramento da sua conta. Durante as próximas 48 horas você poderá cancelar essa decisão. Depois desse período, a exclusão será definitiva e não poderá ser revertida.
-                                                </p>
-
-                                                <div className="space-y-2">
-                                                    <FormTextarea
-                                                        label="Sua resposta (opcional)"
-                                                        placeholder="Seu feedback ajuda a melhorar a Dudit."
-                                                        value={customReason}
-                                                        onChange={(e: any) => setCustomReason(e.target.value)}
-                                                        maxLength={500}
-                                                        showCharacterCount
-                                                        name="observacoes"
-                                                        className="min-h-[120px]"
-                                                    />
-                                                </div>
-
-                                                <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() => setDeleteStep("none")}
-                                                        disabled={loadingDryRun}
-                                                    >
-                                                        Cancelar
-                                                    </Button>
-                                                    <Button
-                                                        variant="default"
-                                                        onClick={handleContinueToConfirm}
-                                                        disabled={loadingDryRun}
-                                                        className="bg-brand-green text-white hover:bg-brand-green/90"
-                                                    >
-                                                        {loadingDryRun ? "Carregando..." : "Continuar"}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {deleteStep === "confirm" && (
-                                            <div className="space-y-6 pt-2 pb-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
-                                                <div className="flex items-start">
-                                                    <InfoCard
-                                                        title="Essa decisão é sua."
-                                                        message="Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta. Você terá 48 horas para desistir a qualquer momento."
-                                                        className="flex-1"
-                                                        color="red"
-                                                    />
-                                                </div>
-
-                                                {/* SUA CONTA HOJE */}
-                                                {dryRunReport && (
-                                                    <div className="space-y-3">
-                                                        <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
-                                                            Sua conta hoje
-                                                        </h4>
-                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                            {dryRunReport.customersCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.customersCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Clientes cadastrados
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.productsCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.productsCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Produtos
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.servicesCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.servicesCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Serviços
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.ordersCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.ordersCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Pedidos realizados
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.serviceOrdersCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.serviceOrdersCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Ordens de Serviço
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.appointmentsCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.appointmentsCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Compromissos agendados
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.filesCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.filesCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Arquivos enviados
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.storesCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.storesCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium text-ellipsis overflow-hidden whitespace-nowrap block" title={dryRunReport.storeNames?.join(", ")}>
-                                                                        Lojas ({dryRunReport.storeNames?.join(", ")})
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.membersCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.membersCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Membros da equipe
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {dryRunReport.whatsappCount > 0 && (
-                                                                <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                                                    <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                        {dryRunReport.whatsappCount}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text font-medium">
-                                                                        Integrações WhatsApp
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* O QUE SERÁ PERDIDO */}
-                                                {dryRunReport && (
-                                                    <div className="space-y-3 pt-2">
-                                                        <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
-                                                            Ao encerrar sua conta, você perderá permanentemente:
-                                                        </h4>
-                                                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-brand-dark/80 dark:text-dark-body">
-                                                            {dryRunReport.storesCount > 0 && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Lojas cadastradas</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">({dryRunReport.storesCount} lojas: {dryRunReport.storeNames?.join(", ")})</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            {dryRunReport.membersCount > 0 && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Equipe</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">({dryRunReport.membersCount} membros da equipe)</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            {dryRunReport.customersCount > 0 && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Cadastro de clientes</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">({dryRunReport.customersCount} registros)</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            {(dryRunReport.productsCount > 0 || dryRunReport.servicesCount > 0) && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Produtos e serviços</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">({dryRunReport.productsCount + dryRunReport.servicesCount} itens)</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            {dryRunReport.appointmentsCount > 0 && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Agenda</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">({dryRunReport.appointmentsCount} compromissos)</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            {dryRunReport.ordersCount > 0 && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Financeiro</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">(histórico completo de faturamento)</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            {dryRunReport.whatsappCount > 0 && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Integrações</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">(conexões ativas de WhatsApp)</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            {dryRunReport.filesCount > 0 && (
-                                                                <li className="flex items-start gap-2">
-                                                                    <span className="text-red-500 mt-0.5">•</span>
-                                                                    <div>
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">Arquivos enviados</strong>
-                                                                        <span className="block text-xs text-brand-inactive-text">(imagens e mídias no R2)</span>
-                                                                    </div>
-                                                                </li>
-                                                            )}
-                                                            <li className="flex items-start gap-2">
-                                                                <span className="text-red-500 mt-0.5">•</span>
-                                                                <div>
-                                                                    <strong className="text-brand-dark dark:text-dark-heading">Configurações e Equipe</strong>
-                                                                    <span className="block text-xs text-brand-inactive-text">(dados da empresa e permissões de acesso)</span>
-                                                                </div>
-                                                            </li>
-                                                        </ul>
-                                                        <p className="text-xs text-brand-inactive-text">
-                                                            Tudo isso será removido definitivamente após o período de carência.
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                {/* O QUE SERÁ PRESERVADO */}
-                                                <div className="space-y-3 pt-2">
-                                                    <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
-                                                        O que será preservado
-                                                    </h4>
-                                                    <p className="text-xs text-brand-inactive-text">
-                                                        Para cumprir obrigações legais, manteremos apenas registros mínimos anonimizados relacionados a pedidos, auditoria e compliance.
-                                                    </p>
-                                                    <ul className="space-y-1.5 text-xs font-semibold text-brand-dark/90 dark:text-dark-heading">
-                                                        <li className="flex items-center gap-2">
-                                                            <span className="text-emerald-500 font-bold">✓</span> Nenhum dado pessoal permanecerá acessível.
-                                                        </li>
-                                                        <li className="flex items-center gap-2">
-                                                            <span className="text-emerald-500 font-bold">✓</span> Nenhuma cobrança continuará sendo realizada.
-                                                        </li>
-                                                        <li className="flex items-center gap-2">
-                                                            <span className="text-emerald-500 font-bold">✓</span> Nenhum usuário conseguirá acessar sua conta.
-                                                        </li>
-                                                    </ul>
-                                                </div>
-
-                                                {/* O QUE ACONTECERÁ AGORA (TIMELINE) */}
-                                                <div className="space-y-3 pt-2">
-                                                    <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
-                                                        O que acontecerá agora
-                                                    </h4>
-                                                    <div className="relative pl-6 space-y-4 border-l border-brand-border dark:border-dark-border ml-2 py-1">
-                                                        <div className="relative">
-                                                            <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-brand-green border-4 border-white dark:border-dark-surface" />
-                                                            <div>
-                                                                <strong className="text-xs text-brand-dark dark:text-dark-heading block">Agora</strong>
-                                                                <span className="text-xs text-brand-inactive-text">Sua assinatura é cancelada e nenhuma nova cobrança será criada.</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="relative">
-                                                            <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-amber-50 border-4 border-white dark:border-dark-surface" />
-                                                            <div>
-                                                                <strong className="text-xs text-brand-dark dark:text-dark-heading block">Imediatamente</strong>
-                                                                <span className="text-xs text-brand-inactive-text">Sua sessão será encerrada e o login será bloqueado.</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="relative">
-                                                            <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-red-50 border-4 border-white dark:border-dark-surface" />
-                                                            <div>
-                                                                <strong className="text-xs text-brand-dark dark:text-dark-heading block">Processamento assíncrono</strong>
-                                                                <span className="text-xs text-brand-inactive-text">Nossos servidores iniciarão a limpeza imediata de arquivos e serviços vinculados.</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="relative">
-                                                            <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-gray-400 border-4 border-white dark:border-dark-surface" />
-                                                            <div>
-                                                                <strong className="text-xs text-brand-dark dark:text-dark-heading block">Após a conclusão</strong>
-                                                                <span className="text-xs text-brand-inactive-text">O processo de exclusão é finalizado sem possibilidade de recuperação de dados.</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
- 
-                                                {/* CONFIRMAÇÃO POR ESCRITO */}
-                                                <div className="py-4 border-t border-brand-border dark:border-dark-border text-center space-y-3">
-                                                    <p className="text-xs font-bold text-red-600 dark:text-red-400">
-                                                        Atenção: Esta ação é definitiva e removerá todos os seus dados.
-                                                    </p>
-                                                    <p className="text-xs text-brand-inactive-text">
-                                                        Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar.
-                                                    </p>
-                                                    <input
-                                                        type="text"
-                                                        value={confirmText}
-                                                        onChange={(e) => setConfirmText(e.target.value)}
-                                                        placeholder="EXCLUIR"
-                                                        className="w-full max-w-[200px] mx-auto text-center uppercase tracking-wider font-bold h-10 border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
-                                                    />
-                                                </div>
-
-                                                {/* ALTERNATIVAS DISCRETAS */}
-                                                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-4 border-t border-brand-border dark:border-dark-border text-xs text-brand-inactive-text">
-                                                    <a href="/erp/clientes" className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium">
-                                                        Exportar meus dados
-                                                    </a>
-                                                    <a href="https://wa.me/5551999999999" target="_blank" rel="noopener noreferrer" className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium">
-                                                        Falar com o suporte
-                                                    </a>
-                                                    {hasActivePaidSub && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setDeleteStep("none")
-                                                                setCancelModal(true)
-                                                            }}
-                                                            className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium"
-                                                        >
-                                                            Cancelar apenas a assinatura
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDeleteStep("none")}
-                                                        className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors font-medium"
-                                                    >
-                                                        Voltar
-                                                    </button>
-                                                </div>
- 
-                                                {/* FOOTER ACTIONS */}
-                                                <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() => setDeleteStep("none")}
-                                                        disabled={isDeleting}
-                                                        className="flex-1 h-12 font-bold"
-                                                    >
-                                                        Continuar com minha conta
-                                                    </Button>
-                                                    <Button
-                                                        variant="default"
-                                                        onClick={handleDeleteAccount}
-                                                        disabled={isDeleting || confirmText !== "EXCLUIR"}
-                                                        className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        {isDeleting ? "Excluindo..." : "Confirmar exclusão da conta"}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </DefaultModal>
- 
-                                    {/* Modal para Assinatura Ativa (Bloqueio) */}
-                                    <DefaultModal
-                                        isOpen={activeSubModalOpen}
-                                        onClose={() => setActiveSubModalOpen(false)}
-                                        title="Assinatura Ativa Detectada"
-                                    >
-                                        <div className="space-y-6 pt-2 pb-4 text-center">
-                                            <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-500 mb-2">
-                                                <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                </svg>
-                                            </div>
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                Cancele sua Assinatura Primeiro
-                                            </h3>
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body px-4">
-                                                Você possui uma assinatura ativa da plataforma. Cancele sua assinatura antes de excluir sua conta.
-                                            </p>
-                                            <div className="flex gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setActiveSubModalOpen(false)
-                                                        setBillingTab("plan")
-                                                    }}
-                                                    className="flex-1 h-12 font-bold"
-                                                >
-                                                    Ir para assinatura
-                                                </Button>
-                                                <Button
-                                                    variant="default"
-                                                    onClick={handleCancelActiveSubscription}
-                                                    disabled={isCancellingSubscription}
-                                                    className="flex-1 h-12 font-bold bg-amber-600 text-white hover:bg-amber-700"
-                                                >
-                                                    {isCancellingSubscription ? "Cancelando..." : "Cancelar assinatura"}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </DefaultModal>
+                                    <PlanCardSkeleton />
+                                    <PlanCardSkeleton />
+                                    <PlanCardSkeleton />
                                 </>
+                            ) : (
+                                plans.map((plan) => {
+                                    const isCurrent = subData?.plan?.id === plan.id
+                                    const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
+                                    const isPopular = plan.slug === "crescer"
+
+                                    return (
+                                        <PlanCard
+                                            key={plan.id}
+                                            slug={plan.slug}
+                                            name={getHardcodedPlan(plan.slug).name}
+                                            objective={getHardcodedPlan(plan.slug).objective}
+                                            price={plan.price}
+                                            features={getHardcodedPlan(plan.slug).features}
+                                            limits={getHardcodedPlan(plan.slug).limits}
+                                            popular={isPopular}
+                                            isCurrent={isCurrent}
+                                            isDowngrade={isDowngrade}
+                                            isLoading={actionLoading === plan.id}
+                                            billingCycle={billingCycle}
+                                            onAction={() => {
+                                                setPlansModalOpen(false)
+                                                handlePlanAction(plan)
+                                            }}
+                                        />
+                                    )
+                                })
                             )}
                         </div>
                     </div>
-                </Tabs>
-            </div>
+                </DefaultModal>
 
-            {/* Mobile Bottom Action Bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                <Button
-                    variant="outline"
-                    onClick={handleBack}
-                    className="flex-1 h-12 font-bold"
+                {/* ─── Subscribe Dialog ─────────────────────────────────── */}
+                <Dialog
+                    open={subscribeModal.open}
+                    onOpenChange={(open) => {
+                        if (!open && !actionLoading) setSubscribeModal({ open: false, planId: "", planName: "" })
+                    }}
                 >
-                    Voltar
-                </Button>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Zap size={20} className="text-brand-green" />
+                                Assinar {subscribeModal.planName}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Insira seu email de faturamento para prosseguir. Você será redirecionado para o Mercado Pago para finalizar o pagamento de forma segura.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="py-4 space-y-4">
+                            <FormInput
+                                label="Email de faturamento"
+                                name="billing_email"
+                                type="email"
+                                placeholder="seuemail@exemplo.com"
+                                value={billingEmail}
+                                onChange={(e) => {
+                                    setBillingEmail(e.target.value)
+                                    setEmailError("")
+                                }}
+                                className="mb-0"
+                            />
+                            {emailError && (
+                                <p className="text-sm text-red-500 flex items-center gap-1">
+                                    <AlertTriangleIcon size={14} /> {emailError}
+                                </p>
+                            )}
+
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50 text-xs text-brand-inactive-text">
+                                <ShieldCheck size={14} className="text-brand-green shrink-0 mt-0.5" />
+                                <span>
+                                    Pagamento processado com segurança pelo Mercado Pago. Seus dados financeiros nunca passam pela Dudit.
+                                </span>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => setSubscribeModal({ open: false, planId: "", planName: "" })}
+                                disabled={!!actionLoading}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="bg-brand-green text-white hover:bg-brand-green/90"
+                                onClick={handleSubscribe}
+                                disabled={!!actionLoading}
+                            >
+                                {actionLoading ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin mr-2" />
+                                        Processando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <ArrowUpRight size={16} className="mr-2" />
+                                        Ir para o pagamento
+                                    </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* ─── Downgrade Confirmation Dialog ────────────────────── */}
+                <Dialog
+                    open={downgradeModal.open}
+                    onOpenChange={(open) => {
+                        if (!open && !actionLoading) setDowngradeModal({ open: false, planId: "", planName: "" })
+                    }}
+                >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <AlertTriangleIcon size={20} className="text-amber-500" />
+                                Confirmar downgrade
+                            </DialogTitle>
+                            <DialogDescription>
+                                Você está rebaixando seu plano para <strong>{downgradeModal.planName}</strong>. A mudança será aplicada no final do ciclo de faturamento atual. Até lá, você continua com todos os recursos do plano atual.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="py-2">
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-300">
+                                <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
+                                <span>
+                                    Recursos exclusivos do plano atual podem ficar indisponíveis após o downgrade. Verifique se seus dados estão dentro dos limites do novo plano.
+                                </span>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => setDowngradeModal({ open: false, planId: "", planName: "" })}
+                                disabled={!!actionLoading}
+                            >
+                                Manter plano atual
+                            </Button>
+                            <Button
+                                className="bg-amber-500 text-white hover:bg-amber-600"
+                                onClick={handleDowngrade}
+                                disabled={!!actionLoading}
+                            >
+                                {actionLoading ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin mr-2" />
+                                        Agendando...
+                                    </>
+                                ) : (
+                                    "Confirmar downgrade"
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* ─── Cancel Subscription Dialog ──────────────────────── */}
+                <Dialog
+                    open={cancelModal}
+                    onOpenChange={(open) => {
+                        if (!open && !actionLoading) setCancelModal(false)
+                    }}
+                >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-red-600">
+                                <XIcon size={20} />
+                                Cancelar assinatura
+                            </DialogTitle>
+                            <DialogDescription>
+                                Tem certeza? Ao cancelar sua assinatura do plano <strong>{subData?.plan.name}</strong>, você voltará para o plano Grátis e perderá acesso aos recursos premium.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="py-2">
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-xs text-red-600 dark:text-red-300">
+                                <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
+                                <span>
+                                    Esta ação não pode ser desfeita instantaneamente. Para reativar, será necessário criar uma nova assinatura.
+                                </span>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => setCancelModal(false)}
+                                disabled={!!actionLoading}
+                            >
+                                Não, manter plano
+                            </Button>
+                            <Button
+                                className="bg-red-600 text-white hover:bg-red-700"
+                                onClick={handleCancel}
+                                disabled={!!actionLoading}
+                            >
+                                {actionLoading === "cancel" ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin mr-2" />
+                                        Cancelando...
+                                    </>
+                                ) : (
+                                    "Sim, cancelar assinatura"
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Account Deletion Flow Modal */}
+                <DefaultModal
+                    isOpen={deleteStep !== "none" && deleteStep !== "success"}
+                    onClose={() => {
+                        if (!isDeleting) {
+                            setDeleteStep("none")
+                            setCustomReason("")
+                        }
+                    }}
+                    title={deleteStep === "confirm" ? "Confirmar encerramento da conta" : "O que fez você decidir encerrar sua conta?"}
+                >
+                    {deleteStep === "reason" && (
+                        <div className="space-y-6 pt-2 pb-4">
+                            <p className="text-sm text-brand-dark dark:text-dark-body">
+                                Antes de continuar, queremos apenas garantir que você saiba exatamente o que acontecerá. Ao confirmar, iniciaremos o processo de encerramento da sua conta. Durante as próximas 48 horas você poderá cancelar essa decisão. Depois desse período, a exclusão será definitiva e não poderá ser revertida.
+                            </p>
+
+                            <div className="space-y-2">
+                                <FormTextarea
+                                    label="Sua resposta (opcional)"
+                                    placeholder="Seu feedback ajuda a melhorar a Dudit."
+                                    value={customReason}
+                                    onChange={(e: any) => setCustomReason(e.target.value)}
+                                    maxLength={500}
+                                    showCharacterCount
+                                    name="observacoes"
+                                    className="min-h-[120px]"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setDeleteStep("none")}
+                                    disabled={loadingDryRun}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    variant="default"
+                                    onClick={handleContinueToConfirm}
+                                    disabled={loadingDryRun}
+                                    className="bg-brand-green text-white hover:bg-brand-green/90"
+                                >
+                                    {loadingDryRun ? "Carregando..." : "Continuar"}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {deleteStep === "confirm" && (
+                        <div className="space-y-6 pt-2 pb-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="flex items-start">
+                                <InfoCard
+                                    title="Essa decisão é sua."
+                                    message="Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta. Você terá 48 horas para desistir a qualquer momento."
+                                    className="flex-1"
+                                    color="red"
+                                />
+                            </div>
+
+                            {/* SUA CONTA HOJE */}
+                            {dryRunReport && (
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
+                                        Sua conta hoje
+                                    </h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                        {dryRunReport.customersCount > 0 && (
+                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
+                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
+                                                    {dryRunReport.customersCount}
+                                                </span>
+                                                <span className="text-[11px] text-brand-inactive-text font-medium">
+                                                    Clientes cadastrados
+                                                </span>
+                                            </div>
+                                        )}
+                                        {dryRunReport.productsCount > 0 && (
+                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
+                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
+                                                    {dryRunReport.productsCount}
+                                                </span>
+                                                <span className="text-[11px] text-brand-inactive-text font-medium">
+                                                    Produtos
+                                                </span>
+                                            </div>
+                                        )}
+                                        {dryRunReport.servicesCount > 0 && (
+                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
+                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
+                                                    {dryRunReport.servicesCount}
+                                                </span>
+                                                <span className="text-[11px] text-brand-inactive-text font-medium">
+                                                    Serviços
+                                                </span>
+                                            </div>
+                                        )}
+                                        {dryRunReport.ordersCount > 0 && (
+                                            <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
+                                                <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
+                                                    {dryRunReport.ordersCount}
+                                                </span>
+                                                <span className="text-[11px] text-brand-inactive-text font-medium">
+                                                    Pedidos realizados
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* CONFIRMAÇÃO POR ESCRITO */}
+                            <div className="py-4 border-t border-brand-border dark:border-dark-border text-center space-y-3">
+                                <p className="text-xs font-bold text-red-600 dark:text-red-400">
+                                    Atenção: Esta ação é definitiva e removerá todos os seus dados.
+                                </p>
+                                <p className="text-xs text-brand-inactive-text">
+                                    Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar.
+                                </p>
+                                <input
+                                    type="text"
+                                    value={confirmText}
+                                    onChange={(e) => setConfirmText(e.target.value)}
+                                    placeholder="EXCLUIR"
+                                    className="w-full max-w-[200px] mx-auto text-center uppercase tracking-wider font-bold h-10 border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                                />
+                            </div>
+
+                            {/* FOOTER ACTIONS */}
+                            <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setDeleteStep("none")}
+                                    disabled={isDeleting}
+                                    className="flex-1 h-12 font-bold"
+                                >
+                                    Desistir
+                                </Button>
+                                <Button
+                                    variant="default"
+                                    onClick={handleDeleteAccount}
+                                    disabled={isDeleting || confirmText !== "EXCLUIR"}
+                                    className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-bold"
+                                >
+                                    {isDeleting ? "Excluindo..." : "Confirmar exclusão"}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DefaultModal>
+
+                {/* Modal para Assinatura Ativa (Bloqueio de Exclusão) */}
+                <DefaultModal
+                    isOpen={activeSubModalOpen}
+                    onClose={() => setActiveSubModalOpen(false)}
+                    title="Assinatura Ativa Detectada"
+                >
+                    <div className="space-y-4 py-2">
+                        <p className="text-sm text-brand-dark dark:text-dark-body">
+                            Você possui uma assinatura ativa da plataforma. Cancele sua assinatura antes de excluir sua conta.
+                        </p>
+                        <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                            <Button variant="outline" onClick={() => setActiveSubModalOpen(false)}>
+                                Voltar
+                            </Button>
+                            <Button
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                                onClick={() => {
+                                    setActiveSubModalOpen(false)
+                                    setCancelModal(true)
+                                }}
+                            >
+                                Cancelar assinatura
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
             </div>
         </FadeIn>
     )

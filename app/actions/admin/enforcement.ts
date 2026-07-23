@@ -642,6 +642,7 @@ export async function softDeleteProduct(
             deleted_reason: reason.trim(),
             deleted_by: admin.userId,
             is_active: false,
+            status: "archived",
         } as any)
         .eq("id", productId)
 
@@ -699,6 +700,7 @@ export async function softDeleteService(
             deleted_reason: reason.trim(),
             deleted_by: admin.userId,
             is_active: false,
+            status: "archived",
         } as any)
         .eq("id", serviceId)
 
