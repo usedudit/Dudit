@@ -280,6 +280,20 @@ export interface EnforcementPartner {
     suspended_until: string | null
     risk_score: number
     created_at: string
+    partner_id?: string
+    type: "partner" | "store"
+    stores?: AdminStoreEntry[]
+}
+
+export interface AdminStoreEntry {
+    id: string
+    name: string
+    is_active: boolean
+    suspended_at: string | null
+    suspended_reason: string | null
+    risk_score: number
+    created_at: string
+    partner_id: string
 }
 
 // ─── Subscription Types ─────────────────────────────────────────────────────

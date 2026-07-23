@@ -7,9 +7,8 @@ import {
     StoreIcon,
     CheckCircleIcon,
     BlockedIcon,
-    ClockIcon,
     AlertTriangleIcon,
-    UserIcon
+    UserIcon,
 } from "@/lib/icons"
 import type { EnforcementPartner } from "@/lib/admin/types"
 
@@ -20,6 +19,8 @@ interface PartnerListRowProps {
     onSuspend: (partner: EnforcementPartner) => void
     onEnableERP: (partner: EnforcementPartner) => void
     onDisableERP: (partner: EnforcementPartner) => void
+    onUnsuspendStore: (partner: EnforcementPartner) => void
+    onSuspendStore: (partner: EnforcementPartner) => void
     onView: (partner: EnforcementPartner) => void
 }
 
@@ -30,26 +31,45 @@ const PartnerListRow = React.memo(({
     onSuspend,
     onEnableERP,
     onDisableERP,
+    onUnsuspendStore,
+    onSuspendStore,
     onView
 }: PartnerListRowProps) => {
+    const isStore = partner.type === "store"
 
     return (
         <motion.tr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+            className={`group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer ${isStore ? "bg-blue-50/30 dark:bg-blue-900/5" : "bg-white dark:bg-dark-background"}`}
             onClick={() => onView(partner)}
         >
-            {/* Parceiro */}
+            {/* Parceiro / Loja */}
             <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                        {partner.store_name}
-                    </span>
-                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                    <div className="flex items-center gap-2">
+                        {isStore ? (
+                            <StoreIcon size={14} className="text-blue-500 shrink-0" />
+                        ) : (
+                            <StoreIcon size={14} className="text-brand-dark shrink-0" />
+                        )}
+                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                            {partner.store_name}
+                        </span>
+                    </div>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-6">
                         {partner.id}
                     </span>
                 </div>
+            </td>
+
+            {/* Tipo */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                {isStore ? (
+                    <Badge variant="blue">Loja</Badge>
+                ) : (
+                    <Badge variant="green">Parceiro</Badge>
+                )}
             </td>
 
             {/* Dono */}
@@ -93,14 +113,24 @@ const PartnerListRow = React.memo(({
             {/* Status */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center">
-                    {partner.erp_disabled ? (
-                        <Badge variant="red">ERP Off</Badge>
-                    ) : partner.suspended_at ? (
-                        <Badge variant="orange">Suspenso</Badge>
-                    ) : !partner.is_active ? (
-                        <Badge variant="gray">Inativo</Badge>
+                    {isStore ? (
+                        partner.suspended_at ? (
+                            <Badge variant="orange">Suspensa</Badge>
+                        ) : partner.is_active ? (
+                            <Badge variant="green">Ativa</Badge>
+                        ) : (
+                            <Badge variant="gray">Inativa</Badge>
+                        )
                     ) : (
-                        <Badge variant="green">Ativo</Badge>
+                        partner.erp_disabled ? (
+                            <Badge variant="red">ERP Off</Badge>
+                        ) : partner.suspended_at ? (
+                            <Badge variant="orange">Suspenso</Badge>
+                        ) : !partner.is_active ? (
+                            <Badge variant="gray">Inativo</Badge>
+                        ) : (
+                            <Badge variant="green">Ativo</Badge>
+                        )
                     )}
                 </div>
             </td>
@@ -108,27 +138,41 @@ const PartnerListRow = React.memo(({
             {/* Ações */}
             <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
-                    <ActionsDropdown>
-                        {partner.suspended_at ? (
-                            <DropdownItem onClick={() => onUnsuspend(partner)} className="text-brand-green">
-                                <CheckCircleIcon size={16} /> Reativar Parceiro
-                            </DropdownItem>
-                        ) : (
-                            <DropdownItem onClick={() => onSuspend(partner)} className="text-brand-orange">
-                                <AlertTriangleIcon size={16} /> Suspender Parceiro
-                            </DropdownItem>
-                        )}
+                    {isStore ? (
+                        <ActionsDropdown>
+                            {partner.suspended_at ? (
+                                <DropdownItem onClick={() => onUnsuspendStore(partner)} className="text-brand-green">
+                                    <CheckCircleIcon size={16} /> Reativar Loja
+                                </DropdownItem>
+                            ) : (
+                                <DropdownItem onClick={() => onSuspendStore(partner)} className="text-brand-orange">
+                                    <AlertTriangleIcon size={16} /> Suspender Loja
+                                </DropdownItem>
+                            )}
+                        </ActionsDropdown>
+                    ) : (
+                        <ActionsDropdown>
+                            {partner.suspended_at ? (
+                                <DropdownItem onClick={() => onUnsuspend(partner)} className="text-brand-green">
+                                    <CheckCircleIcon size={16} /> Reativar Parceiro
+                                </DropdownItem>
+                            ) : (
+                                <DropdownItem onClick={() => onSuspend(partner)} className="text-brand-orange">
+                                    <AlertTriangleIcon size={16} /> Suspender Parceiro
+                                </DropdownItem>
+                            )}
 
-                        {partner.erp_disabled ? (
-                            <DropdownItem onClick={() => onEnableERP(partner)} className="text-brand-blue">
-                                <CheckCircleIcon size={16} /> Habilitar ERP
-                            </DropdownItem>
-                        ) : (
-                            <DropdownItem onClick={() => onDisableERP(partner)} className="text-brand-red">
-                                <BlockedIcon size={16} /> Desabilitar ERP
-                            </DropdownItem>
-                        )}
-                    </ActionsDropdown>
+                            {partner.erp_disabled ? (
+                                <DropdownItem onClick={() => onEnableERP(partner)} className="text-brand-blue">
+                                    <CheckCircleIcon size={16} /> Habilitar ERP
+                                </DropdownItem>
+                            ) : (
+                                <DropdownItem onClick={() => onDisableERP(partner)} className="text-brand-red">
+                                    <BlockedIcon size={16} /> Desabilitar ERP
+                                </DropdownItem>
+                            )}
+                        </ActionsDropdown>
+                    )}
                 </div>
             </td>
         </motion.tr>

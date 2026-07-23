@@ -163,7 +163,6 @@ export async function getPartners(
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
-    // Use admin client to bypass RLS and see ALL partners
     const supabase: any = getAdminClient()
     const pageSize = Math.min(limit, 50)
 
@@ -211,24 +210,105 @@ export async function getPartners(
         ownerMap = new Map((owners || []).map((o: any) => [o.user_id, o.full_name]))
     }
 
-    const mapped: EnforcementPartner[] = items.map((p: any) => ({
-        id: p.id,
-        store_name: p.store_name || "Sem nome",
-        owner_name: ownerMap.get(p.user_id) || "Desconhecido",
-        owner_user_id: p.user_id,
-        is_active: p.is_active,
-        erp_disabled: p.erp_disabled || false,
-        suspended_at: p.suspended_at,
-        suspended_until: p.suspended_until,
-        risk_score: p.risk_score || 0,
-        created_at: p.created_at,
+    // Fetch stores for each partner
+    const partnerIds = items.map((p: any) => p.id)
+    let storesByPartner = new Map<string, any[]>()
+    if (partnerIds.length > 0) {
+        const { data: stores } = await supabase
+            .from("stores")
+            .select("id, name, is_active, suspended_at, suspended_reason, risk_score, created_at, partner_id")
+            .in("partner_id", partnerIds)
+        if (stores) {
+            for (const s of stores) {
+                const list = storesByPartner.get(s.partner_id) || []
+                list.push(s)
+                storesByPartner.set(s.partner_id, list)
+            }
+        }
+    }
+
+    // If searching, also search stores
+    let storeMatches: any[] = []
+    if (search && search.trim().length > 0) {
+        const sanitized = sanitizeIlike(search.trim())
+        const { data: searchStores } = await supabase
+            .from("stores")
+            .select("id, name, is_active, suspended_at, suspended_reason, risk_score, created_at, partner_id")
+            .ilike("name", `%${sanitized}%`)
+        if (searchStores) {
+            // Also fetch partner info for matching stores
+            const storePartnerIds = [...new Set(searchStores.map((s: any) => s.partner_id))]
+            const { data: storePartners } = await supabase
+                .from("partners")
+                .select("id, store_name, user_id, is_active, erp_disabled, suspended_at, suspended_until, risk_score, created_at")
+                .in("id", storePartnerIds)
+            const partnerMap = new Map((storePartners || []).map((p: any) => [p.id, p]))
+
+            // Only include stores whose partner is not already in the main list
+            const existingIds = new Set(items.map((p: any) => p.id))
+            const storePartnerIdsSet = new Set(storePartnerIds)
+            // Filter out stores whose partners are already in results
+            storeMatches = searchStores
+                .filter((s: any) => !existingIds.has(s.partner_id))
+                .map((s: any) => {
+                    const p = partnerMap.get(s.partner_id)
+                    return { store: s, partner: p }
+                })
+                .filter((x: any) => x.partner)
+        }
+    }
+
+    const mapped: EnforcementPartner[] = items.map((p: any) => {
+        const stores = (storesByPartner.get(p.id) || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            is_active: s.is_active,
+            suspended_at: s.suspended_at,
+            suspended_reason: s.suspended_reason,
+            risk_score: s.risk_score || 0,
+            created_at: s.created_at,
+            partner_id: s.partner_id,
+        }))
+        return {
+            id: p.id,
+            store_name: p.store_name || "Sem nome",
+            owner_name: ownerMap.get(p.user_id) || "Desconhecido",
+            owner_user_id: p.user_id,
+            is_active: p.is_active,
+            erp_disabled: p.erp_disabled || false,
+            suspended_at: p.suspended_at,
+            suspended_until: p.suspended_until,
+            risk_score: p.risk_score || 0,
+            created_at: p.created_at,
+            type: "partner",
+            stores: stores.length > 0 ? stores : undefined,
+        }
+    })
+
+    // Add store-only items found by search
+    const storeMapped: EnforcementPartner[] = storeMatches.map((x: any) => ({
+        id: x.store.id,
+        store_name: `${x.store.name} (${x.partner.store_name})`,
+        owner_name: ownerMap.get(x.partner.user_id) || "Desconhecido",
+        owner_user_id: x.partner.user_id || "",
+        is_active: x.store.is_active,
+        erp_disabled: false,
+        suspended_at: x.store.suspended_at,
+        suspended_until: null,
+        risk_score: x.store.risk_score || 0,
+        created_at: x.store.created_at,
+        partner_id: x.store.partner_id,
+        type: "store",
     }))
 
+    const allItems = [...mapped, ...storeMapped]
+    const totalHasMore = hasMore || storeMapped.length > 0
+
     return {
-        data: mapped,
-        nextCursor: hasMore && items.length > 0 ? items[items.length - 1].created_at : null,
+        data: allItems,
+        nextCursor: totalHasMore && allItems.length > 0 ? allItems[allItems.length - 1].created_at : null,
         prevCursor: cursor || null,
-        hasMore,
+        hasMore: totalHasMore,
     }
 }
 
@@ -532,6 +612,116 @@ export async function unsuspendPartner(
         targetType: "partner",
         targetId: partnerId,
         metadata: { reason: reason.trim(), storeName: partner.store_name },
+    })
+
+    return { success: true }
+}
+
+// ─── Suspend Store (store-level, not partner) ⚠️ (step-up required) ─────────
+
+export async function suspendStore(
+    storeId: string,
+    reason: string,
+    stepUpToken: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("admin")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+    await requireStepUp(admin.userId, stepUpToken)
+
+    if (!reason || reason.trim().length < 5) {
+        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
+    }
+
+    const supabase: any = getAdminClient()
+
+    const { data: store, error: fetchError } = await supabase
+        .from("stores")
+        .select("id, name, partner_id, is_active, suspended_at")
+        .eq("id", storeId)
+        .single()
+
+    if (fetchError || !store) {
+        return { success: false, error: "Loja não encontrada" }
+    }
+
+    if (store.suspended_at) {
+        return { success: false, error: "Loja já está suspensa" }
+    }
+
+    const { error: updateError } = await supabase
+        .from("stores")
+        .update({
+            is_active: false,
+            suspended_at: new Date().toISOString(),
+            suspended_reason: reason.trim(),
+            suspended_by: admin.userId,
+        } as any)
+        .eq("id", storeId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.PARTNER_SUSPEND,
+        targetType: "partner",
+        targetId: storeId,
+        metadata: { reason: reason.trim(), storeName: store.name, storeId },
+    })
+
+    return { success: true }
+}
+
+// ─── Unsuspend Store ────────────────────────────────────────────────────────
+
+export async function unsuspendStore(
+    storeId: string,
+    reason: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("admin")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (!reason || reason.trim().length < 5) {
+        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
+    }
+
+    const supabase: any = getAdminClient()
+
+    const { data: store, error: fetchError } = await supabase
+        .from("stores")
+        .select("id, name, suspended_at")
+        .eq("id", storeId)
+        .single()
+
+    if (fetchError || !store) {
+        return { success: false, error: "Loja não encontrada" }
+    }
+
+    if (!store.suspended_at) {
+        return { success: false, error: "Loja não está suspensa" }
+    }
+
+    const { error: updateError } = await supabase
+        .from("stores")
+        .update({
+            is_active: true,
+            suspended_at: null,
+            suspended_reason: null,
+            suspended_by: null,
+        } as any)
+        .eq("id", storeId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.PARTNER_UNSUSPEND,
+        targetType: "partner",
+        targetId: storeId,
+        metadata: { reason: reason.trim(), storeName: store.name },
     })
 
     return { success: true }

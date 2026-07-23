@@ -70,9 +70,16 @@ const ReturnListRow = React.memo(({ request, isPending, onDetail }: ReturnListRo
             </td>
 
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
-                <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                    {request.partners?.store_name || request.partners?.business_type || "-"}
-                </span>
+                <div className="flex flex-col min-w-0">
+                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                        {request.partners?.store_name || request.partners?.business_type || "-"}
+                    </span>
+                    {request.orders?.store_id && (
+                        <span className="text-[11px] font-medium text-brand-inactive-text">
+                            store: {request.orders.store_id.slice(0, 8)}
+                        </span>
+                    )}
+                </div>
             </td>
 
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">

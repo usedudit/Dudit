@@ -26,6 +26,12 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_store_id ON subscriptions(store_id)
 ALTER TABLE recurring_subscriptions ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_recurring_subscriptions_store_id ON recurring_subscriptions(store_id);
 
+-- Add suspension columns to stores table for admin enforcement
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS suspended_reason TEXT;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS suspended_by UUID REFERENCES user_profiles(user_id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_stores_suspended_at ON stores(suspended_at);
+
 -- ─── 2. Store-level risk functions ───────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.mp_store_risk_rank_multiplier(p_risk_score INTEGER)

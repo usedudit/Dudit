@@ -55,11 +55,18 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
             </td>
 
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
-                <div className="flex items-center gap-1">
-                    <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
-                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                        {order.partners?.store_name || order.partners?.business_type || "-"}
-                    </span>
+                <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-1">
+                        <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
+                        <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                            {order.partners?.store_name || order.partners?.business_type || "-"}
+                        </span>
+                    </div>
+                    {order.stores?.name && (
+                        <span className="text-[11px] font-medium text-brand-inactive-text ml-4">
+                            Loja: {order.stores.name}
+                        </span>
+                    )}
                 </div>
             </td>
 

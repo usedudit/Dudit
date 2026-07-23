@@ -15,6 +15,8 @@ import {
     getPartners,
     suspendPartner,
     unsuspendPartner,
+    suspendStore,
+    unsuspendStore,
     disableTenantAccess,
     enableTenantAccess,
 } from "@/app/actions/admin/enforcement"
@@ -64,11 +66,13 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
     const [enableTarget, setEnableTarget] = useState<EnforcementPartner | null>(null)
     const [suspendTarget, setSuspendTarget] = useState<EnforcementPartner | null>(null)
     const [unsuspendTarget, setUnsuspendTarget] = useState<EnforcementPartner | null>(null)
+    const [suspendStoreTarget, setSuspendStoreTarget] = useState<EnforcementPartner | null>(null)
+    const [unsuspendStoreTarget, setUnsuspendStoreTarget] = useState<EnforcementPartner | null>(null)
     const [disableReason, setDisableReason] = useState("")
     const [disableDuration, setDisableDuration] = useState<number | null>(30)
     const [disableConfirmed, setDisableConfirmed] = useState(false)
     const [showStepUp, setShowStepUp] = useState(false)
-    const [pendingStepUpAction, setPendingStepUpAction] = useState<"disable" | "suspend" | null>(null)
+    const [pendingStepUpAction, setPendingStepUpAction] = useState<"disable" | "suspend" | "suspendStore" | null>(null)
     const [detailPartner, setDetailPartner] = useState<EnforcementPartner | null>(null)
     const [isPending, startTransition] = useTransition()
 
@@ -92,7 +96,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
             const res = await getPartners(cursor, 40, debouncedSearch, statusTab)
             return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (p) => p.id,
+        dedupeKey: (p) => p.id + p.type,
         getDetailFn: async () => null,
     })
 
@@ -140,6 +144,12 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
         setShowStepUp(true)
     }
 
+    const handleSuspendStore = () => {
+        if (!suspendStoreTarget) return
+        setPendingStepUpAction("suspendStore")
+        setShowStepUp(true)
+    }
+
     const handleStepUpAuthenticated = (token: string) => {
         setShowStepUp(false)
 
@@ -168,6 +178,17 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                     toast.error(result.error || "Erro ao suspender parceiro")
                 }
             })
+        } else if (pendingStepUpAction === "suspendStore" && suspendStoreTarget) {
+            startTransition(async () => {
+                const result = await suspendStore(suspendStoreTarget.id, "Suspenso pelo admin", token)
+                if (result.success) {
+                    toast.success("Loja suspensa com sucesso!")
+                    setSuspendStoreTarget(null)
+                    afterMutation(suspendStoreTarget.id)
+                } else {
+                    toast.error(result.error || "Erro ao suspender loja")
+                }
+            })
         }
         setPendingStepUpAction(null)
     }
@@ -182,6 +203,20 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 afterMutation(unsuspendTarget.id)
             } else {
                 toast.error(result.error || "Erro ao reativar parceiro")
+            }
+        })
+    }
+
+    const handleUnsuspendStore = () => {
+        if (!unsuspendStoreTarget) return
+        startTransition(async () => {
+            const result = await unsuspendStore(unsuspendStoreTarget.id, "Reativado pelo admin")
+            if (result.success) {
+                toast.success("Loja reativada com sucesso!")
+                setUnsuspendStoreTarget(null)
+                afterMutation(unsuspendStoreTarget.id)
+            } else {
+                toast.error(result.error || "Erro ao reativar loja")
             }
         })
     }
@@ -238,7 +273,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
                                     {paginatedItems.map((partner) => (
                                         <div
-                                            key={partner.id}
+                                            key={partner.id + partner.type}
                                             className="py-5 flex flex-col gap-3 cursor-pointer"
                                             onClick={() => setDetailPartner(partner)}
                                         >
@@ -252,7 +287,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                                             {partner.store_name}
                                                         </span>
                                                         <span className="text-xs font-medium text-brand-inactive-text">
-                                                            Dono: {partner.owner_name}
+                                                            {partner.type === "store" ? "Loja" : "Parceiro"} &middot; Dono: {partner.owner_name}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -264,14 +299,24 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                             </div>
 
                                             <div className="flex items-center gap-2">
-                                                {partner.erp_disabled ? (
-                                                    <Badge variant="red">ERP Desabilitado</Badge>
-                                                ) : partner.suspended_at ? (
-                                                    <Badge variant="orange">Suspenso</Badge>
-                                                ) : !partner.is_active ? (
-                                                    <Badge variant="gray">Inativo</Badge>
+                                                {partner.type === "store" ? (
+                                                    partner.suspended_at ? (
+                                                        <Badge variant="orange">Suspensa</Badge>
+                                                    ) : partner.is_active ? (
+                                                        <Badge variant="green">Ativa</Badge>
+                                                    ) : (
+                                                        <Badge variant="gray">Inativa</Badge>
+                                                    )
                                                 ) : (
-                                                    <Badge variant="green">Ativo</Badge>
+                                                    partner.erp_disabled ? (
+                                                        <Badge variant="red">ERP Desabilitado</Badge>
+                                                    ) : partner.suspended_at ? (
+                                                        <Badge variant="orange">Suspenso</Badge>
+                                                    ) : !partner.is_active ? (
+                                                        <Badge variant="gray">Inativo</Badge>
+                                                    ) : (
+                                                        <Badge variant="green">Ativo</Badge>
+                                                    )
                                                 )}
                                                 <span className="text-xs text-brand-inactive-text ml-auto">
                                                     {new Date(partner.created_at).toLocaleDateString("pt-BR")}
@@ -280,15 +325,25 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
 
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="flex gap-2 flex-1 action-btn" onClick={e => e.stopPropagation()}>
-                                                    {partner.suspended_at ? (
-                                                        <Button variant="outline" size="sm" onClick={() => setUnsuspendTarget(partner)} className="flex-1 text-xs h-9">Reativar</Button>
+                                                    {partner.type === "store" ? (
+                                                        partner.suspended_at ? (
+                                                            <Button variant="outline" size="sm" onClick={() => setUnsuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Reativar Loja</Button>
+                                                        ) : (
+                                                            <Button variant="outline" size="sm" onClick={() => setSuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Suspender Loja</Button>
+                                                        )
                                                     ) : (
-                                                        <Button variant="outline" size="sm" onClick={() => setSuspendTarget(partner)} className="flex-1 text-xs h-9">Suspender</Button>
-                                                    )}
-                                                    {partner.erp_disabled ? (
-                                                        <Button variant="outline" size="sm" onClick={() => setEnableTarget(partner)} className="flex-1 text-xs h-9">Habilitar ERP</Button>
-                                                    ) : (
-                                                        <Button variant="outline" size="sm" onClick={() => setDisableTarget(partner)} className="flex-1 text-xs h-9">Desativar ERP</Button>
+                                                        <>
+                                                            {partner.suspended_at ? (
+                                                                <Button variant="outline" size="sm" onClick={() => setUnsuspendTarget(partner)} className="flex-1 text-xs h-9">Reativar</Button>
+                                                            ) : (
+                                                                <Button variant="outline" size="sm" onClick={() => setSuspendTarget(partner)} className="flex-1 text-xs h-9">Suspender</Button>
+                                                            )}
+                                                            {partner.erp_disabled ? (
+                                                                <Button variant="outline" size="sm" onClick={() => setEnableTarget(partner)} className="flex-1 text-xs h-9">Habilitar ERP</Button>
+                                                            ) : (
+                                                                <Button variant="outline" size="sm" onClick={() => setDisableTarget(partner)} className="flex-1 text-xs h-9">Desativar ERP</Button>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
@@ -299,10 +354,11 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                 {/* Desktop Table View */}
                                 <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
                                     <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Parceiro</th>
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Nome</th>
+                                                    <th className="py-3 px-2 w-24 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Tipo</th>
                                                     <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight">Dono</th>
                                                     <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Data</th>
                                                     <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Risco</th>
@@ -313,13 +369,15 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                             <tbody>
                                                 {paginatedItems.map((partner) => (
                                                     <PartnerListRow
-                                                        key={partner.id}
+                                                        key={partner.id + partner.type}
                                                         partner={partner}
                                                         isPending={isPending}
                                                         onUnsuspend={setUnsuspendTarget}
                                                         onSuspend={setSuspendTarget}
                                                         onEnableERP={setEnableTarget}
                                                         onDisableERP={setDisableTarget}
+                                                        onUnsuspendStore={setUnsuspendStoreTarget}
+                                                        onSuspendStore={setSuspendStoreTarget}
                                                         onView={setDetailPartner}
                                                     />
                                                 ))}
@@ -395,7 +453,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 variant="warning"
             />
 
-            {/* Suspend - AlertModal */}
+            {/* Suspend Partner - AlertModal */}
             <AlertModal
                 isOpen={!!suspendTarget}
                 onClose={() => setSuspendTarget(null)}
@@ -406,7 +464,18 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 variant="danger"
             />
 
-            {/* Unsuspend - AlertModal */}
+            {/* Suspend Store - AlertModal */}
+            <AlertModal
+                isOpen={!!suspendStoreTarget}
+                onClose={() => setSuspendStoreTarget(null)}
+                onConfirm={handleSuspendStore}
+                title="Suspender loja"
+                message={`Suspender a loja "${suspendStoreTarget?.store_name || ""}" do marketplace. Produtos desta loja ficarão ocultos.`}
+                confirmText="Suspender Loja"
+                variant="danger"
+            />
+
+            {/* Unsuspend Partner - AlertModal */}
             <AlertModal
                 isOpen={!!unsuspendTarget}
                 onClose={() => setUnsuspendTarget(null)}
@@ -414,6 +483,17 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 title="Reativar parceiro"
                 message={`Reativar "${unsuspendTarget?.store_name || ""}" no marketplace. Produtos voltarão a aparecer.`}
                 confirmText="Reativar"
+                variant="warning"
+            />
+
+            {/* Unsuspend Store - AlertModal */}
+            <AlertModal
+                isOpen={!!unsuspendStoreTarget}
+                onClose={() => setUnsuspendStoreTarget(null)}
+                onConfirm={handleUnsuspendStore}
+                title="Reativar loja"
+                message={`Reativar a loja "${unsuspendStoreTarget?.store_name || ""}" no marketplace.`}
+                confirmText="Reativar Loja"
                 variant="warning"
             />
 
@@ -450,7 +530,7 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
             {/* Header */}
             <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Parceiro</h2>
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes</h2>
                 <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
@@ -467,6 +547,9 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
                             {partner.store_name}
                         </h3>
+                        <Badge variant={partner.type === "store" ? "blue" : "green"}>
+                            {partner.type === "store" ? "Loja" : "Parceiro"}
+                        </Badge>
                         <div className="flex items-center gap-2 mt-1">
                             <span className="text-[11px] font-bold text-brand-inactive-text">Score de Risco</span>
                             <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${partner.risk_score > 70 ? "bg-red-100 text-red-700" : partner.risk_score > 30 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
@@ -490,7 +573,7 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                         <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
                             <ClockIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                             <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Integrado em</span>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Criado em</span>
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                     {new Date(partner.created_at).toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' })}
                                 </span>
@@ -500,13 +583,40 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                         <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
                             <ShieldIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                             <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Status do Sistema</span>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Status</span>
                                 <div className="flex flex-wrap gap-2 mt-1">
-                                    {partner.suspended_at ? <Badge variant="red">Suspenso</Badge> : <Badge variant="green">Parceiro Ativo</Badge>}
-                                    {partner.erp_disabled ? <Badge variant="red">ERP Bloqueado</Badge> : <Badge variant="blue">ERP Ativo</Badge>}
+                                    {partner.type === "store" ? (
+                                        partner.suspended_at ? <Badge variant="red">Suspensa</Badge> : <Badge variant="green">Ativa</Badge>
+                                    ) : (
+                                        <>
+                                            {partner.suspended_at ? <Badge variant="red">Suspenso</Badge> : <Badge variant="green">Parceiro Ativo</Badge>}
+                                            {partner.erp_disabled ? <Badge variant="red">ERP Bloqueado</Badge> : <Badge variant="blue">ERP Ativo</Badge>}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
+
+                        {partner.type === "partner" && partner.stores && partner.stores.length > 0 && (
+                            <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
+                                <StoreIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
+                                <div className="flex-1">
+                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Lojas</span>
+                                    <div className="flex flex-col gap-2 mt-2">
+                                        {partner.stores.map((s) => (
+                                            <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-dark-background border border-brand-border dark:border-dark-border">
+                                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{s.name}</span>
+                                                {s.suspended_at ? (
+                                                    <Badge variant="orange">Suspensa</Badge>
+                                                ) : (
+                                                    <Badge variant="green">Ativa</Badge>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -514,7 +624,7 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                     <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Identificação</h4>
                     <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-brand-inactive-text font-medium">Tenant ID</span>
+                            <span className="text-xs text-brand-inactive-text font-medium">ID</span>
                             <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{partner.id}</code>
                         </div>
                     </div>
