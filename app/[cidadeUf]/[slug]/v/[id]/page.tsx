@@ -130,16 +130,16 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     }
   })
 
-  normalizeBusinessInfo(partner?.business_info)
+  normalizeBusinessInfo(store.business_info || partner?.business_info)
 
   const productCategories = Array.from(new Set(filteredProducts?.map((p: any) => p.category).filter(Boolean))) as string[]
   const serviceCategories = Array.from(new Set(filteredServices?.map((s: any) => s.category).filter(Boolean))) as string[]
 
-  const createdDate = new Date(partner?.created_at || store.created_at)
+  const createdDate = new Date(store.created_at || partner?.created_at)
   const yearsOnPlatform = new Date().getFullYear() - createdDate.getFullYear() || 1
 
   const stats = {
-    salesCount: Number(partner?.vendas_totais || 0),
+    salesCount: Number(store.vendas_totais ?? partner?.vendas_totais ?? 0),
     reviewsCount: statsBase?.reviewsCount || 0,
     yearsOnPlatform,
     itemsCount: (filteredProducts?.length || 0) + (filteredServices?.length || 0),
@@ -153,6 +153,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const address = store.addresses?.[0]
   const storeCity = address?.city || store.city || ""
   const storeState = address?.state || store.state || ""
+  const storeRating = Number(store.rating ?? partner?.rating ?? 0)
 
   const schemaJsonLd = {
     '@context': 'https://schema.org',
@@ -168,10 +169,10 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       postalCode: address?.zip_code || '',
       addressCountry: 'BR',
     },
-    telephone: store.phone || partner?.phone || '',
-    aggregateRating: partner?.rating ? {
+    telephone: store.phone || store.whatsapp_phone || partner?.phone || '',
+    aggregateRating: storeRating > 0 ? {
       '@type': 'AggregateRating',
-      ratingValue: Number(partner.rating).toFixed(1),
+      ratingValue: storeRating.toFixed(1),
       reviewCount: statsBase?.reviewsCount || 1,
     } : undefined,
     makesOffer: [
@@ -214,7 +215,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     id: store.id,
     storeName: store.name || partner?.store_name || "Loja",
     storeDescription: store.description || partner?.store_description || "",
-    storeImageUrl: store.logo_url || partner?.store_image_url || null,
+    storeImageUrl: store.logo_url || store.image_url || partner?.store_image_url || null,
     profile_image_url: null,
     city: address?.city || store.city || "",
     state: address?.state || store.state || "",
@@ -222,19 +223,19 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     number: address?.number || "",
     neighborhood: address?.neighborhood || "",
     zipCode: address?.zip_code || "",
-    rating: Number(partner?.rating || 0),
+    rating: storeRating,
     createdAt: store.created_at || partner?.created_at,
-    offeringType: null,
+    offeringType: store.offering_type || partner?.offering_type || null,
     openingHours: store.opening_hours || partner?.opening_hours || null,
-    phone: store.phone || partner?.phone || "",
-    lat: null,
-    lng: null,
-    businessInfo: partner?.business_info,
-    paymentMethods: null,
+    phone: store.phone || store.whatsapp_phone || partner?.phone || "",
+    lat: store.latitude || null,
+    lng: store.longitude || null,
+    businessInfo: store.business_info || partner?.business_info || null,
+    paymentMethods: store.payment_methods?.length ? store.payment_methods : (partner?.payment_methods || []),
     banner_url: store.banner_url || partner?.banner_url || null,
     gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',
-    isShowcaseActive: partner?.is_showcase_active !== false,
+    isShowcaseActive: store.is_showcase_active ?? partner?.is_showcase_active ?? true,
   }
 
   return (

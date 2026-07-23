@@ -117,11 +117,11 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     redirect(correctUrl)
   }
 
-  const createdDate = new Date(p?.created_at || store.created_at)
+  const createdDate = new Date(store.created_at || p?.created_at)
   const yearsOnPlatform = new Date().getFullYear() - createdDate.getFullYear() || 1
 
   const stats = {
-    salesCount: statsBase?.salesCount || 0,
+    salesCount: Number(store.vendas_totais ?? p?.vendas_totais ?? statsBase?.salesCount ?? 0),
     reviewsCount: statsBase?.reviewsCount || 0,
     yearsOnPlatform,
     itemsCount: (products?.length || 0) + (services?.length || 0),
@@ -148,6 +148,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const sdesc = store.description || p?.store_description || ""
   const logo = store.logo_url || store.image_url || p?.store_image_url || 'https://img.dudit.com.br/static/Logo.png'
   const banner = store.banner_url || p?.banner_url || ""
+  const storeRating = Number(store.rating ?? p?.rating ?? 0)
 
   const schemaJsonLd = {
     '@context': 'https://schema.org',
@@ -163,10 +164,10 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       postalCode: addr?.zip_code || '',
       addressCountry: 'BR',
     },
-    telephone: store.phone || p?.phone || '',
-    aggregateRating: p?.rating ? {
+    telephone: store.phone || store.whatsapp_phone || p?.phone || '',
+    aggregateRating: storeRating > 0 ? {
       '@type': 'AggregateRating',
-      ratingValue: Number(p.rating).toFixed(1),
+      ratingValue: storeRating.toFixed(1),
       reviewCount: statsBase?.reviewsCount || 1,
     } : undefined,
     makesOffer: [
@@ -210,26 +211,26 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     storeName: store.name || p?.store_name || "",
     storeDescription: store.description || p?.store_description || "",
     storeImageUrl: logo,
-    profile_image_url: p?.profile_image_url || null,
+    profile_image_url: null,
     city: storeCity,
     state: storeState,
     street: addr?.street || "",
     number: addr?.number || "",
     neighborhood: addr?.neighborhood || "",
     zipCode: addr?.zip_code || "",
-    rating: Number(p?.rating || 0),
-    createdAt: p?.created_at || store.created_at,
-    offeringType: p?.offering_type || null,
+    rating: storeRating,
+    createdAt: store.created_at || p?.created_at,
+    offeringType: store.offering_type || p?.offering_type || null,
     openingHours: store.opening_hours || p?.opening_hours || null,
-    phone: store.phone || p?.phone || null,
+    phone: store.phone || store.whatsapp_phone || p?.phone || null,
     lat: store.latitude || null,
     lng: store.longitude || null,
     businessInfo: store.business_info || p?.business_info || null,
-    paymentMethods: p?.payment_methods || [],
+    paymentMethods: store.payment_methods?.length ? store.payment_methods : (p?.payment_methods || []),
     banner_url: banner,
     gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',
-    isShowcaseActive: store.is_showcase_active !== false,
+    isShowcaseActive: store.is_showcase_active ?? p?.is_showcase_active ?? true,
   }
 
   return (

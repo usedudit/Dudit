@@ -24,7 +24,7 @@ export const getCachedStoreBySlug = async (slug: string) => {
                     .from("stores")
                     .select(`
                         *,
-                        partners!inner(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*))
+                        partners!inner(id, store_name, store_description, store_image_url, banner_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*))
                     `)
                     .eq("slug", slug)
                     .eq("is_active", true)
@@ -45,7 +45,7 @@ export async function getStoreBySlug(slug: string) {
         .from("stores")
         .select(`
                         *,
-                        partners!inner(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*))
+                        partners!inner(id, store_name, store_description, store_image_url, banner_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*))
         `)
         .eq("slug", slug)
         .eq("is_active", true)
@@ -63,7 +63,7 @@ export const getCachedStoreById = async (storeId: string) => {
                     .from("stores")
                     .select(`
                         *,
-                        partners!left(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*))
+                        partners!left(id, store_name, store_description, store_image_url, banner_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*))
                     `)
                     .eq("id", storeId)
                     .maybeSingle()
