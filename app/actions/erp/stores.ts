@@ -18,7 +18,7 @@ export async function listStoresAction(partnerId: string) {
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
         .from("stores")
-        .select("*")
+        .select("*, addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: true })
 
@@ -32,7 +32,7 @@ export async function getStoreAction(storeId: string) {
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
         .from("stores")
-        .select("*")
+        .select("*, addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
         .eq("id", storeId)
         .single()
 

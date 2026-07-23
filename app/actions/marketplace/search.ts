@@ -715,6 +715,7 @@ async function hydrateMarketplaceSearchHits(
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                stores!inner(id, name, logo_url, image_url, banner_url, city, state),
                 product_variants(variant_options, price_adjustment, is_active),
                 show_price_in_store
             `)
@@ -741,7 +742,8 @@ async function hydrateMarketplaceSearchHits(
     if (lojasIds.length > 0) {
         promises.push(
             supabase.from("partners").select(`
-                id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at, is_showcase_active, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
+                id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at, is_showcase_active, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count),
+                stores!inner(id, name, logo_url, image_url, banner_url, city, state)
             `).in("id", lojasIds)
         )
     }
@@ -750,6 +752,7 @@ async function hydrateMarketplaceSearchHits(
             supabase.from("recurring_plans").select(`
                 id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                 partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                stores!inner(id, name, logo_url, image_url, banner_url, city, state),
                 recurring_plan_items(
                     id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                     products:product_id(id, name, price, images),
@@ -780,23 +783,29 @@ async function hydrateMarketplaceSearchHits(
         if (!item) continue
 
         if (hit.item_type === "loja") {
+            const store = Array.isArray(item.stores) ? item.stores[0] : item.stores
+            const storeId = store?.id || item.id
+            const storeName = store?.name || item.store_name || "Vendedor"
+            const storeImage = store?.logo_url || store?.image_url || item.store_image_url
             results.push({
-                id: item.id,
-                name: item.store_name,
-                description: item.store_description,
-                images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+                id: storeId,
+                name: storeName,
+                description: store?.description || item.store_description,
+                images: [store?.banner_url || item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
                 rating: item.rating,
                 itemType: "loja",
                 category: item.category?.parent?.name || item.category?.name || "Loja Parceira",
                 partners: {
-                    id: item.id,
-                    store_name: item.store_name,
-                    store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                    banner_url: item.banner_url || null,
+                    id: storeId,
+                    store_id: storeId,
+                    store_name: storeName,
+                    store_image_url: storeImage,
+                    store_avatar: storeImage || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    banner_url: store?.banner_url || item.banner_url || null,
                     latitude: item.latitude,
                     longitude: item.longitude,
-                    city: item.addresses?.[0]?.city || null,
-                    state: item.addresses?.[0]?.state || null,
+                    city: store?.city || item.addresses?.[0]?.city || null,
+                    state: store?.state || item.addresses?.[0]?.state || null,
                     reviewsCount: item.reviews?.[0]?.count || 0,
                 },
                 created_at: item.created_at,
@@ -811,13 +820,22 @@ async function hydrateMarketplaceSearchHits(
         }
 
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        const storeId = rawStore?.id || rawPartner?.id
+        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
+        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
         const partner = rawPartner ? {
             ...rawPartner,
-            store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+            store_id: storeId,
+            store_name: storeName,
+            store_image_url: storeImage,
+            store_avatar: storeImage || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
             latitude: rawPartner.latitude,
             longitude: rawPartner.longitude,
-            city: rawPartner.addresses?.[0]?.city || null,
-            state: rawPartner.addresses?.[0]?.state || null,
+            city: storeCity,
+            state: storeState,
         } : null
 
         if (hit.item_type === "produto") {

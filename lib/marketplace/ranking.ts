@@ -5,7 +5,8 @@
 export type RankableItem = {
   id: string
   partner_id?: string
-  partners?: { id?: string } | null
+  store_id?: string
+  partners?: { id?: string; store_id?: string } | null
   marketplace_score?: number
   rating?: number
   created_at?: string
@@ -79,7 +80,19 @@ function getPartnerId(item: RankableItem): string | null {
 }
 
 /**
+ * Resolve the store identity for diversity deduplication.
+ * Uses store_id when available (store-aware), falls back to partner_id for legacy items.
+ */
+function getStoreId(item: RankableItem): string | null {
+  if (item.store_id) return item.store_id
+  const p = item.partners
+  if (p && typeof p === "object" && "store_id" in p) return (p as any).store_id || null
+  return getPartnerId(item)
+}
+
+/**
  * Lightweight seller diversity: avoid more than 2 consecutive items from same seller.
+ * Deduplicates by store_id when available, falls back to partner_id for legacy items.
  * O(n) single pass - swaps in a different-seller item when needed.
  */
 export function applySellerDiversity<T extends RankableItem>(items: T[], maxConsecutive = 2): T[] {
@@ -89,20 +102,20 @@ export function applySellerDiversity<T extends RankableItem>(items: T[], maxCons
   const deferred: T[] = []
 
   for (const item of items) {
-    const pid = getPartnerId(item)
-    if (!pid) {
+    const sid = getStoreId(item)
+    if (!sid) {
       result.push(item)
       continue
     }
 
     let consecutive = 0
     for (let i = result.length - 1; i >= 0; i--) {
-      if (getPartnerId(result[i]) === pid) consecutive++
+      if (getStoreId(result[i]) === sid) consecutive++
       else break
     }
 
     if (consecutive >= maxConsecutive) {
-      const swapIdx = deferred.findIndex((d) => getPartnerId(d) !== pid)
+      const swapIdx = deferred.findIndex((d) => getStoreId(d) !== sid)
       if (swapIdx >= 0) {
         const swap = deferred.splice(swapIdx, 1)[0]
         result.push(swap)

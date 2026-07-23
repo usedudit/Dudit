@@ -58,6 +58,7 @@ export interface CheckoutSessionData {
     source: "cart" | "product" | "service"
     products: ProductItem[]
     partnerId: string
+    storeId?: string
     partnerInfo: {
         address: any
         paymentMethods: string[]
@@ -310,6 +311,7 @@ export function CheckoutPageClient() {
 
     const products = sessionData?.products || []
     const partnerId = sessionData?.partnerId || ""
+    const storeId = sessionData?.storeId
     const partnerInfo = sessionData?.partnerInfo || { paymentMethods: [] } as any
 
     const cartItemIds = useMemo(
@@ -320,6 +322,7 @@ export function CheckoutPageClient() {
     const { checkoutContext, contextLoading, contextError } = useMarketplaceCheckoutContext({
         partnerId,
         cartItemIds,
+        storeId,
         mpConnected: Boolean(partnerInfo?.mpConnected),
         enabled: Boolean(partnerId && cartItemIds.length > 0),
         refreshTrigger,
@@ -1951,7 +1954,7 @@ export function CheckoutPageClient() {
                         payDepositOnly,
                         checkoutPricingSnapshot,
                         false,
-                        undefined,
+                        storeId,
                         true,
                     )
                     if (result.error) throw new Error(result.error)
@@ -1996,6 +1999,7 @@ export function CheckoutPageClient() {
                         false,
                         checkoutPricingSnapshot,
                         false,
+                        storeId,
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -2115,7 +2119,7 @@ export function CheckoutPageClient() {
                         payDepositOnly,
                         checkoutPricingSnapshot,
                         isPickupPayment,
-                        undefined,
+                        storeId,
                         useStoreCredit && availableStoreCredit > 0,
                     )
                     if (result.error) throw new Error(result.error)

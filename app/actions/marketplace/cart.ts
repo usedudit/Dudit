@@ -99,6 +99,7 @@ export async function getCachedCart(userId: string) {
       booking_metadata,
       pay_deposit_only,
       partner_id,
+      store_id,
       quantity,
       selected,
       created_at,
@@ -182,39 +183,41 @@ export async function getCachedCart(userId: string) {
     console.error("Erro ao buscar dados complementares dos parceiros em paralelo (com batching):", e)
   }
 
-  // 3. Agrupa os itens por Loja (Parceiro)
+  // 3. Agrupa os itens por Loja (store_id com fallback para partner_id)
   const itemsByPartner = cartItems.reduce((acc: any, item: any) => {
     const partnerId = item.partner_id
-    if (typeof partnerId === "string" && partnerId !== "__proto__" && partnerId !== "constructor" && partnerId !== "prototype") {
-      if (!acc[partnerId]) {
-        const partner = item.partners ? { ...item.partners } : null
-        // Anexa endereços ao parceiro
-        if (partner) {
-          partner.addresses = partnerAddresses[partnerId] || []
-        }
-        acc[partnerId] = {
-          partner,
-          items: [],
-          products: [],
-          services: [],
-          subscriptions: [],
-          paymentMethods: Array.from(
-            new Set(
-              (paymentMethods || [])
-                .filter((pm: any) => pm.partner_id === partnerId)
-                .map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
-            )
-          ),
-          deliverySettings: partnerDeliverySettings[partnerId] || null,
-          promotions: partnerPromotions[partnerId] || [],
-        }
+    if (typeof partnerId !== "string" || partnerId === "__proto__" || partnerId === "constructor" || partnerId === "prototype") return acc
+    const storeId = item.store_id || null
+    const storeKey = item.store_id || partnerId
+    if (!acc[storeKey]) {
+      const partner = item.partners ? { ...item.partners } : null
+      if (partner) {
+        partner.addresses = partnerAddresses[partnerId] || []
       }
-      acc[partnerId].items.push(item)
-      const type = item.item_type || "product"
-      if (type === "product") acc[partnerId].products.push(item)
-      else if (type === "service_booking") acc[partnerId].services.push(item)
-      else if (type === "subscription") acc[partnerId].subscriptions.push(item)
+      acc[storeKey] = {
+        storeId,
+        partnerId,
+        partner,
+        items: [],
+        products: [],
+        services: [],
+        subscriptions: [],
+        paymentMethods: Array.from(
+          new Set(
+            (paymentMethods || [])
+              .filter((pm: any) => pm.partner_id === partnerId)
+              .map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
+          )
+        ),
+        deliverySettings: partnerDeliverySettings[partnerId] || null,
+        promotions: partnerPromotions[partnerId] || [],
+      }
     }
+    acc[storeKey].items.push(item)
+    const type = item.item_type || "product"
+    if (type === "product") acc[storeKey].products.push(item)
+    else if (type === "service_booking") acc[storeKey].services.push(item)
+    else if (type === "subscription") acc[storeKey].subscriptions.push(item)
     return acc
   }, {})
 
@@ -222,8 +225,8 @@ export async function getCachedCart(userId: string) {
   const outOfStockVariantProductIds: string[] = []
   const outOfStockVariantIds: string[] = []
 
-  for (const partnerId of Object.keys(itemsByPartner)) {
-    for (const item of (itemsByPartner as any)[partnerId].items) {
+  for (const storeKey of Object.keys(itemsByPartner)) {
+    for (const item of (itemsByPartner as any)[storeKey].items) {
       if (item.variant_id && item.product_variants) {
         const stock = item.product_variants.stock_available ?? item.product_variants.stock_quantity ?? 0
         if (stock <= 0) {
@@ -247,8 +250,8 @@ export async function getCachedCart(userId: string) {
         (v: any) => (v.stock_available ?? v.stock_quantity ?? 0) > 0
       )
 
-      for (const partnerId of Object.keys(itemsByPartner)) {
-        for (const item of (itemsByPartner as any)[partnerId].items) {
+      for (const storeKey of Object.keys(itemsByPartner)) {
+        for (const item of (itemsByPartner as any)[storeKey].items) {
           if (item.variant_id && outOfStockVariantIds.includes(item.variant_id)) {
             item.available_alternatives = availableAlts
               .filter((v: any) => v.product_id === item.product_id && v.id !== item.variant_id)
@@ -410,6 +413,7 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
       .insert({
         user_id: user.id,
         partner_id: partnerId,
+        store_id: storeId || null,
         item_type: "product",
         product_id: resolvedProductId,
         variant_id: variantId || null,
@@ -1134,6 +1138,7 @@ export async function checkoutCartAction(
       customer_id: resolvedCustomerId,
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
+      store_id: storeId || null,
       total_amount: persistedTotal,
       delivery_fee: persistedDeliveryFee,
       distance_km: distanceKm,

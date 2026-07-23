@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { revalidateTag } from "next/cache"
 
 const PARTNER_STATS_TAG = "partner-stats"
+const STORE_STATS_TAG = "store-stats"
 
 /**
  * Central entry point when a marketplace order becomes paid.
@@ -109,11 +110,14 @@ async function invalidatePartnerStatsForOrder(
 ): Promise<void> {
   const { data: order } = await supabase
     .from("orders")
-    .select("partner_id")
+    .select("partner_id, store_id")
     .eq("id", orderId)
     .maybeSingle()
   if (order?.partner_id) {
     revalidateTag(`${PARTNER_STATS_TAG}-${order.partner_id}`, "max")
+  }
+  if (order?.store_id) {
+    revalidateTag(`${STORE_STATS_TAG}-${order.store_id}`, "max")
   }
 }
 

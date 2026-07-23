@@ -104,6 +104,7 @@ async function createBookingFromMetadata(
     })
 
     const updatePayload: Record<string, unknown> = {
+      store_id: params.meta.storeId || null,
       paid_amount: params.paidAmount,
       payment_status: params.paymentStatus,
       fulfillment_mode:
@@ -129,6 +130,7 @@ async function createBookingFromMetadata(
     .from("appointments")
     .insert({
       partner_id: params.partnerId,
+      store_id: params.meta.storeId || null,
       customer_id: customerId,
       customer_name: params.buyerName,
       service_name: params.meta.serviceName,

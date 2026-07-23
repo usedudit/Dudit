@@ -121,15 +121,29 @@ export async function previewMarketplacePaymentAction(input: {
 
   const supabase = await getSupabaseServerClient()
   
-  const { data: method, error } = await supabase
-    .from("payment_methods")
-    .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
-    .eq("id", input.paymentMethodId)
-    .eq("partner_id", input.partnerId)
-    .single()
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.paymentMethodId)
+  
+  let method: any = null
 
-  if (error || !method) {
-    return { success: false as const, error: "Nenhum método de pagamento ativo foi encontrado para o método selecionado." }
+  if (isUuid) {
+    const { data, error } = await supabase
+      .from("payment_methods")
+      .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
+      .eq("id", input.paymentMethodId)
+      .eq("partner_id", input.partnerId)
+      .single()
+  
+    if (error || !data) {
+      return { success: false as const, error: "Nenhum método de pagamento ativo foi encontrado para o método selecionado." }
+    }
+    method = data
+  } else {
+    const { pickBestPaymentMethod } = await import("@/lib/services/payment-method.service")
+    const best = await pickBestPaymentMethod(supabase as any, input.paymentMethodId as any, input.partnerId, { preferDefault: true })
+    if (!best) {
+      return { success: false as const, error: "Nenhum método de pagamento ativo foi encontrado para o método selecionado." }
+    }
+    method = best
   }
   
   const chosenType = toCanonicalPaymentType(method.type || method.payment_type)

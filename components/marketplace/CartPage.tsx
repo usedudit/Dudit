@@ -41,8 +41,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
 
-    const renderPromoBanners = (partnerId: string, partnerItemsTotal: number) => {
-        const promos = itemsByPartner[partnerId]?.promotions || []
+    const renderPromoBanners = (storeKey: string, partnerItemsTotal: number) => {
+        const promos = itemsByPartner[storeKey]?.promotions || []
         const pendingPromos = promos.filter((p: any) =>
             p.minSpendAmount &&
             p.minSpendAmount > partnerItemsTotal &&
@@ -103,8 +103,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const getItemBestPrice = (item: any, promotions: any[]) => getItemPricingContext(item, promotions).bestPrice
 
-    const getPartnerDisplayTotal = (partnerId: string, items: any[]) => {
-        const promos = itemsByPartner[partnerId]?.promotions || []
+    const getPartnerDisplayTotal = (storeKey: string, items: any[]) => {
+        const promos = itemsByPartner[storeKey]?.promotions || []
         return items
             .filter((item: any) => getItemSelected(item))
             .reduce((sum: number, item: any) => sum + getItemBestPrice(item, promos) * getItemQuantity(item), 0)
@@ -322,10 +322,10 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         }
     }
 
-    const handleOpenCheckout = (partnerId: string) => {
+    const handleOpenCheckout = (storeKey: string) => {
         if (!userId) { router.push("/auth/login?next=/cart"); return }
 
-        const partnerData = itemsByPartner[partnerId]
+        const partnerData = itemsByPartner[storeKey]
         const hasSelected = partnerData?.items.some((item: any) => getItemSelected(item))
 
         if (!hasSelected) {
@@ -334,11 +334,13 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         }
 
         const partnerItems = partnerData.items.filter((item: any) => getItemSelected(item))
+        const partnerId = partnerData.partnerId || storeKey
 
         const checkoutData = {
             source: "cart",
-            partnerId: partnerId,
-            products: getPartnerCheckoutProducts(partnerId),
+            partnerId,
+            storeId: partnerData.storeId || undefined,
+            products: getPartnerCheckoutProducts(storeKey),
             partnerInfo: {
                 address: partnerData.partner?.addresses?.[0] || {},
                 paymentMethods: partnerData.paymentMethods || ["Dinheiro"],
@@ -372,29 +374,29 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     }
 
     // Total only counts selected items (with optimistic overrides)
-    const globalTotal = Object.values(itemsByPartner).reduce((acc: number, partner: any) => {
+    const globalTotal = Object.entries(itemsByPartner).reduce((acc: number, [storeKey, partner]: [string, any]) => {
         const items = partner.items.filter((item: any) => getItemSelected(item))
         if (items.length === 0) return acc
-        const itemsTotal = getPartnerDisplayTotal(partner.partner?.id, items)
+        const itemsTotal = getPartnerDisplayTotal(storeKey, items)
         return acc + itemsTotal + getPartnerDeliveryFee(partner)
     }, 0)
 
-    const getPartnerSelectedTotal = (items: any[], partnerId?: string) =>
+    const getPartnerSelectedTotal = (items: any[], storeKey?: string) =>
         items
             .filter((item: any) => getItemSelected(item))
             .reduce((sum: number, item: any) => {
-                const price = partnerId ? getItemBestPrice(item, itemsByPartner[partnerId]?.promotions || []) : (item.products?.price || 0)
+                const price = storeKey ? getItemBestPrice(item, itemsByPartner[storeKey]?.promotions || []) : (item.products?.price || 0)
                 return sum + price * getItemQuantity(item)
             }, 0)
 
-    const getPartnerCheckoutProducts = (partnerId: string) =>
-        itemsByPartner[partnerId].items
+    const getPartnerCheckoutProducts = (storeKey: string) =>
+        itemsByPartner[storeKey].items
             .filter((item: any) => getItemSelected(item))
             .map((item: any) => ({
                 id: item.variant_id || item.product_id || item.service_id || item.recurring_plan_id,
                 name: getItemName(item),
                 variant: item.variant_id && item.product_variants ? `${item.product_variants.variant_type}: ${item.product_variants.variant_name}` : undefined,
-                price: getItemBestPrice(item, partnerId ? itemsByPartner[partnerId]?.promotions || [] : []),
+                price: getItemBestPrice(item, storeKey ? itemsByPartner[storeKey]?.promotions || [] : []),
                 quantity: getItemQuantity(item),
                 image: getItemImage(item),
                 availabilityValue: Number(item.products?.availability_value || 0),
@@ -440,32 +442,33 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         <div className="lg:col-span-12 space-y-8">
-                            {Object.entries(itemsByPartner).map(([partnerId, data]: [string, any], index: number, array: any[]) => {
+                            {Object.entries(itemsByPartner).map(([storeKey, data]: [string, any], index: number, array: any[]) => {
+                                const partnerId = data.partnerId || storeKey
                                 const partnerPromos = data.promotions || []
-                                const partnerItemsTotal = getPartnerSelectedTotal(data.items, partnerId)
+                                const partnerItemsTotal = getPartnerSelectedTotal(data.items, storeKey)
                                 const partnerDeliveryFee = getPartnerDeliveryFee(data)
                                 const partnerTotalWithDelivery = partnerItemsTotal > 0 ? partnerItemsTotal + partnerDeliveryFee : 0
-                                const expanded = isExpanded(partnerId)
+                                const expanded = isExpanded(storeKey)
                                 const inStockItems = data.items.filter((item: any) => !isItemOutOfStock(item))
                                 const allSelected = inStockItems.length > 0 && inStockItems.every((item: any) => getItemSelected(item))
                                 const sellerImage = data.partner?.store_image_url
 
                                 return (
-                                    <Fragment key={partnerId}>
+                                    <Fragment key={storeKey}>
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 lg:gap-y-0 relative items-start">
                                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 bg-transparent overflow-hidden">
                                                 {/* Header do vendedor - estilo Accordion / FormSection */}
                                                 <div
                                                     className="flex items-center justify-between pb-4 mb-4 border-b border-brand-border dark:border-dark-border cursor-pointer select-none"
-                                                    onClick={() => toggleVendor(partnerId)}
+                                                    onClick={() => toggleVendor(storeKey)}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div onClick={e => e.stopPropagation()} className="flex items-center">
                                                             <Checkbox
-                                                                id={`select-partner-${partnerId}`}
+                                                                id={`select-partner-${storeKey}`}
                                                                 checked={allSelected}
                                                                 onChange={() => togglePartnerSelection(partnerId, data.items, allSelected)}
-                                                                disabled={loading === partnerId}
+                                                                disabled={loading === storeKey}
                                                             />
                                                         </div>
                                                         <div className="flex items-center gap-2">
@@ -508,7 +511,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                     section.items.length === 0
                                                                         ? []
                                                                         : [
-                                                                            <div key={`${partnerId}-${section.title}-hdr`} className="flex items-center justify-between mb-3 mt-2 first:mt-0">
+                                                                             <div key={`${storeKey}-${section.title}-hdr`} className="flex items-center justify-between mb-3 mt-2 first:mt-0">
                                                                                 <h4 className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text">{section.title}</h4>
                                                                                 <span className="text-xs text-brand-inactive-text">
                                                                                     {section.items.filter((i: any) => getItemSelected(i)).length} itens · {formatCurrency(
@@ -805,7 +808,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                                                                 {/* Mobile/Tablet: resumo inline + botão */}
                                                                 <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border md:hidden space-y-3">
-                                                                    {renderPromoBanners(partnerId, partnerItemsTotal)}
+                                                                    {renderPromoBanners(storeKey, partnerItemsTotal)}
                                                                     <div className="flex justify-between items-center text-sm">
                                                                         <span className="text-brand-inactive-text">Total dos itens</span>
                                                                         <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
@@ -820,7 +823,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                         <span>{formatCurrency(partnerTotalWithDelivery)}</span>
                                                                     </div>
                                                                     <Button
-                                                                        onClick={() => handleOpenCheckout(partnerId)}
+                                                                        onClick={() => handleOpenCheckout(storeKey)}
                                                                         className="w-full"
                                                                         disabled={partnerItemsTotal === 0}
                                                                     >
@@ -853,7 +856,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 className="overflow-hidden"
                                                             >
                                                                 <div className="p-6 space-y-4">
-                                                                    {renderPromoBanners(partnerId, partnerItemsTotal)}
+                                                                    {renderPromoBanners(storeKey, partnerItemsTotal)}
                                                                     <div className="flex justify-between items-center text-sm font-medium">
                                                                         <span className="text-brand-inactive-text">Total dos itens</span>
                                                                         <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
@@ -868,7 +871,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                         <span>{formatCurrency(partnerTotalWithDelivery)}</span>
                                                                     </div>
                                                                     <Button
-                                                                        onClick={() => handleOpenCheckout(partnerId)}
+                                                                        onClick={() => handleOpenCheckout(storeKey)}
                                                                         className="w-full h-[46px]"
                                                                         disabled={partnerItemsTotal === 0}
                                                                     >

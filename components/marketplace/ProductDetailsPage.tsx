@@ -833,6 +833,7 @@ export function ProductDetailsPageClient({
             const checkoutData = {
                 source: "cart" as const,
                 partnerId: partner.id,
+                storeId: product.store_id || undefined,
                 products: [{
                     id: product.id,
                     name: `${product.name} ${selectedVariant?.variant_name || ""}`.trim(),

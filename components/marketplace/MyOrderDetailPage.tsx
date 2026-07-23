@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
@@ -21,7 +21,7 @@ import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit, getEligibilityLabel, getSlaStatusLabel } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
@@ -632,12 +632,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const dateStrFull = formatFullDate(order.created_at);
     const dateStrTime = formatTime(order.created_at);
     const statusConfig = getStatusConfig(order.situation);
-    const storeImage = order.partners?.store_image_url
-        ? getR2ImageUrl(order.partners.store_image_url)
+    const store = order.stores || order.partners
+    const storeImage = store?.store_image_url || store?.logo_url
+        ? getR2ImageUrl(store?.store_image_url || store?.logo_url)
         : "https://img.dudit.com.br/static/Placeholder.png";
 
     const isDelivery = order.delivery_type === "delivery";
-    const sellerName = order.partners?.store_name || "Loja Parceira";
+    const sellerName = store?.store_name || store?.name || order.partners?.store_name || "Loja Parceira";
     const totalAmount = Number(order.total_amount);
 
     const orderItems = order.order_items || [];
@@ -645,17 +646,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking");
     const hasProducts = orderItems.some((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription");
     const hasMixedItems = hasAnyService && hasProducts;
+    const storeDeleted = isStoreDeleted(order);
+    const isCancelled = order.situation === "cancelled";
     const canCancelOrder = canRequestOrderCancellation(order) && !hasActiveReturn;
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
     const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
-    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && order.situation !== "cancelled" && hasReturnableItems;
+    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
     const returnButtonLabel = order.delivery_status === "delivered"
         ? "Solicitar troca ou devolução"
         : "Solicitar reembolso ou vale-compra";
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
-    const showConfirmReceiptButton = hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
-    const showConfirmExecutionButton = hasAnyService && order.delivery_status !== "delivered";
+    const showConfirmReceiptButton = !isCancelled && hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
+    const showConfirmExecutionButton = !isCancelled && hasAnyService && order.delivery_status !== "delivered";
 
     const showExchangeOption = !hasOnlyServices && order.delivery_status === "delivered";
     const resolutionOptions = [
@@ -1053,11 +1056,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 {getFulfillmentModeLabel(fulfillmentMode)}
                                             </div>
                                         ) : null}
-                                        {isService && order.situation === "cancelled" && (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                <Badge variant="red">Cancelado</Badge>
-                                            </div>
-                                        )}
+
                                     </>
                                 ) : (
                                     <>
@@ -1217,7 +1216,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <XIcon className="w-5 h-5" />
                     </Button>
                     <div className="text-left flex-1 min-w-0">
-                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Pedido #{orderNumber}</h1>
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
+                            <span>Pedido #{orderNumber}</span>
+                            {order.situation === "cancelled" && (
+                                <Badge variant="red">Cancelado</Badge>
+                            )}
+                        </h1>
                         <p className="text-md text-brand-inactive-text mt-1">{dateStrFull}</p>
                     </div>
                     <div className={`flex items-center gap-1.5 text-sm font-bold ${statusConfig.color} shrink-0`}>
@@ -1242,7 +1246,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <div className="lg:col-span-8 space-y-8">
                                     {/* Mobile/Tablet Order Summary Card */}
                                     <div className="block lg:hidden">
-                                        <FormSection title={`Pedido #${orderNumber}`}>
+                                        <FormSection title={
+                                            <div className="flex items-center gap-2">
+                                                <span>Pedido #{orderNumber}</span>
+                                                {order.situation === "cancelled" && (
+                                                    <Badge variant="red">Cancelado</Badge>
+                                                )}
+                                            </div>
+                                        }>
                                             <DetailRow
                                                 label="Status do Pedido"
                                                 value={
@@ -1295,11 +1306,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                             {getFulfillmentModeLabel(fulfillmentMode)}
                                                                         </div>
                                                                     ) : null}
-                                                                    {isService && order.situation === "cancelled" && (
-                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                                            <Badge variant="red">Cancelado</Badge>
-                                                                        </div>
-                                                                    )}
+
                                                                 </>
                                                             ) : (
                                                                 <>
@@ -1422,7 +1429,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         const isCustomerAddress = mode === "customer_location" || mode === "delivery";
                                                         const address = isCustomerAddress
                                                             ? (order.delivery_address || "Endereço nao informado")
-                                                            : formatPartnerAddress(order.partners?.addresses);
+                                                            : order.stores
+                                                                ? `${order.stores.street || ""}, ${order.stores.number || "S/N"}${order.stores.neighborhood ? ` - ${order.stores.neighborhood}` : ""}, ${order.stores.city || ""} - ${order.stores.state || ""}`.replace(/\s+/g, ' ').trim() || "Endereço não informado"
+                                                                : formatPartnerAddress(order.partners?.addresses);
 
                                                         const isServiceCancelled = order.situation === "cancelled";
                                                         const isSub = !!item.recurring_plan_id || item.line_type === "subscription";
@@ -1439,11 +1448,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                     className="w-10 h-10 object-cover rounded-xl shrink-0"
                                                                 />
                                                                 <div className="flex flex-col justify-center min-w-0">
-                                                                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate flex items-center gap-2">
+                                                                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
                                                                         {addressTitle}
-                                                                        {isServiceCancelled && (
-                                                                            <Badge variant="red">Cancelado</Badge>
-                                                                        )}
                                                                     </p>
                                                                     <p className="text-xs lg:text-sm text-brand-inactive-text">
                                                                         {bookingDate && bookingTime ? `${formatDate(bookingDate)} às ${bookingTime} | ` : ""}
@@ -1489,16 +1495,33 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Section 4: Vendedor */}
                                     <FormSection title="Vendedor">
-                                        <Link href={getStoreUrl({ ...order.partners, id: order.partners?.store_id || order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
-                                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
-                                                <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
+                                        {storeDeleted ? (
+                                            <div className="flex items-center gap-4 block">
+                                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                                    <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                        <span>{sellerName}</span>
+                                                        <Tooltip text="Este negócio não está mais no Dudit">
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block align-middle cursor-help" />
+                                                        </Tooltip>
+                                                    </div>
+                                                    <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Este negócio não está mais no Dudit</div>
+                                                </div>
                                             </div>
-                                            <div className="flex-1">
-                                                <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
-                                                <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
-                                            </div>
-                                            <ChevronRightIcon size={18} className="text-brand-inactive-text" />
-                                        </Link>
+                                        ) : (
+                                            <Link href={getStoreUrl({ ...store, id: store?.store_id || store?.id || order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                                    <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
+                                                    <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
+                                                </div>
+                                                <ChevronRightIcon size={18} className="text-brand-inactive-text" />
+                                            </Link>
+                                        )}
                                     </FormSection>
 
                                     {/* Mobile/Tablet Section 5: Resumo dos Valores */}

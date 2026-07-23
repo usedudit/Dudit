@@ -13,6 +13,7 @@ async function checkFraudulentReview(
   partnerId: string,
   productId: string | null,
   serviceId: string | null = null,
+  storeId?: string | null,
 ): Promise<{ isSuspicious: boolean; reason?: string }> {
   console.log(`[REVIEW CHECK] User: ${userId}, Partner: ${partnerId}, Product: ${productId}, Service: ${serviceId}`)
 
@@ -26,32 +27,43 @@ async function checkFraudulentReview(
   }
 
   // 2. Verificar se o usuário tem algum pedido pago DESTE produto/serviço
-  // Selecionamos com !inner join em order_items para garantir que o item específico exista no pedido
   let orders = null;
 
   if (productId) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
       .select("id, order_items!inner(product_id)")
       .eq("buyer_id", userId)
-      .eq("partner_id", partnerId)
       .in("situation", ["paid", "shipped", "delivered"])
       .eq("order_items.product_id", productId)
 
+    if (storeId) {
+      query = query.eq("store_id", storeId)
+    } else {
+      query = query.eq("partner_id", partnerId)
+    }
+
+    const { data, error } = await query
     if (error) {
       console.error(`[REVIEW CHECK] Database error querying orders: ${error.message}`)
       return { isSuspicious: true, reason: "Erro ao verificar histórico de compras" }
     }
     orders = data;
   } else if (serviceId) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
       .select("id, order_items!inner(service_id)")
       .eq("buyer_id", userId)
-      .eq("partner_id", partnerId)
       .in("situation", ["paid", "shipped", "delivered"])
       .eq("order_items.service_id", serviceId)
 
+    if (storeId) {
+      query = query.eq("store_id", storeId)
+    } else {
+      query = query.eq("partner_id", partnerId)
+    }
+
+    const { data, error } = await query
     if (error) {
       console.error(`[REVIEW CHECK] Database error querying orders: ${error.message}`)
       return { isSuspicious: true, reason: "Erro ao verificar histórico de compras" }
@@ -170,6 +182,22 @@ async function updateServiceRating(supabase: any, serviceId: string) {
   await supabase.from("services").update({ rating: averageRating }).eq("id", serviceId)
 }
 
+async function updateStoreRating(supabase: any, storeId: string) {
+  const { data: reviews } = await supabase
+    .from("reviews")
+    .select("rating")
+    .eq("store_id", storeId)
+    .not("rating", "is", null)
+
+  if (!reviews || reviews.length === 0) {
+    await supabase.from("stores").update({ rating: 0 }).eq("id", storeId)
+    return
+  }
+
+  const averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
+  await supabase.from("stores").update({ rating: averageRating }).eq("id", storeId)
+}
+
 async function updatePartnerRating(supabase: any, partnerId: string) {
   // Get all reviews directly for this partner (both product and service reviews)
   const { data: reviews, error } = await supabase
@@ -199,6 +227,7 @@ export async function createReviewAction(data: {
   partnerId: string
   productId: string | null
   serviceId: string | null
+  storeId?: string | null
   rating: number
   comment: string
   csrf_token?: string
@@ -219,18 +248,17 @@ export async function createReviewAction(data: {
   const currentUser = await requireUser()
   const userId = currentUser.id
 
-  const fraudCheck = await checkFraudulentReview(supabase, userId, data.partnerId, data.productId, data.serviceId)
+  const fraudCheck = await checkFraudulentReview(supabase, userId, data.partnerId, data.productId, data.serviceId, data.storeId)
 
   if (fraudCheck.isSuspicious) {
     return { error: fraudCheck.reason || "Não foi possível criar a avaliação" }
   }
 
-
-
   const { error } = await supabase.from("reviews").insert({
     order_id: data.orderId,
     user_id: userId,
     partner_id: data.partnerId,
+    store_id: data.storeId || null,
     product_id: data.productId,
     service_id: data.serviceId,
     rating: data.rating,
@@ -248,6 +276,9 @@ export async function createReviewAction(data: {
     await updateServiceRating(supabase, data.serviceId)
   }
   await updatePartnerRating(supabase, data.partnerId)
+  if (data.storeId) {
+    await updateStoreRating(supabase, data.storeId)
+  }
 
   // Invalidate partner cache tags to ensure seller page shows real-time stats
   try {
@@ -290,7 +321,7 @@ export async function updateReviewAction(reviewId: string, data: {
   // Verify user owns this review
   const { data: review } = await supabase
     .from("reviews")
-    .select("user_id, partner_id, product_id, service_id")
+    .select("user_id, partner_id, store_id, product_id, service_id")
     .eq("id", reviewId)
     .single()
 
@@ -318,6 +349,9 @@ export async function updateReviewAction(reviewId: string, data: {
     await updateServiceRating(supabase, review.service_id)
   }
   await updatePartnerRating(supabase, review.partner_id)
+  if (review.store_id) {
+    await updateStoreRating(supabase, review.store_id)
+  }
 
   // Invalidate cache tags
   try {
@@ -355,7 +389,7 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
   // Verify user owns this review
   const { data: review } = await supabase
     .from("reviews")
-    .select("user_id, partner_id, product_id, service_id")
+    .select("user_id, partner_id, store_id, product_id, service_id")
     .eq("id", reviewId)
     .single()
 
@@ -379,6 +413,9 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
     await updateServiceRating(supabase, review.service_id)
   }
   await updatePartnerRating(supabase, review.partner_id)
+  if (review.store_id) {
+    await updateStoreRating(supabase, review.store_id)
+  }
 
   // Invalidate cache tags
   try {
@@ -474,18 +511,25 @@ export async function getProductReviews(productId: string) {
   }))
 }
 
-export async function getPartnerReviews(partnerId: string) {
+export async function getPartnerReviews(partnerId: string, storeId?: string | null) {
   const supabase = await getSupabaseServerClient()
 
-  const { data: reviewsData, error } = await supabase
+  let query = supabase
     .from("reviews")
     .select(`
       *,
       products(name, images, slug, unit),
       services(name, images, slug, unit)
     `)
-    .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  } else {
+    query = query.eq("partner_id", partnerId)
+  }
+
+  const { data: reviewsData, error } = await query
 
   if (error || !reviewsData) {
     console.error("[Reviews] Fetch error:", error?.message)

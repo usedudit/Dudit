@@ -825,6 +825,7 @@ useEffect(() => {
             const checkoutData = {
                 source: "cart" as const,
                 partnerId: partner.id,
+                storeId: partner.store_id || undefined,
                 products: [{
                     id: service.id,
                     name: lineLabel,

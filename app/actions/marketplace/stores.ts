@@ -61,7 +61,7 @@ export const getCachedStoreById = async (storeId: string) => {
         fn = unstable_cache(
             async () => {
                 const supabase = createAdminClient()
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from("stores")
                     .select(`
                         *,
@@ -70,6 +70,8 @@ export const getCachedStoreById = async (storeId: string) => {
                     `)
                     .eq("id", storeId)
                     .maybeSingle()
+                if (error) console.error("[getCachedStoreById] Erro na query:", error.message, { storeId })
+                if (!data) console.error("[getCachedStoreById] Store nao encontrada:", { storeId })
                 return data
             },
             [`store-profile-${storeId}`],

@@ -99,7 +99,7 @@ export function StoreProvider({
     try {
       const { data, error } = await supabase
         .from("stores")
-        .select("*")
+        .select("*, addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: true })
 

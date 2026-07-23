@@ -67,6 +67,7 @@ export async function addServiceBookingToCartAction(
     .insert({
       user_id: user.id,
       partner_id: input.partnerId,
+      store_id: input.storeId || null,
       item_type: "service_booking",
       service_id: input.serviceId,
       product_id: null,
@@ -137,6 +138,7 @@ export async function prepareServiceBookingCheckoutAction(
     booking: ServiceBookingMetadata
     payDepositOnly?: boolean
     csrf_token?: string
+    storeId?: string
   },
 ) {
   const result = await addServiceBookingToCartAction(input)

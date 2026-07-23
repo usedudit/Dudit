@@ -426,7 +426,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
           {activePage === "business-data" && (
             <BusinessDataSubPage
-              key="business-data"
+              key={`business-data-${selectedStore?.id || 'default'}`}
               partner={partner}
               store={selectedStore}
               paymentMethods={paymentMethods}

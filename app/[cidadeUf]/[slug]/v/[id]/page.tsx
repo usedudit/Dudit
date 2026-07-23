@@ -59,6 +59,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const store = await getCachedStoreById(id)
 
   if (!store) {
+    console.error("[VendorPage] Store not found:", { id, currentSlug, currentCidadeUf })
     return notFound()
   }
 

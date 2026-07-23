@@ -13,7 +13,7 @@ import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
-import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils";
+import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from "@/lib/utils";
 
 
 const getStatusConfig = (status: string) => {
@@ -229,6 +229,11 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             {/* Store Name Top */}
                                                             <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                                                 {order.partners?.store_name || "Loja Parceira"}
+                                                                {isStoreDeleted(order) && (
+                                                                    <Tooltip text="Este negócio não está mais no Dudit">
+                                                                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block align-middle cursor-help" />
+                                                                    </Tooltip>
+                                                                )}
                                                                 {returnHistoryCount > 0 && (
                                                                     <Tooltip text="Possui histórico de trocas/devoluções">
                                                                         <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap inline-flex">
@@ -239,8 +244,11 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                             </h3>
                                                             {/* Order ID & Date Bottom */}
                                                             <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                                <div className="flex items-center gap-1">
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
+                                                                    {order.situation === "cancelled" && (
+                                                                        <Badge variant="red" className="scale-90 px-1.5 py-0">Cancelado</Badge>
+                                                                    )}
                                                                     <span className="hidden lg:inline">•</span>
                                                                     <span className="hidden lg:inline">{formatFullDate(order.created_at)}</span>
                                                                 </div>

@@ -81,3 +81,30 @@ export function calculatePasswordScore(password: string): number {
   if (/[^A-Za-z0-9]/.test(password)) score++
   return score
 }
+
+export function isStoreDeleted(order: any): boolean {
+  if (!order) return false
+  if (order.is_partner_deleted || order.is_store_deleted) return true
+
+  const partner = order.partners
+  const store = order.stores
+
+  if ((order.partner_id || order.store_id) && !partner && !store) {
+    return true
+  }
+
+  if (partner) {
+    if (partner.deleted_at || partner.status === "deleted" || partner.is_deleted || partner.account_deleted || partner.is_active === false) {
+      return true
+    }
+  }
+
+  if (store) {
+    if (store.deleted_at || store.status === "deleted" || store.is_deleted || store.account_deleted || store.is_active === false) {
+      return true
+    }
+  }
+
+  return false
+}
+

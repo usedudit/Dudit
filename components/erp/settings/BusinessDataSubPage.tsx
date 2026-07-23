@@ -33,6 +33,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
+import { useStore } from "@/lib/store-context"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
@@ -82,6 +83,7 @@ export const BusinessDataSubPage = ({
     paymentMethods: any[]
     onBack: () => void
 }) => {
+    const { refreshStores } = useStore()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isPending, startTransition] = useTransition()
     const [isLoading, setIsLoading] = useState(false)
@@ -106,7 +108,7 @@ export const BusinessDataSubPage = ({
         cnpj: partner.cpf || partner.cnpj || "",
         sells: store?.business_info?.sells || partnerBusinessInfo?.sells || ["products"],
         mode: ((store?.business_info?.mode || partnerBusinessInfo?.mode || "erp")) as BusinessMode,
-        phone: store?.phone ? formatE164ToDisplay(store.phone) : "",
+        phone: store?.phone ? formatE164ToDisplay(store.phone) : (partner.phone ? formatE164ToDisplay(partner.phone) : ""),
         category: partner.category || "",
         categoryId: store?.category_id || null,
         subcategoryId: store?.subcategory_id || null,
@@ -128,15 +130,15 @@ export const BusinessDataSubPage = ({
         loadCategoryPath()
     }, [generalInfo.categoryId, generalInfo.subcategoryId])
 
-    const partnerAddress = partner.addresses?.[0] || {};
-    const storeAddress = store?.addresses?.[0] || {};
-    const effectiveZip = store?.zip_code || storeAddress.zip_code || "";
-    const effectiveStreet = store?.street || storeAddress.street || "";
-    const effectiveNumber = store?.number || storeAddress.number || "";
-    const effectiveComplement = store?.complement || storeAddress.complement || "";
-    const effectiveNeighborhood = store?.neighborhood || storeAddress.neighborhood || "";
-    const effectiveCity = store?.city || storeAddress.city || "";
-    const effectiveState = store?.state || storeAddress.state || "";
+    const partnerAddress = partner.addresses?.[0] || partner.address || {};
+    const storeAddress = store?.addresses?.[0] || store?.address || {};
+    const effectiveZip = store?.zip_code || storeAddress.zip_code || partnerAddress.zip_code || partner.zip_code || "";
+    const effectiveStreet = store?.street || storeAddress.street || partnerAddress.street || partner.street || "";
+    const effectiveNumber = store?.number || storeAddress.number || partnerAddress.number || partner.number || "";
+    const effectiveComplement = store?.complement || storeAddress.complement || partnerAddress.complement || partner.complement || "";
+    const effectiveNeighborhood = store?.neighborhood || storeAddress.neighborhood || partnerAddress.neighborhood || partner.neighborhood || "";
+    const effectiveCity = store?.city || storeAddress.city || partnerAddress.city || partner.city || "";
+    const effectiveState = store?.state || storeAddress.state || partnerAddress.state || partner.state || "";
     const [addresses, setAddresses] = useState({
         zipCode: effectiveZip,
         street: effectiveStreet,
@@ -156,7 +158,11 @@ export const BusinessDataSubPage = ({
         inscricaoMunicipal: partner.inscricao_municipal || "",
     })
 
-    const [hours, setHours] = useState(() => store?.opening_hours ? normalizeOpeningHours(store.opening_hours) : {})
+    const storeHoursObj = store?.opening_hours && typeof store.opening_hours === "object" && Object.keys(store.opening_hours).length > 0 ? store.opening_hours : null
+    const partnerHoursObj = partner?.opening_hours && typeof partner.opening_hours === "object" && Object.keys(partner.opening_hours).length > 0 ? partner.opening_hours : null
+    const effectiveHours = storeHoursObj || partnerHoursObj || {}
+
+    const [hours, setHours] = useState(() => normalizeOpeningHours(effectiveHours))
 
     const [initialState, setInitialState] = useState(() => ({
         generalInfo: { ...generalInfo },
@@ -291,6 +297,7 @@ export const BusinessDataSubPage = ({
                     setIsLoading(false)
                 } else {
                     notifySuccess("Configurações atualizadas com sucesso!")
+                    await refreshStores()
                     setInitialState({
                         generalInfo: { ...generalInfo },
                         addresses: { ...addresses },

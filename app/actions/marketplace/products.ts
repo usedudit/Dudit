@@ -29,7 +29,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     .from("products")
     .select(`
       id, store_id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
-      is_active, status,
+      is_active, status, moderation_status,
       category_id, category:product_categories!category_id(name),
       subcategory_id, subcategory:product_categories!subcategory_id(name),
       brand_id, brand:brands!brand_id(name),
@@ -48,7 +48,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
         addresses(city, state),
         payment_methods(*)
       ),
-      stores!inner(
+      stores!left(
         id, name, description, logo_url, image_url, banner_url,
         phone, city, state, opening_hours, gallery,
         is_showcase_active, latitude, longitude, business_info
