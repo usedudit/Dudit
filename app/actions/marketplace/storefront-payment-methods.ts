@@ -20,23 +20,51 @@ export interface StorefrontPaymentMethod {
  * Agrupa por tipo canônico e retorna o "melhor" de cada tipo (maior desconto, menor taxa).
  * Não requer permissão de partner - qualquer usuário logado pode consultar (é dado público da vitrine).
  */
-export async function getStorefrontPaymentMethodsAction(partnerId: string) {
+export async function getStorefrontPaymentMethodsAction(partnerId: string, storeId?: string | null) {
   await requireUser()
 
   const supabase = await getSupabaseServerClient()
 
-  const { data: methodsRows, error } = await supabase
-    .from("payment_methods")
-    .select(
-      "id, type, payment_type, is_active, is_default, " +
-      "discount_percent, fee_percent, fee_fixed, " +
-      "max_installments, supports_installments, priority, card_brand"
-    )
-    .eq("partner_id", partnerId)
-    .eq("is_active", true)
-    .order("is_default", { ascending: false })
-    .order("priority", { ascending: false })
-    .order("discount_percent", { ascending: false })
+  let methodsRows: any[] | null = null
+  let error: any = null
+
+  if (storeId) {
+    const res = await supabase
+      .from("payment_methods")
+      .select(
+        "id, type, payment_type, is_active, is_default, " +
+        "discount_percent, fee_percent, fee_fixed, " +
+        "max_installments, supports_installments, priority, card_brand, store_id"
+      )
+      .eq("partner_id", partnerId)
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .order("is_default", { ascending: false })
+      .order("priority", { ascending: false })
+      .order("discount_percent", { ascending: false })
+
+    if (!res.error && res.data && res.data.length > 0) {
+      methodsRows = res.data
+    }
+  }
+
+  if (!methodsRows) {
+    const res = await supabase
+      .from("payment_methods")
+      .select(
+        "id, type, payment_type, is_active, is_default, " +
+        "discount_percent, fee_percent, fee_fixed, " +
+        "max_installments, supports_installments, priority, card_brand, store_id"
+      )
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .order("is_default", { ascending: false })
+      .order("priority", { ascending: false })
+      .order("discount_percent", { ascending: false })
+
+    methodsRows = res.data
+    error = res.error
+  }
 
   const methods = methodsRows as any[] | null
 

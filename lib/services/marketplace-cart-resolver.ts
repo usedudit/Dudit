@@ -22,6 +22,7 @@ export type ResolvedCartLine = {
   cartItemId: string
   itemType: "product" | "service_booking" | "subscription"
   partnerId: string
+  storeId?: string | null
   quantity: number
   unitPrice: number
   lineName: string
@@ -226,6 +227,7 @@ export async function resolveCheckoutCartLines(
         imageUrl: product.images?.[0] || null,
         baseName: product.name,
         variantName: (variantId && row.product_variants) ? row.product_variants.variant_name : null,
+        storeId: row.store_id || null,
       })
       continue
     }
@@ -325,6 +327,7 @@ export async function resolveCheckoutCartLines(
         imageUrl: service.images?.[0] || null,
         baseName: service.name,
         variantName: null,
+        storeId: row.store_id || null,
       })
       continue
     }
@@ -425,6 +428,7 @@ export async function resolveCheckoutCartLines(
         imageUrl: null,
         baseName: planRow.name || "Assinatura",
         variantName: null,
+        storeId: row.store_id || null,
       })
     }
   }

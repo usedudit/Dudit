@@ -56,7 +56,7 @@ const PartnersPageControls = ({
             {/* --- CONTROLS BAR --- */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full px-4 md:px-8 mb-6">
                 <Input
-                    placeholder="Buscar lojas ou proprietários..."
+                    placeholder="Buscar lojas..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     variant="full-rounded"

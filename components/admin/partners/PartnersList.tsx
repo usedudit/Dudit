@@ -68,6 +68,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
     const [unsuspendTarget, setUnsuspendTarget] = useState<EnforcementPartner | null>(null)
     const [suspendStoreTarget, setSuspendStoreTarget] = useState<EnforcementPartner | null>(null)
     const [unsuspendStoreTarget, setUnsuspendStoreTarget] = useState<EnforcementPartner | null>(null)
+    const [suspendPartnerFromStoreTarget, setSuspendPartnerFromStoreTarget] = useState<EnforcementPartner | null>(null)
     const [disableReason, setDisableReason] = useState("")
     const [disableDuration, setDisableDuration] = useState<number | null>(30)
     const [disableConfirmed, setDisableConfirmed] = useState(false)
@@ -147,6 +148,18 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
     const handleSuspendStore = () => {
         if (!suspendStoreTarget) return
         setPendingStepUpAction("suspendStore")
+        setShowStepUp(true)
+    }
+
+    const handleSuspendPartnerFromStore = (store: EnforcementPartner) => {
+        const partnerId = store.partner_id || store.id
+        const target: EnforcementPartner = {
+            ...store,
+            id: partnerId,
+            type: "partner",
+        }
+        setSuspendTarget(target)
+        setPendingStepUpAction("suspend")
         setShowStepUp(true)
     }
 
@@ -299,24 +312,12 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                             </div>
 
                                             <div className="flex items-center gap-2">
-                                                {partner.type === "store" ? (
-                                                    partner.suspended_at ? (
-                                                        <Badge variant="orange">Suspensa</Badge>
-                                                    ) : partner.is_active ? (
-                                                        <Badge variant="green">Ativa</Badge>
-                                                    ) : (
-                                                        <Badge variant="gray">Inativa</Badge>
-                                                    )
+                                                {partner.suspended_at ? (
+                                                    <Badge variant="orange">Suspensa</Badge>
+                                                ) : partner.is_active ? (
+                                                    <Badge variant="green">Ativa</Badge>
                                                 ) : (
-                                                    partner.erp_disabled ? (
-                                                        <Badge variant="red">ERP Desabilitado</Badge>
-                                                    ) : partner.suspended_at ? (
-                                                        <Badge variant="orange">Suspenso</Badge>
-                                                    ) : !partner.is_active ? (
-                                                        <Badge variant="gray">Inativo</Badge>
-                                                    ) : (
-                                                        <Badge variant="green">Ativo</Badge>
-                                                    )
+                                                    <Badge variant="gray">Inativa</Badge>
                                                 )}
                                                 <span className="text-xs text-brand-inactive-text ml-auto">
                                                     {new Date(partner.created_at).toLocaleDateString("pt-BR")}
@@ -325,24 +326,12 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
 
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="flex gap-2 flex-1 action-btn" onClick={e => e.stopPropagation()}>
-                                                    {partner.type === "store" ? (
-                                                        partner.suspended_at ? (
-                                                            <Button variant="outline" size="sm" onClick={() => setUnsuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Reativar Loja</Button>
-                                                        ) : (
-                                                            <Button variant="outline" size="sm" onClick={() => setSuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Suspender Loja</Button>
-                                                        )
+                                                    {partner.suspended_at ? (
+                                                        <Button variant="outline" size="sm" onClick={() => setUnsuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Reativar Loja</Button>
                                                     ) : (
                                                         <>
-                                                            {partner.suspended_at ? (
-                                                                <Button variant="outline" size="sm" onClick={() => setUnsuspendTarget(partner)} className="flex-1 text-xs h-9">Reativar</Button>
-                                                            ) : (
-                                                                <Button variant="outline" size="sm" onClick={() => setSuspendTarget(partner)} className="flex-1 text-xs h-9">Suspender</Button>
-                                                            )}
-                                                            {partner.erp_disabled ? (
-                                                                <Button variant="outline" size="sm" onClick={() => setEnableTarget(partner)} className="flex-1 text-xs h-9">Habilitar ERP</Button>
-                                                            ) : (
-                                                                <Button variant="outline" size="sm" onClick={() => setDisableTarget(partner)} className="flex-1 text-xs h-9">Desativar ERP</Button>
-                                                            )}
+                                                            <Button variant="outline" size="sm" onClick={() => setSuspendStoreTarget(partner)} className="flex-1 text-xs h-9">Desabilitar ERP</Button>
+                                                            <Button variant="outline" size="sm" onClick={() => handleSuspendPartnerFromStore(partner)} className="flex-1 text-xs h-9">Suspender Parceiro</Button>
                                                         </>
                                                     )}
                                                 </div>
@@ -378,6 +367,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                                         onDisableERP={setDisableTarget}
                                                         onUnsuspendStore={setUnsuspendStoreTarget}
                                                         onSuspendStore={setSuspendStoreTarget}
+                                                        onSuspendPartnerFromStore={handleSuspendPartnerFromStore}
                                                         onView={setDetailPartner}
                                                     />
                                                 ))}
@@ -538,7 +528,7 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                {/* Header Info */}
+                {/* Store Info */}
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30">
                         <StoreIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
@@ -547,9 +537,7 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
                             {partner.store_name}
                         </h3>
-                        <Badge variant={partner.type === "store" ? "blue" : "green"}>
-                            {partner.type === "store" ? "Loja" : "Parceiro"}
-                        </Badge>
+                        <Badge variant="blue">Loja</Badge>
                         <div className="flex items-center gap-2 mt-1">
                             <span className="text-[11px] font-bold text-brand-inactive-text">Score de Risco</span>
                             <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${partner.risk_score > 70 ? "bg-red-100 text-red-700" : partner.risk_score > 30 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
@@ -585,31 +573,26 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                             <div>
                                 <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Status</span>
                                 <div className="flex flex-wrap gap-2 mt-1">
-                                    {partner.type === "store" ? (
-                                        partner.suspended_at ? <Badge variant="red">Suspensa</Badge> : <Badge variant="green">Ativa</Badge>
-                                    ) : (
-                                        <>
-                                            {partner.suspended_at ? <Badge variant="red">Suspenso</Badge> : <Badge variant="green">Parceiro Ativo</Badge>}
-                                            {partner.erp_disabled ? <Badge variant="red">ERP Bloqueado</Badge> : <Badge variant="blue">ERP Ativo</Badge>}
-                                        </>
-                                    )}
+                                    {partner.suspended_at ? <Badge variant="red">Suspensa</Badge> : partner.is_active ? <Badge variant="green">Ativa</Badge> : <Badge variant="gray">Inativa</Badge>}
                                 </div>
                             </div>
                         </div>
 
-                        {partner.type === "partner" && partner.stores && partner.stores.length > 0 && (
+                        {partner.stores && partner.stores.length > 0 && (
                             <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
                                 <StoreIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                                 <div className="flex-1">
-                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Lojas</span>
+                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Todas as Lojas do Parceiro</span>
                                     <div className="flex flex-col gap-2 mt-2">
                                         {partner.stores.map((s) => (
-                                            <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-dark-background border border-brand-border dark:border-dark-border">
+                                            <div key={s.id} className={`flex items-center justify-between p-2 rounded-lg bg-white dark:bg-dark-background border ${s.id === partner.id ? 'border-brand-primary ring-1 ring-brand-primary/20' : 'border-brand-border dark:border-dark-border'}`}>
                                                 <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{s.name}</span>
                                                 {s.suspended_at ? (
                                                     <Badge variant="orange">Suspensa</Badge>
-                                                ) : (
+                                                ) : s.is_active ? (
                                                     <Badge variant="green">Ativa</Badge>
+                                                ) : (
+                                                    <Badge variant="gray">Inativa</Badge>
                                                 )}
                                             </div>
                                         ))}
@@ -624,9 +607,15 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                     <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Identificação</h4>
                     <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-brand-inactive-text font-medium">ID</span>
+                            <span className="text-xs text-brand-inactive-text font-medium">ID da Loja</span>
                             <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{partner.id}</code>
                         </div>
+                        {partner.partner_id && (
+                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-brand-border/50">
+                                <span className="text-xs text-brand-inactive-text font-medium">ID do Parceiro</span>
+                                <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{partner.partner_id}</code>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

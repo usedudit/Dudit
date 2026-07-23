@@ -130,19 +130,21 @@ export async function getCachedCart(userId: string) {
 
   if (!cartItems || cartItems.length === 0) return {}
 
-  // 2. Busca Métodos de Pagamento, Endereços, Configurações de Entrega e Promoções em Paralelo (Batching)
+  // 2. Busca Métodos de Pagamento, Endereços, Configurações de Entrega, Promoções e Lojas em Paralelo (Batching)
   const partnerIds = [...new Set(cartItems.map((item: any) => item.partner_id))] as string[]
+  const storeIds = [...new Set(cartItems.map((item: any) => item.store_id).filter(Boolean))] as string[]
 
   let paymentMethods: any[] | null = null
   let partnerAddresses: Record<string, any[]> = {}
   let partnerDeliverySettings: Record<string, any> = {}
   let partnerPromotions: Record<string, any[]> = {}
+  let storesMap: Record<string, any> = {}
 
   try {
-    const [pmResult, addrResult, delResult, promosBatch] = await Promise.all([
+    const [pmResult, addrResult, delResult, promosBatch, storesResult] = await Promise.all([
       supabase
         .from("payment_methods")
-        .select("partner_id, payment_type, type, is_active")
+        .select("partner_id, store_id, payment_type, type, is_active")
         .in("partner_id", partnerIds)
         .eq("is_active", true),
       supabase
@@ -154,10 +156,23 @@ export async function getCachedCart(userId: string) {
         .select("partner_id, base_fee, is_delivery_enabled")
         .in("partner_id", partnerIds),
       listActivePromotionsInBatch(partnerIds, userId),
+      storeIds.length > 0
+        ? supabase
+          .from("stores")
+          .select("id, partner_id, name, slug, image_url, logo_url, opening_hours, phone, whatsapp_phone, description, address_id, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .in("id", storeIds)
+        : Promise.resolve({ data: [] as any[] }),
     ])
 
     paymentMethods = pmResult.data
     partnerPromotions = promosBatch || {}
+
+    if (storesResult.data) {
+      storesMap = storesResult.data.reduce((acc: any, s: any) => {
+        if (s?.id) acc[s.id] = s
+        return acc
+      }, {})
+    }
 
     if (addrResult.data) {
       partnerAddresses = addrResult.data.reduce((acc: any, addr: any) => {
@@ -189,24 +204,30 @@ export async function getCachedCart(userId: string) {
     if (typeof partnerId !== "string" || partnerId === "__proto__" || partnerId === "constructor" || partnerId === "prototype") return acc
     const storeId = item.store_id || null
     const storeKey = item.store_id || partnerId
+    const store = storeId ? storesMap[storeId] || null : null
+
     if (!acc[storeKey]) {
       const partner = item.partners ? { ...item.partners } : null
       if (partner) {
         partner.addresses = partnerAddresses[partnerId] || []
       }
+
+      const rawPm = paymentMethods || []
+      const storePms = storeId ? rawPm.filter((pm: any) => pm.store_id === storeId) : []
+      const effectivePms = storePms.length > 0 ? storePms : rawPm.filter((pm: any) => pm.partner_id === partnerId)
+
       acc[storeKey] = {
         storeId,
         partnerId,
         partner,
+        store,
         items: [],
         products: [],
         services: [],
         subscriptions: [],
         paymentMethods: Array.from(
           new Set(
-            (paymentMethods || [])
-              .filter((pm: any) => pm.partner_id === partnerId)
-              .map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
+            effectivePms.map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
           )
         ),
         deliverySettings: partnerDeliverySettings[partnerId] || null,

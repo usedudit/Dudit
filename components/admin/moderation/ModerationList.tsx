@@ -128,13 +128,13 @@ function ProductModerationSheet({
                     </p>
                 </div>
 
-                {/* Partner Info */}
+                {/* Store Info Card */}
                 <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border">
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <StoreIcon size={16} className="text-brand-inactive-text" />
-                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">{item.owner_store_name}</span>
+                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">{item.store_name || item.owner_store_name}</span>
                             </div>
                             {item.risk_score > 0 && (
                                 <Badge variant={item.risk_score >= 50 ? "red" : item.risk_score >= 20 ? "orange" : "blue"}>
@@ -142,10 +142,29 @@ function ProductModerationSheet({
                                 </Badge>
                             )}
                         </div>
-                        <div className="flex items-center gap-2">
-                            <UserIcon size={16} className="text-brand-inactive-text" />
-                            <span className="text-sm text-brand-inactive-text dark:text-dark-body truncate">Responsável: <strong>{item.owner_user_name}</strong></span>
+                        {item.store_phone && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">{item.store_phone}</span>
+                            </div>
+                        )}
+                        {item.store_description && (
+                            <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
+                                {item.store_description}
+                            </p>
+                        )}
+                        <div className="flex items-center gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                            <div className="flex items-center gap-2">
+                                <UserIcon size={14} className="text-brand-inactive-text" />
+                                <span className="text-xs text-brand-inactive-text truncate">
+                                    Proprietário: <strong>{item.owner_user_name || "N/A"}</strong>
+                                </span>
+                            </div>
                         </div>
+                        {item.owner_user_id && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono text-brand-inactive-text opacity-70 break-all">{item.owner_user_id}</span>
+                            </div>
+                        )}
                         <div className="flex items-center gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
                             <ClockIcon size={14} className="text-brand-inactive-text" />
                             <span className="text-xs text-brand-inactive-text truncate">Enviado em {formatDate(item.created_at)}</span>
@@ -153,10 +172,46 @@ function ProductModerationSheet({
                     </div>
                 </div>
 
+                {/* Banner */}
+                {(item.store_banner_url || item.store_logo_url) && (
+                    <div className="space-y-2">
+                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Banner da Vitrine</h4>
+                        <div className="relative w-full h-32 rounded-xl overflow-hidden bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border">
+                            {item.store_banner_url ? (
+                                <img
+                                    src={item.store_banner_url.startsWith("http") ? item.store_banner_url : `https://img.dudit.com.br/${item.store_banner_url}`}
+                                    alt="Banner"
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-brand-inactive-text text-xs">Sem banner</div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Gallery */}
+                {item.store_gallery && item.store_gallery.length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Galeria ({item.store_gallery.length})</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                            {item.store_gallery.map((url: string, idx: number) => (
+                                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border">
+                                    <img
+                                        src={url.startsWith("http") ? url : `https://img.dudit.com.br/${url}`}
+                                        alt={`Galeria ${idx + 1}`}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Images */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Imagens ({item.images?.length || 0})</h4>
+                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Imagens do {item.type === "product" ? "Produto" : item.type === "service" ? "Serviço" : "Item"} ({item.images?.length || 0})</h4>
                         {selectedImages.size > 0 && (
                             <span className="text-xs font-bold text-brand-red">{selectedImages.size} selecionada(s)</span>
                         )}

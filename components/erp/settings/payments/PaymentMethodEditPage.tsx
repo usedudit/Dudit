@@ -32,6 +32,7 @@ import {
 } from "@/app/actions/erp/payment-methods"
 import { ChevronLeftIcon, SaveIcon, InfoIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { useStore } from "@/lib/store-context"
 
 const AVAILABLE_BRANDS = [
     { id: "visa", name: "Visa", image: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
@@ -85,7 +86,16 @@ interface PaymentMethodEditPageProps {
     embedded?: boolean
 }
 
-export function PaymentMethodEditPage({ partnerId, storeId, editingMethod, existingMethods = [], onBack, embedded }: PaymentMethodEditPageProps) {
+export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editingMethod, existingMethods = [], onBack, embedded }: PaymentMethodEditPageProps) {
+    let selectedStoreId: string | null = null
+    try {
+        const storeCtx = useStore()
+        selectedStoreId = storeCtx?.selectedStore?.id || null
+    } catch {
+        selectedStoreId = null
+    }
+    const activeStoreId = propStoreId || selectedStoreId || null
+
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingDetails, setIsLoadingDetails] = useState(false)
@@ -225,7 +235,7 @@ export function PaymentMethodEditPage({ partnerId, storeId, editingMethod, exist
         setIsLoading(true)
         try {
             const payload = {
-                storeId: storeId || null,
+                storeId: activeStoreId,
                 name: formData.name,
                 paymentType: formData.type,
                 isActive: formData.is_active,

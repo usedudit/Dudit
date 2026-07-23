@@ -154,6 +154,14 @@ export interface ModerationItem {
     owner_store_name: string
     owner_user_name: string
     partner_id: string
+    store_id?: string
+    store_name?: string
+    store_phone?: string
+    store_description?: string | null
+    store_banner_url?: string | null
+    store_gallery?: string[]
+    store_logo_url?: string | null
+    owner_user_id?: string
     moderation_status: string
     risk_score: number
     created_at: string

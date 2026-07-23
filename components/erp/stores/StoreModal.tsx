@@ -1,11 +1,28 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { DefaultModal, Button, Input, PhoneInput, CepInput, StateComboBox, FormTextarea, InfoCard, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
-import { uploadImageToR2Action } from "@/app/actions/shared/r2"
+import React, { useState, useEffect, useRef } from "react"
+import {
+  DefaultModal,
+  Button,
+  Input,
+  PhoneInput,
+  CepInput,
+  StateComboBox,
+  NumberInputWithCheckbox,
+  FormSection,
+  FormTextarea,
+  InfoCard,
+  Spinner,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent
+} from "@/components/reusable"
+import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
+import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
+import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { createStoreAction, createStoreWithInheritanceAction, updateStoreAction } from "@/app/actions/erp/stores"
-import { ImageCropperModal } from "@/components/ImageCropperModal"
-import { UploadIcon, TrashIcon, StoreIcon, ClockIcon, MapPinIcon, InfoIcon } from "@/lib/icons"
+import ImageCropperModal from "@/components/ImageCropperModal"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface StoreModalProps {
@@ -17,51 +34,37 @@ interface StoreModalProps {
   onSaved: () => void
 }
 
-const DAYS_OF_WEEK = [
-  { key: "monday", label: "Segunda-feira" },
-  { key: "tuesday", label: "Terça-feira" },
-  { key: "wednesday", label: "Quarta-feira" },
-  { key: "thursday", label: "Quinta-feira" },
-  { key: "friday", label: "Sexta-feira" },
-  { key: "saturday", label: "Sábado" },
-  { key: "sunday", label: "Domingo" },
-]
-
 export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onSaved }: StoreModalProps) {
   const isEdit = !!store
-
   const [activeTab, setActiveTab] = useState<string>("gerais")
 
   // --- General Fields ---
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [phone, setPhone] = useState("")
   const [whatsappPhone, setWhatsappPhone] = useState("")
+
+  // --- Logo / Photo State (Exact ShowcaseSubPage pattern) ---
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [croppedImage, setCroppedImage] = useState<string | null>(null)
-  const [isCropperOpen, setIsCropperOpen] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [cropModalOpen, setCropModalOpen] = useState(false)
+  const [tempImageFile, setTempImageFile] = useState<File | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // --- Address Fields ---
-  const [zipCode, setZipCode] = useState("")
-  const [street, setStreet] = useState("")
-  const [number, setNumber] = useState("")
-  const [noNumber, setNoNumber] = useState(false)
-  const [neighborhood, setNeighborhood] = useState("")
-  const [city, setCity] = useState("")
-  const [state, setState] = useState("")
-  const [complement, setComplement] = useState("")
-
-  // --- Hours Fields ---
-  const [openingHours, setOpeningHours] = useState<Record<string, { active: boolean; open: string; close: string }>>({
-    monday: { active: true, open: "08:00", close: "18:00" },
-    tuesday: { active: true, open: "08:00", close: "18:00" },
-    wednesday: { active: true, open: "08:00", close: "18:00" },
-    thursday: { active: true, open: "08:00", close: "18:00" },
-    friday: { active: true, open: "08:00", close: "18:00" },
-    saturday: { active: false, open: "08:00", close: "12:00" },
-    sunday: { active: false, open: "08:00", close: "12:00" },
+  // --- Address State (Exact BusinessDataSubPage / Register pattern) ---
+  const [addresses, setAddresses] = useState({
+    zipCode: "",
+    street: "",
+    number: "",
+    complement: "",
+    neighborhood: "",
+    city: "",
+    state: "",
+    noNumber: false,
   })
+
+  // --- Opening Hours State (Exact BusinessHoursSelector pattern) ---
+  const [hours, setHours] = useState(() => normalizeOpeningHours({}))
 
   // --- Inheritance Options (Create Mode) ---
   const [showInheritance, setShowInheritance] = useState(false)
@@ -87,85 +90,74 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
       if (store) {
         setName(store.name || "")
         setDescription(store.description || "")
-        setPhone(store.phone || "")
-        setWhatsappPhone(store.whatsapp_phone || "")
-        setImageUrl(store.image_url || null)
-        setCroppedImage(null)
-        setImageFile(null)
+        setWhatsappPhone(store.whatsapp_phone || store.phone || "")
 
-        // Address
-        setZipCode(store.zip_code || store.address?.zip_code || "")
-        setStreet(store.street || store.address?.street || "")
-        setNumber(store.number || store.address?.number || "")
-        setNoNumber(store.number === "S/N" || store.address?.number === "S/N")
-        setNeighborhood(store.neighborhood || store.address?.neighborhood || "")
-        setCity(store.city || store.address?.city || "")
-        setState(store.state || store.address?.state || "")
-        setComplement(store.complement || store.address?.complement || "")
+        const initialLogo = store.logo_url || store.image_url || null
+        setImageUrl(initialLogo)
+        setImagePreview(initialLogo ? getR2ImageUrl(initialLogo) : null)
+        setTempImageFile(null)
 
-        // Hours
-        if (store.opening_hours && typeof store.opening_hours === "object") {
-          setOpeningHours((prev) => ({ ...prev, ...store.opening_hours }))
-        }
+        const addr = store.addresses?.[0] || store.address || {}
+        const effNumber = store.number || addr.number || ""
+        setAddresses({
+          zipCode: store.zip_code || addr.zip_code || "",
+          street: store.street || addr.street || "",
+          number: effNumber === "S/N" ? "" : effNumber,
+          complement: store.complement || addr.complement || "",
+          neighborhood: store.neighborhood || addr.neighborhood || "",
+          city: store.city || addr.city || "",
+          state: store.state || addr.state || "",
+          noNumber: effNumber === "S/N",
+        })
+
+        const effHours = store.opening_hours || {}
+        setHours(normalizeOpeningHours(effHours))
       } else {
         setName("")
         setDescription("")
-        setPhone("")
         setWhatsappPhone("")
         setImageUrl(null)
-        setCroppedImage(null)
-        setImageFile(null)
-        setZipCode("")
-        setStreet("")
-        setNumber("")
-        setNoNumber(false)
-        setNeighborhood("")
-        setCity("")
-        setState("")
-        setComplement("")
-        setShowInheritance(false)
-        setOpeningHours({
-          monday: { active: true, open: "08:00", close: "18:00" },
-          tuesday: { active: true, open: "08:00", close: "18:00" },
-          wednesday: { active: true, open: "08:00", close: "18:00" },
-          thursday: { active: true, open: "08:00", close: "18:00" },
-          friday: { active: true, open: "08:00", close: "18:00" },
-          saturday: { active: false, open: "08:00", close: "12:00" },
-          sunday: { active: false, open: "08:00", close: "12:00" },
+        setImagePreview(null)
+        setTempImageFile(null)
+        setAddresses({
+          zipCode: "",
+          street: "",
+          number: "",
+          complement: "",
+          neighborhood: "",
+          city: "",
+          state: "",
+          noNumber: false,
         })
+        setHours(normalizeOpeningHours({}))
+        setShowInheritance(false)
       }
     }
   }, [isOpen, store])
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- Photo Upload Handler (Exact ShowcaseSubPage) ---
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.currentTarget.value = ""
     if (!file) return
-
     if (file.size > 3 * 1024 * 1024) {
-      setError("Arquivo muito grande. Máximo 3MB.")
+      setError("Máximo 3MB por imagem")
       return
     }
-
     setError("")
-    setImageFile(file)
-    setIsCropperOpen(true)
+    setTempImageFile(file)
+    setCropModalOpen(true)
   }
 
-  const handleCropComplete = (croppedImageData: string) => {
-    setCroppedImage(croppedImageData)
-    setIsCropperOpen(false)
+  const handleCropComplete = (url: string) => {
+    setCropModalOpen(false)
+    setImagePreview(url)
+    setTempImageFile(null)
   }
 
-  const handleCepAddressFound = (data: { street?: string; neighborhood?: string; city?: string; state?: string }) => {
-    if (data.street) setStreet(data.street)
-    if (data.neighborhood) setNeighborhood(data.neighborhood)
-    if (data.city) setCity(data.city)
-    if (data.state) setState(data.state)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // --- Submit Handler ---
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     if (!name.trim()) {
       setError("Nome da loja é obrigatório")
       setActiveTab("gerais")
@@ -176,32 +168,47 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
     setError("")
 
     try {
-      let finalImageUrl = imageUrl
+      let finalLogoUrl = imageUrl
 
-      if (croppedImage) {
-        const uploadRes = await uploadImageToR2Action(croppedImage, "stores")
-        if (!uploadRes.success) {
-          throw new Error(uploadRes.error || "Erro ao fazer upload da imagem")
+      // Upload logo to R2 if base64 (Exact ShowcaseSubPage pattern)
+      if (imagePreview && imagePreview.startsWith("data:")) {
+        setImageUploading(true)
+        try {
+          const blob = await (await fetch(imagePreview)).blob()
+          const ext = blob.type === "image/png" ? "png" : "jpg"
+          const file = new File([blob], `logo.${ext}`, { type: blob.type })
+          const formData = new FormData()
+          formData.append("file", file)
+          const res = await fetchWithCSRF("/api/upload-image?uploadType=partner-logo", { method: "POST", body: formData })
+          const data = await res.json()
+          if (data.success && data.key) {
+            finalLogoUrl = data.key
+          } else {
+            throw new Error(data.error || "Erro no upload da logo")
+          }
+        } catch (err: any) {
+          throw new Error(err.message || "Erro no upload da foto")
+        } finally {
+          setImageUploading(false)
         }
-        finalImageUrl = uploadRes.publicId || null
       }
 
       const storePayload = {
         name: name.trim(),
         description: description.trim() || undefined,
-        phone: phone.trim() || undefined,
+        phone: whatsappPhone.trim() || undefined,
         whatsapp_phone: whatsappPhone.trim() || undefined,
-        image_url: finalImageUrl || undefined,
-        logo_url: finalImageUrl || undefined,
-        zip_code: zipCode.trim() || undefined,
-        street: street.trim() || undefined,
-        number: noNumber ? "S/N" : (number.trim() || undefined),
-        noNumber,
-        neighborhood: neighborhood.trim() || undefined,
-        city: city.trim() || undefined,
-        state: state.trim() || undefined,
-        complement: complement.trim() || undefined,
-        opening_hours: openingHours,
+        image_url: finalLogoUrl || undefined,
+        logo_url: finalLogoUrl || undefined,
+        zip_code: addresses.zipCode.trim() || undefined,
+        street: addresses.street.trim() || undefined,
+        number: addresses.noNumber ? "S/N" : (addresses.number.trim() || undefined),
+        noNumber: addresses.noNumber,
+        neighborhood: addresses.neighborhood.trim() || undefined,
+        city: addresses.city.trim() || undefined,
+        state: addresses.state.trim() || undefined,
+        complement: addresses.complement.trim() || undefined,
+        opening_hours: hours as any,
       }
 
       if (isEdit) {
@@ -238,8 +245,6 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
     }
   }
 
-  const displayImage = croppedImage || (imageUrl ? getR2ImageUrl(imageUrl) : null)
-
   return (
     <>
       <DefaultModal
@@ -253,9 +258,8 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
               Cancelar
             </Button>
             <Button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               disabled={isLoading || !name.trim()}
-              className="bg-brand-primary text-white"
             >
               {isLoading ? "Salvando..." : isEdit ? "Salvar Alterações" : "Criar Loja"}
             </Button>
@@ -264,121 +268,56 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full justify-start border-b border-brand-border dark:border-dark-border bg-transparent p-0 gap-6">
-              <TabsTrigger
-                value="gerais"
-                className="py-2.5 px-1 border-b-2 border-transparent data-[state=active]:border-brand-primary data-[state=active]:text-brand-primary rounded-none font-medium flex items-center gap-2"
-              >
-                <InfoIcon className="w-4 h-4" />
-                Dados Gerais
-              </TabsTrigger>
-              <TabsTrigger
-                value="endereco"
-                className="py-2.5 px-1 border-b-2 border-transparent data-[state=active]:border-brand-primary data-[state=active]:text-brand-primary rounded-none font-medium flex items-center gap-2"
-              >
-                <MapPinIcon className="w-4 h-4" />
-                Endereço
-              </TabsTrigger>
-              <TabsTrigger
-                value="horarios"
-                className="py-2.5 px-1 border-b-2 border-transparent data-[state=active]:border-brand-primary data-[state=active]:text-brand-primary rounded-none font-medium flex items-center gap-2"
-              >
-                <ClockIcon className="w-4 h-4" />
-                Horários
-              </TabsTrigger>
+            <TabsList className="w-full justify-start border-b border-brand-border dark:border-dark-border bg-transparent p-0">
+              <TabsTrigger value="gerais">Dados Gerais</TabsTrigger>
+              <TabsTrigger value="endereco">Endereço</TabsTrigger>
+              <TabsTrigger value="horarios">Horários</TabsTrigger>
             </TabsList>
 
             {/* ABA 1: DADOS GERAIS */}
             <TabsContent value="gerais" className="space-y-4 pt-4">
-              {/* Image Upload */}
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                  Imagem / Logotipo da Loja (opcional)
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                    {displayImage ? (
-                      <img src={displayImage} alt="Preview" className="w-full h-full object-cover" />
+              {/* Logo Upload (Exact ShowcaseSubPage pattern) */}
+              <FormSection title="Logo do Negócio">
+                <div className="flex items-center gap-4 dark:bg-dark-background/50">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden"
+                  >
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
                     ) : (
-                      <StoreIcon className="w-8 h-8 text-brand-primary" />
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                     )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <label htmlFor="store-image-upload">
-                        <input
-                          id="store-image-upload"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileSelect}
-                          disabled={isLoading}
-                          className="hidden"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={isLoading}
-                          onClick={() => document.getElementById("store-image-upload")?.click()}
-                          className="flex items-center gap-2"
-                        >
-                          <UploadIcon className="w-4 h-4" />
-                          {displayImage ? "Alterar Foto" : "Escolher Foto"}
-                        </Button>
-                      </label>
-                      {displayImage && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setImageUrl(null)
-                            setCroppedImage(null)
-                            setImageFile(null)
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </Button>
-                      )}
+                    {imageUploading && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <Spinner size={20} className="text-white" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                     </div>
-                    <p className="text-xs text-brand-inactive-text">Formatos aceitos: JPG, PNG. Máx. 3MB</p>
                   </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo da Empresa</p>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
+                  </div>
+                  <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
                 </div>
-              </div>
+              </FormSection>
 
-              {/* Nome da Loja (Required) */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                  Nome da Loja <span className="text-red-500">*</span>
-                </label>
+              {/* Nome da Loja & WhatsApp Side by Side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
+                  label="Nome da Loja"
                   placeholder="Ex: Filial Centro, Loja Shopping..."
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={isLoading}
                   required
                 />
-              </div>
-
-              {/* Telefone & WhatsApp */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    Telefone
-                  </label>
+                <div>
                   <PhoneInput
-                    placeholder="(00) 0000-0000"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    WhatsApp
-                  </label>
-                  <PhoneInput
+                    label="WhatsApp"
                     placeholder="(00) 00000-0000"
                     value={whatsappPhone}
                     onChange={(e) => setWhatsappPhone(e.target.value)}
@@ -388,19 +327,17 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
               </div>
 
               {/* Descrição */}
-              <div className="flex flex-col gap-1.5">
-                <FormTextarea
-                  label="Descrição (opcional)"
-                  name="description"
-                  placeholder="Informações adicionais sobre esta unidade..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                  disabled={isLoading}
-                />
-              </div>
+              <FormTextarea
+                label="Descrição (opcional)"
+                name="description"
+                placeholder="Informações adicionais sobre esta unidade..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                disabled={isLoading}
+              />
 
-              {/* Inherit options if creating and sourceStore exists */}
+              {/* Copy options if creating and sourceStore exists */}
               {!isEdit && sourceStore && (
                 <div className="p-4 rounded-xl bg-brand-primary/5 border border-brand-primary/20 space-y-3">
                   <label className="flex items-center gap-2 text-sm font-semibold text-brand-dark cursor-pointer">
@@ -441,172 +378,89 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
               )}
             </TabsContent>
 
-            {/* ABA 2: ENDEREÇO */}
+            {/* ABA 2: ENDEREÇO (Exact BusinessDataSubPage pattern) */}
             <TabsContent value="endereco" className="space-y-4 pt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
+              <FormSection title="Endereço">
+                <div className="space-y-4">
                   <CepInput
-                    value={zipCode}
-                    onChange={(val) => setZipCode(val)}
-                    onAddressFetched={handleCepAddressFound}
-                    disabled={isLoading}
+                    value={addresses.zipCode}
+                    onChange={(val) => {
+                      setAddresses((prev) => ({ ...prev, zipCode: val }))
+                    }}
+                    name="cep"
+                    onAddressFetched={(data) => {
+                      setAddresses((prev) => ({
+                        ...prev,
+                        street: data.street || prev.street,
+                        number: data.number || prev.number,
+                        neighborhood: data.neighborhood || prev.neighborhood,
+                        city: data.city || prev.city,
+                        state: data.state || prev.state,
+                        noNumber: data.number === "S/N",
+                      }))
+                    }}
                   />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    Bairro
-                  </label>
                   <Input
-                    placeholder="Bairro"
-                    value={neighborhood}
-                    onChange={(e) => setNeighborhood(e.target.value)}
-                    disabled={isLoading}
+                    label="Rua/Avenida"
+                    placeholder="Rua, Avenida, etc."
+                    value={addresses.street}
+                    onChange={(e) => setAddresses((prev) => ({ ...prev, street: e.target.value }))}
                   />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2 flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    Rua / Logradouro
-                  </label>
-                  <Input
-                    placeholder="Ex: Av. Paulista"
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    Número
-                  </label>
-                  <Input
-                    placeholder="123"
-                    value={noNumber ? "S/N" : number}
-                    onChange={(e) => setNumber(e.target.value)}
-                    disabled={isLoading || noNumber}
-                  />
-                  <label className="flex items-center gap-1.5 text-xs text-brand-inactive-text mt-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={noNumber}
-                      onChange={(e) => {
-                        setNoNumber(e.target.checked)
-                        if (e.target.checked) setNumber("")
-                      }}
-                      className="rounded border-brand-border text-brand-primary"
-                    />
-                    Sem número (S/N)
-                  </label>
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
+                    <div>
+                      <NumberInputWithCheckbox
+                        label="Número"
+                        number={addresses.number}
+                        noNumber={addresses.noNumber}
+                        onNumberChange={(val) => setAddresses((prev) => ({ ...prev, number: val }))}
+                        onNoNumberChange={(checked) => setAddresses((prev) => ({ ...prev, noNumber: checked, number: checked ? "S/N" : "" }))}
+                        placeholder="123"
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        label="Complemento"
+                        placeholder="Apto, Bloco, etc."
+                        value={addresses.complement}
+                        onChange={(e) => setAddresses((prev) => ({ ...prev, complement: e.target.value }))}
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    Cidade
-                  </label>
                   <Input
-                    placeholder="Cidade"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    disabled={isLoading}
+                    label="Bairro"
+                    placeholder="Nome do bairro"
+                    value={addresses.neighborhood}
+                    onChange={(e) => setAddresses((prev) => ({ ...prev, neighborhood: e.target.value }))}
                   />
+
+                  <div className="grid grid-cols-2 gap-3 items-start">
+                    <div>
+                      <Input
+                        label="Cidade"
+                        placeholder="Nome da cidade"
+                        value={addresses.city}
+                        onChange={(e) => setAddresses((prev) => ({ ...prev, city: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <StateComboBox
+                        value={addresses.state}
+                        onChange={(v) => setAddresses((prev) => ({ ...prev, state: v }))}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    Estado (UF)
-                  </label>
-                  <StateComboBox
-                    value={state}
-                    onChange={(val) => setState(val)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                    Complemento
-                  </label>
-                  <Input
-                    placeholder="Ex: Sala 402"
-                    value={complement}
-                    onChange={(e) => setComplement(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
+              </FormSection>
             </TabsContent>
 
-            {/* ABA 3: HORÁRIOS */}
-            <TabsContent value="horarios" className="space-y-3 pt-4">
-              <p className="text-xs text-brand-inactive-text mb-2">
-                Defina os horários de funcionamento padrão para esta loja.
-              </p>
-              <div className="space-y-2">
-                {DAYS_OF_WEEK.map(({ key, label }) => {
-                  const dayState = openingHours[key] || { active: false, open: "08:00", close: "18:00" }
-
-                  return (
-                    <div
-                      key={key}
-                      className="flex flex-wrap items-center justify-between p-3 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface gap-3"
-                    >
-                      <div className="flex items-center gap-3 min-w-[140px]">
-                        <input
-                          type="checkbox"
-                          checked={dayState.active}
-                          onChange={(e) => {
-                            const val = e.target.checked
-                            setOpeningHours((prev) => ({
-                              ...prev,
-                              [key]: { ...dayState, active: val },
-                            }))
-                          }}
-                          className="rounded border-brand-border text-brand-primary"
-                        />
-                        <span className={`text-sm font-medium ${dayState.active ? "text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"}`}>
-                          {label}
-                        </span>
-                      </div>
-
-                      {dayState.active ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="time"
-                            value={dayState.open}
-                            onChange={(e) => {
-                              const openVal = e.target.value
-                              setOpeningHours((prev) => ({
-                                ...prev,
-                                [key]: { ...dayState, open: openVal },
-                              }))
-                            }}
-                            className="px-2 py-1 rounded-lg border border-brand-border text-sm font-medium bg-white dark:bg-dark-surface"
-                          />
-                          <span className="text-xs text-brand-inactive-text">até</span>
-                          <input
-                            type="time"
-                            value={dayState.close}
-                            onChange={(e) => {
-                              const closeVal = e.target.value
-                              setOpeningHours((prev) => ({
-                                ...prev,
-                                [key]: { ...dayState, close: closeVal },
-                              }))
-                            }}
-                            className="px-2 py-1 rounded-lg border border-brand-border text-sm font-medium bg-white dark:bg-dark-surface"
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-xs font-semibold text-red-500 bg-red-100 dark:bg-red-950/40 px-2.5 py-1 rounded-full">
-                          Fechado
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+            {/* ABA 3: HORÁRIOS (Exact BusinessHoursSelector pattern) */}
+            <TabsContent value="horarios" className="space-y-4 pt-4">
+              <FormSection title="Horários de Funcionamento">
+                <BusinessHoursSelector value={hours as any} onChange={setHours as any} />
+              </FormSection>
             </TabsContent>
           </Tabs>
 
@@ -614,12 +468,14 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
         </form>
       </DefaultModal>
 
-      <ImageCropperModal
-        isOpen={isCropperOpen}
-        onClose={() => setIsCropperOpen(false)}
-        onConfirm={handleCropComplete}
-        imageFile={imageFile}
-      />
+      {tempImageFile && (
+        <ImageCropperModal
+          isOpen={cropModalOpen}
+          onClose={() => setCropModalOpen(false)}
+          onConfirm={handleCropComplete}
+          imageFile={tempImageFile}
+        />
+      )}
     </>
   )
 }

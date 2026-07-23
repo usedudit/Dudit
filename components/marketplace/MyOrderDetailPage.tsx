@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
@@ -408,22 +408,6 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
         </div>
     );
 };
-
-const InfoCard = ({ icon: Icon, title, description, onClick, rightIcon: RightIcon = ChevronRightIcon }: any) => (
-    <div
-        onClick={onClick}
-        className="group flex items-center gap-4 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-heading/30 transition-all cursor-pointer"
-    >
-        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
-            <Icon size={20} className="text-brand-dark dark:text-dark-heading" />
-        </div>
-        <div className="flex-1 w-full min-w-0 pr-2">
-            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-0.5 truncate">{title}</h3>
-            <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
-        </div>
-        <RightIcon size={18} className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
-    </div>
-);
 
 export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => {
     const router = useRouter();
@@ -1486,9 +1470,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 }
                                             />
                                             {order.situation === "pending" && order.payment_expires_at && (
-                                                <div className="mt-2 text-xs text-brand-orange bg-orange-500/10 px-3 py-2 rounded-lg font-medium">
-                                                    ⏰ O pagamento expira em {formatFullDate(order.payment_expires_at)} às {formatTime(order.payment_expires_at)}.
-                                                </div>
+                                                <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' rightElement={<Button variant='link' onClick={handlePixClick}>Pagar agora</Button>} />
                                             )}
                                         </div>
                                     </FormSection>

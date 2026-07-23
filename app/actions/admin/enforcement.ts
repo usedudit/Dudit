@@ -153,6 +153,7 @@ export async function getUsers(
 }
 
 // ─── Get Partners (separate from users) ─────────────────────────────────────
+// Now returns STORES as primary list items. Partners appear only in the detail sheet.
 
 export async function getPartners(
     cursor?: string | null,
@@ -166,149 +167,112 @@ export async function getPartners(
     const supabase: any = getAdminClient()
     const pageSize = Math.min(limit, 50)
 
-    let query = supabase
-        .from("partners")
-        .select("id, store_name, user_id, is_active, erp_disabled, suspended_at, suspended_until, risk_score, created_at")
+    // Main query: fetch stores with partner info
+    let storeQuery = supabase
+        .from("stores")
+        .select("id, name, is_active, suspended_at, suspended_reason, risk_score, created_at, partner_id")
 
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
-        query = query.ilike("store_name", `%${sanitized}%`)
+        storeQuery = storeQuery.ilike("name", `%${sanitized}%`)
     }
 
     if (status === "active") {
-        query = query.is("suspended_at", null).eq("erp_disabled", false).eq("is_active", true)
+        storeQuery = storeQuery.eq("is_active", true).is("suspended_at", null)
     } else if (status === "suspended") {
-        query = query.not("suspended_at", "is", null)
+        storeQuery = storeQuery.not("suspended_at", "is", null)
     } else if (status === "erp_disabled") {
-        query = query.eq("erp_disabled", true)
+        storeQuery = storeQuery.eq("is_active", false)
     }
 
     if (cursor) {
-        query = query.lt("created_at", cursor)
+        storeQuery = storeQuery.lt("created_at", cursor)
     }
 
-    query = query.order("created_at", { ascending: false }).limit(pageSize + 1)
+    storeQuery = storeQuery.order("created_at", { ascending: false }).limit(pageSize + 1)
 
-    const { data: partners, error } = await query
+    const { data: stores, error } = await storeQuery
 
     if (error) {
-        console.error("[ADMIN_ENFORCEMENT] Failed to fetch partners:", error.message)
+        console.error("[ADMIN_ENFORCEMENT] Failed to fetch stores:", error.message)
         return { data: [], nextCursor: null, prevCursor: null, hasMore: false }
     }
 
-    const hasMore = (partners?.length || 0) > pageSize
-    const items = (partners || []).slice(0, pageSize)
+    const hasMore = (stores?.length || 0) > pageSize
+    const items = (stores || []).slice(0, pageSize)
 
-    // Fetch owner names
-    const ownerIds = items.map((p: any) => p.user_id).filter(Boolean)
+    // Fetch partner info + owner names for each store
+    const partnerIds = [...new Set(items.map((s: any) => s.partner_id).filter(Boolean))]
+    let partnerMap = new Map<string, any>()
     let ownerMap = new Map<string, string>()
-    if (ownerIds.length > 0) {
-        const { data: owners } = await supabase
-            .from("user_profiles")
-            .select("user_id, full_name")
-            .in("user_id", ownerIds)
-        ownerMap = new Map((owners || []).map((o: any) => [o.user_id, o.full_name]))
+    if (partnerIds.length > 0) {
+        const { data: partners } = await supabase
+            .from("partners")
+            .select("id, store_name, user_id, is_active, erp_disabled, suspended_at, suspended_until, risk_score, created_at")
+            .in("id", partnerIds)
+        if (partners) {
+            partnerMap = new Map(partners.map((p: any) => [p.id, p]))
+        }
+
+        const ownerIds = [...new Set(partners.map((p: any) => p.user_id).filter(Boolean))]
+        if (ownerIds.length > 0) {
+            const { data: owners } = await supabase
+                .from("user_profiles")
+                .select("user_id, full_name")
+                .in("user_id", ownerIds)
+            ownerMap = new Map((owners || []).map((o: any) => [o.user_id, o.full_name]))
+        }
     }
 
-    // Fetch stores for each partner
-    const partnerIds = items.map((p: any) => p.id)
-    let storesByPartner = new Map<string, any[]>()
+    // Build a map of partner_id -> all their stores (for detail sheet)
+    let allStoresByPartner = new Map<string, any[]>()
     if (partnerIds.length > 0) {
-        const { data: stores } = await supabase
+        const { data: allStores } = await supabase
             .from("stores")
             .select("id, name, is_active, suspended_at, suspended_reason, risk_score, created_at, partner_id")
             .in("partner_id", partnerIds)
-        if (stores) {
-            for (const s of stores) {
-                const list = storesByPartner.get(s.partner_id) || []
+        if (allStores) {
+            for (const s of allStores) {
+                const list = allStoresByPartner.get(s.partner_id) || []
                 list.push(s)
-                storesByPartner.set(s.partner_id, list)
+                allStoresByPartner.set(s.partner_id, list)
             }
         }
     }
 
-    // If searching, also search stores
-    let storeMatches: any[] = []
-    if (search && search.trim().length > 0) {
-        const sanitized = sanitizeIlike(search.trim())
-        const { data: searchStores } = await supabase
-            .from("stores")
-            .select("id, name, is_active, suspended_at, suspended_reason, risk_score, created_at, partner_id")
-            .ilike("name", `%${sanitized}%`)
-        if (searchStores) {
-            // Also fetch partner info for matching stores
-            const storePartnerIds = [...new Set(searchStores.map((s: any) => s.partner_id))]
-            const { data: storePartners } = await supabase
-                .from("partners")
-                .select("id, store_name, user_id, is_active, erp_disabled, suspended_at, suspended_until, risk_score, created_at")
-                .in("id", storePartnerIds)
-            const partnerMap = new Map((storePartners || []).map((p: any) => [p.id, p]))
-
-            // Only include stores whose partner is not already in the main list
-            const existingIds = new Set(items.map((p: any) => p.id))
-            const storePartnerIdsSet = new Set(storePartnerIds)
-            // Filter out stores whose partners are already in results
-            storeMatches = searchStores
-                .filter((s: any) => !existingIds.has(s.partner_id))
-                .map((s: any) => {
-                    const p = partnerMap.get(s.partner_id)
-                    return { store: s, partner: p }
-                })
-                .filter((x: any) => x.partner)
-        }
-    }
-
-    const mapped: EnforcementPartner[] = items.map((p: any) => {
-        const stores = (storesByPartner.get(p.id) || []).map((s: any) => ({
+    const mapped: EnforcementPartner[] = items.map((s: any) => {
+        const partner = partnerMap.get(s.partner_id)
+        return {
             id: s.id,
-            name: s.name,
+            store_name: `${s.name} (${partner?.store_name || "Sem parceiro"})`,
+            owner_name: ownerMap.get(partner?.user_id) || "Desconhecido",
+            owner_user_id: partner?.user_id || "",
             is_active: s.is_active,
+            erp_disabled: !s.is_active,
             suspended_at: s.suspended_at,
-            suspended_reason: s.suspended_reason,
+            suspended_until: null,
             risk_score: s.risk_score || 0,
             created_at: s.created_at,
             partner_id: s.partner_id,
-        }))
-        return {
-            id: p.id,
-            store_name: p.store_name || "Sem nome",
-            owner_name: ownerMap.get(p.user_id) || "Desconhecido",
-            owner_user_id: p.user_id,
-            is_active: p.is_active,
-            erp_disabled: p.erp_disabled || false,
-            suspended_at: p.suspended_at,
-            suspended_until: p.suspended_until,
-            risk_score: p.risk_score || 0,
-            created_at: p.created_at,
-            type: "partner",
-            stores: stores.length > 0 ? stores : undefined,
+            type: "store",
+            stores: allStoresByPartner.get(s.partner_id)?.map((st: any) => ({
+                id: st.id,
+                name: st.name,
+                is_active: st.is_active,
+                suspended_at: st.suspended_at,
+                suspended_reason: st.suspended_reason,
+                risk_score: st.risk_score || 0,
+                created_at: st.created_at,
+                partner_id: st.partner_id,
+            })),
         }
     })
 
-    // Add store-only items found by search
-    const storeMapped: EnforcementPartner[] = storeMatches.map((x: any) => ({
-        id: x.store.id,
-        store_name: `${x.store.name} (${x.partner.store_name})`,
-        owner_name: ownerMap.get(x.partner.user_id) || "Desconhecido",
-        owner_user_id: x.partner.user_id || "",
-        is_active: x.store.is_active,
-        erp_disabled: false,
-        suspended_at: x.store.suspended_at,
-        suspended_until: null,
-        risk_score: x.store.risk_score || 0,
-        created_at: x.store.created_at,
-        partner_id: x.store.partner_id,
-        type: "store",
-    }))
-
-    const allItems = [...mapped, ...storeMapped]
-    const totalHasMore = hasMore || storeMapped.length > 0
-
     return {
-        data: allItems,
-        nextCursor: totalHasMore && allItems.length > 0 ? allItems[allItems.length - 1].created_at : null,
+        data: mapped,
+        nextCursor: hasMore && mapped.length > 0 ? mapped[mapped.length - 1].created_at : null,
         prevCursor: cursor || null,
-        hasMore: totalHasMore,
+        hasMore,
     }
 }
 
@@ -551,6 +515,17 @@ export async function suspendPartner(
         return { success: false, error: updateError.message }
     }
 
+    // Also suspend all stores of this partner
+    await supabase
+        .from("stores")
+        .update({
+            is_active: false,
+            suspended_at: new Date().toISOString(),
+            suspended_reason: `Parceiro suspenso: ${reason.trim()}`,
+            suspended_by: admin.userId,
+        } as any)
+        .eq("partner_id", partnerId)
+
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: AdminActionType.PARTNER_SUSPEND,
@@ -605,6 +580,17 @@ export async function unsuspendPartner(
     if (updateError) {
         return { success: false, error: updateError.message }
     }
+
+    // Also unsuspend all stores of this partner
+    await supabase
+        .from("stores")
+        .update({
+            is_active: true,
+            suspended_at: null,
+            suspended_reason: null,
+            suspended_by: null,
+        } as any)
+        .eq("partner_id", partnerId)
 
     await adminAuditLog({
         adminUserId: admin.userId,

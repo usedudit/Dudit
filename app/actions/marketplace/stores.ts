@@ -25,7 +25,7 @@ export const getCachedStoreBySlug = async (slug: string) => {
                     .select(`
                         *,
                         partners!inner(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*)),
-                        addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
+                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
                     `)
                     .eq("slug", slug)
                     .eq("is_active", true)
@@ -45,9 +45,9 @@ export async function getStoreBySlug(slug: string) {
     const { data } = await supabase
         .from("stores")
         .select(`
-            *,
-            partners!inner(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*)),
-            addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
+                        *,
+                        partners!inner(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*)),
+                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
         `)
         .eq("slug", slug)
         .eq("is_active", true)
@@ -65,8 +65,8 @@ export const getCachedStoreById = async (storeId: string) => {
                     .from("stores")
                     .select(`
                         *,
-                        partners!inner(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*)),
-                        addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
+                        partners!left(id, store_name, store_description, store_image_url, banner_url, profile_image_url, offering_type, rating, phone, opening_hours, business_info, created_at, is_showcase_active, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, payment_methods(*)),
+                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
                     `)
                     .eq("id", storeId)
                     .maybeSingle()

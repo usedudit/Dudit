@@ -366,8 +366,8 @@ export function CheckoutPageClient() {
             notifyError("Erro", "Erro ao atualizar forma de atendimento.")
         }
     }
-    const storeImage = partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
-    const sellerName = partnerInfo?.store_name || "Loja"
+    const storeImage = checkoutContext?.store?.logo_url || checkoutContext?.store?.image_url || partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const sellerName = checkoutContext?.store?.name || checkoutContext?.partner?.storeName || partnerInfo?.store_name || "Loja"
 
     const quantities = useMemo<Record<string, number>>(() => {
         const acc: Record<string, number> = {}

@@ -74,17 +74,17 @@ const ModerationListRow = React.memo(({
                 </div>
             </td>
 
-            {/* Parceiro */}
+            {/* Loja */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-1">
                         <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
                         <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                            {item.owner_store_name}
+                            {item.store_name || item.owner_store_name}
                         </span>
                     </div>
                     <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">
-                        {item.partner_id}
+                        {item.store_id || item.partner_id}
                     </span>
                 </div>
             </td>

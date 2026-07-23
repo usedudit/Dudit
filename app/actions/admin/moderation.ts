@@ -83,12 +83,13 @@ export async function getModerationQueue(
     const supabase = getAdminClient()
     const pageSize = Math.min(limit, 50)
 
-    // Real query: products pending moderation with partner info
+    // Real query: products pending moderation with partner + store info
     let productQuery = supabase
         .from("products")
         .select(`
-      id, name, description, price, images, moderation_status, created_at,
-      partner:partners!inner(id, store_name, user_id, risk_score)
+      id, name, description, price, images, moderation_status, created_at, store_id,
+      partner:partners!inner(id, store_name, user_id, risk_score),
+      store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
     `)
         .is("deleted_at", null)
 
@@ -113,7 +114,7 @@ export async function getModerationQueue(
     const hasMore = (products?.length || 0) > pageSize
     const items = (products || []).slice(0, pageSize)
 
-    // Fetch owner names for each partner (products only)
+    // Fetch owner names + store profiles
     const ownerIds = [...new Set(items.map((p: any) => p.partner?.user_id).filter(Boolean))]
     let ownerMap = new Map<string, string>()
     if (ownerIds.length > 0) {
@@ -123,6 +124,45 @@ export async function getModerationQueue(
             .in("user_id", ownerIds)
         ownerMap = new Map((owners || []).map((o: any) => [o.user_id, o.full_name]))
     }
+
+    // Also fetch store extras (phone, description, banner, gallery) not returned by the join
+    const storeIds = [...new Set(items.map((p: any) => p.store_id).filter(Boolean))]
+    let storeExtraMap = new Map<string, any>()
+    if (storeIds.length > 0) {
+        const { data: storeExtras } = await supabase
+            .from("stores")
+            .select("id, name, phone, description, banner_url, gallery, logo_url, risk_score")
+            .in("id", storeIds)
+        if (storeExtras) {
+            storeExtraMap = new Map(storeExtras.map((s: any) => [s.id, s]))
+        }
+    }
+
+    const mappedProducts: ModerationItem[] = items.map((p: any) => {
+        const st = p.store || storeExtraMap.get(p.store_id)
+        return {
+            id: p.id,
+            type: "product" as const,
+            title: p.name,
+            description: p.description,
+            price: p.price || 0,
+            images: p.images || [],
+            owner_store_name: st?.name || p.partner?.store_name || "Desconhecido",
+            owner_user_name: ownerMap.get(p.partner?.user_id) || "",
+            partner_id: p.partner?.id || "",
+            store_id: p.store_id || undefined,
+            store_name: st?.name || undefined,
+            store_phone: st?.phone || undefined,
+            store_description: st?.description || undefined,
+            store_banner_url: st?.banner_url || undefined,
+            store_gallery: st?.gallery || undefined,
+            store_logo_url: st?.logo_url || undefined,
+            owner_user_id: p.partner?.user_id || undefined,
+            moderation_status: p.moderation_status,
+            risk_score: st?.risk_score ?? p.partner?.risk_score ?? 0,
+            created_at: p.created_at,
+        }
+    })
 
     // Community videos query
     let videoQuery = supabase
@@ -141,8 +181,6 @@ export async function getModerationQueue(
     // // TODO: Fix the partners query
     // // )
     // const mappedPartners: ModerationItem[] = []
-
-    const mappedProducts: ModerationItem[] = []
 
     let returnQuery = supabase
         .from("return_requests")

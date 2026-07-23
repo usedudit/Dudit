@@ -35,6 +35,15 @@ export type MarketplaceCheckoutContextResult =
       servicesSubtotal: number
       subscriptionsSubtotal: number
       deposit: MarketplaceCheckoutDepositConfig
+      store?: {
+        id: string
+        name: string
+        slug: string | null
+        logo_url: string | null
+        image_url: string | null
+        address: Record<string, unknown> | null
+        openingHours: any
+      } | null
       partner: {
         id: string
         slug: string | null
@@ -114,7 +123,9 @@ export async function getMarketplaceCheckoutContextAction(input: {
   // para usar no cálculo do depósito, alinhado com o que o resolver do carrinho usa
   const originalServicesSubtotal = servicesSubtotal
 
-  const [{ data: partnerRow }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
+  const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
+
+  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
     admin
       .from("partners")
       .select(
@@ -122,19 +133,46 @@ export async function getMarketplaceCheckoutContextAction(input: {
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
+    targetStoreId
+      ? admin
+        .from("stores")
+        .select("id, name, slug, image_url, logo_url, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+        .eq("id", targetStoreId)
+        .maybeSingle()
+      : Promise.resolve({ data: null }),
     getPartnerPlan(resolved.partnerId),
     getPartnerDeliveryConfigAction(resolved.partnerId),
     cachedListActivePromotionsInBatch([resolved.partnerId], user.id),
-    admin
-      .from("payment_methods")
-      .select(
-        "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, pix_key, pix_key_type"
-      )
-      .eq("partner_id", resolved.partnerId)
-      .eq("is_active", true)
-      .order("is_default", { ascending: false })
-      .order("priority", { ascending: false })
-      .order("discount_percent", { ascending: false }),
+    (async () => {
+      if (targetStoreId) {
+        const { data: storeMethods } = await admin
+          .from("payment_methods")
+          .select(
+            "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, pix_key, pix_key_type, store_id"
+          )
+          .eq("partner_id", resolved.partnerId)
+          .eq("store_id", targetStoreId)
+          .eq("is_active", true)
+          .order("is_default", { ascending: false })
+          .order("priority", { ascending: false })
+          .order("discount_percent", { ascending: false })
+
+        if (storeMethods && storeMethods.length > 0) {
+          return { data: storeMethods }
+        }
+      }
+
+      return admin
+        .from("payment_methods")
+        .select(
+          "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, store_id"
+        )
+        .eq("partner_id", resolved.partnerId)
+        .eq("is_active", true)
+        .order("is_default", { ascending: false })
+        .order("priority", { ascending: false })
+        .order("discount_percent", { ascending: false })
+    })(),
     getCachedAddresses(user.id, "user"),
     (() => {
       let q = admin
@@ -295,6 +333,9 @@ export async function getMarketplaceCheckoutContextAction(input: {
 
   const addresses = partnerRow?.addresses
   const partnerAddress = Array.isArray(addresses) ? addresses[0] : addresses
+  const storeAddress = (storeRowData as any)?.addresses?.[0] || null
+  const effectiveAddress = storeAddress || partnerAddress
+  const effectiveStoreName = (storeRowData as any)?.name || partnerRow?.store_name || null
 
   const rawMethods = (storefrontPaymentMethodsResult as any)?.data || []
   const pixMethod = rawMethods.find((m: any) => m.type === "pix") || null
@@ -339,14 +380,23 @@ export async function getMarketplaceCheckoutContextAction(input: {
       previewAmount,
       mpEnabled: serviceDepositMpEnabled,
     },
+    store: storeRowData ? {
+      id: (storeRowData as any).id,
+      name: (storeRowData as any).name,
+      slug: (storeRowData as any).slug || null,
+      logo_url: (storeRowData as any).logo_url || null,
+      image_url: (storeRowData as any).image_url || null,
+      address: (storeAddress as Record<string, unknown>) || null,
+      openingHours: (storeRowData as any).opening_hours || null,
+    } : null,
     partner: {
       id: resolved.partnerId,
-      slug: null,
-      address: (partnerAddress as Record<string, unknown>) || null,
-      storeName: partnerRow?.store_name || null,
-      store_name: partnerRow?.store_name || null,
+      slug: (storeRowData as any)?.slug || null,
+      address: (effectiveAddress as Record<string, unknown>) || null,
+      storeName: effectiveStoreName,
+      store_name: effectiveStoreName,
       mpConnected,
-      phone: partnerRow?.phone || null,
+      phone: (storeRowData as any)?.phone || partnerRow?.phone || null,
       pixKey: pixMethod?.pix_key || null,
       pixKeyType: pixMethod?.pix_key_type || null,
       pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",

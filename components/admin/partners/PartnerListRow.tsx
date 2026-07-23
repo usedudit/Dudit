@@ -21,6 +21,7 @@ interface PartnerListRowProps {
     onDisableERP: (partner: EnforcementPartner) => void
     onUnsuspendStore: (partner: EnforcementPartner) => void
     onSuspendStore: (partner: EnforcementPartner) => void
+    onSuspendPartnerFromStore: (store: EnforcementPartner) => void
     onView: (partner: EnforcementPartner) => void
 }
 
@@ -33,6 +34,7 @@ const PartnerListRow = React.memo(({
     onDisableERP,
     onUnsuspendStore,
     onSuspendStore,
+    onSuspendPartnerFromStore,
     onView
 }: PartnerListRowProps) => {
     const isStore = partner.type === "store"
@@ -138,41 +140,22 @@ const PartnerListRow = React.memo(({
             {/* Ações */}
             <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
-                    {isStore ? (
-                        <ActionsDropdown>
-                            {partner.suspended_at ? (
-                                <DropdownItem onClick={() => onUnsuspendStore(partner)} className="text-brand-green">
-                                    <CheckCircleIcon size={16} /> Reativar Loja
-                                </DropdownItem>
-                            ) : (
-                                <DropdownItem onClick={() => onSuspendStore(partner)} className="text-brand-orange">
-                                    <AlertTriangleIcon size={16} /> Suspender Loja
-                                </DropdownItem>
-                            )}
-                        </ActionsDropdown>
-                    ) : (
-                        <ActionsDropdown>
-                            {partner.suspended_at ? (
-                                <DropdownItem onClick={() => onUnsuspend(partner)} className="text-brand-green">
-                                    <CheckCircleIcon size={16} /> Reativar Parceiro
-                                </DropdownItem>
-                            ) : (
-                                <DropdownItem onClick={() => onSuspend(partner)} className="text-brand-orange">
-                                    <AlertTriangleIcon size={16} /> Suspender Parceiro
-                                </DropdownItem>
-                            )}
-
-                            {partner.erp_disabled ? (
-                                <DropdownItem onClick={() => onEnableERP(partner)} className="text-brand-blue">
-                                    <CheckCircleIcon size={16} /> Habilitar ERP
-                                </DropdownItem>
-                            ) : (
-                                <DropdownItem onClick={() => onDisableERP(partner)} className="text-brand-red">
+                    <ActionsDropdown>
+                        {partner.suspended_at ? (
+                            <DropdownItem onClick={() => onUnsuspendStore(partner)} className="text-brand-green">
+                                <CheckCircleIcon size={16} /> Reativar Loja
+                            </DropdownItem>
+                        ) : (
+                            <>
+                                <DropdownItem onClick={() => onSuspendStore(partner)} className="text-brand-red">
                                     <BlockedIcon size={16} /> Desabilitar ERP
                                 </DropdownItem>
-                            )}
-                        </ActionsDropdown>
-                    )}
+                                <DropdownItem onClick={() => onSuspendPartnerFromStore(partner)} className="text-brand-orange">
+                                    <AlertTriangleIcon size={16} /> Suspender Parceiro
+                                </DropdownItem>
+                            </>
+                        )}
+                    </ActionsDropdown>
                 </div>
             </td>
         </motion.tr>

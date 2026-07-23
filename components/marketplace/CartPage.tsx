@@ -342,12 +342,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             storeId: partnerData.storeId || undefined,
             products: getPartnerCheckoutProducts(storeKey),
             partnerInfo: {
-                address: partnerData.partner?.addresses?.[0] || {},
+                address: partnerData.store?.addresses?.[0] || partnerData.partner?.addresses?.[0] || {},
                 paymentMethods: partnerData.paymentMethods || ["Dinheiro"],
                 mpConnected: !!partnerData.partner?.mp_user_id,
                 mpPublicKey: partnerData.partner?.mp_public_key,
-                store_name: partnerData.partner?.store_name,
-                openingHours: partnerData.partner?.opening_hours || null,
+                store_name: partnerData.store?.name || partnerData.partner?.store_name,
+                openingHours: partnerData.store?.opening_hours || partnerData.partner?.opening_hours || null,
             },
             cartItems: partnerItems.map((item: any) => ({
                 cartItemId: item.id,
@@ -451,7 +451,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 const expanded = isExpanded(storeKey)
                                 const inStockItems = data.items.filter((item: any) => !isItemOutOfStock(item))
                                 const allSelected = inStockItems.length > 0 && inStockItems.every((item: any) => getItemSelected(item))
-                                const sellerImage = data.partner?.store_image_url
+                                const sellerName = data.store?.name || data.partner?.store_name || "Loja"
+                                const sellerImage = data.store?.logo_url || data.store?.image_url || data.partner?.store_image_url
+                                const storeObj = data.store ? { ...data.store, id: data.store.id, store_name: data.store.name } : data.partner
 
                                 return (
                                     <Fragment key={storeKey}>
@@ -474,15 +476,15 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                         <div className="flex items-center gap-2">
                                                             <img
                                                                 src={getImageUrl(sellerImage) || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                alt={data.partner?.store_name}
+                                                                alt={sellerName}
                                                                 className="bg-white border border-brand-border dark:border-dark-border w-6 h-6 rounded-full object-cover"
-                                                                onClick={e => { e.stopPropagation(); router.push(getStoreUrl(data.partner)) }}
+                                                                onClick={e => { e.stopPropagation(); router.push(getStoreUrl(storeObj)) }}
                                                             />
                                                             <h3
                                                                 className="text-lg font-semibold text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors"
-                                                                onClick={e => { e.stopPropagation(); router.push(getStoreUrl(data.partner)) }}
+                                                                onClick={e => { e.stopPropagation(); router.push(getStoreUrl(storeObj)) }}
                                                             >
-                                                                {data.partner?.store_name || "Loja"}
+                                                                {sellerName}
                                                             </h3>
                                                         </div>
                                                     </div>
@@ -511,7 +513,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                     section.items.length === 0
                                                                         ? []
                                                                         : [
-                                                                             <div key={`${storeKey}-${section.title}-hdr`} className="flex items-center justify-between mb-3 mt-2 first:mt-0">
+                                                                            <div key={`${storeKey}-${section.title}-hdr`} className="flex items-center justify-between mb-3 mt-2 first:mt-0">
                                                                                 <h4 className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text">{section.title}</h4>
                                                                                 <span className="text-xs text-brand-inactive-text">
                                                                                     {section.items.filter((i: any) => getItemSelected(i)).length} itens · {formatCurrency(

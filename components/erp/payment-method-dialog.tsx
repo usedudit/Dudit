@@ -23,6 +23,7 @@ import {
 } from "@/app/actions/erp/payment-methods"
 import { createFinanceAccountAction, getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { PlusIcon } from "@/lib/icons"
+import { useStore } from "@/lib/store-context"
 
 interface PaymentMethod {
     id: string
@@ -48,6 +49,7 @@ interface PaymentMethodDialogProps {
     open: boolean
     onClose: (shouldReload?: boolean) => void
     partnerId: string
+    storeId?: string | null
     editingMethod: PaymentMethod | null
     onSuccess?: (newMethod?: any) => void
 }
@@ -69,7 +71,16 @@ const ACCOUNT_TYPE_OPTIONS = [
     { value: "wallet", label: "Carteira" },
 ] as const
 
-export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }: PaymentMethodDialogProps) {
+export function PaymentMethodDialog({ open, onClose, partnerId, storeId: propStoreId, editingMethod }: PaymentMethodDialogProps) {
+    let selectedStoreId: string | null = null
+    try {
+        const storeCtx = useStore()
+        selectedStoreId = storeCtx?.selectedStore?.id || null
+    } catch {
+        selectedStoreId = null
+    }
+    const activeStoreId = propStoreId || selectedStoreId || null
+
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isLoadingDetails, setIsLoadingDetails] = useState(false)
@@ -359,6 +370,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
             } else {
                 const result = await createPaymentMethodAction({
                     partnerId,
+                    storeId: activeStoreId,
                     ...payload,
                 })
 

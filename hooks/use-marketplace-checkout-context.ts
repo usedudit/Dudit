@@ -59,7 +59,7 @@ export function useMarketplaceCheckoutContext(params: {
     return () => {
       active = false
     }
-  }, [params.partnerId, cartKey, params.mpConnected, params.enabled, params.refreshTrigger])
+  }, [params.partnerId, cartKey, params.mpConnected, params.storeId, params.enabled, params.refreshTrigger])
 
   return { checkoutContext: data, contextError: error, contextLoading: loading }
 }
