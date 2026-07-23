@@ -28,6 +28,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 import { getMercadoPagoStatusAction, checkMercadoPagoPaymentStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
+import { getServiceCheckoutSettingsAction } from '@/app/actions/marketplace/service-checkout-settings';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
@@ -245,6 +246,7 @@ export type PaymentModalProps = {
     /** Quando o pedido tem serviços, permite gerar cobrança de sinal via MP antes do pagamento integral. */
     allowDepositCharge?: boolean
     depositChargeAmount?: number
+    depositPercentage?: number
 }
 
 /** Mesmo texto em PDV e venda manual - importe nos pais para garantir paridade. */
@@ -272,9 +274,28 @@ const PaymentModal = ({
     originalPaymentMethod,
     allowDepositCharge = false,
     depositChargeAmount = 0,
+    depositPercentage: propsDepositPercentage,
 }: PaymentModalProps) => {
     const { toast } = useToast();
     const { selectedStore } = useStore();
+
+    const [effectiveDepositPercent, setEffectiveDepositPercent] = useState<number | undefined>(propsDepositPercentage)
+
+    useEffect(() => {
+        if (propsDepositPercentage != null) {
+            setEffectiveDepositPercent(propsDepositPercentage)
+            return
+        }
+        if (!partnerId) return
+        let active = true
+        getServiceCheckoutSettingsAction(partnerId).then((res) => {
+            if (active && res?.success && res?.settings) {
+                setEffectiveDepositPercent(res.settings.depositPercentage)
+            }
+        })
+        return () => { active = false }
+    }, [partnerId, propsDepositPercentage])
+
     // Views: methods (main) | method_type_select | money | card | pix | split | split_method_select
     const [view, setView] = useState<string>('methods');
     /** Valor base alocado ao pedido neste meio (antes de desconto/juros/taxa do método); servidor recalcula o líquido a cobrar. */
@@ -2024,7 +2045,7 @@ const PaymentModal = ({
                                                         <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-border/20">
                                                             <div className="flex items-center justify-between gap-3">
                                                                 <div>
-                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal</p>
+                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal{effectiveDepositPercent ? ` (${effectiveDepositPercent}%)` : ""}</p>
                                                                     <p className="text-xs text-brand-inactive-text">Pix Mercado Pago - {formatCurrency(depositChargeAmount)}</p>
                                                                 </div>
                                                                 <Button variant="filled" onClick={handleGenerateDepositCharge} isLoading={generatingDepositPix}>

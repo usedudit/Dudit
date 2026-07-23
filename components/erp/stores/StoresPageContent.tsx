@@ -8,6 +8,8 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { StoreModal } from "./StoreModal"
+import StoreGridCard, { type StoreRow } from "./StoreGridCard"
+import StoreListRow from "./StoreListRow"
 
 import {
   Button,
@@ -19,46 +21,20 @@ import {
   TabsList,
   TabsTrigger,
   TabCountBadge,
+  Checkbox,
+  SelectionBanner,
 } from "@/components/reusable"
 
 import {
   PlusIcon,
   SearchIcon,
-  EditIcon,
-  TrashIcon,
-  StoreIcon,
-  MapPinIcon,
-  PhoneIcon,
   ListIcon,
   GridIcon,
   StarIcon,
+  TrashIcon,
 } from "@/lib/icons"
 
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { FadeIn } from "@/components/animations/FadeIn"
-
-interface StoreRow {
-  id: string
-  partner_id: string
-  name: string
-  slug: string | null
-  description: string | null
-  phone: string | null
-  whatsapp_phone: string | null
-  image_url: string | null
-  logo_url: string | null
-  zip_code: string | null
-  street: string | null
-  number: string | null
-  neighborhood: string | null
-  city: string | null
-  state: string | null
-  complement: string | null
-  opening_hours: Record<string, unknown> | null
-  is_headquarters: boolean
-  is_active: boolean
-  created_at: string
-}
 
 interface StoresPageContentProps {
   partnerId: string
@@ -82,6 +58,7 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
   const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive">("all")
   const [viewMode, setViewMode] = useState<"grid" | "list">(isMobileOrTablet ? "grid" : "list")
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -147,6 +124,11 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
       if (res.success) {
         setIsDeleteAlertOpen(false)
         setDeletingStore(null)
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(deletingStore.id)
+          return next
+        })
         await loadStores()
         await refreshStores()
       }
@@ -193,6 +175,24 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
     return { all, active, inactive }
   }, [stores])
 
+  // Selection handlers
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    setSelectedIds(new Set(filteredStores.map((s) => s.id)))
+  }
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set())
+  }
+
   // --- PLAN GATE BANNER (IF NOT ESCALAR) ---
   if (!isEscalar || planGate) {
     return (
@@ -218,6 +218,7 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
 
   // Source Store reference for inheritance
   const sourceStore = stores.find((s) => s.is_headquarters) || stores[0] || null
+  const isAllSelected = filteredStores.length > 0 && selectedIds.size === filteredStores.length
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -324,6 +325,18 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
           </div>
         </div>
 
+        {/* SELECTION BANNER */}
+        {selectedIds.size > 0 && (
+          <div className="px-4 md:px-8 mb-4">
+            <SelectionBanner
+              selectedCount={selectedIds.size}
+              totalCount={filteredStores.length}
+              onSelectAll={handleSelectAll}
+              onClearSelection={handleClearSelection}
+            />
+          </div>
+        )}
+
         {/* CONTENT AREA */}
         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-6 px-4 md:px-8">
           {isLoading ? (
@@ -353,201 +366,53 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
               }
             />
           ) : viewMode === "grid" || isMobileOrTablet ? (
-            /* GRID VIEW */
+            /* GRID VIEW CARDS (Exact Product/Customer Grid Pattern) */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedStores.map((store) => {
-                const logo = getR2ImageUrl(store.logo_url || store.image_url)
-                const isSelected = selectedStore?.id === store.id
-
-                return (
-                  <FadeIn key={store.id}>
-                    <div className={`p-5 rounded-2xl bg-white dark:bg-dark-surface border transition-all flex flex-col justify-between h-full shadow-xs ${isSelected ? "border-brand-primary ring-2 ring-brand-primary/20" : "border-brand-border dark:border-dark-border hover:border-brand-primary/40"}`}>
-                      <div className="space-y-4">
-                        {/* Header: Logo + Title + Badges */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                              {logo ? (
-                                <img src={logo} alt={store.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <StoreIcon className="w-6 h-6 text-brand-primary" />
-                              )}
-                            </div>
-                            <div>
-                              <h3 className="font-bold text-brand-dark dark:text-dark-heading line-clamp-1 text-base">
-                                {store.name}
-                              </h3>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                {store.is_headquarters && (
-                                  <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                                    Matriz
-                                  </span>
-                                )}
-                                {store.is_active ? (
-                                  <span className="text-[10px] font-bold uppercase tracking-wider bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                                    Ativa
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] font-bold uppercase tracking-wider bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full">
-                                    Inativa
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Address & Contact Info */}
-                        <div className="space-y-1.5 text-xs text-brand-inactive-text border-t border-brand-border dark:border-dark-border pt-3">
-                          <div className="flex items-center gap-2">
-                            <MapPinIcon className="w-3.5 h-3.5 shrink-0 text-brand-inactive-text" />
-                            <span className="truncate">
-                              {store.city && store.state
-                                ? `${store.city}, ${store.state}`
-                                : store.street
-                                  ? `${store.street}, ${store.number || ""}`
-                                  : "Sem endereço cadastrado"}
-                            </span>
-                          </div>
-                          {(store.whatsapp_phone || store.phone) && (
-                            <div className="flex items-center gap-2">
-                              <PhoneIcon className="w-3.5 h-3.5 shrink-0 text-brand-inactive-text" />
-                              <span>{store.whatsapp_phone || store.phone}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Actions Footer */}
-                      <div className="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-brand-border dark:border-dark-border">
-                        <Button
-                          variant={isSelected ? "outline" : "filled"}
-                          size="sm"
-                          onClick={() => selectStore(store.id)}
-                          className={isSelected ? "border-brand-primary text-brand-primary" : "bg-brand-primary text-white"}
-                        >
-                          {isSelected ? "Loja Atual" : "Acessar Loja"}
-                        </Button>
-
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEdit(store)}
-                            className="p-2 text-brand-dark dark:text-dark-heading hover:bg-brand-gray/30"
-                          >
-                            <EditIcon className="w-4 h-4" />
-                          </Button>
-                          {!store.is_headquarters && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenDelete(store)}
-                              className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </FadeIn>
-                )
-              })}
+              {paginatedStores.map((store) => (
+                <StoreGridCard
+                  key={store.id}
+                  store={store}
+                  selected={selectedIds.has(store.id)}
+                  isCurrentStore={selectedStore?.id === store.id}
+                  onSelect={() => handleToggleSelect(store.id)}
+                  onSwitchStore={() => selectStore(store.id)}
+                  onEdit={() => handleOpenEdit(store)}
+                  onDelete={() => handleOpenDelete(store)}
+                />
+              ))}
             </div>
           ) : (
-            /* LIST VIEW */
+            /* LIST VIEW TABLE (Exact Product/Customer List Row Pattern) */
             <div className="overflow-x-auto rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface text-xs font-bold text-brand-inactive-text uppercase">
-                    <th className="py-3.5 px-4">Loja</th>
-                    <th className="py-3.5 px-4">Endereço</th>
-                    <th className="py-3.5 px-4">WhatsApp</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
-                    <th className="py-3.5 px-4 text-right">Ações</th>
+                    <th className="py-3.5 pl-6 pr-0 w-14">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onChange={isAllSelected ? handleClearSelection : handleSelectAll}
+                      />
+                    </th>
+                    <th className="py-3.5 px-2">Loja</th>
+                    <th className="py-3.5 px-2">Endereço</th>
+                    <th className="py-3.5 px-2">Contato</th>
+                    <th className="py-3.5 px-2 text-center">Status</th>
+                    <th className="py-3.5 px-2 text-right pr-6">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border dark:divide-dark-border text-sm">
-                  {paginatedStores.map((store) => {
-                    const logo = getR2ImageUrl(store.logo_url || store.image_url)
-                    const isSelected = selectedStore?.id === store.id
-
-                    return (
-                      <tr key={store.id} className="hover:bg-brand-gray/10 dark:hover:bg-dark-border/40 transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg overflow-hidden bg-brand-primary/10 border border-brand-border shrink-0 flex items-center justify-center">
-                              {logo ? (
-                                <img src={logo} alt={store.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <StoreIcon className="w-5 h-5 text-brand-primary" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-bold text-brand-dark dark:text-dark-heading line-clamp-1">
-                                {store.name}
-                              </p>
-                              {store.is_headquarters && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                                  Matriz
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-brand-inactive-text text-xs">
-                          {store.city && store.state
-                            ? `${store.city}, ${store.state}`
-                            : "Sem endereço"}
-                        </td>
-                        <td className="py-3 px-4 text-brand-inactive-text text-xs">
-                          {store.whatsapp_phone || store.phone || "-"}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {store.is_active ? (
-                            <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
-                              Ativa
-                            </span>
-                          ) : (
-                            <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                              Inativa
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant={isSelected ? "outline" : "filled"}
-                              size="sm"
-                              onClick={() => selectStore(store.id)}
-                              className={isSelected ? "border-brand-primary text-brand-primary text-xs" : "bg-brand-primary text-white text-xs"}
-                            >
-                              {isSelected ? "Atual" : "Acessar"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenEdit(store)}
-                              className="p-1.5 text-brand-dark"
-                            >
-                              <EditIcon className="w-4 h-4" />
-                            </Button>
-                            {!store.is_headquarters && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenDelete(store)}
-                                className="p-1.5 text-red-500"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {paginatedStores.map((store) => (
+                    <StoreListRow
+                      key={store.id}
+                      store={store}
+                      selected={selectedIds.has(store.id)}
+                      isCurrentStore={selectedStore?.id === store.id}
+                      onSelect={() => handleToggleSelect(store.id)}
+                      onSwitchStore={() => selectStore(store.id)}
+                      onEdit={() => handleOpenEdit(store)}
+                      onDelete={() => handleOpenDelete(store)}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -555,7 +420,7 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
 
           {/* PAGINATION */}
           {totalPages > 1 && (
-            <div className="mt-4">
+            <div className="mt-6 flex justify-center">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}

@@ -791,12 +791,12 @@ export async function checkoutCartAction(
       : Promise.resolve({ success: true, fee: 0, distanceKm: null, breakdown: null }),
     cachedListActivePromotionsForMarketplaceAction(partnerId, user.id),
     (isUuid && !useMercadoPago)
-      ? supabase
+      ? adminClient
         .from("payment_methods")
         .select("*, payment_method_installment_fees(installment_number, fee_percent)")
         .eq("id", paymentMethod)
         .eq("partner_id", partnerId)
-        .single()
+        .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ])
 
@@ -882,7 +882,7 @@ export async function checkoutCartAction(
   if (!paymentValidation.valid) return { error: paymentValidation.error }
 
   if (!bestMethod && !useMercadoPago) {
-    bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })
+    bestMethod = await pickBestPaymentMethod(adminClient as any, chosenType, partnerId, { preferDefault: true, storeId })
   }
 
   if (!bestMethod && !useMercadoPago) {

@@ -40,6 +40,7 @@ import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/p
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 
+import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 // Tabs
@@ -374,11 +375,34 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
     }, [items])
 
+    const [depositSettings, setDepositSettings] = useState<{ depositEnabled: boolean; depositPercentage: number }>({
+        depositEnabled: false,
+        depositPercentage: 50,
+    })
+
+    useEffect(() => {
+        if (!partnerId) return
+        let active = true
+        getServiceCheckoutSettingsAction(partnerId).then((res) => {
+            if (active && res?.success && res?.settings) {
+                setDepositSettings({
+                    depositEnabled: Boolean(res.settings.depositEnabled),
+                    depositPercentage: Number(res.settings.depositPercentage || 50),
+                })
+            }
+        })
+        return () => { active = false }
+    }, [partnerId])
+
     const serviceSubtotal = useMemo(
         () => items.filter((item) => item.isService).reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
         [items],
     )
-    const depositChargeAmount = Math.round(serviceSubtotal * 0.5 * 100) / 100
+    const depositChargeAmount = useMemo(() => {
+        if (!depositSettings.depositEnabled) return 0
+        const pct = (depositSettings.depositPercentage || 50) / 100
+        return Math.round(serviceSubtotal * pct * 100) / 100
+    }, [serviceSubtotal, depositSettings])
 
     const hasWinningDiscount = useMemo(() => {
         return items.some((item) => {
@@ -1947,8 +1971,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             originalPaymentMethod={originalPaymentMethod}
                             onConfirm={handleConfirmPayment}
                             deliveryMethod={deliveryMethod}
-                            allowDepositCharge={serviceSubtotal > 0.009 && !isMarketplaceOrder}
+                            allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009 && !isMarketplaceOrder}
                             depositChargeAmount={depositChargeAmount}
+                            depositPercentage={depositSettings.depositPercentage}
                         />
                     )}
                 </AnimatePresence>

@@ -26,6 +26,10 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_store_id ON subscriptions(store_id)
 ALTER TABLE recurring_subscriptions ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_recurring_subscriptions_store_id ON recurring_subscriptions(store_id);
 
+-- Add store_id to recurring_plans table (used by search_marketplace)
+ALTER TABLE recurring_plans ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_recurring_plans_store_id ON recurring_plans(store_id);
+
 -- Add suspension columns to stores table for admin enforcement
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS suspended_reason TEXT;

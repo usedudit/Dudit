@@ -171,10 +171,11 @@ export async function getPaymentMethodsAction(partnerId: string, storeId?: strin
 
     try {
         const all = await getCachedPaymentMethods(partnerId)()
-        const methods = storeId
-            ? all.filter((m: any) => !m.store_id || m.store_id === storeId)
-            : all.filter((m: any) => !m.store_id)
-        return { methods }
+        if (storeId) {
+            const storeMethods = all.filter((m: any) => m.store_id === storeId)
+            if (storeMethods.length > 0) return { methods: storeMethods }
+        }
+        return { methods: all }
     } catch (err: any) {
         return { error: err?.message || "Erro ao carregar métodos de pagamento" }
     }

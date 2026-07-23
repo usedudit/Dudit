@@ -4,6 +4,7 @@ type SupabaseLike = any
 
 export type PaymentMethodPickContext = {
     preferDefault?: boolean
+    storeId?: string | null
 }
 
 export function toPaymentMethodTypeFromLabel(value: string | null | undefined) {
@@ -23,15 +24,33 @@ export async function pickBestPaymentMethod(
     context: PaymentMethodPickContext = {},
 ) {
     const canonicalType = toCanonicalPaymentType(type)
-    const { data, error } = await supabase
-        .from("payment_methods")
-        .select("id, partner_id, type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
-        .eq("partner_id", partnerId)
-        .eq("type", canonicalType)
-        .eq("is_active", true)
+    let rows: any[] = []
 
-    if (error) throw new Error(error.message)
-    const rows = data || []
+    if (context.storeId) {
+        const { data: storeData } = await supabase
+            .from("payment_methods")
+            .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, store_id")
+            .eq("partner_id", partnerId)
+            .eq("store_id", context.storeId)
+            .eq("is_active", true)
+
+        if (storeData && storeData.length > 0) {
+            rows = storeData.filter((m: any) => toCanonicalPaymentType(m.type || m.payment_type) === canonicalType)
+        }
+    }
+
+    if (rows.length === 0) {
+        const { data: partnerData } = await supabase
+            .from("payment_methods")
+            .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, store_id")
+            .eq("partner_id", partnerId)
+            .eq("is_active", true)
+
+        if (partnerData) {
+            rows = partnerData.filter((m: any) => toCanonicalPaymentType(m.type || m.payment_type) === canonicalType)
+        }
+    }
+
     if (rows.length === 0) return null
 
     rows.sort((a: any, b: any) => {

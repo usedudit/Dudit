@@ -536,13 +536,11 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
-            if (paymentOption === "traditional") {
-                setPayDepositOnly(true)
-            }
+            setPayDepositOnly(true)
         } else {
             setPayDepositOnly(false)
         }
-    }, [paymentOption, checkoutContext?.deposit.available])
+    }, [checkoutContext?.deposit.available])
 
     // Show incompatible payment restrictions warning
     useEffect(() => {

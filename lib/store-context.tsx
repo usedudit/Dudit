@@ -97,18 +97,26 @@ export function StoreProvider({
     }
 
     try {
-      const { data, error } = await supabase
-        .from("stores")
-        .select("*, addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
-        .eq("partner_id", partnerId)
-        .order("created_at", { ascending: true })
-
-      if (error) throw error
+      let data: Store[] = []
+      try {
+        const { listStoresAction } = await import("@/app/actions/erp/stores")
+        data = (await listStoresAction(partnerId)) as Store[]
+      } catch {
+        const { data: resData, error } = await supabase
+          .from("stores")
+          .select("*, addresses!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .eq("partner_id", partnerId)
+          .order("created_at", { ascending: true })
+        if (error) throw error
+        data = (resData || []) as Store[]
+      }
 
       setHasError(false)
       setStores(data || [])
-      localStorage.setItem("cachedStores", JSON.stringify(data || []))
-      localStorage.setItem("cachedStoresTimestamp", String(Date.now()))
+      if (data && data.length > 0) {
+        localStorage.setItem("cachedStores", JSON.stringify(data))
+        localStorage.setItem("cachedStoresTimestamp", String(Date.now()))
+      }
 
       const savedStoreId = localStorage.getItem("selectedStoreId")
 
@@ -120,6 +128,8 @@ export function StoreProvider({
       } else if (data && data.length > 0) {
         setSelectedStore(data[0])
         localStorage.setItem("selectedStoreId", data[0].id)
+      } else {
+        setSelectedStore(null)
       }
     } catch (error) {
       console.error("Error fetching stores:", error)
