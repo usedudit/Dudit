@@ -159,7 +159,7 @@ export async function getCachedCart(userId: string) {
       storeIds.length > 0
         ? supabase
           .from("stores")
-          .select("id, partner_id, name, slug, image_url, logo_url, opening_hours, phone, whatsapp_phone, description, address_id, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .select("id, partner_id, name, slug, logo_url, opening_hours, phone, description, address_id, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
           .in("id", storeIds)
         : Promise.resolve({ data: [] as any[] }),
     ])

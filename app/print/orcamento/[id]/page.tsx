@@ -51,7 +51,7 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
     // Fetch partner logo and address details
     const [partnerRes, storeRes, addressRes] = await Promise.all([
         supabase.from("partners").select("store_name, store_image_url").eq("id", quote.partner_id).maybeSingle(),
-        supabase.from("stores").select("name, image_url").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
+        supabase.from("stores").select("name, logo_url").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
         getPartnerAddressAction(quote.partner_id)
     ])
 

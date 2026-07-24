@@ -13,15 +13,15 @@ export interface StoreRow {
   slug: string | null
   description: string | null
   phone: string | null
-  whatsapp_phone: string | null
-  image_url: string | null
+  whatsapp_phone?: string | null
+  image_url?: string | null
   logo_url: string | null
   zip_code: string | null
   street: string | null
   number: string | null
   neighborhood: string | null
-  city: string | null
-  state: string | null
+  city?: string | null
+  state?: string | null
   complement: string | null
   opening_hours: Record<string, unknown> | null
   is_headquarters: boolean
@@ -97,19 +97,19 @@ const StoreGridCard = React.memo(
             <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center mt-1">
               <MapPinIcon size={12} className="mr-1 shrink-0 text-brand-inactive-text" />
               <span className="truncate">
-                {store.city && store.state
-                  ? `${store.city}, ${store.state}`
-                  : store.street
-                    ? `${store.street}, ${store.number || ""}`
+                {store.street
+                  ? `${store.street}, ${store.number || ""}`
+                  : store.city && store.state
+                    ? `${store.city}, ${store.state}`
                     : "Sem endereço cadastrado"}
               </span>
             </div>
 
             {/* Linha 3: Contato */}
-            {(store.whatsapp_phone || store.phone) && (
+            {Boolean(store.phone || store.whatsapp_phone) && (
               <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center mt-1">
                 <PhoneIcon size={12} className="mr-1 shrink-0 text-brand-inactive-text" />
-                <span>{store.whatsapp_phone || store.phone}</span>
+                <span>{store.phone || store.whatsapp_phone}</span>
               </div>
             )}
           </div>

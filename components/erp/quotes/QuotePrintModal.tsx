@@ -54,7 +54,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
             const [quoteDetailsRes, partnerRes, storeRes, addressRes] = await Promise.all([
                 getQuoteDetailsAction(quoteId, partnerId),
                 supabase.from("partners").select("store_name, store_image_url").eq("id", partnerId).maybeSingle(),
-                supabase.from("stores").select("name, image_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
+                supabase.from("stores").select("name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
                 getPartnerAddressAction(partnerId),
             ])
 

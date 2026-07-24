@@ -225,7 +225,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     zipCode: address?.zip_code || "",
     rating: storeRating,
     createdAt: store.created_at || partner?.created_at,
-    offeringType: store.offering_type || partner?.offering_type || null,
+    offeringType: (() => { const sells = (store.business_info as any)?.sells || (partner?.business_info as any)?.sells || ['products']; return sells.includes('products') && sells.includes('services') ? 'both' : sells.includes('services') ? 'services' : 'products' })(),
     openingHours: store.opening_hours || partner?.opening_hours || null,
     phone: store.phone || store.whatsapp_phone || partner?.phone || "",
     lat: store.latitude || null,

@@ -214,7 +214,7 @@ export async function getUserFavoritesAction(params?: {
                             stock_available, stock_quantity,
                             category_id, category:product_categories!category_id(name),
                             partners(id, store_name, store_image_url, addresses(city, state)),
-                            stores!inner(id, name, description, logo_url, image_url, banner_url, phone, city, state, is_showcase_active),
+                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses(city, state)),
                             product_variants(variant_options, price_adjustment, is_active),
                             show_price_in_store
                         `)
@@ -230,7 +230,7 @@ export async function getUserFavoritesAction(params?: {
                         .select(`
                             id, name, price, images, rating, is_active, billing_unit, price_type,
                             partners(id, store_name, store_image_url, addresses(city, state)),
-                            stores!inner(id, name, description, logo_url, image_url, banner_url, phone, city, state, is_showcase_active),
+                            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses(city, state)),
                             show_price_in_store
                         `)
                         .in("id", serviceIds)

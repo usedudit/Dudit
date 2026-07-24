@@ -96,7 +96,7 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
     const [headerRes, partnerRes, storeRes] = await Promise.all([
         getPartnerReceiptHeaderAction(partnerId),
         supabase.from("partners").select("store_image_url").eq("id", partnerId).maybeSingle(),
-        supabase.from("stores").select("image_url").eq("partner_id", partnerId).limit(1).maybeSingle()
+        supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
 
     const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {

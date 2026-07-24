@@ -197,8 +197,6 @@ export function StoreModal({ isOpen, onClose, partnerId, store, sourceStore, onS
         name: name.trim(),
         description: description.trim() || undefined,
         phone: whatsappPhone.trim() || undefined,
-        whatsapp_phone: whatsappPhone.trim() || undefined,
-        image_url: finalLogoUrl || undefined,
         logo_url: finalLogoUrl || undefined,
         zip_code: addresses.zipCode.trim() || undefined,
         street: addresses.street.trim() || undefined,

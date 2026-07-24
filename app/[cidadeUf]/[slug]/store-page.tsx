@@ -44,7 +44,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
         zipCode: address?.zip_code || "",
         rating: Number(storeData.rating ?? partner?.rating ?? 0),
         createdAt: storeData.created_at || partner?.created_at,
-        offeringType: storeData.offering_type || partner?.offering_type || null,
+        offeringType: (() => { const sells = (storeData.business_info as any)?.sells || (partner?.business_info as any)?.sells || ['products']; return sells.includes('products') && sells.includes('services') ? 'both' : sells.includes('services') ? 'services' : 'products' })(),
         openingHours: storeData.opening_hours || partner?.opening_hours || null,
         phone: storeData.phone || storeData.whatsapp_phone || partner?.phone || "",
         lat: storeData.latitude || null,

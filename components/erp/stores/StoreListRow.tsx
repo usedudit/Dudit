@@ -64,7 +64,7 @@ const StoreListRow = React.memo(
                 )}
               </span>
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                {store.city && store.state ? `${store.city}, ${store.state}` : store.street || "Sem endereço"}
+                {store.street ? `${store.street}, ${store.number || ""}` : (store.city && store.state ? `${store.city}, ${store.state}` : "Sem endereço")}
               </span>
             </div>
           </div>
@@ -77,7 +77,7 @@ const StoreListRow = React.memo(
 
         {/* Coluna Contato */}
         <td className="p-2.5 border-b border-brand-border dark:border-dark-border text-xs text-brand-inactive-text dark:text-dark-body">
-          {store.whatsapp_phone || store.phone || "-"}
+          {store.phone || store.whatsapp_phone || "-"}
         </td>
 
         {/* Coluna Status */}

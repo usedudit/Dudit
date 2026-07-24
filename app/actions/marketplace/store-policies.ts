@@ -10,23 +10,23 @@ export async function getPartnerReturnPolicyPublicAction(partnerId: string) {
 
     const [{ data: policyRow }, { data: partner }] = await Promise.all([
       supabase.from("partner_return_policies").select("*").eq("partner_id", partnerId).maybeSingle(),
-      supabase.from("partners").select("store_name, fantasy_name").eq("id", partnerId).maybeSingle(),
+      supabase.from("partners").select("store_name").eq("id", partnerId).maybeSingle(),
     ])
 
     if (policyRow) {
       const policy = normalizePolicyRow(policyRow, partnerId)
       if (!policy.fullPolicyText.trim()) {
-        policy.fullPolicyText = buildDefaultPolicyText(partner?.store_name || partner?.fantasy_name)
+        policy.fullPolicyText = buildDefaultPolicyText(partner?.store_name)
       }
-      return successResponse({ policy, storeName: partner?.store_name || partner?.fantasy_name || null })
+      return successResponse({ policy, storeName: partner?.store_name || null })
     }
 
     const policy = {
       partnerId,
       ...DEFAULT_POLICY,
-      fullPolicyText: buildDefaultPolicyText(partner?.store_name || partner?.fantasy_name),
+      fullPolicyText: buildDefaultPolicyText(partner?.store_name),
     }
-    return successResponse({ policy, storeName: partner?.store_name || partner?.fantasy_name || null, isDefault: true })
+    return successResponse({ policy, storeName: partner?.store_name || null, isDefault: true })
   } catch (e: unknown) {
     return errorResponse(e instanceof Error ? e.message : "Erro ao carregar políticas da loja")
   }

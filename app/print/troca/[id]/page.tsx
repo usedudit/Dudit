@@ -93,7 +93,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
     const [headerRes, partnerRes, storeRes, addressRes] = await Promise.all([
         getPartnerReceiptHeaderAction(partnerId),
         supabase.from("partners").select("store_name, store_image_url").eq("id", partnerId).maybeSingle(),
-        supabase.from("stores").select("name, image_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
+        supabase.from("stores").select("name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
         supabase.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
 
@@ -104,7 +104,7 @@ export default async function PrintTrocaPage({ params }: PageProps) {
         taxIdLine: "",
     }
     const partnerName = storeRes.data?.name || partnerRes.data?.store_name || "Parceiro"
-    const rawAvatar = storeRes.data?.image_url || partnerRes.data?.store_image_url || undefined
+    const rawAvatar = storeRes.data?.logo_url || partnerRes.data?.store_image_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
 
     const partnerAddress = (() => {

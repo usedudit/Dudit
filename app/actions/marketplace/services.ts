@@ -49,9 +49,10 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       service_categories:service_categories!category_id (name),
       marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
       stores!inner(
-        id, name, description, logo_url, image_url, banner_url,
-        phone, city, state, opening_hours, gallery,
-        is_showcase_active, latitude, longitude, business_info
+        id, name, description, logo_url, banner_url,
+        phone, opening_hours, gallery,
+        is_showcase_active, latitude, longitude, business_info,
+        addresses(city, state)
       )
     `)
     .eq("id", serviceId)

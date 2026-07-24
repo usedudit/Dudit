@@ -29,7 +29,7 @@ export function StoreSwitcher() {
         return <div className="w-9 h-9 rounded-lg bg-gray-200 dark:bg-dark-border animate-pulse" />
     }
 
-    const storeLogo = getR2ImageUrl(selectedStore.image_url)
+    const storeLogo = getR2ImageUrl(selectedStore.logo_url || selectedStore.image_url)
 
     const handleCreateClick = () => {
         if (!hasMinimumPlan(planSlug, "escalar")) {
@@ -68,7 +68,7 @@ export function StoreSwitcher() {
                 showChevron={false}
             >
                 {stores.map((store) => {
-                    const storeImage = getR2ImageUrl(store.image_url) || "/local-grocery-store.png"
+                    const storeImage = getR2ImageUrl(store.logo_url || store.image_url) || "/local-grocery-store.png"
 
                     return (
                         <DropdownItem

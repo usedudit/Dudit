@@ -677,7 +677,7 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
     // 2. Fetch partner, store and default address
     const [partnerRes, storeRes] = await Promise.all([
         supabase.from("partners").select("store_name, store_image_url, user_id, phone").eq("id", partnerId).maybeSingle(),
-        supabase.from("stores").select("name, image_url").eq("partner_id", partnerId).limit(1).maybeSingle()
+        supabase.from("stores").select("name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
     const partner = partnerRes.data
     const store = storeRes.data

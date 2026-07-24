@@ -11,6 +11,7 @@ import {
     FormSection,
 } from "@/components/reusable"
 import { updateStoreAction } from "@/app/actions/erp/stores"
+import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { ChevronLeftIcon, SaveIcon, Store, TrashIcon, PlusIcon, WhatsappIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -203,6 +204,10 @@ export const ShowcaseSubPage = ({
             }
 
             try {
+                await updatePartnerAction(partnerId, {
+                    orderFlow: generalInfo.orderFlow as any,
+                })
+
                 const result = await updateStoreAction({
                     storeId: store.id,
                     partnerId,
@@ -210,7 +215,6 @@ export const ShowcaseSubPage = ({
                     banner_url: finalBannerUrl || null,
                     is_showcase_active: generalInfo.isShowcaseActive,
                     gallery: finalGalleryUrls,
-                    order_flow: generalInfo.orderFlow,
                 })
 
                 if (!result.success) {

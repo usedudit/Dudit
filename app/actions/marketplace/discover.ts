@@ -371,8 +371,8 @@ const PARTNER_JOIN = `partners!inner(
     addresses!inner(city, state)
 ),
 stores!inner(
-    id, name, description, logo_url, image_url, banner_url,
-    phone, city, state, is_showcase_active
+    id, name, description, logo_url, banner_url,
+    phone, is_showcase_active, addresses(city, state)
 )`
 
 // ─── Process product into ItemCard shape ────────────────────────────────────
@@ -1510,11 +1510,12 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     let { data, error } = await supabase
         .from("stores")
         .select(`
-            id, name, description, logo_url, image_url, banner_url,
-            phone, city, state, rating, is_showcase_active, partner_id,
-            partners!inner(store_name, store_image_url, latitude, longitude, is_showcase_active)
+            id, name, description, logo_url, banner_url,
+            phone, rating, is_showcase_active, partner_id,
+            addresses(city, state),
+            partners!inner(store_name, store_image_url, latitude, longitude)
         `)
-        .eq("status", "ativo")
+        .eq("is_active", true)
         .in("partner_id", allIds)
         .order("rating", { ascending: false, nulls: "last" })
         .limit(30)
@@ -1557,8 +1558,9 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const vitrineMapper = (store: any) => {
         const p = store.partners
+        const addr = Array.isArray(store.addresses) ? store.addresses[0] : store.addresses
         const storeName = store.name || p?.store_name || "Vendedor"
-        const storeImage = store.logo_url || store.image_url || p?.store_image_url
+        const storeImage = store.logo_url || p?.store_image_url
         return {
             id: store.id,
             name: storeName,
@@ -1577,8 +1579,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                 latitude: p?.latitude || null,
                 longitude: p?.longitude || null,
-                city: store.city || "",
-                state: store.state || "",
+                city: addr?.city || "",
+                state: addr?.state || "",
             },
             itemType: "vitrine" as const,
         }

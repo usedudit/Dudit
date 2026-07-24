@@ -14,14 +14,14 @@ interface Store {
   slug: string | null
   description: string | null
   phone: string | null
-  city: string | null
-  state: string | null
+  city?: string | null
+  state?: string | null
   opening_hours: Record<string, unknown> | null
   banner_url: string | null
   logo_url: string | null
   gallery: unknown[] | null
-  image_url: string | null
-  whatsapp_phone: string | null
+  image_url?: string | null
+  whatsapp_phone?: string | null
   is_headquarters: boolean
   is_active: boolean
   address_id: string | null

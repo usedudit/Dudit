@@ -76,7 +76,7 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
       const { data, error: supabaseError } = await supabase.from("stores").insert({
         partner_id: partnerId,
         name: storeName,
-        image_url: imageUrl,
+        logo_url: imageUrl,
       })
 
       if (supabaseError) {

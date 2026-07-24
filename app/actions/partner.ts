@@ -104,8 +104,10 @@ export async function createPartnerAction(data: CreatePartnerData) {
       opening_hours: data.openingHours || defaultOpeningHours,
       store_image_url: data.storeImageUrl,
       banner_url: getRandomDefaultBanner(),
-      offering_type: data.offeringType,
-      provides_services: data.offeringType === "services" || data.offeringType === "both",
+      business_info: {
+        sells: data.offeringType === "both" ? ["products", "services"] : data.offeringType === "services" ? ["services"] : ["products"],
+        mode: "erp",
+      },
       latitude: null as number | null,
       longitude: null as number | null,
     }
@@ -342,7 +344,12 @@ export async function updatePartnerAction(
     updateData.gallery = (data as any).gallery
   }
 
-  if (data.offeringType !== undefined) updateData.offering_type = data.offeringType
+  if (data.offeringType !== undefined) {
+    updateData.business_info = {
+      sells: data.offeringType === "both" ? ["products", "services"] : data.offeringType === "services" ? ["services"] : ["products"],
+      mode: "erp",
+    }
+  }
 
   // Campos de endereço vão para a tabela addresses, não para partners
   const addressData: any = {}

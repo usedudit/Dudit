@@ -220,7 +220,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     zipCode: addr?.zip_code || "",
     rating: storeRating,
     createdAt: store.created_at || p?.created_at,
-    offeringType: store.offering_type || p?.offering_type || null,
+    offeringType: (() => { const sells = (store.business_info as any)?.sells || (p?.business_info as any)?.sells || ['products']; return sells.includes('products') && sells.includes('services') ? 'both' : sells.includes('services') ? 'services' : 'products' })(),
     openingHours: store.opening_hours || p?.opening_hours || null,
     phone: store.phone || store.whatsapp_phone || p?.phone || null,
     lat: store.latitude || null,

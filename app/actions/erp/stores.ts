@@ -48,18 +48,16 @@ interface CreateStoreInput {
     slug?: string
     description?: string
     phone?: string
-    whatsapp_phone?: string
-    city?: string
-    state?: string
     opening_hours?: Record<string, unknown>
     logo_url?: string
-    image_url?: string
     // Address fields
     zip_code?: string
     street?: string
     number?: string
     complement?: string
     neighborhood?: string
+    city?: string
+    state?: string
     noNumber?: boolean
 }
 
@@ -82,12 +80,8 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
                 slug,
                 description: input.description || null,
                 phone: input.phone || null,
-                whatsapp_phone: input.whatsapp_phone || null,
-                city: input.city || null,
-                state: input.state || null,
                 opening_hours: input.opening_hours || null,
                 logo_url: input.logo_url || null,
-                image_url: input.image_url || null,
                 is_active: true,
             })
             .select("id")
@@ -140,18 +134,14 @@ interface UpdateStoreInput {
     slug?: string
     description?: string
     phone?: string
-    city?: string
-    state?: string
     opening_hours?: Record<string, unknown>
     banner_url?: string
     logo_url?: string
     gallery?: unknown[]
-    whatsapp_phone?: string
     is_active?: boolean
     is_headquarters?: boolean
     // F5.4a: Showcase / storefront fields
     is_showcase_active?: boolean
-    order_flow?: string
     // F5.4b: Business data fields
     business_info?: Record<string, unknown>
     category_id?: string | null
@@ -159,8 +149,9 @@ interface UpdateStoreInput {
     latitude?: number | null
     longitude?: number | null
     timezone?: string
-    pickup_payment_policy?: string
-    // F5.5c: Address fields (city/state already declared above)
+    // Address fields
+    city?: string
+    state?: string
     zip_code?: string
     street?: string
     number?: string
@@ -182,18 +173,14 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.slug !== undefined) updateData.slug = input.slug
         if (input.description !== undefined) updateData.description = input.description
         if (input.phone !== undefined) updateData.phone = input.phone
-        if (input.city !== undefined) updateData.city = input.city
-        if (input.state !== undefined) updateData.state = input.state
         if (input.opening_hours !== undefined) updateData.opening_hours = input.opening_hours
         if (input.banner_url !== undefined) updateData.banner_url = input.banner_url
         if (input.logo_url !== undefined) updateData.logo_url = input.logo_url
         if (input.gallery !== undefined) updateData.gallery = input.gallery
-        if (input.whatsapp_phone !== undefined) updateData.whatsapp_phone = input.whatsapp_phone
         if (input.is_active !== undefined) updateData.is_active = input.is_active
         if (input.is_headquarters !== undefined) updateData.is_headquarters = input.is_headquarters
         // F5.4a: Showcase fields
         if (input.is_showcase_active !== undefined) updateData.is_showcase_active = input.is_showcase_active
-        if (input.order_flow !== undefined) updateData.order_flow = input.order_flow
         // F5.4b: Business data fields
         if (input.business_info !== undefined) updateData.business_info = input.business_info
         if (input.category_id !== undefined) updateData.category_id = input.category_id
@@ -201,7 +188,6 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.latitude !== undefined) updateData.latitude = input.latitude
         if (input.longitude !== undefined) updateData.longitude = input.longitude
         if (input.timezone !== undefined) updateData.timezone = input.timezone
-        if (input.pickup_payment_policy !== undefined) updateData.pickup_payment_policy = input.pickup_payment_policy
         updateData.updated_at = new Date().toISOString()
 
         // F5.5c: Handle address upsert

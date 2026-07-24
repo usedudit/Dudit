@@ -69,7 +69,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             // Top 1000 stores
             supabase
                 .from("stores")
-                .select("id, name, slug, updated_at, created_at, city, state, addresses(city, state)")
+                .select("id, name, slug, updated_at, created_at, addresses(city, state)")
                 .eq("is_active", true)
                 .order("created_at", { ascending: false })
                 .limit(1000),
