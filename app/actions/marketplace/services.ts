@@ -52,7 +52,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         id, name, description, logo_url, banner_url,
         phone, opening_hours, gallery,
         is_showcase_active, latitude, longitude, business_info,
-        addresses(city, state)
+        addresses!store_id!left(city, state)
       )
     `)
     .eq("id", serviceId)

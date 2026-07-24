@@ -1411,10 +1411,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         const fulfillmentLine = findFulfillmentLine(order, item);
                                                         const mode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
                                                         const isCustomerAddress = mode === "customer_location" || mode === "delivery";
+                                                        const storeAddr = order.stores?.addresses?.[0] || (order.stores as any);
                                                         const address = isCustomerAddress
-                                                            ? (order.delivery_address || "Endereço nao informado")
-                                                            : order.stores
-                                                                ? `${order.stores.street || ""}, ${order.stores.number || "S/N"}${order.stores.neighborhood ? ` - ${order.stores.neighborhood}` : ""}, ${order.stores.city || ""} - ${order.stores.state || ""}`.replace(/\s+/g, ' ').trim() || "Endereço não informado"
+                                                            ? (order.delivery_address || "Endereço não informado")
+                                                            : storeAddr?.street
+                                                                ? `${storeAddr.street || ""}, ${storeAddr.number || "S/N"}${storeAddr.neighborhood ? ` - ${storeAddr.neighborhood}` : ""}, ${storeAddr.city || ""} - ${storeAddr.state || ""}`.replace(/\s+/g, ' ').trim()
                                                                 : formatPartnerAddress(order.partners?.addresses);
 
                                                         const isServiceCancelled = order.situation === "cancelled";

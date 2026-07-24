@@ -84,22 +84,23 @@ export function PlanDetailsPageClient({
 
     const partner = useMemo(() => {
         const p = plan.partners || {}
-        const address = p.addresses?.[0] || {}
+        const store = plan.stores || p.stores
+        const address = store?.addresses?.[0] || p.addresses?.[0] || {}
         return {
             id: p.id || plan.partner_id || "1",
             user_id: p.user_id,
-            store_name: p.store_name || "Vendedor da Dudit",
+            store_name: store?.name || p.store_name || "Vendedor da Dudit",
             city: address?.city || "Brasil",
             state: address?.state || "BR",
-            store_image_url: p.store_image_url || null,
-            store_avatar: p.store_image_url || p.store_avatar || p.profile_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-            profile_image_url: p.profile_image_url || null,
-            banner_url: p.banner_url || null,
-            rating: p.rating || 0,
-            vendas_totais: p.vendas_totais || 0,
-            created_at: p.created_at,
-            phone: p.phone || null,
-            addresses: p.addresses || [],
+            store_image_url: store?.logo_url || p.store_image_url || null,
+            store_avatar: store?.logo_url || p.store_image_url || p.store_avatar || p.profile_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            profile_image_url: store?.logo_url || p.profile_image_url || null,
+            banner_url: store?.banner_url || p.banner_url || null,
+            rating: store?.rating ?? p.rating ?? 0,
+            vendas_totais: store?.vendas_totais ?? p.vendas_totais ?? 0,
+            created_at: store?.created_at || p.created_at,
+            phone: store?.phone || p.phone || null,
+            addresses: store?.addresses || p.addresses || [],
             mp_user_id: p.mp_user_id || null,
             mp_public_key: p.mp_public_key || null,
         }

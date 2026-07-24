@@ -390,11 +390,11 @@ export async function getReports(
     if (partnerIds.length > 0) {
         fetches.push(
             supabase
-                .from("partners")
-                .select("id, store_name")
-                .in("id", partnerIds)
+                .from("stores")
+                .select("id, partner_id, name")
+                .in("partner_id", partnerIds)
                 .then(({ data }: any) => {
-                    ; (data || []).forEach((p: any) => targetNames.set(`partner:${p.id}`, p.store_name))
+                    ; (data || []).forEach((s: any) => targetNames.set(`partner:${s.partner_id}`, s.name))
                 })
         )
     }

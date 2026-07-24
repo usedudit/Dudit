@@ -198,18 +198,19 @@ export function ProductDetailsPageClient({
 
     const partner = useMemo(() => {
         const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
-        const address = p?.addresses?.[0] || {}
+        const store = product?.stores || p?.stores
+        const address = store?.addresses?.[0] || p?.addresses?.[0] || {}
         return {
             id: p?.id || product.partner_id || "1",
             user_id: p?.user_id,
-            phone: p?.phone,
-            store_name: p?.store_name || "Vendedor da Dudit",
+            phone: store?.phone || store?.whatsapp_phone || p?.phone,
+            store_name: store?.name || p?.store_name || "Vendedor da Dudit",
             city: address?.city || "Brasil",
             state: address?.state || "BR",
-            store_image_url: p?.store_image_url || null,
-            store_avatar: p?.store_image_url || p?.store_avatar || p?.profile_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-            profile_image_url: p?.profile_image_url || null,
-            banner_url: p?.banner_url || null,
+            store_image_url: store?.logo_url || store?.image_url || p?.store_image_url || null,
+            store_avatar: store?.logo_url || store?.image_url || p?.store_image_url || p?.store_avatar || p?.profile_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            profile_image_url: store?.logo_url || p?.profile_image_url || null,
+            banner_url: store?.banner_url || p?.banner_url || null,
             mp_user_id: p?.mp_user_id,
             mp_public_key: p?.mp_public_key,
             address: {
@@ -217,12 +218,12 @@ export function ProductDetailsPageClient({
                 neighborhood: address?.neighborhood, city: address?.city,
                 state: address?.state, zipCode: address?.zip_code,
             },
-            paymentMethods: p?.payment_methods || [],
-            openingHours: p?.opening_hours || null,
+            paymentMethods: store?.payment_methods || p?.payment_methods || [],
+            openingHours: store?.opening_hours || p?.opening_hours || null,
             max_installments: p?.max_installments || 12,
-            rating: p?.rating || p?.average_rating || 0,
-            vendas_totais: p?.vendas_totais || 0,
-            created_at: p?.created_at,
+            rating: store?.rating ?? p?.rating ?? p?.average_rating ?? 0,
+            vendas_totais: store?.vendas_totais ?? p?.vendas_totais ?? 0,
+            created_at: store?.created_at || p?.created_at,
         }
     }, [product])
 

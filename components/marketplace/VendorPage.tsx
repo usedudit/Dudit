@@ -316,7 +316,7 @@ const MapboxMap = ({ lat, lng, name, address, isActive }: { lat?: number; lng?: 
     }, [isActive])
 
     if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || !isMapping) {
-        return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Localizacao indisponivel no mapa.</div>
+        return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Localização indisponível no mapa.</div>
     }
     return <div ref={mapContainerRef} className="w-full h-full bg-gray-100" />
 }
@@ -743,8 +743,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     const partnerRawImage = partner.store_avatar || partner.store_image_url || partner.profile_image_url || partner.storeImageUrl || null
     const partnerProfileImageUrl = getImageUrl(partnerRawImage)
-    const fallbackBanner = partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
-    const bannerImage = partner.banner_url ? getImageUrl(partner.banner_url) : fallbackBanner
+    const bannerImage = useMemo(() => {
+        if (partner.banner_url) return getImageUrl(partner.banner_url)
+        return partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
+    }, [partner.banner_url, partnerRawImage, partner.storeName])
 
     const hasPlans = plans && plans.length > 0
     const currentItems = activeContext === "Produtos" ? products : (activeContext === "Servicos" ? services : plans)
@@ -1020,7 +1022,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {!isShowcaseActive && (
                         <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-center gap-3">
                             <span className="text-amber-600 shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
                             </span>
                             <p className="text-[14px] text-amber-800 font-medium">Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.</p>
                         </div>

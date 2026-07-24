@@ -372,7 +372,7 @@ const PARTNER_JOIN = `partners!inner(
 ),
 stores!inner(
     id, name, description, logo_url, banner_url,
-    phone, is_showcase_active, addresses(city, state)
+    phone, is_showcase_active, addresses!store_id!left(city, state)
 )`
 
 // ─── Process product into ItemCard shape ────────────────────────────────────
@@ -1512,7 +1512,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .select(`
             id, name, description, logo_url, banner_url,
             phone, rating, is_showcase_active, partner_id,
-            addresses(city, state),
+            addresses!store_id!left(city, state),
             partners!inner(store_name, store_image_url, latitude, longitude)
         `)
         .eq("is_active", true)

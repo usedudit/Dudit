@@ -223,23 +223,24 @@ export function ServiceDetailsPageClient({
 
     const partner = useMemo(() => {
         const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
+        const store = p?.store
         const address = p?.addresses?.[0] || {}
         return {
             id: p?.id || service.partner_id,
             store_id: p?.store_id,
             user_id: p?.user_id,
-            phone: p?.phone,
-            store_name: p?.store_name || "Profissional",
+            phone: store?.phone || store?.whatsapp_phone || p?.phone,
+            store_name: store?.name || p?.store_name || "Profissional",
             city: address?.city || "Brasil",
             state: address?.state || "BR",
-            store_avatar: p?.store_image_url || PLACEHOLDER,
-            profile_image_url: p?.store_image_url || null,
-            banner_url: p?.banner_url || null,
-            opening_hours: p?.opening_hours || null,
-            rating: p?.rating || 0,
-            paymentMethods: p?.payment_methods || [],
-            payment_methods: p?.payment_methods || [],
-            addresses: p?.addresses || [],
+            store_avatar: store?.logo_url || store?.image_url || p?.store_image_url || PLACEHOLDER,
+            profile_image_url: store?.logo_url || p?.store_image_url || null,
+            banner_url: store?.banner_url || p?.banner_url || null,
+            opening_hours: store?.opening_hours || p?.opening_hours || null,
+            rating: store?.rating ?? p?.rating ?? 0,
+            paymentMethods: store?.payment_methods || p?.payment_methods || [],
+            payment_methods: store?.payment_methods || p?.payment_methods || [],
+            addresses: store?.addresses || p?.addresses || [],
             mp_user_id: p?.mp_user_id,
             mp_public_key: p?.mp_public_key,
             vendas_totais: p?.vendas_totais || 0,

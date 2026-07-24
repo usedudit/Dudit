@@ -792,7 +792,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
                 can_add_delivery: legacy.pdv.can_add_delivery ?? legacy.specific?.can_add_delivery ?? false,
             },
         })
-        if (legacy.pdv.open_pdv !== undefined || legacy.pdv.close_pdv !== undefined || 
+        if (legacy.pdv.open_pdv !== undefined || legacy.pdv.close_pdv !== undefined ||
             legacy.pdv.sangria !== undefined || legacy.pdv.reforco !== undefined) {
             base.cash_register.specific = {
                 ...(base.cash_register?.specific || {}),

@@ -129,14 +129,14 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "id, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, pickup_payment_policy, order_flow, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, service_deposit_enabled, service_deposit_percentage, mp_user_id, mp_accepted_payment_methods, order_flow, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
     targetStoreId
       ? admin
         .from("stores")
-        .select("id, name, slug, image_url, logo_url, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+        .select("id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
         .eq("id", targetStoreId)
         .maybeSingle()
       : Promise.resolve({ data: null }),

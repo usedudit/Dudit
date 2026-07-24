@@ -49,9 +49,10 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
         payment_methods(*)
       ),
       stores!left(
-        id, name, description, logo_url, image_url, banner_url,
-        phone, city, state, opening_hours, gallery,
-        is_showcase_active, latitude, longitude, business_info
+        id, name, description, logo_url, banner_url,
+        phone, opening_hours, gallery,
+        is_showcase_active, latitude, longitude, business_info,
+        addresses!store_id!left(city, state)
       )
     `)
     .eq("id", id)

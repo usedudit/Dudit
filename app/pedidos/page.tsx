@@ -24,7 +24,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     partner_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes,
     partners(id, store_name, store_image_url, is_active, addresses(id, zip_code, street, number, complement, neighborhood, city, state)),
-    stores!left(id, name, logo_url, banner_url, description, phone, street, number, complement, neighborhood, city, state, zip_code),
+    stores!left(id, name, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_events(*), return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       product_variants(variant_name, variant_options),

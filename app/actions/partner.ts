@@ -94,32 +94,22 @@ export async function createPartnerAction(data: CreatePartnerData) {
 
     const cnpjClean = data.cnpj ? data.cnpj.replace(/\D/g, "") : null
 
-    const insertData = {
+    const insertData: any = {
       user_id: data.userId,
-      store_name: data.storeName,
-      store_description: data.storeDescription || "",
       business_type: data.businessType,
       cnpj: cnpjClean,
       cpf: cpfEncrypted,
-      opening_hours: data.openingHours || defaultOpeningHours,
-      store_image_url: data.storeImageUrl,
-      banner_url: getRandomDefaultBanner(),
       business_info: {
         sells: data.offeringType === "both" ? ["products", "services"] : data.offeringType === "services" ? ["services"] : ["products"],
         mode: "erp",
       },
-      latitude: null as number | null,
-      longitude: null as number | null,
     }
 
+    let coords: { lat: number; lng: number } | null = null
     if (data.city || data.street || data.zipCode) {
       const fullAddressString = [data.street, data.number, data.neighborhood, data.city, data.state, "BR"].filter(Boolean).join(", ")
       try {
-        const coords = await geocodeAddress(fullAddressString)
-        if (coords) {
-          insertData.latitude = coords.lat
-          insertData.longitude = coords.lng
-        }
+        coords = await geocodeAddress(fullAddressString)
       } catch (e) {
         console.error("[createPartnerAction] Geocoding failed:", e)
       }
@@ -135,14 +125,22 @@ export async function createPartnerAction(data: CreatePartnerData) {
       return { success: false, error: `Erro ao criar parceria: ${partnerError.message}` }
     }
 
-    // Auto-create default store for the partner
+    // Auto-create default headquarters store for the partner
     const { data: store, error: storeError } = await supabaseAdmin
       .from("stores")
       .insert({
         partner_id: partner.id,
         name: data.storeName,
         slug: data.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+        description: data.storeDescription || "",
+        logo_url: data.storeImageUrl || null,
+        banner_url: getRandomDefaultBanner(),
+        opening_hours: data.openingHours || defaultOpeningHours,
+        is_headquarters: true,
         is_active: true,
+        is_showcase_active: true,
+        latitude: coords?.lat || null,
+        longitude: coords?.lng || null,
       })
       .select("id")
       .single()
@@ -155,6 +153,7 @@ export async function createPartnerAction(data: CreatePartnerData) {
     if (data.city || data.street || data.zipCode) {
       await supabaseAdmin.from("addresses").insert({
         partner_id: partner.id,
+        store_id: store?.id || null,
         zip_code: data.zipCode || null,
         street: data.street || null,
         number: data.number || null,
@@ -310,8 +309,6 @@ export async function updatePartnerAction(
   if (isSeoSensitiveChange) {
     updateData.last_seo_update_at = new Date().toISOString()
   }
-  if (data.storeName) updateData.store_name = data.storeName
-  if (data.storeDescription !== undefined) updateData.store_description = data.storeDescription
   if (data.businessType) updateData.business_type = data.businessType
   if (data.cnpj !== undefined) updateData.cnpj = data.cnpj
   if (data.cpf !== undefined) {
@@ -328,8 +325,13 @@ export async function updatePartnerAction(
       updateData.cpf = null
     }
   }
-  if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
-  if (data.storeImageUrl !== undefined) updateData.store_image_url = data.storeImageUrl
+
+  // Handle store updates (headquarters store)
+  const storeUpdateData: Record<string, any> = {}
+  if (data.storeName) storeUpdateData.name = data.storeName
+  if (data.storeDescription !== undefined) storeUpdateData.description = data.storeDescription
+  if (data.openingHours !== undefined) storeUpdateData.opening_hours = normalizeOpeningHours(data.openingHours)
+  if (data.storeImageUrl !== undefined) storeUpdateData.logo_url = data.storeImageUrl
 
   if ((data as any).gallery !== undefined) {
     if (!Array.isArray((data as any).gallery)) {
@@ -341,7 +343,22 @@ export async function updatePartnerAction(
     if ((data as any).gallery.length > limit) {
       return { error: `Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.` }
     }
-    updateData.gallery = (data as any).gallery
+    storeUpdateData.gallery = (data as any).gallery
+  }
+
+  if (Object.keys(storeUpdateData).length > 0) {
+    storeUpdateData.updated_at = new Date().toISOString()
+    const admin = getAdminClient()
+    const { data: hqStore } = await admin
+      .from("stores")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (hqStore?.id) {
+      await admin.from("stores").update(storeUpdateData).eq("id", hqStore.id)
+    }
   }
 
   if (data.offeringType !== undefined) {

@@ -505,7 +505,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   // Verify this partner belongs to the current user
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id, business_info, store_name, store_image_url, banner_url")
+    .select("user_id, business_info")
     .eq("id", partnerId)
     .single()
 
@@ -514,17 +514,44 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   }
 
   const updateData: any = {}
+  const storeUpdateData: any = {}
   const sanitizedPhone = typeof data.phone === "string" ? sanitizeInput(data.phone, 20) : undefined
 
-  // Mapeamento de campos da tabela PARTNERS
-  if (data.storeName) updateData.store_name = data.storeName
-  if (data.storeDescription !== undefined) updateData.store_description = data.storeDescription
+  // Store table fields
+  if (data.storeName) storeUpdateData.name = data.storeName
+  if (data.storeDescription !== undefined) storeUpdateData.description = data.storeDescription
   if (data.storeImageUrl !== undefined) {
     if (data.storeImageUrl && data.storeImageUrl.startsWith("data:")) {
       return { error: "Formato de imagem inválido (base64 não permitido)" }
     }
-    updateData.store_image_url = data.storeImageUrl
+    storeUpdateData.logo_url = data.storeImageUrl
   }
+  if (data.openingHours !== undefined) storeUpdateData.opening_hours = normalizeOpeningHours(data.openingHours)
+  if (sanitizedPhone !== undefined) {
+    if (sanitizedPhone) {
+      let phoneToValidate = sanitizedPhone
+      const digits = sanitizedPhone.replace(/\D/g, "")
+      if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+        phoneToValidate = digits.slice(2)
+      }
+      
+      if (!validatePhoneBR(phoneToValidate)) {
+        return { error: "Número de telefone inválido" }
+      }
+      storeUpdateData.phone = normalizePhoneToE164(sanitizedPhone)
+    } else {
+      storeUpdateData.phone = null
+    }
+  }
+  if (data.bannerUrl !== undefined) {
+    if (data.bannerUrl && data.bannerUrl.startsWith("data:")) {
+      return { error: "Formato de banner inválido (base64 não permitido)" }
+    }
+    storeUpdateData.banner_url = data.bannerUrl || getRandomDefaultBanner()
+  }
+  if (data.isShowcaseActive !== undefined) storeUpdateData.is_showcase_active = data.isShowcaseActive
+
+  // Partner table fields
   if (data.businessType) updateData.business_type = data.businessType
   if (data.cnpj !== undefined) {
     updateData.cnpj = data.cnpj ? data.cnpj.replace(/\D/g, "") : null
@@ -539,23 +566,6 @@ export async function updatePartnerAction(partnerId: string, data: any) {
       mode: existingInfo.mode // Never trust the frontend for mode changes on update
     }
   }
-  if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
-  if (sanitizedPhone !== undefined) {
-    if (sanitizedPhone) {
-      let phoneToValidate = sanitizedPhone
-      const digits = sanitizedPhone.replace(/\D/g, "")
-      if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
-        phoneToValidate = digits.slice(2)
-      }
-      
-      if (!validatePhoneBR(phoneToValidate)) {
-        return { error: "Número de telefone inválido" }
-      }
-      updateData.phone = normalizePhoneToE164(sanitizedPhone)
-    } else {
-      updateData.phone = null
-    }
-  }
 
   // Campos fiscais
   if (data.crt !== undefined) updateData.crt = data.crt
@@ -564,24 +574,23 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.ieIsento !== undefined) updateData.ie_isento = data.ieIsento
   if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
   
-  // Vitrine Online
-  if (data.bannerUrl !== undefined) {
-    if (data.bannerUrl && data.bannerUrl.startsWith("data:")) {
-      return { error: "Formato de banner inválido (base64 não permitido)" }
-    }
-    
-    // Se o banner for removido ou for nulo, gera um padrão baseado no nome
-    if (!data.bannerUrl) {
-      const storeNameForBanner = data.storeName || partnerCheck?.store_name || "Vendedor"
-      updateData.banner_url = await getDefaultPartnerBannerUrl(storeNameForBanner, data.storeImageUrl ?? partnerCheck?.store_image_url)
-    } else {
-      updateData.banner_url = data.bannerUrl
-    }
-  }
-  if (data.isShowcaseActive !== undefined) updateData.is_showcase_active = data.isShowcaseActive
-  if (data.category !== undefined) updateData.category = data.category
   if (data.categoryId !== undefined) updateData.category_id = data.categoryId
   if (data.subcategoryId !== undefined) updateData.subcategory_id = data.subcategoryId
+
+  if (Object.keys(storeUpdateData).length > 0) {
+    storeUpdateData.updated_at = new Date().toISOString()
+    const admin = getAdminClient()
+    const { data: hqStore } = await admin
+      .from("stores")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (hqStore?.id) {
+      await admin.from("stores").update(storeUpdateData).eq("id", hqStore.id)
+    }
+  }
 
   if (data.gallery !== undefined) {
     if (!Array.isArray(data.gallery)) {
@@ -721,13 +730,13 @@ export async function registerPartner(data: any) {
     const { data: existing } = await supabaseAdmin.from("partners").select("id").eq("user_id", userId).maybeSingle()
     if (existing) return { success: false, error: "Você já possui uma conta de parceiro." }
 
-    // 2. Verifica duplicidade de nome da loja (case-insensitive)
+    // 2. Verifica duplicidade de nome da loja (case-insensitive na tabela stores)
     if (data.storeName) {
       const normalizedStoreName = data.storeName.trim().toLowerCase()
       const { data: duplicateName } = await supabaseAdmin
-        .from("partners")
+        .from("stores")
         .select("id")
-        .ilike("store_name", normalizedStoreName)
+        .ilike("name", normalizedStoreName)
         .maybeSingle()
       if (duplicateName) {
         return { success: false, error: "Já existe uma loja com este nome. Escolha outro nome." }
@@ -777,18 +786,12 @@ export async function registerPartner(data: any) {
 
     const defaultBannerUrl = await getDefaultPartnerBannerUrl(data.storeName, data.storeImageUrl)
 
-    const insertPartnerData = {
+    const insertPartnerData: any = {
       user_id: userId,
-      store_name: data.storeName,
-      store_description: data.storeDescription || "",
-      store_image_url: data.storeImageUrl,
-      banner_url: data.bannerUrl || defaultBannerUrl,
-      phone: normalizePhoneToE164(sanitizedPhone),
       business_type: data.businessType,
       cnpj: data.cnpj?.replace(/\D/g, "") || null,
       cpf: cpfEncrypted,
       business_info: normalizeBusinessInfo(data.businessInfo),
-      opening_hours: data.businessHours || null,
       is_active: true,
       category_id: data.categoryId || null,
       subcategory_id: data.subcategoryId || null
@@ -805,15 +808,24 @@ export async function registerPartner(data: any) {
       throw error
     }
 
-    // Auto-create default store for the partner
-    const { error: storeError } = await supabaseAdmin
+    // Auto-create default headquarters store for the partner
+    const { data: newStore, error: storeError } = await supabaseAdmin
       .from("stores")
       .insert({
         partner_id: newPartner.id,
         name: data.storeName,
         slug: data.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+        description: data.storeDescription || "",
+        logo_url: data.storeImageUrl || null,
+        banner_url: data.bannerUrl || defaultBannerUrl,
+        phone: normalizePhoneToE164(sanitizedPhone),
+        opening_hours: data.businessHours || null,
+        is_headquarters: true,
         is_active: true,
+        is_showcase_active: true,
       })
+      .select("id")
+      .single()
     if (storeError) {
       console.error("[registerPartner] Failed to create default store:", storeError.message)
     }
@@ -823,6 +835,7 @@ export async function registerPartner(data: any) {
     if (data.zipCode || data.street || data.city) {
       const addressData = {
         partner_id: newPartner.id,
+        store_id: newStore?.id || null,
         zip_code: data.zipCode,
         street: data.street,
         number: data.number || "S/N",
@@ -840,17 +853,15 @@ export async function registerPartner(data: any) {
 
       if (addressError) {
         console.error("Error inserting address:", addressError)
-        // Não lançamos erro fatal aqui para não bloquear o cadastro se apenas o endereço falhar,
-        // mas idealmente deveria tratar.
       }
       
       // GEOCODING AUTOMATICO PARA NOVOS REGISTROS
-      if (data.street && data.city) {
+      if (data.street && data.city && newStore?.id) {
         const addressString = `${data.street}, ${data.number || ''}, ${data.city} - ${data.state || ''}, Brazil, ${data.zipCode || ''}`
         try {
           const coords = await geocodeAddress(addressString)
           if (coords) {
-            await supabaseAdmin.from('partners').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', newPartner.id)
+            await supabaseAdmin.from('stores').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', newStore.id)
           }
         } catch(e) { console.error("Geocoding failed on register", e) }
       }

@@ -24,32 +24,28 @@ export async function pickBestPaymentMethod(
     context: PaymentMethodPickContext = {},
 ) {
     const canonicalType = toCanonicalPaymentType(type)
-    let rows: any[] = []
 
-    if (context.storeId) {
-        const { data: storeData } = await supabase
-            .from("payment_methods")
-            .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, store_id")
-            .eq("partner_id", partnerId)
-            .eq("store_id", context.storeId)
-            .eq("is_active", true)
+    const { data: allMethods } = await supabase
+        .from("payment_methods")
+        .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, store_id, store_ids")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
 
-        if (storeData && storeData.length > 0) {
-            rows = storeData.filter((m: any) => toCanonicalPaymentType(m.type || m.payment_type) === canonicalType)
+    if (!allMethods || allMethods.length === 0) return null
+
+    // Filter by store visibility: store_ids IS NULL or store_ids contains context.storeId
+    const visibleMethods = allMethods.filter((m: any) => {
+        if (!context.storeId) return true
+        if (m.store_ids && Array.isArray(m.store_ids) && m.store_ids.length > 0) {
+            return m.store_ids.includes(context.storeId)
         }
-    }
-
-    if (rows.length === 0) {
-        const { data: partnerData } = await supabase
-            .from("payment_methods")
-            .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, store_id")
-            .eq("partner_id", partnerId)
-            .eq("is_active", true)
-
-        if (partnerData) {
-            rows = partnerData.filter((m: any) => toCanonicalPaymentType(m.type || m.payment_type) === canonicalType)
+        if (m.store_id) {
+            return m.store_id === context.storeId
         }
-    }
+        return true // NULL store_ids/store_id = inherited by all stores
+    })
+
+    const rows = visibleMethods.filter((m: any) => toCanonicalPaymentType(m.type || m.payment_type) === canonicalType)
 
     if (rows.length === 0) return null
 

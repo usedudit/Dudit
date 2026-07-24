@@ -17,8 +17,9 @@ export type CampaignRow = {
 
 export type PromotionRow = {
   id: string
-  campaign_id: string
+  campaign_id: string | null
   partner_id: string
+  store_id: string | null
   name: string
   description: string | null
   promotion_type: "gift" | "buy_x_pay_y" | "discount"
@@ -42,6 +43,7 @@ export type PromotionRow = {
 export type CouponRow = {
   id: string
   partner_id: string
+  store_id: string | null
   code: string
   discount_type: "percentage" | "fixed" | "free_shipping"
   discount_value: number | null
@@ -58,15 +60,10 @@ export type CouponRow = {
   created_at: string
 }
 
-export type StoreAssociation = {
-  store_id: string
-}
-
 /**
- * Resolves promotions válidas para uma store específica.
- * Regra: se promotion_stores vazia → vale para TODAS as stores.
- * Se preenchida → vale apenas para as stores listadas.
- * Único ponto de resolução — toda consulta passa por aqui.
+ * Resolves promoções válidas para uma store específica.
+ * Regra: se store_id for NULL na promoção → vale para TODAS as stores do parceiro.
+ * Se preenchida → vale apenas para a store_id específica.
  */
 export async function getPromotionsForStore(
   partnerId: string,
@@ -74,38 +71,25 @@ export async function getPromotionsForStore(
 ): Promise<PromotionRow[]> {
   const admin = getAdminClient()
 
-  const { data: promotions } = await admin
+  let query = admin
     .from("promotions")
     .select("*")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("priority", { ascending: false })
 
-  if (!promotions) return []
+  if (storeId) {
+    query = query.or(`store_id.is.null,store_id.eq.${storeId}`)
+  }
 
-  if (!storeId) return promotions as PromotionRow[]
-
-  const rows = promotions as PromotionRow[]
-  const ids = rows.map((r) => r.id)
-
-  if (ids.length === 0) return []
-
-  const { data: stores } = await admin
-    .from("promotion_stores")
-    .select("promotion_id")
-    .in("promotion_id", ids)
-    .eq("store_id", storeId)
-
-  const storeSet = new Set((stores || []).map((s: { promotion_id: string }) => s.promotion_id))
-
-  return rows.filter((r) => !storeSet.size || storeSet.has(r.id))
+  const { data: promotions } = await query
+  return (promotions || []) as PromotionRow[]
 }
 
 /**
  * Resolves cupons válidos para uma store específica.
- * Regra: se coupon_stores vazia → vale para TODAS as stores.
- * Se preenchida → vale apenas para as stores listadas.
- * Único ponto de resolução — toda consulta passa por aqui.
+ * Regra: se store_id for NULL no cupom → vale para TODAS as stores do parceiro.
+ * Se preenchida → vale apenas para a store_id específica.
  */
 export async function getCouponsForStore(
   partnerId: string,
@@ -113,30 +97,18 @@ export async function getCouponsForStore(
 ): Promise<CouponRow[]> {
   const admin = getAdminClient()
 
-  const { data: coupons } = await admin
+  let query = admin
     .from("coupons")
     .select("*")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
 
-  if (!coupons) return []
+  if (storeId) {
+    query = query.or(`store_id.is.null,store_id.eq.${storeId}`)
+  }
 
-  if (!storeId) return coupons as CouponRow[]
-
-  const rows = coupons as CouponRow[]
-  const ids = rows.map((r) => r.id)
-
-  if (ids.length === 0) return []
-
-  const { data: stores } = await admin
-    .from("coupon_stores")
-    .select("coupon_id")
-    .in("coupon_id", ids)
-    .eq("store_id", storeId)
-
-  const storeSet = new Set((stores || []).map((s: { coupon_id: string }) => s.coupon_id))
-
-  return rows.filter((r) => !storeSet.size || storeSet.has(r.id))
+  const { data: coupons } = await query
+  return (coupons || []) as CouponRow[]
 }
 
 /**
@@ -148,21 +120,14 @@ export async function isPromotionValidForStore(
 ): Promise<boolean> {
   const admin = getAdminClient()
 
-  const { count } = await admin
-    .from("promotion_stores")
-    .select("*", { count: "exact", head: true })
-    .eq("promotion_id", promotionId)
-
-  if (count === 0) return true
-
   const { data } = await admin
-    .from("promotion_stores")
-    .select("promotion_id")
-    .eq("promotion_id", promotionId)
-    .eq("store_id", storeId)
+    .from("promotions")
+    .select("store_id")
+    .eq("id", promotionId)
     .maybeSingle()
 
-  return data !== null
+  if (!data) return false
+  return data.store_id === null || data.store_id === storeId
 }
 
 /**
@@ -174,81 +139,80 @@ export async function isCouponValidForStore(
 ): Promise<boolean> {
   const admin = getAdminClient()
 
-  const { count } = await admin
-    .from("coupon_stores")
-    .select("*", { count: "exact", head: true })
-    .eq("coupon_id", couponId)
-
-  if (count === 0) return true
-
   const { data } = await admin
-    .from("coupon_stores")
-    .select("coupon_id")
-    .eq("coupon_id", couponId)
-    .eq("store_id", storeId)
+    .from("coupons")
+    .select("store_id")
+    .eq("id", couponId)
     .maybeSingle()
 
-  return data !== null
+  if (!data) return false
+  return data.store_id === null || data.store_id === storeId
 }
 
 /**
- * Substitui todas as associações de lojas de uma promoção em batch.
- * storeIds vazio = remove todas (promoção vale para todas as lojas).
+ * Atualiza a associação de loja de uma promoção.
  */
+export async function setPromotionStore(
+  promotionId: string,
+  storeId: string | null,
+): Promise<void> {
+  const admin = getAdminClient()
+  const { error } = await admin
+    .from("promotions")
+    .update({ store_id: storeId })
+    .eq("id", promotionId)
+
+  if (error) throw new Error(`Erro ao atualizar loja da promoção: ${error.message}`)
+}
+
+/**
+ * Atualiza a associação de loja de um cupom.
+ */
+export async function setCouponStore(
+  couponId: string,
+  storeId: string | null,
+): Promise<void> {
+  const admin = getAdminClient()
+  const { error } = await admin
+    .from("coupons")
+    .update({ store_id: storeId })
+    .eq("id", couponId)
+
+  if (error) throw new Error(`Erro ao atualizar loja do cupom: ${error.message}`)
+}
+
 export async function setPromotionStores(
   promotionId: string,
   storeIds: string[],
 ): Promise<void> {
-  const admin = getAdminClient()
-
-  await admin.from("promotion_stores").delete().eq("promotion_id", promotionId)
-
-  if (storeIds.length === 0) return
-
-  const rows = storeIds.map((store_id) => ({ promotion_id: promotionId, store_id }))
-  const { error } = await admin.from("promotion_stores").insert(rows)
-  if (error) throw new Error(`Erro ao salvar lojas da promoção: ${error.message}`)
+  const storeId = storeIds.length > 0 ? storeIds[0] : null
+  await setPromotionStore(promotionId, storeId)
 }
 
-/**
- * Substitui todas as associações de lojas de um cupom em batch.
- * storeIds vazio = remove todas (cupom vale para todas as lojas).
- */
 export async function setCouponStores(
   couponId: string,
   storeIds: string[],
 ): Promise<void> {
-  const admin = getAdminClient()
-
-  await admin.from("coupon_stores").delete().eq("coupon_id", couponId)
-
-  if (storeIds.length === 0) return
-
-  const rows = storeIds.map((store_id) => ({ coupon_id: couponId, store_id }))
-  const { error } = await admin.from("coupon_stores").insert(rows)
-  if (error) throw new Error(`Erro ao salvar lojas do cupom: ${error.message}`)
+  const storeId = storeIds.length > 0 ? storeIds[0] : null
+  await setCouponStore(couponId, storeId)
 }
 
-/**
- * Busca as stores associadas a uma promoção.
- */
 export async function getPromotionStoreIds(promotionId: string): Promise<string[]> {
   const admin = getAdminClient()
   const { data } = await admin
-    .from("promotion_stores")
+    .from("promotions")
     .select("store_id")
-    .eq("promotion_id", promotionId)
-  return (data || []).map((r: { store_id: string }) => r.store_id)
+    .eq("id", promotionId)
+    .maybeSingle()
+  return data?.store_id ? [data.store_id] : []
 }
 
-/**
- * Busca as stores associadas a um cupom.
- */
 export async function getCouponStoreIds(couponId: string): Promise<string[]> {
   const admin = getAdminClient()
   const { data } = await admin
-    .from("coupon_stores")
+    .from("coupons")
     .select("store_id")
-    .eq("coupon_id", couponId)
-  return (data || []).map((r: { store_id: string }) => r.store_id)
+    .eq("id", couponId)
+    .maybeSingle()
+  return data?.store_id ? [data.store_id] : []
 }
