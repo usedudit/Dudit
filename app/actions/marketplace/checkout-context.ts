@@ -141,7 +141,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
         .maybeSingle()
       : Promise.resolve({ data: null }),
     getPartnerPlan(resolved.partnerId),
-    getPartnerDeliveryConfigAction(resolved.partnerId),
+    getPartnerDeliveryConfigAction(resolved.partnerId, targetStoreId),
     cachedListActivePromotionsInBatch([resolved.partnerId], user.id),
     (async () => {
       if (targetStoreId) {

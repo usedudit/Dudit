@@ -153,7 +153,7 @@ export async function getCachedCart(userId: string) {
         .in("partner_id", partnerIds),
       supabase
         .from("delivery_settings")
-        .select("partner_id, base_fee, is_delivery_enabled")
+        .select("id, partner_id, store_id, base_fee, is_delivery_enabled, is_pickup_enabled, included_km, extra_km_price, max_delivery_km, free_delivery_threshold, delivery_payer")
         .in("partner_id", partnerIds),
       listActivePromotionsInBatch(partnerIds, userId),
       storeIds.length > 0
@@ -187,7 +187,7 @@ export async function getCachedCart(userId: string) {
 
     if (delResult.data) {
       partnerDeliverySettings = delResult.data.reduce((acc: any, ds: any) => {
-        const key = ds.partner_id
+        const key = ds.store_id || ds.partner_id
         if (typeof key === "string" && key !== "__proto__" && key !== "constructor" && key !== "prototype") {
           acc[key] = ds
         }
@@ -230,7 +230,7 @@ export async function getCachedCart(userId: string) {
             effectivePms.map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
           )
         ),
-        deliverySettings: partnerDeliverySettings[partnerId] || null,
+        deliverySettings: (storeId && partnerDeliverySettings[storeId]) || partnerDeliverySettings[partnerId] || null,
         promotions: partnerPromotions[partnerId] || [],
       }
     }
