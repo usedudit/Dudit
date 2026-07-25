@@ -111,11 +111,9 @@ export async function getCachedCart(userId: string) {
         recurring_plan_items(unit_price, quantity)
       ),
       partners(
-        id, 
-        store_image_url,
-        opening_hours,
-        user_id, 
-        mp_user_id, 
+        id,
+        user_id,
+        mp_user_id,
         mp_public_key
       )
     `)

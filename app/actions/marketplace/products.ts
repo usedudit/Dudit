@@ -41,10 +41,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
-        id, store_description, rating, user_id, phone,
-        store_image_url, banner_url,
-        opening_hours,
-        vendas_totais, created_at,
+        id, user_id, created_at,
         addresses(city, state),
         payment_methods(*)
       ),

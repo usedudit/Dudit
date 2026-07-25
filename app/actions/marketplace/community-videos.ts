@@ -62,15 +62,15 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
     if (partnerIds.length > 0) {
       const { data: partners } = await supabase
         .from("stores")
-        .select("id, name, store_image_url, partner_id")
+        .select("id, name, logo_url, partner_id")
         .in("partner_id", partnerIds)
 
-      type PartnerRow = { id: string; name: string | null; store_image_url: string | null; partner_id: string }
+      type PartnerRow = { id: string; name: string | null; logo_url: string | null; partner_id: string }
       const partnerMap = new Map<string, PartnerRow>((partners || []).map((p: PartnerRow) => [p.partner_id, p]))
       for (const item of items) {
         const p = partnerMap.get(item.partner_id)
         if (p) {
-          item.partner = { name: p.name ?? "", store_image_url: p.store_image_url }
+          item.partner = { name: p.name ?? "", store_image_url: p.logo_url }
         }
       }
     }
