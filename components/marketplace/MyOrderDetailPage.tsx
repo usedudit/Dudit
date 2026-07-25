@@ -399,7 +399,7 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
                                     <p className="mt-2">Recebedor: {order.customer_name || 'Usuário Dudit'}</p>
                                 </>
                             ) : (
-                                <p className="font-medium text-brand-dark dark:text-dark-heading">Retirada diretamente com a loja parceira ({order.partners?.store_name}).</p>
+                                <p className="font-medium text-brand-dark dark:text-dark-heading">Retirada diretamente com a loja parceira ({order.partners?.name || order.partners?.store_name}).</p>
                             )}
                         </div>
                     </div>

@@ -1475,7 +1475,7 @@ export function ProductDetailsPageClient({
                                     <div className="mt-2 min-w-0">
                                         <div className="flex items-center gap-1.5 justify-between">
                                             <span className="font-bold text-brand-dark text-base truncate">
-                                                {partner.store_name}
+{partner.store_name}
                                             </span>
                                             <div className="flex items-center gap-1 shrink-0 px-1.5 py-0.5">
                                                 <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />

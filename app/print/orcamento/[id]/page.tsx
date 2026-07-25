@@ -48,15 +48,14 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
         notFound()
     }
 
-    // Fetch partner logo and address details
-    const [partnerRes, storeRes, addressRes] = await Promise.all([
-        supabase.from("partners").select("store_name, store_image_url").eq("id", quote.partner_id).maybeSingle(),
+    // Fetch store logo and address details
+    const [storeRes, addressRes] = await Promise.all([
         supabase.from("stores").select("name, logo_url").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
         getPartnerAddressAction(quote.partner_id)
     ])
 
-    const partnerName = storeRes.data?.name || partnerRes.data?.store_name || "Parceiro"
-    const rawAvatar = storeRes.data?.image_url || partnerRes.data?.store_image_url || undefined
+    const partnerName = storeRes.data?.name || "Parceiro"
+    const rawAvatar = storeRes.data?.logo_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
     const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
 

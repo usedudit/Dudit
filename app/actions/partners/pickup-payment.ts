@@ -15,18 +15,20 @@ export async function getPickupPaymentPolicyAction() {
   if (!ctx) return { error: "Contexto de ERP não encontrado" }
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_delivery", user)
 
-  const { data: partner } = await supabase
-    .from("partners")
+  const { data: store } = await supabase
+    .from("stores")
     .select("pickup_payment_policy")
-    .eq("id", ctx.partnerId)
-    .single()
+    .eq("partner_id", ctx.partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  if (!partner) {
-    return { error: "Parceiro não encontrado" }
+  if (!store) {
+    return { error: "Loja não encontrada" }
   }
 
   return {
-    pickupPaymentPolicy: partner.pickup_payment_policy || "require_online_payment",
+    pickupPaymentPolicy: store.pickup_payment_policy || "require_online_payment",
   }
 }
 
@@ -44,9 +46,9 @@ export async function updatePickupPaymentPolicyAction(
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_delivery", user)
 
   const { error } = await supabase
-    .from("partners")
+    .from("stores")
     .update({ pickup_payment_policy: policy })
-    .eq("id", ctx.partnerId)
+    .eq("partner_id", ctx.partnerId)
 
   if (error) {
     return { error: error.message }

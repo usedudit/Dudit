@@ -23,11 +23,19 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
         // 1. Fetch Partner Mode to verify
         const { data: partner, error: partnerError } = await supabase
             .from("partners")
-            .select("business_info, store_name")
+            .select("business_info")
             .eq("id", partnerId)
             .single()
 
         if (partnerError || !partner) throw new Error("Parceiro não encontrado")
+
+        const { data: store } = await supabase
+            .from("stores")
+            .select("name")
+            .eq("partner_id", partnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
         const businessInfo = normalizeBusinessInfo(partner.business_info)
 
@@ -81,7 +89,7 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
                 stats,
                 items,
                 recentOrders: recentOrders || [],
-                storeName: partner.store_name,
+                storeName: store?.name || "",
                 businessInfo
             }
         }
@@ -144,22 +152,16 @@ export async function getOnboardingStatusAction(partnerId: string) {
 
         const supabase = createAdminClient()
 
-        // 1. Fetch Partner
-        const { data: partner, error: partnerError } = await supabase
-            .from("partners")
-            .select("store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active")
-            .eq("id", partnerId)
-            .single()
-
-        if (partnerError || !partner) throw new Error("Parceiro não encontrado")
-
-        // 2. Fetch Addresses
-        const { data: addresses } = await supabase
-            .from("addresses")
-            .select("id, zip_code, street, number, neighborhood, city, state")
+        // 1. Fetch Store Data
+        const { data: store, error: storeError } = await supabase
+            .from("stores")
+            .select("id, name, phone, category_id, logo_url, banner_url, opening_hours, is_showcase_active, addresses(*)")
             .eq("partner_id", partnerId)
-            .eq("is_default", true)
+            .order("is_headquarters", { ascending: false })
             .limit(1)
+            .maybeSingle()
+
+        if (storeError || !store) throw new Error("Loja não encontrada")
 
         // 3. Fetch Payment Methods
         const { data: paymentMethods } = await supabase
@@ -173,16 +175,17 @@ export async function getOnboardingStatusAction(partnerId: string) {
             scopeActiveOnly(supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
         ])
 
+        const addresses = store.addresses || []
         const hasPix = (paymentMethods || []).some((m: any) => (m.type === 'pix' || m.payment_type === 'pix') && m.is_active)
-        const hasAddress = (addresses || []).length > 0 && !!addresses[0].zip_code
-        const hasHours = !!partner.opening_hours && Object.keys(partner.opening_hours).length > 0
+        const hasAddress = (addresses || []).length > 0 && !!(addresses as any)[0].zip_code
+        const hasHours = !!store.opening_hours && Object.keys(store.opening_hours as any).length > 0
         const hasItems = ((productsCount.count || 0) + (servicesCount.count || 0)) > 0
-        const hasShowcase = !!partner.store_image_url && !!partner.banner_url && !partner.banner_url.includes('default/')
+        const hasShowcase = !!store.logo_url && !!store.banner_url && !store.banner_url.includes('default/')
 
         // Checks
         const checklist = {
             profile: {
-                completed: !!partner.store_name && !!partner.phone && !!partner.category_id,
+                completed: !!store.name && !!store.phone && !!store.category_id,
                 title: "Dados Gerais e Segmento",
                 description: "Defina o nome da loja, categoria principal e número de WhatsApp.",
                 tab: "dados-do-negocio"
@@ -222,8 +225,8 @@ export async function getOnboardingStatusAction(partnerId: string) {
         return {
             success: true,
             data: {
-                storeName: partner.store_name,
-                isShowcaseActive: partner.is_showcase_active,
+                storeName: store.name,
+                isShowcaseActive: store.is_showcase_active,
                 checklist
             }
         }

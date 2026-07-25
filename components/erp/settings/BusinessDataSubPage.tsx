@@ -151,11 +151,11 @@ export const BusinessDataSubPage = ({
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
-        crt: partner.crt || "1",
-        contribuinte: partner.contribuinte || "9",
-        inscricaoEstadual: partner.inscricao_estadual || "",
-        ieIsento: partner.ie_isento || false,
-        inscricaoMunicipal: partner.inscricao_municipal || "",
+        crt: store?.crt || partner.crt || "1",
+        contribuinte: store?.contribuinte || partner.contribuinte || "9",
+        inscricaoEstadual: store?.inscricao_estadual || partner.inscricao_estadual || "",
+        ieIsento: store?.ie_isento ?? partner.ie_isento ?? false,
+        inscricaoMunicipal: store?.inscricao_municipal || partner.inscricao_municipal || "",
     })
 
     const storeHoursObj = store?.opening_hours && typeof store.opening_hours === "object" && Object.keys(store.opening_hours).length > 0 ? store.opening_hours : null

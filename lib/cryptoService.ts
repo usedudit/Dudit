@@ -45,7 +45,7 @@ type KeyVersion = "v1" | "v2"
  * The version used by encrypt() for all NEW encryptions.
  * Change this to "v2" after deploying MASTER_KEY_V2.
  */
-const ACTIVE_KEY_VERSION: KeyVersion = "v1"
+const ACTIVE_KEY_VERSION: KeyVersion = "v2"
 
 /** All supported versions for decryption. */
 const SUPPORTED_VERSIONS: readonly KeyVersion[] = ["v1", "v2"] as const

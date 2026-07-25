@@ -254,7 +254,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                     {sub.partner?.store_image_url && (
                       <img
                         src={getR2ImageUrl(sub.partner.store_image_url)}
-                        alt={sub.partner.store_name}
+                        alt={sub.partner?.name || sub.partner?.store_name}
                         className="w-16 h-16 rounded-[16px] object-cover border border-brand-border dark:border-dark-border"
                       />
                     )}
@@ -268,7 +268,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         </Badge>
                       </div>
                       <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                        {sub.partner?.store_name}
+                        {sub.partner?.name || sub.partner?.store_name}
                       </p>
                       
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-brand-inactive-text dark:text-dark-body font-medium">

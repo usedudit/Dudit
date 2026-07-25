@@ -15,20 +15,27 @@ const getCachedPartnerReceiptHeader = (partnerId: string) => unstable_cache(
     async () => {
         const supabase = getAdminClient()
 
-        const [{ data: partner, error: partnerError }, { data: address, error: addressError }] =
+        const [{ data: partner, error: partnerError }, { data: store }, { data: address }] =
             await Promise.all([
                 supabase
                     .from("partners")
                     .select(
-                        "store_name, store_description, cnpj, inscricao_estadual, inscricao_municipal, ie_isento",
+                        "cnpj, inscricao_estadual, inscricao_municipal, ie_isento",
                     )
                     .eq("id", partnerId)
                     .maybeSingle(),
                 supabase
+                    .from("stores")
+                    .select("name, description, crt, contribuinte, inscricao_estadual, ie_isento, inscricao_municipal, addresses(*)")
+                    .eq("partner_id", partnerId)
+                    .order("is_headquarters", { ascending: false })
+                    .limit(1)
+                    .maybeSingle(),
+                supabase
                     .from("addresses")
                     .select("street, number, complement, neighborhood, city, state, zip_code")
-                    .eq("partner_id", partnerId)
-                    .eq("is_default", true)
+                    .or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
+                    .limit(1)
                     .maybeSingle(),
             ])
 
@@ -47,20 +54,18 @@ const getCachedPartnerReceiptHeader = (partnerId: string) => unstable_cache(
         ].filter(Boolean)
 
         const header: SaleReceiptPartnerHeader = {
-            fantasyName: partner.store_name || "Estabelecimento",
-            legalName: partner.store_description || partner.store_name || "Estabelecimento",
+            fantasyName: store?.name || "Estabelecimento",
+            legalName: store?.description || store?.name || "Estabelecimento",
             addressLine: addressParts.join(", ") || "Endereço não informado",
             taxIdLine: buildPartnerTaxIdLine({
                 cnpj: partner.cnpj,
-                stateRegistration: partner.inscricao_estadual,
-                municipalRegistration: partner.inscricao_municipal,
-                ieIsento: partner.ie_isento,
+                stateRegistration: store?.inscricao_estadual || partner.inscricao_estadual,
+                municipalRegistration: store?.inscricao_municipal || partner.inscricao_municipal,
+                ieIsento: store?.ie_isento ?? partner.ie_isento,
             }),
         }
 
-        if (addressError) {
-            console.warn("[getCachedPartnerReceiptHeader] address:", addressError)
-        }
+
 
         return header
     },

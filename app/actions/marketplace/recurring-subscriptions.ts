@@ -175,7 +175,8 @@ export async function getMyRecurringSubscriptionsAction() {
       .select(`
         *,
         recurring_plans(id, name, description, frequency_type, frequency_interval, status),
-        partners:partner_id(id, store_name, store_image_url)
+        partners:partner_id(id),
+        stores(id, name, store_image_url)
       `)
       .in("customer_id", customerIds)
       .order("created_at", { ascending: false })
@@ -309,7 +310,6 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
         partners!partner_id (
           id,
           user_id,
-          store_name,
           store_image_url,
           store_description,
           phone,
@@ -323,6 +323,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
           addresses (id, street, number, neighborhood, city, state, zip_code),
           payment_methods (*)
         ),
+        stores(id, name, logo_url, banner_url),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, name, price, images),
@@ -678,7 +679,7 @@ export async function getMySubscriptionCreditsAction() {
       .select(`
         id, subscription_id, quantity, consumed, expires_at, created_at,
         recurring_subscriptions(recurring_plans(name)),
-        partners:partner_id(store_name),
+        stores(id, name),
         services(name),
         products(name)
       `)
@@ -694,7 +695,7 @@ export async function getMySubscriptionCreditsAction() {
         id: row.id,
         subscriptionId: row.subscription_id,
         planName: row.recurring_subscriptions?.recurring_plans?.name || "Plano",
-        storeName: row.partners?.store_name || "Vendedor",
+        storeName: row.stores?.name || "Vendedor",
         itemName: row.services?.name || row.products?.name || "Item",
         totalCredits: row.quantity,
         consumedCredits: row.consumed,

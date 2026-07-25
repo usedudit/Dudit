@@ -81,32 +81,36 @@ export function validateCPF(cpf: string): boolean {
 }
 
 export function validateCNPJ(cnpj: string): boolean {
-  const cleanCNPJ = cnpj.replace(/\D/g, "")
+  const cleanCNPJ = cnpj.replace(/[^0-9A-Z]/gi, "").toUpperCase()
 
   if (cleanCNPJ.length !== 14) return false
 
-  // Reject known invalid patterns
-  if (/^(\d)\1{13}$/.test(cleanCNPJ)) return false
+  // Reject known invalid patterns (all same character)
+  if (/^([0-9A-Z])\1{13}$/.test(cleanCNPJ)) return false
 
-  // Validate first check digit
+  // Converts char to numeric value per Receita Federal spec (ASCII - 48)
+  // '0'-'9' → 0-9, 'A'-'Z' → 17-42
+  const charValue = (char: string): number => char.charCodeAt(0) - 48
+
+  // Validate first check digit (weights: 5,4,3,2,9,8,7,6,5,4,3,2)
   let sum = 0
   let weight = 5
   for (let i = 0; i < 12; i++) {
-    sum += Number.parseInt(cleanCNPJ.charAt(i)) * weight
+    sum += charValue(cleanCNPJ[i]) * weight
     weight = weight === 2 ? 9 : weight - 1
   }
   let checkDigit = sum % 11 < 2 ? 0 : 11 - (sum % 11)
-  if (checkDigit !== Number.parseInt(cleanCNPJ.charAt(12))) return false
+  if (checkDigit !== Number.parseInt(cleanCNPJ[12])) return false
 
-  // Validate second check digit
+  // Validate second check digit (weights: 6,5,4,3,2,9,8,7,6,5,4,3,2)
   sum = 0
   weight = 6
   for (let i = 0; i < 13; i++) {
-    sum += Number.parseInt(cleanCNPJ.charAt(i)) * weight
+    sum += charValue(cleanCNPJ[i]) * weight
     weight = weight === 2 ? 9 : weight - 1
   }
   checkDigit = sum % 11 < 2 ? 0 : 11 - (sum % 11)
-  if (checkDigit !== Number.parseInt(cleanCNPJ.charAt(13))) return false
+  if (checkDigit !== Number.parseInt(cleanCNPJ[13])) return false
 
   return true
 }

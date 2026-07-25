@@ -35,13 +35,13 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
   const businessInfo = normalizeBusinessInfo(partner.business_info)
 
   const [formData, setFormData] = useState({
-    storeName: partner.store_name || "",
-    storeDescription: partner.store_description || "",
+    storeName: partner.store?.name || partner.store_name || "",
+    storeDescription: partner.store?.description || partner.store_description || "",
     address: partner.address || "",
     businessType: partner.business_type || "pf",
     cnpj: partner.cnpj || "",
     openingHours: partner.opening_hours ? JSON.stringify(partner.opening_hours) : "",
-    storeImageUrl: partner.store_image_url || "",
+    storeImageUrl: partner.store?.logo_url || partner.store_image_url || "",
     businessInfo: {
       sells: Array.isArray(businessInfo.sells) ? businessInfo.sells : ["products"],
       mode: (businessInfo.mode || "erp") as BusinessMode,
@@ -50,13 +50,13 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
   })
 
   const initialSnapshot = useMemo(() => JSON.stringify({
-    storeName: partner.store_name || "",
-    storeDescription: partner.store_description || "",
+    storeName: partner.store?.name || partner.store_name || "",
+    storeDescription: partner.store?.description || partner.store_description || "",
     address: partner.address || "",
     businessType: partner.business_type || "pf",
     cnpj: partner.cnpj || "",
     openingHours: partner.opening_hours ? JSON.stringify(partner.opening_hours) : "",
-    storeImageUrl: partner.store_image_url || "",
+    storeImageUrl: partner.store?.logo_url || partner.store_image_url || "",
     businessInfo: {
       sells: Array.isArray(businessInfo.sells) ? businessInfo.sells : ["products"],
       mode: (businessInfo.mode || "erp") as BusinessMode,

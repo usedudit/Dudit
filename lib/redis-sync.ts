@@ -90,7 +90,8 @@ export async function syncToExploreRedis({
             marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
             category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
-            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+            partners(id),
+            stores(id, name, logo_url, addresses!store_id!left(city, state)),
             product_variants(variant_options, price_adjustment, is_active),
             show_price_in_store
           `)
@@ -143,7 +144,8 @@ export async function syncToExploreRedis({
             id, name, price, promotional_price, images, rating, marketplace_score, bookings_last_30_days, favorites_count, views_count,
             category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+            partners(id),
+            stores(id, name, logo_url, addresses!store_id!left(city, state)),
             show_price_in_store
           `)
           .eq("id", id)
@@ -158,9 +160,11 @@ export async function syncToExploreRedis({
         }
 
         const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
+        const rawStore = Array.isArray(dbData.stores) ? dbData.stores[0] : dbData.stores
         const partner = rawPartner ? {
           ...rawPartner,
-          store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+          store_name: rawStore?.name,
+          store_avatar: rawStore?.logo_url || rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
           latitude: rawPartner.latitude,
           longitude: rawPartner.longitude,
           city: rawPartner.addresses?.[0]?.city || null,
@@ -171,12 +175,11 @@ export async function syncToExploreRedis({
       }
       else if (type === 'loja') {
         const { data: dbData } = await admin
-          .from("partners")
+          .from("stores")
           .select(`
-            id, store_name, store_description, store_image_url, banner_url, rating, marketplace_reputation, latitude, longitude, created_at, updated_at,
-            category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
-            addresses(city, state),
-            reviews(count)
+            id, name, description, logo_url, banner_url, rating, marketplace_reputation, created_at, updated_at, partner_id,
+            addresses!store_id!left(city, state),
+            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
           `)
           .eq("id", id)
           .single()
@@ -185,12 +188,13 @@ export async function syncToExploreRedis({
           const city = dbData.addresses?.[0]?.city || null
           const state = dbData.addresses?.[0]?.state || null
           const reviewsCount = dbData.reviews?.[0]?.count || 0
+          const hqStore = dbData.stores?.find((s: any) => s.is_headquarters) || dbData.stores?.[0]
           const categoryName = dbData.category?.parent?.name || dbData.category?.name || 'Loja Parceira'
           finalData = {
             id: dbData.id,
-            name: dbData.store_name,
-            description: dbData.store_description,
-            images: [dbData.banner_url || dbData.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+            name: hqStore?.name || "Loja",
+            description: hqStore?.description || dbData.store_description,
+            images: [hqStore?.banner_url || dbData.banner_url || hqStore?.logo_url || dbData.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
             rating: dbData.rating,
             category: categoryName,
             partners: {
@@ -214,11 +218,11 @@ export async function syncToExploreRedis({
 
     const finalScore = computeExploreRedisScore(finalData, score)
 
-    // 1. Atualiza o Cache do Objeto (JSON)
+    // 1. Atualiza o Cache do Objeto (JSON) com TTL de 7 dias
     // 2. Atualiza o Índice Específico (zset)
     // 3. Atualiza o Índice Global (zset)
     await Promise.all([
-      redis.set(dataKey, JSON.stringify({ ...finalData, itemType: type })),
+      redis.set(dataKey, JSON.stringify({ ...finalData, itemType: type }), { ex: 604800 }),
       redis.zadd(typeIndexKey, { score: finalScore, member: memberId }),
       redis.zadd(globalIndexKey, { score: finalScore, member: memberId })
     ])
@@ -284,3 +288,7 @@ export async function syncPartnerItemsToExploreRedis(partnerId: string): Promise
     console.log(`[RedisSync] Sincronizados ${products?.length || 0} produtos e ${services?.length || 0} serviços para o parceiro ${partnerId}`)
   }
 }
+
+
+
+

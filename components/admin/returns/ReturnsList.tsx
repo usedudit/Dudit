@@ -155,7 +155,7 @@ const ReturnsList = ({ initialData }: ReturnsListProps) => {
 
                                                 <div className="flex items-center gap-2 text-xs text-brand-inactive-text">
                                                     <StoreIcon size={12} />
-                                                    <span>{request.partners?.store_name || request.partners?.business_type || "-"}</span>
+                                                    <span>{request.partners?.stores?.[0]?.name || request.partners?.store_name || request.partners?.business_type || "-"}</span>
                                                     <span className="ml-auto">{timelineCount} eventos</span>
                                                     {refundAmount > 0 && (
                                                         <span className="font-bold">{formatCurrency(refundAmount)}</span>

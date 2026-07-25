@@ -40,21 +40,42 @@ export const getPartnerStatus = cache(async (userId: string) => {
  */
 export const getPartnerByUserIdCached = cache(async (userId: string) => {
     const supabase = await getSupabaseServerClient()
-    const { data } = await supabase
+    const { data: partner } = await supabase
         .from("partners")
-        .select("*, addresses(*)")
+        .select("*")
         .eq("user_id", userId)
         .maybeSingle()
 
-    if (data && data.addresses && data.addresses.length > 0) {
-        const defaultAddress = data.addresses.find((a: any) => a.is_default) || data.addresses[0];
-        data.zip_code = defaultAddress.zip_code;
-        data.street = defaultAddress.street;
-        data.number = defaultAddress.number;
-        data.complement = defaultAddress.complement;
-        data.neighborhood = defaultAddress.neighborhood;
-        data.city = defaultAddress.city;
-        data.state = defaultAddress.state;
+    if (!partner) return null
+
+    const data: any = { ...partner }
+
+    const { data: store } = await supabase
+        .from("stores")
+        .select("id, name, description, logo_url, banner_url, opening_hours, phone, addresses(*)")
+        .eq("partner_id", partner.id)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (store) {
+        data.store = store
+        data.store_name = store.name
+        data.store_description = store.description
+        data.store_image_url = store.logo_url
+        data.banner_url = store.banner_url
+        data.opening_hours = store.opening_hours
+        data.phone = store.phone
+        const storeAddress = (store as any).addresses?.find((a: any) => a.is_default) || (store as any).addresses?.[0]
+        if (storeAddress) {
+            data.zip_code = storeAddress.zip_code;
+            data.street = storeAddress.street;
+            data.number = storeAddress.number;
+            data.complement = storeAddress.complement;
+            data.neighborhood = storeAddress.neighborhood;
+            data.city = storeAddress.city;
+            data.state = storeAddress.state;
+        }
     }
 
     if (data && data.cpf) {

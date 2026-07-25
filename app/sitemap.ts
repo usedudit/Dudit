@@ -60,11 +60,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const [partnersResponse, storesResponse, productsResponse, citiesResponse] = await Promise.all([
             // Top 200 partners
             supabase
-                .from("partners")
-                .select("id, store_name, updated_at, created_at, addresses(city, state)")
+                .from("stores")
+                .select("id, name, slug, updated_at, created_at, addresses(city, state)")
                 .eq("is_active", true)
-                .order("rating", { ascending: false })
-                .limit(200),
+                .order("created_at", { ascending: false })
+                .limit(1000),
 
             // Top 1000 stores
             supabase
@@ -77,16 +77,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             // Top 500 most recent products in marketplace
             supabase
                 .from("products")
-                .select("id, name, updated_at, created_at, status, partners(id, store_name, addresses(city, state))")
+                .select("id, name, updated_at, created_at, status, partners(id), stores(id, name, addresses!store_id!left(city, state))")
                 .eq("status", "ativo")
                 .eq("show_in_marketplace", true)
                 .order("created_at", { ascending: false })
                 .limit(500),
 
-            // Distinct cities from active partners
+            // Distinct cities from active stores
             supabase
-                .from("partners")
-                .select("addresses(city, state)")
+                .from("stores")
+                .select("addresses!store_id!left(city, state)")
                 .eq("is_active", true)
                 .not("addresses", "is", null)
                 .limit(200),
@@ -119,9 +119,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const seenCities = new Set<string>()
         const citiesSitemap: MetadataRoute.Sitemap = []
 
-        const citiesData = citiesResponse.data || []
-        for (const partner of citiesData) {
-            const addr = partner.addresses?.[0]
+        const citiesData = (citiesResponse.data || []) as any[]
+        for (const store of citiesData) {
+            const addr = Array.isArray(store.addresses) ? store.addresses[0] : store.addresses
             if (addr?.city && addr?.state) {
                 const normalizedCity = addr.city
                     .toLowerCase()

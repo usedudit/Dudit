@@ -57,7 +57,7 @@ const UserEnforcementListRow = React.memo(({
                         <div className="flex items-center gap-1">
                             <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                                {user.partner.store_name}
+                                {user.partner?.store_name || user.partner?.stores?.[0]?.name || "Loja"}
                             </span>
                         </div>
                         <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">

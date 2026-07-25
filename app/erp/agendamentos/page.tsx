@@ -27,7 +27,7 @@ async function loadCatalogs(partnerId: string) {
       .limit(100),
     supabase
       .from("partners")
-      .select("user_id, opening_hours")
+      .select("user_id, stores(opening_hours)")
       .eq("id", partnerId)
       .single(),
     supabase
@@ -116,7 +116,7 @@ async function loadCatalogs(partnerId: string) {
       resources: Array.isArray(s.resources) ? s.resources : [],
     })),
     unavailableTypes: unavailableRes.data || [],
-    openingHours: partner?.opening_hours || null,
+    openingHours: (partner as any)?.stores?.[0]?.opening_hours || (partner as any)?.opening_hours || null,
   }
 }
 

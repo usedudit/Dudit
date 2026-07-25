@@ -212,14 +212,14 @@ async function updatePartnerRating(supabase: any, partnerId: string) {
   }
 
   if (!reviews || reviews.length === 0) {
-    // If no reviews, set partner rating to 0
-    await supabase.from("partners").update({ rating: 0 }).eq("id", partnerId)
+    // If no reviews, set store rating to 0
+    await supabase.from("stores").update({ rating: 0 }).eq("partner_id", partnerId)
     return
   }
 
   const averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
 
-  await supabase.from("partners").update({ rating: averageRating }).eq("id", partnerId)
+  await supabase.from("stores").update({ rating: averageRating }).eq("partner_id", partnerId)
 }
 
 export async function createReviewAction(data: {
@@ -605,7 +605,7 @@ export async function getBuyerReviewsAction() {
       *,
       products(id, name, images, video_thumbnail),
       services(id, name, images),
-      partners(id, store_name, store_image_url, addresses(id, city, state))
+      partners(id),\r\n      stores(id, name, logo_url, addresses!store_id!left(city, state))
     `)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

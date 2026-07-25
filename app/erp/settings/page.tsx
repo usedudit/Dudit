@@ -23,13 +23,33 @@ export default async function SettingsPage() {
   }
 
   const supabase = createAdminClient()
-  const { data: partner } = await supabase
+  const { data: rawPartner } = await supabase
     .from("partners")
-    .select("*, addresses(*)")
+    .select("*")
     .eq("id", context.partnerId)
     .maybeSingle()
 
-  if (!partner) return <AccessDenied />
+  if (!rawPartner) return <AccessDenied />
+
+  const { data: store } = await supabase
+    .from("stores")
+    .select("*, addresses(*)")
+    .eq("partner_id", context.partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const partner: any = {
+    ...rawPartner,
+    store,
+    store_name: store?.name,
+    store_description: store?.description,
+    store_image_url: store?.logo_url,
+    banner_url: store?.banner_url,
+    opening_hours: store?.opening_hours,
+    phone: store?.phone,
+    addresses: store?.addresses || [],
+  }
 
   // Decrypt CPF for display
   if (partner.cpf) {

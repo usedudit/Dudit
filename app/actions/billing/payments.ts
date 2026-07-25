@@ -16,7 +16,7 @@ export async function listPaymentsAction(
     const admin = getAdminClient()
     let query = admin
         .from("billing_payments")
-        .select("*, billing_purchases!inner(partner_id, purchase_type, description, partners!inner(store_name))")
+        .select("*, billing_purchases!inner(partner_id, purchase_type, description, partners!inner(id, stores(name)))")
         .order("created_at", { ascending: false })
         .limit(limit + 1)
 

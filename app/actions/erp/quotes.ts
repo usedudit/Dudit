@@ -676,8 +676,8 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
 
     // 2. Fetch partner, store and default address
     const [partnerRes, storeRes] = await Promise.all([
-        supabase.from("partners").select("store_name, store_image_url, user_id, phone").eq("id", partnerId).maybeSingle(),
-        supabase.from("stores").select("name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
+        supabase.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
+        supabase.from("stores").select("name, logo_url, phone").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle()
     ])
     const partner = partnerRes.data
     const store = storeRes.data
@@ -779,10 +779,10 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
         additional_costs: Number(quote.additional_costs || 0),
         total: Number(quote.total || 0),
         partner: {
-            name: store?.name || partner?.store_name || "Parceiro",
-            image_url: store?.image_url || partner?.store_image_url || null,
+            name: store?.name || "Parceiro",
+            image_url: store?.logo_url || null,
             email: partnerEmail,
-            phone: partner?.phone || null,
+            phone: store?.phone || null,
             address: partnerAddressFormatted
         },
         seller: sellerInfo,

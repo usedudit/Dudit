@@ -55,15 +55,16 @@ async function incrementRiskScore(partnerId: string, points: number): Promise<vo
         try {
             const admin = getAdminClient()
             const { data } = await admin
-                .from("partners")
+                .from("stores")
                 .select("risk_score")
-                .eq("id", partnerId)
-                .single()
+                .eq("partner_id", partnerId)
+                .limit(1)
+                .maybeSingle()
             const current = data?.risk_score || 0
             await admin
-                .from("partners")
+                .from("stores")
                 .update({ risk_score: Math.min(current + points, 100) })
-                .eq("id", partnerId)
+                .eq("partner_id", partnerId)
         } catch (e2) {
             console.error("[RISK_SCORE] Failed to increment:", partnerId, e2)
         }
@@ -88,7 +89,7 @@ export async function getModerationQueue(
         .from("products")
         .select(`
       id, name, description, price, images, moderation_status, created_at, store_id,
-      partner:partners!inner(id, store_name, user_id, risk_score),
+      partner:partners!inner(id, user_id),
       store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
     `)
         .is("deleted_at", null)
@@ -147,7 +148,7 @@ export async function getModerationQueue(
             description: p.description,
             price: p.price || 0,
             images: p.images || [],
-            owner_store_name: st?.name || p.partner?.store_name || "Desconhecido",
+            owner_store_name: st?.name || "Desconhecido",
             owner_user_name: ownerMap.get(p.partner?.user_id) || "",
             partner_id: p.partner?.id || "",
             store_id: p.store_id || undefined,
@@ -187,7 +188,8 @@ export async function getModerationQueue(
         .select(`
             id, order_id, partner_id, customer_name_snapshot, customer_message, reason, status, created_at,
             order_number_snapshot,
-            partners(id, store_name, user_id, risk_score),
+            partners(id, user_id),
+            stores(id, name, risk_score),
             return_evidence(file_url)
         `)
         .eq("status", "ESCALATED")
@@ -234,7 +236,7 @@ export async function getModerationQueue(
         description: [r.reason, r.customer_message].filter(Boolean).join(" - ") || null,
         price: 0,
         images: (r.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
-        owner_store_name: r.partners?.store_name || "Desconhecido",
+        owner_store_name: r.stores?.[0]?.name || "Desconhecido",
         partner_id: r.partner_id,
         owner_user_name: returnOwnerMap.get(r.partners?.user_id) || "",
         moderation_status: "pending_moderation",
@@ -703,11 +705,11 @@ export async function getAdminCommunityVideos(
         if (data && data.length > 0) {
             const partnerIds = [...new Set(data.map((v: any) => v.partner_id).filter(Boolean))]
             if (partnerIds.length > 0) {
-                const { data: partners } = await supabase
-                    .from("partners")
-                    .select("id, store_name")
-                    .in("id", partnerIds)
-                partnerMap = new Map((partners || []).map((p: any) => [p.id, p]))
+                const { data: stores } = await supabase
+                    .from("stores")
+                    .select("partner_id, name")
+                    .in("partner_id", partnerIds)
+                partnerMap = new Map((stores || []).map((s: any) => [s.partner_id, { id: s.partner_id, store_name: s.name }]))
             }
         }
 

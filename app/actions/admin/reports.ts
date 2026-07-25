@@ -775,7 +775,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
     if (targetType === "product") {
         const { data, error } = await adminClient
             .from("products")
-            .select("*, partner:partners(business_type, id, store_image_url)")
+            .select("*, partner:partners(business_type, id), store:stores(name, logo_url)")
             .eq("id", targetId)
             .single()
         if (error || !data) return null

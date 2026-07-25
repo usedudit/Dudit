@@ -57,27 +57,27 @@ ALTER TABLE suppliers
   ADD CONSTRAINT suppliers_email_format 
   CHECK (email IS NULL OR email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
 
--- Validaç��o de CPF (11 dígitos)
+-- Validação de CPF (11 dígitos)
 ALTER TABLE customers 
   DROP CONSTRAINT IF EXISTS customers_cpf_format,
   ADD CONSTRAINT customers_cpf_format 
   CHECK (cpf IS NULL OR cpf ~ '^\d{11}$');
 
--- Validação de CNPJ (14 dígitos)
+-- Validação de CNPJ (14 caracteres alfanuméricos)
 ALTER TABLE customers 
   DROP CONSTRAINT IF EXISTS customers_cnpj_format,
   ADD CONSTRAINT customers_cnpj_format 
-  CHECK (cnpj IS NULL OR cnpj ~ '^\d{14}$');
+  CHECK (cnpj IS NULL OR cnpj ~ '^[0-9A-Z]{14}$');
 
 ALTER TABLE suppliers 
   DROP CONSTRAINT IF EXISTS suppliers_cnpj_format,
   ADD CONSTRAINT suppliers_cnpj_format 
-  CHECK (cnpj IS NULL OR cnpj ~ '^\d{14}$');
+  CHECK (cnpj IS NULL OR cnpj ~ '^[0-9A-Z]{14}$');
 
 ALTER TABLE partners 
   DROP CONSTRAINT IF EXISTS partners_cnpj_format,
   ADD CONSTRAINT partners_cnpj_format 
-  CHECK (cnpj IS NULL OR cnpj ~ '^\d{14}$');
+  CHECK (cnpj IS NULL OR cnpj ~ '^[0-9A-Z]{14}$');
 
 -- Validação de preços e quantidades (não negativos)
 ALTER TABLE products 

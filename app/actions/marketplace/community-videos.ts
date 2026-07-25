@@ -30,7 +30,7 @@ export interface CommunityVideoItem {
   orders_origin_count: number
   published_at: string | null
   created_at: string
-  partner?: { store_name: string; store_image_url: string | null }
+  partner?: { name: string; store_image_url: string | null }
 }
 
 export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
@@ -61,16 +61,16 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
     const partnerIds = [...new Set(items.map((i) => i.partner_id).filter(Boolean))]
     if (partnerIds.length > 0) {
       const { data: partners } = await supabase
-        .from("partners")
-        .select("id, store_name, store_image_url")
-        .in("id", partnerIds)
+        .from("stores")
+        .select("id, name, store_image_url, partner_id")
+        .in("partner_id", partnerIds)
 
-      type PartnerRow = { id: string; store_name: string | null; store_image_url: string | null }
-      const partnerMap = new Map<string, PartnerRow>((partners || []).map((p: PartnerRow) => [p.id, p]))
+      type PartnerRow = { id: string; name: string | null; store_image_url: string | null; partner_id: string }
+      const partnerMap = new Map<string, PartnerRow>((partners || []).map((p: PartnerRow) => [p.partner_id, p]))
       for (const item of items) {
         const p = partnerMap.get(item.partner_id)
         if (p) {
-          item.partner = { store_name: p.store_name ?? "", store_image_url: p.store_image_url }
+          item.partner = { name: p.name ?? "", store_image_url: p.store_image_url }
         }
       }
     }

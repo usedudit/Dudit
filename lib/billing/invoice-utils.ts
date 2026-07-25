@@ -1,11 +1,11 @@
 export function formatDocument(doc: string | null): string {
     if (!doc) return ""
-    const cleaned = doc.replace(/\D/g, "")
+    const cleaned = doc.replace(/[^0-9A-Z]/gi, "").toUpperCase()
     if (cleaned.length === 11) {
         return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
     }
     if (cleaned.length === 14) {
-        return cleaned.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5")
+        return cleaned.replace(/^([0-9A-Z]{2})([0-9A-Z]{3})([0-9A-Z]{3})([0-9A-Z]{4})(\d{2})$/, "$1.$2.$3/$4-$5")
     }
     return doc
 }

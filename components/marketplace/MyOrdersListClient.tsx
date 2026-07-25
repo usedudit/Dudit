@@ -221,14 +221,14 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                         {/* Seller Image */}
                                                         <img
                                                             src={storeImage}
-                                                            alt={order.partners?.store_name || "Loja"}
+                                                            alt={order.partners?.name || order.partners?.store_name || "Loja"}
                                                             className="w-10 h-10 rounded-full object-cover border border-brand-border dark:border-dark-border bg-white"
                                                         />
 
                                                         <div>
                                                             {/* Store Name Top */}
                                                             <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                                {order.partners?.store_name || "Loja Parceira"}
+                                                                {order.partners?.name || order.partners?.store_name || "Loja Parceira"}
                                                                 {isStoreDeleted(order) && (
                                                                     <Tooltip text="Este negócio não está mais no Dudit">
                                                                         <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block align-middle cursor-help" />

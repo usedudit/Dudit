@@ -634,16 +634,18 @@ export async function getAvailableTimeSlotsAction(
       return { start: startMin, end: endMin + bufferMinutes }
     })
 
-    // Fetch partner opening hours
-    const { data: partnerData, error: partnerErr } = await supabase
-      .from("partners")
+    // Fetch store opening hours
+    const { data: storeData, error: storeErr } = await supabase
+      .from("stores")
       .select("opening_hours")
-      .eq("id", partnerId)
-      .single()
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (partnerErr) throw partnerErr
+    if (storeErr) throw storeErr
 
-    const rawOpeningHours = partnerData?.opening_hours
+    const rawOpeningHours = storeData?.opening_hours
 
     // Determine day of the week
     const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]

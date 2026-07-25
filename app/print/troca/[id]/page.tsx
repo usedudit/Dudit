@@ -90,12 +90,13 @@ export default async function PrintTrocaPage({ params }: PageProps) {
     const returnRequest = returnRes.data as any
 
     // Fetch partner metadata, store avatar and address details
-    const [headerRes, partnerRes, storeRes, addressRes] = await Promise.all([
+    const [headerRes, storeRes] = await Promise.all([
         getPartnerReceiptHeaderAction(partnerId),
-        supabase.from("partners").select("store_name, store_image_url").eq("id", partnerId).maybeSingle(),
-        supabase.from("stores").select("name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
-        supabase.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code").eq("partner_id", partnerId).limit(1).maybeSingle()
+        supabase.from("stores").select("id, name, logo_url, addresses!store_id!left(street, number, complement, neighborhood, city, state, zip_code)").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
+    const storeData = storeRes.data
+    const addressRes = { data: storeData?.addresses?.[0] || null }
+    const partnerRes = { data: { store_name: storeData?.name, store_image_url: storeData?.logo_url } }
 
     const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
         fantasyName: "",

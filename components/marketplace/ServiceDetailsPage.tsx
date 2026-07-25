@@ -28,8 +28,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
-import { InfoCard } from "@/components/reusable/InfoCard"
+import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
@@ -223,11 +222,11 @@ export function ServiceDetailsPageClient({
 
     const partner = useMemo(() => {
         const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
-        const store = p?.store
-        const address = p?.addresses?.[0] || {}
+        const store = service?.stores || p?.stores || p?.store
+        const address = store?.addresses?.[0] || p?.addresses?.[0] || {}
         return {
             id: p?.id || service.partner_id,
-            store_id: p?.store_id,
+            store_id: p?.store_id || store?.id,
             user_id: p?.user_id,
             phone: store?.phone || store?.whatsapp_phone || p?.phone,
             store_name: store?.name || p?.store_name || "Profissional",
@@ -243,8 +242,8 @@ export function ServiceDetailsPageClient({
             addresses: store?.addresses || p?.addresses || [],
             mp_user_id: p?.mp_user_id,
             mp_public_key: p?.mp_public_key,
-            vendas_totais: p?.vendas_totais || 0,
-            created_at: p?.created_at,
+            vendas_totais: store?.vendas_totais || p?.vendas_totais || 0,
+            created_at: store?.created_at || p?.created_at,
         }
     }, [service])
 
@@ -736,7 +735,7 @@ export function ServiceDetailsPageClient({
 
     // ─── Fetch slots on date/staff change ─────────────────────────────────────
 
-useEffect(() => {
+    useEffect(() => {
         if (!selectedDate || !selectedStaffId || !partner.id) return
 
         setIsLoadingSlots(true)

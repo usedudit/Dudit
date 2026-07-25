@@ -213,7 +213,7 @@ export async function getUserFavoritesAction(params?: {
                             id, name, price, promotional_price, images, rating, is_active, show_in_marketplace,
                             stock_available, stock_quantity,
                             category_id, category:product_categories!category_id(name),
-                            partners(id, store_name, store_image_url, addresses(city, state)),
+                            partners(id),
                             stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state)),
                             product_variants(variant_options, price_adjustment, is_active),
                             show_price_in_store
@@ -229,7 +229,7 @@ export async function getUserFavoritesAction(params?: {
                         .from("services")
                         .select(`
                             id, name, price, images, rating, is_active, billing_unit, price_type,
-                            partners(id, store_name, store_image_url, addresses(city, state)),
+                            partners(id),
                             stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state)),
                             show_price_in_store
                         `)
@@ -258,7 +258,7 @@ export async function getUserFavoritesAction(params?: {
                 const rawPartner = Array.isArray(p.partners) ? p.partners[0] : p.partners
                 const rawStore = Array.isArray(p.stores) ? p.stores[0] : p.stores
                 const storeId = rawStore?.id || rawPartner?.id
-                const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+                const storeName = rawStore?.name || "Vendedor"
                 const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
                 const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
                 const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
@@ -299,7 +299,7 @@ export async function getUserFavoritesAction(params?: {
                 const rawPartner = Array.isArray(s.partners) ? s.partners[0] : s.partners
                 const rawStore = Array.isArray(s.stores) ? s.stores[0] : s.stores
                 const storeId = rawStore?.id || rawPartner?.id
-                const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+                const storeName = rawStore?.name || "Vendedor"
                 const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
                 const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
                 const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null

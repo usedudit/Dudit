@@ -42,7 +42,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
     // Parcerias/Dados Gerais
     supabase
       .from("partners")
-      .select("store_name, phone, category_id, store_image_url, banner_url, opening_hours, is_showcase_active, mp_user_id, business_info")
+      .select("category_id, is_showcase_active, mp_user_id, business_info")
       .eq("id", partnerId)
       .single(),
     
@@ -53,13 +53,12 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       .eq("partner_id", partnerId)
       .maybeSingle(),
     
-    // Endereço Padrão (precisa de city/state para URL pública)
     supabase
       .from("addresses")
       .select("city, state")
-      .eq("partner_id", partnerId)
-      .eq("is_default", true)
-      .limit(1),
+      .or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
+      .limit(1)
+      .maybeSingle(),
 
     // Métodos de Pagamento (para validar Pix)
     supabase
@@ -135,6 +134,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   }
 
   const partner = partnerRes.data;
+  const store = storeRes.data;
   const businessInfo = normalizeBusinessInfo(partner.business_info);
 
   // 2. Determina variáveis auxiliares de Onboarding
@@ -153,9 +153,9 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const activeServices = servicesCountRes.count || 0;
   const hasItems = (activeProducts + activeServices) > 0;
 
-  const hasLogoAndBanner = !!partner.store_image_url && 
-    !!partner.banner_url && 
-    !partner.banner_url.includes("default/");
+  const logoUrl = store?.logo_url || partner?.store_image_url
+  const bannerUrl = store?.banner_url || partner?.banner_url
+  const hasLogoAndBanner = !!logoUrl && !!bannerUrl && !bannerUrl.includes("default/");
 
   const isWhatsAppConnected = (whatsappConnRes.data || []).length > 0;
   const isMercadoPagoConnected = !!partner.mp_user_id;
@@ -174,7 +174,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   // 3. Monta o objeto de Contexto
   const context: DashboardContext = {
     partnerId,
-    storeName: partner.store_name || "Sua Loja",
+    storeName: store?.name || partner?.store_name || "Sua Loja",
     isQuickMode: businessInfo.mode === "quick",
     sellsProducts,
     sellsServices,
@@ -220,32 +220,32 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
   // 6. Gera saudação e mensagens baseadas no modo e preenchimento
   const greeting = {
-    title: `Olá, ${partner.store_name}! 👋`,
+    title: `Olá, ${store?.name || partner?.store_name || "Sua Loja"}! 👋`,
     subtitle: checklist
       ? "Complete o onboarding para começar a vender na Dudit."
       : "Veja como está seu negócio hoje no Marketplace."
   };
 
   // 7. Gera a URL pública do perfil do vendedor
-  const store = storeRes.data
-  const partnerForUrl = store
+  const storeData = storeRes.data
+  const partnerForUrl = storeData
     ? {
-        id: store.id,
-        name: store.name,
-        slug: store.slug,
-        store_name: partner.store_name,
-        city: store.city,
-        state: store.state,
+        id: storeData.id,
+        name: storeData.name,
+        slug: storeData.slug,
+        store_name: storeData.name,
+        city: storeData.city,
+        state: storeData.state,
       }
     : {
         id: partnerId,
-        store_name: partner.store_name,
+        store_name: storeData?.name || partner?.store_name || "",
         addresses: addressRes.data || [],
       };
   const partnerUrl = getStoreUrl(partnerForUrl);
 
   return {
-    storeName: partner.store_name,
+    storeName: storeData?.name || partner?.store_name || "Sua Loja",
     partnerUrl,
     isQuickMode: context.isQuickMode,
     planSlug: context.planSlug,

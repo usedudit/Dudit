@@ -1317,9 +1317,11 @@ async function resolveOrderPreparationEstimate(params: {
             .eq("partner_id", params.partnerId)
             .in("id", productIds),
         params.supabase
-            .from("partners")
+            .from("stores")
             .select("opening_hours")
-            .eq("id", params.partnerId)
+            .eq("partner_id", params.partnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
             .maybeSingle(),
     ])
 
@@ -3335,12 +3337,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const firstOrder = currentOrders?.[0]
         if (!firstOrder) return
 
-        const { data: partner } = await supabase
-            .from("partners")
-            .select("store_name")
-            .eq("id", payload.partnerId)
+        const { data: store } = await supabase
+            .from("stores")
+            .select("name")
+            .eq("partner_id", payload.partnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
             .maybeSingle()
-        const storeName = partner?.store_name || "Vendedor"
+        const storeName = store?.name || "Vendedor"
         const customerName = String(firstOrder.customer_name || "cliente")
 
         if (payload.actionType === "payment_status" && payload.statusValue) {

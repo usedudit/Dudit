@@ -48,25 +48,25 @@ export async function getPartnerReturnPolicyAction(partnerId: string) {
     const access = await requirePermission(partnerId, "settings", "settings_returns")
     const supabase = createAdminClient()
 
-    const [{ data: policyRow }, { data: partner }] = await Promise.all([
+    const [{ data: policyRow }, { data: store }] = await Promise.all([
       supabase.from("partner_return_policies").select("*").eq("partner_id", partnerId).maybeSingle(),
-      supabase.from("partners").select("store_name").eq("id", partnerId).maybeSingle(),
+      supabase.from("stores").select("name").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
     ])
 
     if (policyRow) {
       const policy = normalizePolicyRow(policyRow, partnerId)
       if (!policy.fullPolicyText.trim()) {
-        policy.fullPolicyText = buildDefaultPolicyText(partner?.store_name)
+        policy.fullPolicyText = buildDefaultPolicyText(store?.name)
       }
-      return successResponse({ policy, storeName: partner?.store_name || null })
+      return successResponse({ policy, storeName: store?.name || null })
     }
 
     const policy: PartnerReturnPolicy = {
       partnerId,
       ...DEFAULT_POLICY,
-      fullPolicyText: buildDefaultPolicyText(partner?.store_name),
+      fullPolicyText: buildDefaultPolicyText(store?.name),
     }
-    return successResponse({ policy, storeName: partner?.store_name || null, isDefault: true })
+    return successResponse({ policy, storeName: store?.name || null, isDefault: true })
   } catch (e: unknown) {
     return errorResponse(e instanceof Error ? e.message : "Erro ao carregar política")
   }

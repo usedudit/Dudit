@@ -42,13 +42,15 @@ function applyShowcasePenalty(items: any[]): any[] {
 
 function normalizePlan(item: any) {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+    const storeAddr = rawStore?.addresses?.[0] || rawPartner?.addresses?.[0]
     const partner = rawPartner ? {
         ...rawPartner,
-        store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
-        latitude: rawPartner.latitude,
-        longitude: rawPartner.longitude,
-        city: rawPartner.addresses?.[0]?.city || null,
-        state: rawPartner.addresses?.[0]?.state || null
+        store_name: rawStore?.name,
+        store_avatar: rawStore?.logo_url || rawPartner?.store_image_url || rawPartner?.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+        store_image_url: rawStore?.logo_url || rawPartner?.store_image_url,
+        city: storeAddr?.city || null,
+        state: storeAddr?.state || null
     } : null
 
     let computedPrice = 0
@@ -77,7 +79,7 @@ function normalizePlan(item: any) {
         }
     }
 
-    const image = firstImage || rawPartner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const image = firstImage || rawStore?.logo_url || rawPartner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
 
     return {
         id: item.id,
@@ -541,7 +543,7 @@ async function _searchMarketplaceInternal(
                         id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
-                        partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                        partners(id, is_showcase_active),
                         stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
                         product_variants(variant_options, price_adjustment, is_active),
                         show_price_in_store
@@ -557,7 +559,7 @@ async function _searchMarketplaceInternal(
                     supabase.from("services").select(`
                         id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                         marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                        partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                        partners(id, is_showcase_active),
                         stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
                         show_price_in_store
                     `)
@@ -570,7 +572,7 @@ async function _searchMarketplaceInternal(
                 promises.push(
                     supabase.from("stores").select(`
                         id, name, description, logo_url, banner_url, phone, rating, is_showcase_active, partner_id, addresses!store_id!left(city, state),
-                        partners!inner(id, store_name, store_description, store_image_url, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count))
+                        partners!inner(id, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
                     `).in("partner_id", lojasIds)
                         .eq("is_active", true)
                 )
@@ -579,7 +581,7 @@ async function _searchMarketplaceInternal(
                 promises.push(
                     supabase.from("recurring_plans").select(`
                         id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                        partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                        partners(id, is_showcase_active),
                         recurring_plan_items(
                             id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                             products:product_id(id, name, price, images),
@@ -601,13 +603,14 @@ async function _searchMarketplaceInternal(
             })
 
             const normalizeRecord = (item: any) => {
-                if (item.store_name) {
+                if (item.name && item.store_description !== undefined) {
+                    // This is a store record from stores table
                     return {
-                        id: item.id, name: item.store_name, description: item.store_description,
+                        id: item.id, name: item.name, description: item.description,
                         images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
                         rating: item.rating, itemType: 'loja', category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
                         partners: {
-                            id: item.id, store_name: item.store_name,
+                            id: item.id, store_name: item.name,
                             store_avatar: item.store_image_url || item.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
                             banner_url: item.banner_url || null,
                             latitude: item.latitude, longitude: item.longitude,
@@ -714,7 +717,7 @@ async function hydrateMarketplaceSearchHits(
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
-                partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                partners(id, is_showcase_active),
                 stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
                 product_variants(variant_options, price_adjustment, is_active),
                 show_price_in_store
@@ -730,7 +733,7 @@ async function hydrateMarketplaceSearchHits(
             supabase.from("services").select(`
                 id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                partners(id, is_showcase_active),
                 stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
                 show_price_in_store
             `)
@@ -741,17 +744,17 @@ async function hydrateMarketplaceSearchHits(
     }
     if (lojasIds.length > 0) {
         promises.push(
-            supabase.from("partners").select(`
-                id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at, is_showcase_active, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count),
-                stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state))
-            `).in("id", lojasIds)
+            supabase.from("stores").select(`
+                id, name, description, logo_url, banner_url, rating, created_at, is_showcase_active, partner_id, addresses!store_id!left(city, state),
+                partners!inner(id, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
+            `).in("partner_id", lojasIds)
         )
     }
     if (planosIds.length > 0) {
         promises.push(
             supabase.from("recurring_plans").select(`
                 id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                partners(id, store_name, store_image_url, latitude, longitude, is_showcase_active, addresses(city, state)),
+                partners(id, is_showcase_active),
                 stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
                 recurring_plan_items(
                     id, item_type, product_id, variant_id, service_id, quantity, unit_price,
@@ -785,7 +788,7 @@ async function hydrateMarketplaceSearchHits(
         if (hit.item_type === "loja") {
             const store = Array.isArray(item.stores) ? item.stores[0] : item.stores
             const storeId = store?.id || item.id
-            const storeName = store?.name || item.store_name || "Vendedor"
+            const storeName = store?.name || "Vendedor"
             const storeImage = store?.logo_url || store?.image_url || item.store_image_url
             results.push({
                 id: storeId,
@@ -822,7 +825,7 @@ async function hydrateMarketplaceSearchHits(
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeId = rawStore?.id || rawPartner?.id
-        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+        const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
         const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
         const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
@@ -945,8 +948,8 @@ async function searchMarketplaceByCity(
 
     if (query.trim()) {
         let partnersQuery = supabase
-            .from("partners")
-            .select("id, latitude, longitude, addresses!inner(city, state)")
+            .from("stores")
+            .select("id, partner_id, latitude, longitude, addresses!inner(city, state)")
             .eq("is_active", true)
             .eq("addresses.state", dbState)
 
@@ -1014,16 +1017,16 @@ async function searchMarketplaceByCity(
     let filteredPartners: any[] = []
 
     let partnerDetailsQuery = supabase
-        .from("partners")
+        .from("stores")
         .select(`
-            id, store_name, store_description, store_image_url, banner_url,
+            id, partner_id, name, description, logo_url, banner_url,
             rating, latitude, longitude,
             created_at,
-            category_id,
-            category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
-            addresses!inner(city, state),
-            reviews(count),
-            stores!inner(id, name, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state))
+            addresses!store_id!inner(city, state),
+            partners!inner(
+                id, is_active, category_id,
+                category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name))
+            )
         `)
         .eq("is_active", true)
         .eq("addresses.state", dbState)
@@ -1046,7 +1049,7 @@ async function searchMarketplaceByCity(
         console.error("[searchMarketplaceByCity] Partner details query error:", partnerDetailsRes.error)
     }
     const allPartners = partnerDetailsRes.data || []
-    let partnerIds = allPartners.map((p: any) => p.id)
+    let partnerIds = [...new Set(allPartners.map((s: any) => s.partner_id))]
 
     // Filtro por Raio
     let centerCoords = limits.centerCoords || null
@@ -1087,7 +1090,7 @@ async function searchMarketplaceByCity(
                     category_id, category:product_categories!category_id(name), created_at,
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
-                    partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    partners!inner(id, is_showcase_active),
                     stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
                     product_variants(variant_options, price_adjustment, is_active),
                     show_price_in_store
@@ -1109,7 +1112,7 @@ async function searchMarketplaceByCity(
                 .select(`
                     id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                    partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    partners!inner(id, is_showcase_active),
                     stores!inner(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
                     show_price_in_store
                 `)
@@ -1129,7 +1132,7 @@ async function searchMarketplaceByCity(
                 .from("recurring_plans")
                 .select(`
                     id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                    partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
+                    partners!inner(id, is_showcase_active),
                     recurring_plan_items(
                         id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                         products:product_id(id, name, price, images),
@@ -1168,32 +1171,32 @@ async function searchMarketplaceByCity(
     }
 
     const normalizedPartners = filteredPartners.map((item: any) => {
-        const store = Array.isArray(item.stores) ? item.stores[0] : item.stores
-        const storeName = store?.name || item.store_name || "Vendedor"
-        const storeImage = store?.logo_url || store?.image_url || item.store_image_url
-        const storeCity = store?.city || item.addresses?.[0]?.city || null
-        const storeState = store?.state || item.addresses?.[0]?.state || null
-        const storeId = store?.id || item.id
+        const storeName = item.name || "Vendedor"
+        const storeImage = item.logo_url
+        const storeCity = item.addresses?.[0]?.city || null
+        const storeState = item.addresses?.[0]?.state || null
+        const storeId = item.id
+        const categoryName = item.partners?.category?.parent?.name || item.partners?.category?.name || 'Loja Parceira'
         return {
             id: storeId,
             name: storeName,
-            description: store?.description || item.store_description,
-            images: [store?.banner_url || item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
-            rating: store?.rating ?? item.rating,
+            description: item.description,
+            images: [item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
+            rating: item.rating || 0,
             itemType: 'loja',
-            category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
+            category: categoryName,
             partners: {
-                id: storeId,
+                id: item.partner_id,
                 store_id: storeId,
                 store_name: storeName,
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-                banner_url: store?.banner_url || item.banner_url || null,
+                banner_url: item.banner_url || null,
                 latitude: item.latitude,
                 longitude: item.longitude,
                 city: storeCity,
                 state: storeState,
-                reviewsCount: item.reviews?.[0]?.count || 0
+                reviewsCount: 0
             },
             created_at: item.created_at
         }

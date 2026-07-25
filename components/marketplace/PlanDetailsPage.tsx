@@ -89,7 +89,7 @@ export function PlanDetailsPageClient({
         return {
             id: p.id || plan.partner_id || "1",
             user_id: p.user_id,
-            store_name: store?.name || p.store_name || "Vendedor da Dudit",
+            store_name: store?.name || p?.storeName || "Vendedor da Dudit",
             city: address?.city || "Brasil",
             state: address?.state || "BR",
             store_image_url: store?.logo_url || p.store_image_url || null,
@@ -309,9 +309,9 @@ export function PlanDetailsPageClient({
     const handleWhatsApp = useCallback(() => {
         const cleaned = partner.phone?.replace(/\D/g, "") ?? ""
         const number = cleaned.startsWith("55") ? cleaned : `55${cleaned}`
-        const text = encodeURIComponent(`Olá, ${partner.store_name}! Vi seu plano "${plan.name}" na Dudit e gostaria de mais informações.`)
+        const text = encodeURIComponent(`Olá, ${partner.store_name || partner.store_name}! Vi seu plano "${plan.name}" na Dudit e gostaria de mais informações.`)
         window.open(`https://wa.me/${number}?text=${text}`, "_blank")
-    }, [partner.phone, partner.store_name, plan.name])
+    }, [partner.phone, partner.store_name, partner.store_name, plan.name])
 
     const goToImage = useCallback((index: number) => {
         setSlideDirection(index > activeImgIndex ? 1 : -1)
@@ -876,7 +876,7 @@ export function PlanDetailsPageClient({
                                                     {/* Avatar overlapping banner */}
                                                     <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white -mt-8 z-10 self-start shadow-sm">
                                                         <UserProfileImage
-                                                            fullName={partner.store_name}
+                                                            fullName={partner.store_name || partner.store_name}
                                                             imageUrl={sellerAvatarImage}
                                                             className="w-full h-full object-cover"
                                                         />
@@ -885,7 +885,7 @@ export function PlanDetailsPageClient({
                                                     <div className="mt-3 min-w-0">
                                                         <div className="flex items-center gap-1.5 justify-between">
                                                             <span className="font-bold text-brand-dark text-lg truncate">
-                                                                {partner.store_name}
+                                                                {partner.store_name || partner.store_name}
                                                             </span>
                                                             <div className="flex items-center gap-1 shrink-0">
                                                                 <StarIcon size={14} className="text-brand-green fill-brand-green" strokeWidth={0} />

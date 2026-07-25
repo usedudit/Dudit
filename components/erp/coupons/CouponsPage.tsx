@@ -1027,13 +1027,13 @@ export default function CouponsPage({
                     url={typeof window !== 'undefined' ? `${window.location.origin}${getStoreUrl({
                         id: storeId || localPartner?.id,
                         slug: localPartner?.slug,
-                        store_name: localPartner?.store_name,
+                        storeName: localPartner?.store?.name || localPartner?.store_name,
                         city: localPartner?.city,
                         state: localPartner?.state,
                         addresses: localPartner?.addresses
                     })}?cupom=${sharingCoupon.code}` : ""}
                     title={`Cupom ${sharingCoupon.code}`}
-                    shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Entrega gratis" ? "entrega grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
+                    shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Entrega gratis" ? "entrega grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store?.name || localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
                     label="Link com cupom"
                 />
             )}

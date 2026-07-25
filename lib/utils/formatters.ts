@@ -158,13 +158,13 @@ export function formatCPF(value: string): string {
  * Formats a string as CNPJ (00.000.000/0000-00).
  */
 export function formatCNPJ(value: string): string {
-  const digits = value.replace(/\D/g, "")
-  return digits
-    .replace(/(\d{2})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1/$2")
-    .replace(/(\d{4})(\d)/, "$1-$2")
-    .replace(/(-\d{2})\d+?$/, "$1")
+  const clean = value.replace(/[^0-9A-Z]/gi, "").toUpperCase()
+  return clean
+    .replace(/^([0-9A-Z]{2})([0-9A-Z])/, "$1.$2")
+    .replace(/^([0-9A-Z]{2}\.)([0-9A-Z]{3})([0-9A-Z])/, "$1$2.$3")
+    .replace(/\.([0-9A-Z]{3})([0-9A-Z])/, ".$1/$2")
+    .replace(/\/([0-9A-Z]{4})([0-9A-Z])/, "/$1-$2")
+    .replace(/(-\d{2})[0-9A-Z]+?$/, "$1")
 }
 
 /**

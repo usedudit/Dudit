@@ -205,9 +205,11 @@ export async function quoteDeliveryFeeAction(input: {
     resolveDeliverySettingsRow(supabase, input.partnerId, input.storeId),
     supabase.from("delivery_fee_rules").select("*").eq("partner_id", input.partnerId).eq("is_active", true).order("start_time"),
     supabase
-      .from("partners")
+      .from("stores")
       .select("latitude, longitude")
-      .eq("id", input.partnerId)
+      .eq("partner_id", input.partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
       .maybeSingle(),
   ])
 

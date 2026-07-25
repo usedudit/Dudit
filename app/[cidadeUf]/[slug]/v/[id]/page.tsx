@@ -158,7 +158,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const schemaJsonLd = {
     '@context': 'https://schema.org',
     '@type': ['Store', 'LocalBusiness', 'Organization'],
-    name: store.name || partner?.store_name,
+    name: store.name,
     image: store.logo_url || store.image_url || partner?.store_image_url || 'https://img.dudit.com.br/static/Logo.png',
     description: store.description || partner?.store_description,
     address: {
@@ -213,7 +213,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
 
   const partnerData = {
     id: store.id,
-    storeName: store.name || partner?.store_name || "Loja",
+    storeName: store.name || "Loja",
     storeDescription: store.description || partner?.store_description || "",
     storeImageUrl: store.logo_url || store.image_url || partner?.store_image_url || null,
     profile_image_url: null,

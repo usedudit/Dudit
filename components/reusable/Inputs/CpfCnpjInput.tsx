@@ -7,7 +7,7 @@ type CpfCnpjInputProps = React.ComponentProps<typeof Input>
 
 export function CpfCnpjInput({ onChange, value, ...props }: CpfCnpjInputProps) {
     const formatDocument = (val: string) => {
-        let rawValue = val.replace(/\D/g, "")
+        let rawValue = val.replace(/[^0-9A-Z]/gi, "").toUpperCase()
         if (rawValue.length > 14) rawValue = rawValue.slice(0, 14)
 
         if (rawValue.length <= 11) {
@@ -16,10 +16,10 @@ export function CpfCnpjInput({ onChange, value, ...props }: CpfCnpjInputProps) {
             rawValue = rawValue.replace(/(\d{3})(\d{1,2})$/, "$1-$2")
             return rawValue
         } else {
-            rawValue = rawValue.replace(/^(\d{2})(\d)/, "$1.$2")
-            rawValue = rawValue.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-            rawValue = rawValue.replace(/\.(\d{3})(\d)/, ".$1/$2")
-            rawValue = rawValue.replace(/(\d{4})(\d)/, "$1-$2")
+            rawValue = rawValue.replace(/^([0-9A-Z]{2})([0-9A-Z])/, "$1.$2")
+            rawValue = rawValue.replace(/^([0-9A-Z]{2})\.([0-9A-Z]{3})([0-9A-Z])/, "$1.$2.$3")
+            rawValue = rawValue.replace(/\.([0-9A-Z]{3})([0-9A-Z])/, ".$1/$2")
+            rawValue = rawValue.replace(/([0-9A-Z]{4})([0-9A-Z])/, "$1-$2")
             return rawValue
         }
     }
@@ -35,7 +35,7 @@ export function CpfCnpjInput({ onChange, value, ...props }: CpfCnpjInputProps) {
             {...props}
             value={typeof value === 'string' ? formatDocument(value) : value}
             onChange={handleChange}
-            inputMode="numeric"
+            inputMode="text"
             placeholder={props.placeholder || "000.000.000-00"}
             maxLength={18}
         />

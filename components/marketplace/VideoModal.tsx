@@ -20,7 +20,7 @@ interface VideoData {
   linked_item_id: string | null
   partner_id: string
   views_count: number
-  partner?: { store_name: string; store_image_url: string | null } | null
+  partner?: { name?: string; store_name?: string; store_image_url: string | null } | null
 }
 
 interface VideoModalProps {
@@ -152,7 +152,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                   )}
                   {video.partner && (
                     <p className="text-xs sm:text-sm text-brand-inactive-text mt-0.5">
-                      por <span className="font-medium text-brand-dark">{video.partner.store_name}</span>
+                      por <span className="font-medium text-brand-dark">{video.partner?.name || video.partner?.store_name}</span>
                     </p>
                   )}
                 </div>

@@ -51,7 +51,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
-    const storeName = partner.store_name || vitrine.name || "Vendedor"
+    const storeName = partner.name || partner.store_name || vitrine.name || "Vendedor"
     const rawStoreAvatar =
         partner.store_avatar ||
         partner.store_image_url ||

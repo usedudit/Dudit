@@ -23,21 +23,22 @@ function validateCPF(v: string): boolean {
 }
 
 function validateCNPJ(v: string): boolean {
-  const digits = v.replace(/\D/g, "")
-  if (digits.length !== 14) return false
-  if (/^(\d)\1{13}$/.test(digits)) return false
+  const chars = v.replace(/[^0-9A-Z]/gi, "").toUpperCase()
+  if (chars.length !== 14) return false
+  if (/^([0-9A-Z])\1{13}$/.test(chars)) return false
+  const val = (c: string) => c.charCodeAt(0) - 48
   let sum = 0
   const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-  for (let i = 0; i < 12; i++) sum += parseInt(digits[i]) * w1[i]
+  for (let i = 0; i < 12; i++) sum += val(chars[i]) * w1[i]
   let r = sum % 11
   if (r < 2) r = 0; else r = 11 - r
-  if (r !== parseInt(digits[12])) return false
+  if (r !== parseInt(chars[12])) return false
   sum = 0
   const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-  for (let i = 0; i < 13; i++) sum += parseInt(digits[i]) * w2[i]
+  for (let i = 0; i < 13; i++) sum += val(chars[i]) * w2[i]
   r = sum % 11
   if (r < 2) r = 0; else r = 11 - r
-  return r === parseInt(digits[13])
+  return r === parseInt(chars[13])
 }
 
 function toNumber(v: string): number | null {

@@ -152,7 +152,8 @@ export async function fetchModerationTarget(
                     .select(`
                         id, name, description, price, images, tags, video_url, video_type,
                         video_thumbnail, moderation_status, is_active, created_at,
-                        partner:partners(id, store_name, risk_score)
+                        partner:partners(id),
+                        store:stores(id, name, risk_score)
                     `)
                     .eq("id", id)
                     .is("deleted_at", null)
@@ -175,7 +176,8 @@ export async function fetchModerationTarget(
                     .select(`
                         id, name, description, price, images, tags, video_url, video_type,
                         video_thumbnail, moderation_status, is_active, created_at,
-                        partner:partners!inner(id, store_name, risk_score)
+                        partner:partners!inner(id),
+                        store:stores(id, name, risk_score)
                     `)
                     .eq("id", id)
                     .is("deleted_at", null)
@@ -190,7 +192,8 @@ export async function fetchModerationTarget(
                     .from("recurring_plans")
                     .select(`
                         id, name, description, status, frequency_type, show_in_marketplace, created_at,
-                        partner:partners!inner(id, store_name, risk_score)
+                        partner:partners!inner(id),
+                        store:stores(id, name, risk_score)
                     `)
                     .eq("id", id)
                     .single()
@@ -206,35 +209,35 @@ export async function fetchModerationTarget(
             }
 
             case "partner": {
-                const { data, error } = await admin
+                const { data: partner, error } = await admin
                     .from("partners")
                     .select(`
-                        id, store_name, store_description, store_image_url, banner_url,
-                        gallery, risk_score, is_active, created_at, user_id
+                        id, is_active, created_at, user_id
                     `)
                     .eq("id", id)
                     .single()
 
-                if (error || !data) return { success: false, error: "Parceiro não encontrado" }
+                if (error || !partner) return { success: false, error: "Parceiro não encontrado" }
 
-                let galleryArr: string[] = []
-                if (data.gallery) {
-                    if (Array.isArray(data.gallery)) galleryArr = data.gallery
-                    else if (typeof data.gallery === "string") {
-                        try { galleryArr = JSON.parse(data.gallery) } catch { galleryArr = [] }
-                    }
-                }
+                // Get store name from stores table
+                const { data: hqStore } = await admin
+                    .from("stores")
+                    .select("name, description, logo_url, banner_url, gallery")
+                    .eq("partner_id", id)
+                    .order("is_headquarters", { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
 
                 // Fetch owner separately (avoid FK join issues)
                 let owner = null
-                if (data.user_id) {
+                if (partner.user_id) {
                     const { data: profile } = await admin
                         .from("user_profiles")
                         .select("full_name, risk_score")
-                        .eq("id", data.user_id)
+                        .eq("id", partner.user_id)
                         .single()
                     if (profile) {
-                        const { data: authData } = await admin.auth.admin.getUserById(data.user_id)
+                        const { data: authData } = await admin.auth.admin.getUserById(partner.user_id)
                         const authUser = authData?.user ? { email: authData.user.email } : null
                         owner = {
                             ...profile,
@@ -243,8 +246,21 @@ export async function fetchModerationTarget(
                     }
                 }
 
-                const { user_id, ...partnerData } = data
-                return { success: true, data: { ...partnerData, gallery: galleryArr, owner } as FetchedPartner }
+                // Merge store data over partner data
+                const storeName = hqStore?.name || "Loja"
+                const { user_id, ...partnerData } = partner
+                return {
+                    success: true,
+                    data: {
+                        ...partnerData,
+                        store_name: storeName,
+                        store_description: hqStore?.description || null,
+                        store_image_url: hqStore?.logo_url || null,
+                        banner_url: hqStore?.banner_url || null,
+                        gallery: hqStore?.gallery || [],
+                        owner
+                    } as FetchedPartner
+                }
             }
 
             case "review": {
@@ -252,7 +268,8 @@ export async function fetchModerationTarget(
                     .from("reviews")
                     .select(`
                         id, rating, comment, is_hidden, created_at, user_id,
-                        partner:partners(id, store_name, risk_score),
+                        partner:partners(id),
+                        store:stores(id, name, risk_score),
                         product:products(id, name)
                     `)
                     .eq("id", id)
@@ -313,29 +330,26 @@ export async function editField(
             const { data } = await fetchAdmin.from("recurring_plans").select(field).eq("id", targetId).single()
             previousValue = data?.[field] !== null && data?.[field] !== undefined ? String(data[field]) : ""
         } else if (targetType === "partner") {
-            const { data } = await fetchAdmin.from("partners").select(field).eq("id", targetId).single()
-            previousValue = data?.[field] !== null && data?.[field] !== undefined ? String(data[field]) : ""
+            const storeFieldMap: Record<string, string> = {
+                store_name: "name",
+                store_description: "description",
+                store_image_url: "logo_url"
+            }
+            const actualField = storeFieldMap[field] || field
+            const isStoreField = ["name", "description", "logo_url", "banner_url", "gallery", "opening_hours", "phone", "risk_score"].includes(actualField)
+            
+            if (isStoreField) {
+                const { data } = await fetchAdmin.from("stores").select(actualField).eq("partner_id", targetId).limit(1).maybeSingle()
+                previousValue = data?.[actualField] !== null && data?.[actualField] !== undefined ? String(data[actualField]) : ""
+                const { error: updateError } = await fetchAdmin.from("stores").update({ [actualField]: value === "" ? null : value }).eq("partner_id", targetId)
+                if (updateError) return { success: false, error: updateError.message }
+            } else {
+                const { data } = await fetchAdmin.from("partners").select(field).eq("id", targetId).single()
+                previousValue = data?.[field] !== null && data?.[field] !== undefined ? String(data[field]) : ""
+                const { error: updateError } = await fetchAdmin.from("partners").update({ [field]: value === "" ? null : value }).eq("id", targetId)
+                if (updateError) return { success: false, error: updateError.message }
+            }
         }
-
-        // Determine table
-        const tableMap: Record<string, string> = {
-            product: "products",
-            service: "services",
-            recurring_plan: "recurring_plans",
-            partner: "partners",
-        }
-        const table = tableMap[targetType]
-        if (!table) return { success: false, error: "Tipo inválido para edição" }
-
-        const updateData: any = {}
-        updateData[field] = value === "" ? null : value
-
-        const { error: updateError } = await getAdminClient()
-            .from(table as any)
-            .update(updateData)
-            .eq("id", targetId)
-
-        if (updateError) return { success: false, error: updateError.message }
 
         await logModerationAction({
             adminUserId: admin.userId,
@@ -427,37 +441,37 @@ export async function removeImage(
 
             if (error) return { success: false, error: error.message }
         } else if (effectiveType === "partner") {
-            if (field === "store_image_url") {
-                const { data } = await fetchAdmin.from("partners").select("store_image_url").eq("id", effectiveId).single()
-                previousImagesStr = data?.store_image_url || ""
+            if (field === "store_image_url" || field === "logo_url") {
+                const { data } = await fetchAdmin.from("stores").select("logo_url").eq("partner_id", effectiveId).limit(1).maybeSingle()
+                previousImagesStr = data?.logo_url || ""
 
                 const { error } = await fetchAdmin
-                    .from("partners")
-                    .update({ store_image_url: null })
-                    .eq("id", effectiveId)
+                    .from("stores")
+                    .update({ logo_url: null })
+                    .eq("partner_id", effectiveId)
 
                 if (error) return { success: false, error: error.message }
             } else if (field === "banner_url") {
-                const { data } = await fetchAdmin.from("partners").select("banner_url").eq("id", effectiveId).single()
+                const { data } = await fetchAdmin.from("stores").select("banner_url").eq("partner_id", effectiveId).limit(1).maybeSingle()
                 previousImagesStr = data?.banner_url || ""
 
                 const { error } = await fetchAdmin
-                    .from("partners")
+                    .from("stores")
                     .update({ banner_url: null })
-                    .eq("id", effectiveId)
+                    .eq("partner_id", effectiveId)
 
                 if (error) return { success: false, error: error.message }
             } else if (field === "gallery") {
-                const { data } = await fetchAdmin.from("partners").select("gallery").eq("id", effectiveId).single()
+                const { data } = await fetchAdmin.from("stores").select("gallery").eq("partner_id", effectiveId).limit(1).maybeSingle()
                 const gallery = data?.gallery || []
                 currentImages = Array.isArray(gallery) ? gallery : typeof gallery === "string" ? JSON.parse(gallery) : []
                 previousImagesStr = JSON.stringify(currentImages)
                 currentImages = currentImages.filter((img: string) => img !== imageUrl)
 
                 const { error } = await fetchAdmin
-                    .from("partners")
+                    .from("stores")
                     .update({ gallery: currentImages })
-                    .eq("id", effectiveId)
+                    .eq("partner_id", effectiveId)
 
                 if (error) return { success: false, error: error.message }
             }
@@ -707,20 +721,22 @@ export async function updatePartnerRiskScore(
 
     try {
         const fetchAdmin = getAdminClient()
-        const { data: partner } = await fetchAdmin
-            .from("partners")
+        const { data: store } = await fetchAdmin
+            .from("stores")
             .select("id, risk_score")
-            .eq("id", partnerId)
-            .single()
+            .eq("partner_id", partnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
-        if (!partner) return { success: false, error: "Parceiro não encontrado" }
+        if (!store) return { success: false, error: "Loja do parceiro não encontrada" }
 
-        const previousScore = partner.risk_score
+        const previousScore = store.risk_score || 0
 
         const { error } = await fetchAdmin
-            .from("partners")
+            .from("stores")
             .update({ risk_score: Math.min(newScore, 100) })
-            .eq("id", partnerId)
+            .eq("partner_id", partnerId)
 
         if (error) return { success: false, error: error.message }
 

@@ -72,8 +72,8 @@ export const getSearchSuggestionsBucket = async () => {
           .eq("is_active", true)
           .limit(200),
         supabase
-          .from("partners")
-          .select("store_name")
+          .from("stores")
+          .select("name")
           .eq("is_active", true)
           .limit(100),
       ])
@@ -102,8 +102,8 @@ export const getSearchSuggestionsBucket = async () => {
       }
 
       if (partnersRes.data) {
-        partnersRes.data.forEach((pr: { store_name: string }) => {
-          if (pr.store_name) suggestions.push({ label: pr.store_name, type: "loja" })
+        partnersRes.data.forEach((pr: { name: string }) => {
+          if (pr.name) suggestions.push({ label: pr.name, type: "loja" })
         })
       }
 

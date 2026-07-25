@@ -415,12 +415,14 @@ export function AdminModerationPanel() {
 //      PartnerInfo) are unchanged from the original file.
 // ─── They are included below for completeness ──────────────────────────────
 
-function PartnerInfo({ partner }: { partner: { id: string; store_name: string; risk_score: number } | null }) {
-    if (!partner) return null
+function PartnerInfo({ partner, store }: { partner?: { id: string } | null; store?: { id: string; name?: string; risk_score?: number } | null }) {
+    if (!partner && !store) return null
+    const name = store?.name || "Loja"
+    const risk = store?.risk_score ?? 0
     return (
         <p className="text-sm text-brand-inactive-text">
-            Parceiro: <strong className="text-brand-dark dark:text-dark-heading">{partner.store_name}</strong>
-            <span className="ml-2">Risk Score: {partner.risk_score}</span>
+            Loja: <strong className="text-brand-dark dark:text-dark-heading">{name}</strong>
+            <span className="ml-2">Risk Score: {risk}</span>
         </p>
     )
 }
@@ -644,10 +646,10 @@ function ProductGeneral({ data, isPending, onRefresh }: { data: FetchedProduct; 
                         <Badge variant={data.is_active ? "green" : "red"}>{data.is_active ? "Ativo" : "Inativo"}</Badge>
                         <p className="text-sm text-brand-inactive-text">Moderação: {data.moderation_status}</p>
                     </SidebarCard>
-                    <SidebarCard title="Parceiro">
+<SidebarCard title="Parceiro">
                         {data.partner ? (
                             <>
-                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.partner.store_name}</p>
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.partner.store_name || data.partner.stores?.[0]?.name}</p>
                                 <p className="text-sm text-brand-inactive-text">ID: {data.partner.id}</p>
                                 <p className="text-sm text-brand-inactive-text">Risk Score: {data.partner.risk_score}</p>
                             </>
@@ -1059,7 +1061,7 @@ function ReviewGeneral({ data, isPending, onRefresh }: { data: FetchedReview; is
                     <SidebarCard title="Informações">
                         {data.user && <p className="text-sm text-brand-inactive-text">Por: <strong className="text-brand-dark dark:text-dark-heading">{data.user.full_name || "Anônimo"}</strong></p>}
                         {data.product && <p className="text-sm text-brand-inactive-text">Produto: <strong className="text-brand-dark dark:text-dark-heading">{data.product.name}</strong></p>}
-                        {data.partner && <p className="text-sm text-brand-inactive-text">Parceiro: <strong className="text-brand-dark dark:text-dark-heading">{data.partner.store_name}</strong></p>}
+                        {data.partner && <p className="text-sm text-brand-inactive-text">Parceiro: <strong className="text-brand-dark dark:text-dark-heading">{data.partner.store_name || data.partner.stores?.[0]?.name}</strong></p>}
                     </SidebarCard>
                     <SaveFooter riskScore={riskScore} onRiskScoreChange={setRiskScore} notes={notes} onNotesChange={setNotes}
                         onSave={handleSave} onDelete={handleDelete} isPending={saving || deleting} showDelete

@@ -36,7 +36,8 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
       .select(`
         id, name, price, promotional_price, images, rating, show_price_in_store,
         partner_id,
-        partners!partner_id(id, store_name, store_image_url)
+        partners!partner_id(id),
+        stores(id, name, logo_url)
       `)
       .eq("id", id)
     if (storeId) q = q.eq("store_id", storeId)
@@ -80,7 +81,8 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
       .select(`
         id, name, price, promotional_price, images, rating, show_price_in_store,
         partner_id,
-        partners!partner_id(id, store_name, store_image_url)
+        partners!partner_id(id),
+        stores(id, name, logo_url)
       `)
       .eq("id", id)
     if (storeId) q = q.eq("store_id", storeId)

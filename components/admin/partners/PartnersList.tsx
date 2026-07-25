@@ -297,7 +297,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                                     </div>
                                                     <div className="min-w-0 flex flex-col">
                                                         <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                            {partner.store_name}
+                                                            {partner.store_name || partner.stores?.[0]?.name || "Loja"}
                                                         </span>
                                                         <span className="text-xs font-medium text-brand-inactive-text">
                                                             {partner.type === "store" ? "Loja" : "Parceiro"} &middot; Dono: {partner.owner_name}
@@ -535,7 +535,7 @@ function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetPr
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                            {partner.store_name}
+                            {partner.store_name || partner.stores?.[0]?.name || "Loja"}
                         </h3>
                         <Badge variant="blue">Loja</Badge>
                         <div className="flex items-center gap-2 mt-1">

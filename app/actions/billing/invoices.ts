@@ -91,7 +91,7 @@ export async function generateInvoiceAction(
             purchase as BillingPurchase,
             (payments || []) as BillingPayment[],
             {
-                name: partner.store_name || partner.name || "Empresa",
+                name: partner.stores?.[0]?.name || partner.name || "Empresa",
                 document: partnerDoc,
                 address: partnerAddress,
                 email: partner.email || null,

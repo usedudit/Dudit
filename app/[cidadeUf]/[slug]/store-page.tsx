@@ -32,7 +32,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
 
     const partnerData = {
         id: storeData.id,
-        storeName: storeData.name || partner?.store_name || "Loja",
+        storeName: storeData.name || "Loja",
         storeDescription: storeData.description || partner?.store_description || "",
         storeImageUrl: storeData.logo_url || storeData.image_url || partner?.store_image_url || null,
         profile_image_url: null,
@@ -90,7 +90,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
 
 export async function generateStoreMetadata(store: any, cidadeUf?: string): Promise<Metadata> {
     const partner = store.partners
-    const storeName = store.name || partner?.store_name || "Loja"
+    const storeName = store.name || "Loja"
     const storeDescription = store.description || partner?.store_description || ""
     const city = store.city || store.addresses?.[0]?.city || ""
     const state = store.state || store.addresses?.[0]?.state || ""

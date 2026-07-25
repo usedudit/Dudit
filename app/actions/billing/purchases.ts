@@ -36,7 +36,7 @@ function buildPurchaseQuery(filters?: BillingFilters) {
     const admin = getAdminClient()
     let query = admin
         .from("billing_purchases")
-        .select("*, partners!billing_purchases_partner_id_fkey(store_name)")
+        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name))")
     return applyFilters(query, filters)
 }
 
@@ -70,7 +70,7 @@ export async function listPurchasesAction(
     return {
         data: items.map((item: any) => ({
             ...item,
-            partner_name: item.partners?.store_name || null,
+            partner_name: item.partners?.stores?.[0]?.name || null,
         })),
         nextCursor: items.length > 0 ? items[items.length - 1].created_at : null,
         hasMore,
@@ -84,7 +84,7 @@ export async function getPurchaseAction(purchaseId: string): Promise<PurchaseWit
     const admin = getAdminClient()
     const { data, error } = await admin
         .from("billing_purchases")
-        .select("*, partners!billing_purchases_partner_id_fkey(store_name), billing_payments(*), billing_invoices(*)")
+        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name)), billing_payments(*), billing_invoices(*)")
         .eq("id", purchaseId)
         .maybeSingle()
 
@@ -92,7 +92,7 @@ export async function getPurchaseAction(purchaseId: string): Promise<PurchaseWit
 
     return {
         ...data,
-        partner_name: (data as any).partners?.store_name || null,
+        partner_name: (data as any).partners?.stores?.[0]?.name || null,
         payments: (data as any).billing_payments || [],
         invoice: (data as any).billing_invoices?.[0] || null,
     } as PurchaseWithRelations
@@ -166,7 +166,7 @@ export async function listPurchasesPageAction(
     const { count } = await baseQuery.select("*", { count: "exact", head: true })
 
     let dataQuery = baseQuery
-        .select("*, partners!billing_purchases_partner_id_fkey(store_name)")
+        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name))")
         .order(sortBy || "created_at", { ascending: sortDir === "asc" })
         .range((page - 1) * pageSize, (page - 1) * pageSize + pageSize - 1)
 

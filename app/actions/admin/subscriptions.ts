@@ -32,7 +32,7 @@ export async function getSubscriptions(
     let query = supabase
         .from("partners")
         .select(
-            "id, user_id, store_name, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_token_expires_at, suspended_at, erp_disabled, created_at"
+            "id, user_id, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_token_expires_at, suspended_at, erp_disabled, created_at, stores(name)"
         )
 
     // Filter by connection status
@@ -62,7 +62,7 @@ export async function getSubscriptions(
 
     const mapped: SubscriptionEntry[] = items.map((p: any) => ({
         partner_id: p.id,
-        store_name: p.store_name,
+        store_name: p.stores?.[0]?.name || "Loja",
         user_id: p.user_id,
         user_email: "",
         is_active: p.is_active,
@@ -97,7 +97,7 @@ export async function getSubscriptionDetail(
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
         .select(
-            "id, user_id, store_name, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_token_expires_at, suspended_at, erp_disabled, created_at"
+            "id, user_id, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_token_expires_at, suspended_at, erp_disabled, created_at, stores(name)"
         )
         .eq("id", partnerId)
         .single()
@@ -110,7 +110,7 @@ export async function getSubscriptionDetail(
         success: true,
         data: {
             partner_id: partner.id,
-            store_name: partner.store_name,
+            store_name: partner.stores?.[0]?.name || "Loja",
             user_id: partner.user_id,
             user_email: "",
             is_active: partner.is_active,
@@ -145,13 +145,23 @@ export async function forceCancelSubscription(
     // Anti-IDOR: re-fetch
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, user_id, store_name, mp_user_id, mp_access_token_encrypted")
+        .select("id, user_id, mp_user_id, mp_access_token_encrypted")
         .eq("id", partnerId)
         .single()
 
     if (fetchError || !partner) {
         return { success: false, error: "Parceiro não encontrado" }
     }
+
+    // Get store name from stores table
+    const { data: hqStore } = await supabase
+        .from("stores")
+        .select("name")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    const storeName = hqStore?.name || "Loja"
 
     if (!partner.mp_user_id) {
         return { success: false, error: "Parceiro não possui conexão com Mercado Pago" }
@@ -183,7 +193,7 @@ export async function forceCancelSubscription(
         targetId: partnerId,
         metadata: {
             reason: reason.trim(),
-            storeName: partner.store_name,
+            storeName,
             previousMpUserId: partner.mp_user_id,
         },
     })

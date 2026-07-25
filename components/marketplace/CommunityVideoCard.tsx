@@ -10,7 +10,7 @@ interface CommunityVideoCardProps {
     video_thumbnail: string
     duration: number
     views_count: number
-    partner?: { store_name: string } | null
+    partner?: { name: string; store_name?: string } | null
   }
   onOpen: (videoId: string) => void
   className?: string
@@ -58,7 +58,7 @@ export function CommunityVideoCard({ video, onOpen, className = "w-[170px]" }: C
           {video.title || "Vídeo da comunidade"}
         </h3>
         <p className="text-[11px] text-brand-inactive-text mt-1">
-          {video.partner?.store_name || "Loja parceira"}
+          {video.partner?.name || video.partner?.store_name || "Loja parceira"}
         </p>
       </div>
     </button>

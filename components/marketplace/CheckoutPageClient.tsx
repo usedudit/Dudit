@@ -3485,7 +3485,7 @@ export function CheckoutPageClient() {
                     amount={pixPaymentData.amount}
                     orderDetails={pixPaymentData.orderDetails}
                     orderNumber={pixPaymentData.orderId}
-                    sellerName={partnerInfo.store_name}
+                    sellerName={partnerInfo.storeName || partnerInfo.store_name}
                     useMercadoPago={pixPaymentData.useMercadoPago}
                     partnerId={pixPaymentData.partnerId}
                     mpPublicKey={pixPaymentData.mpPublicKey}
@@ -3843,7 +3843,7 @@ export function CheckoutPageClient() {
                         <MapPinIcon size={32} />
                     </div>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">
-                        {partnerInfo.store_name || "Este parceiro"} não entrega no endereço selecionado
+                        {partnerInfo.storeName || partnerInfo.store_name || "Este parceiro"} não entrega no endereço selecionado
                     </h3>
                     <p className="text-brand-inactive-text mb-6">
                         Você gostaria de encontrar outro lugar que entregue neste endereço?

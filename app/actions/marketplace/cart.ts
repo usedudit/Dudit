@@ -112,7 +112,6 @@ export async function getCachedCart(userId: string) {
       ),
       partners(
         id, 
-        store_name, 
         store_image_url,
         opening_hours,
         user_id, 
@@ -777,9 +776,11 @@ export async function checkoutCartAction(
       ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", storeId)
       : Promise.resolve({ data: [] as any[] }),
     adminClient
-      .from("partners")
+      .from("stores")
       .select("opening_hours, is_showcase_active")
-      .eq("id", partnerId)
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
       .maybeSingle(),
     hasDeliveryLines && deliveryAddress
       ? quoteDeliveryFeeAction({

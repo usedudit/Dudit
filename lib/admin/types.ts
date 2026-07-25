@@ -180,7 +180,7 @@ export interface FetchedProduct {
     moderation_status: string
     is_active: boolean
     created_at: string
-    partner: { id: string; store_name: string; risk_score: number } | null
+    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
     variants: FetchedVariant[] | null
 }
 
@@ -210,7 +210,7 @@ export interface FetchedService {
     moderation_status: string
     is_active: boolean
     created_at: string
-    partner: { id: string; store_name: string; risk_score: number } | null
+    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
 }
 
 export interface FetchedRecurringPlan {
@@ -221,7 +221,7 @@ export interface FetchedRecurringPlan {
     frequency_type: string
     show_in_marketplace: boolean
     created_at: string
-    partner: { id: string; store_name: string; risk_score: number } | null
+    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
     items: FetchedRecurringPlanItem[] | null
 }
 
@@ -254,7 +254,7 @@ export interface FetchedReview {
     is_hidden: boolean
     created_at: string
     user: { full_name: string | null } | null
-    partner: { id: string; store_name: string; risk_score: number } | null
+    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
     product: { id: string; name: string } | null
 }
 
@@ -274,6 +274,7 @@ export interface EnforcementUser {
         is_active: boolean
         suspended_at: string | null
         erp_disabled: boolean
+        stores?: { name: string }[]
     } | null
 }
 

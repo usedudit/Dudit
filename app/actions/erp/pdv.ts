@@ -384,9 +384,11 @@ const productIds = Array.from(
                 .eq("partner_id", params.partnerId)
                 .maybeSingle()
             : admin
-                .from("partners")
+                .from("stores")
                 .select("opening_hours")
-                .eq("id", params.partnerId)
+                .eq("partner_id", params.partnerId)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
                 .maybeSingle(),
     ])
 

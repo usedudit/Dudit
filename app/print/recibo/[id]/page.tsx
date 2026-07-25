@@ -93,9 +93,8 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
     const order = orderRes.data
 
     // Fetch partner header and logo details
-    const [headerRes, partnerRes, storeRes] = await Promise.all([
+    const [headerRes, storeRes] = await Promise.all([
         getPartnerReceiptHeaderAction(partnerId),
-        supabase.from("partners").select("store_image_url").eq("id", partnerId).maybeSingle(),
         supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
 
@@ -105,7 +104,7 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
         addressLine: "",
         taxIdLine: "",
     }
-    const rawAvatar = storeRes.data?.image_url || partnerRes.data?.store_image_url || undefined
+    const rawAvatar = storeRes.data?.logo_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
 
     // Build receipt payload

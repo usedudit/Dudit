@@ -51,9 +51,8 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
             setLoading(true)
             const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser
 
-            const [quoteDetailsRes, partnerRes, storeRes, addressRes] = await Promise.all([
+            const [quoteDetailsRes, storeRes, addressRes] = await Promise.all([
                 getQuoteDetailsAction(quoteId, partnerId),
-                supabase.from("partners").select("store_name, store_image_url").eq("id", partnerId).maybeSingle(),
                 supabase.from("stores").select("name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
                 getPartnerAddressAction(partnerId),
             ])
@@ -65,8 +64,8 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
 
             const quoteDetails = quoteDetailsRes.data
 
-            const partnerName = storeRes.data?.name || partnerRes.data?.store_name || "Parceiro"
-            const rawAvatar = storeRes.data?.image_url || partnerRes.data?.store_image_url || selectedStore?.image_url || undefined
+            const partnerName = storeRes.data?.name || "Parceiro"
+            const rawAvatar = storeRes.data?.logo_url || selectedStore?.image_url || undefined
             const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
             const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
 

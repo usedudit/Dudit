@@ -336,11 +336,20 @@ export async function runScheduledWhatsappJob(job: {
 
     const { data: jobPartner } = await admin
       .from("partners")
-      .select("store_name")
+      .select("id")
       .eq("id", job.partner_id)
       .maybeSingle()
 
-    SecureLogger.info("[whatsapp] run: dispatch_start", { jobId: job.id, partnerName: jobPartner?.store_name })
+    // Get store name from stores table
+    const { data: hqStore } = await admin
+      .from("stores")
+      .select("name")
+      .eq("partner_id", job.partner_id)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    SecureLogger.info("[whatsapp] run: dispatch_start", { jobId: job.id, partnerName: hqStore?.name })
 
     const result = await dispatchWhatsappAutomation({
       partnerId: job.partner_id,
@@ -355,7 +364,7 @@ export async function runScheduledWhatsappJob(job: {
         service_name: apt.service_name,
         date: apt.start_date,
         time: apt.start_time,
-        store_name: jobPartner?.store_name || "",
+        store_name: hqStore?.name || "",
       },
       includeAppointmentButtons: job.job_type.includes("reminder"),
     })
@@ -445,10 +454,14 @@ export async function onAppointmentCreated(appointment: Record<string, unknown>)
   const appointmentId = String(appointment.id)
 
   const admin = getAdminClient()
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", partnerId)
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   await dispatchWhatsappAutomation({
@@ -463,7 +476,7 @@ export async function onAppointmentCreated(appointment: Record<string, unknown>)
       service_name: String(appointment.service_name),
       date: String(appointment.start_date),
       time: String(appointment.start_time),
-      store_name: partner?.store_name || "",
+      store_name: hqStore?.name || "",
     },
     includeAppointmentButtons: true,
   })
@@ -490,10 +503,14 @@ export async function onAppointmentStatusChanged(
   if (prev === next) return
 
   const admin = getAdminClient()
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", partnerId)
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const vars: Record<string, string> = {
@@ -501,7 +518,7 @@ export async function onAppointmentStatusChanged(
     service_name: String(appointment.service_name || "serviço"),
     date: String(appointment.start_date || ""),
     time: String(appointment.start_time || ""),
-    store_name: partner?.store_name || "",
+    store_name: hqStore?.name || "",
     ...((appointment.cancellation_note as string) ? { cancellation_note: appointment.cancellation_note as string } : {}),
   }
 
@@ -542,10 +559,13 @@ export async function onAppointmentRescheduled(appointment: Record<string, unkno
     .eq("entity_id", appointmentId)
     .eq("status", "pending")
 
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", partnerId)
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const vars = {
@@ -553,7 +573,7 @@ export async function onAppointmentRescheduled(appointment: Record<string, unkno
     service_name: String(appointment.service_name),
     date: String(appointment.start_date),
     time: String(appointment.start_time),
-    store_name: partner?.store_name || "",
+    store_name: hqStore?.name || "",
   }
 
   await dispatchWhatsappAutomation({
@@ -610,10 +630,14 @@ export async function onOrderStatusChanged(order: Record<string, unknown>, situa
   if (!trigger) return
 
   const admin = getAdminClient()
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", partnerId)
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const formatCurrency = (v: unknown) => {
@@ -634,7 +658,7 @@ export async function onOrderStatusChanged(order: Record<string, unknown>, situa
       order_number: String(order.order_number || orderId.slice(0, 8)),
       customer_name: String(order.customer_name || order.buyer_name || "cliente"),
       amount: formatCurrency(order.total_amount),
-      store_name: partner?.store_name || "",
+      store_name: hqStore?.name || "",
     },
   })
 }
@@ -654,10 +678,14 @@ export async function onDeliveryStatusChanged(delivery: Record<string, unknown>,
   if (!trigger) return
 
   const admin = getAdminClient()
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", partnerId)
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   await dispatchWhatsappAutomation({
@@ -670,7 +698,7 @@ export async function onDeliveryStatusChanged(delivery: Record<string, unknown>,
     customerId: delivery.customer_id as string | null,
     templateVariables: {
       customer_name: String(delivery.customer_name || "cliente"),
-      store_name: partner?.store_name || "",
+      store_name: hqStore?.name || "",
     },
   })
 }
@@ -678,10 +706,14 @@ export async function onDeliveryStatusChanged(delivery: Record<string, unknown>,
 export async function onQuoteShared(quote: Record<string, unknown>) {
   const partnerId = String(quote.partner_id)
   const admin = getAdminClient()
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", partnerId)
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   await dispatchWhatsappAutomation({
@@ -694,7 +726,7 @@ export async function onQuoteShared(quote: Record<string, unknown>) {
     templateVariables: {
       quote_number: String(quote.quote_number || quote.id),
       customer_name: String(quote.customer_name || "cliente"),
-      store_name: partner?.store_name || "",
+      store_name: hqStore?.name || "",
     },
   })
 

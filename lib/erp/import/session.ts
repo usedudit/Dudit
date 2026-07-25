@@ -2,7 +2,7 @@ import "server-only"
 import { redis } from "@/lib/redis"
 import type { ImportSession } from "./types"
 
-const TTL = 7200
+const TTL = 21600 // 6 horas
 const KEY_PREFIX = "import_session:"
 
 function buildKey(partnerId: string, sessionId: string): string {

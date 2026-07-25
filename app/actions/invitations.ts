@@ -489,12 +489,14 @@ export async function validateInvitation(rawToken: string): Promise<{
             return { valid: false, error: GENERIC_INVALID_TOKEN_MSG }
         }
 
-        // Get partner name for display
-        const { data: partner } = await admin
-            .from("partners")
-            .select("store_name")
-            .eq("id", invitation.partner_id)
-            .single()
+        // Get store name for display
+        const { data: store } = await admin
+            .from("stores")
+            .select("name")
+            .eq("partner_id", invitation.partner_id)
+            .limit(1)
+            .maybeSingle()
+        const partner = { store_name: store?.name || "Loja" }
 
         // Audit log (non-blocking)
         const user = await getCurrentUser()

@@ -1,15 +1,6 @@
-import { Redis } from "@upstash/redis"
+import { redis } from "@/lib/redis"
 import { Ratelimit } from "@upstash/ratelimit"
 
-// ============================================================================
-// CONFIG
-// ============================================================================
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL || 'https://build.stub',
-  token: process.env.KV_REST_API_TOKEN || 'build-stub-token',
-})
-
-// Rate Limiter para chamadas internas (opcional, mas bom ter)
 const ratelimiter = new Ratelimit({
   redis,
   analytics: false,
@@ -19,7 +10,7 @@ const ratelimiter = new Ratelimit({
 const CF_API = "https://api.cloudflare.com/client/v4"
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID!
 const CF_TOKEN = process.env.CLOUDFLARE_AI_TOKEN!
-const CACHE_TTL = 60 * 60 * 24
+const CACHE_TTL = 60 * 60 * 24 * 7 // 7 dias
 const MAX_TEXT_LENGTH = 10_000
 
 const SAFETY_CATEGORIES: Record<string, string> = {
@@ -89,10 +80,13 @@ export async function checkTextSafety(texts: string[], userId?: string): Promise
   const cached = await redis.get<ModerationResponse>(cacheKey)
   if (cached) return cached
 
-  // 2. Rate Limit (apenas se passar userId)
+  // 2. Rate limit (10/min) — se estourar, deixa passar sem moderar
   if (userId) {
-    const rl = await ratelimiter.limit(`user:${userId}`)
-    if (!rl.success) return { passed: true }
+    const rl = await ratelimiter.limit(`moderation:text:${userId}`)
+    if (!rl.success) {
+      console.warn(`[MODERATION] Rate limit exceeded for ${userId}, passing without moderation`)
+      return { passed: true }
+    }
   }
 
   // 3. Moderação

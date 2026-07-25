@@ -971,7 +971,9 @@ export async function getServiceOrderByTokenAction(
       admin.from("service_order_attachments").select("file_name, file_key, file_type, category, created_at").eq("service_order_id", row.id).order("created_at", { ascending: false }),
       admin.from("audit_logs").select("id, action_type, change_lines, created_at").eq("entity_type", "service_order").eq("entity_id", row.id).order("created_at", { ascending: false }).limit(50),
       row.sale_id ? admin.from("sales").select("id, sale_number, total_amount, discount_amount, final_amount, paid_amount, payment_status, status, created_at").eq("id", row.sale_id).single() : Promise.resolve({ data: null }),
-      admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").eq("partner_id", row.partner_id),
+      row.store_id
+        ? admin.from("addresses").select("street, number, complement, neighborhood, city, state, zip_code, is_default").eq("store_id", row.store_id)
+        : admin.from("stores").select("addresses!store_id!left(street, number, complement, neighborhood, city, state, zip_code, is_default)").eq("partner_id", row.partner_id).limit(1).then((res: any) => ({ data: res.data?.[0]?.addresses || [] })),
     ])
 
     const customerName = (row.customer_snapshot as any)?.name || null

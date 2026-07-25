@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       .from("orders")
       .select(`
         *,
-        partners(store_name),
+        stores!inner(name),
         order_items (
           *,
           products (
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       ticketUrl,
       orderDetails: {
         orderNumber: order.order_number,
-        sellerName: order.partners?.store_name,
+        sellerName: order.stores?.name,
         deliveryType: order.delivery_type,
         deliveryAddress: order.delivery_address,
         items: order.order_items?.map((item: any) => {

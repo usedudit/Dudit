@@ -251,9 +251,9 @@ const getCachedPartnerIdsByTier = (
     async (): Promise<PartnerTiersRaw> => {
         const supabase = getAdminClient()
 
-        const { data: partners, error } = await supabase
-            .from("partners")
-            .select("id, addresses!inner(city, state)")
+        const { data: stores, error } = await supabase
+            .from("stores")
+            .select("partner_id, addresses!inner(city, state)")
             .eq("is_active", true)
 
         if (error) {
@@ -261,7 +261,7 @@ const getCachedPartnerIdsByTier = (
             return { cityIds: [], stateIds: [], allIds: [] }
         }
 
-        if (!partners || partners.length === 0) {
+        if (!stores || stores.length === 0) {
             dWarn("[DISCOVER][PARTNER_IDS] No active partners found in Brazil")
             return { cityIds: [], stateIds: [], allIds: [] }
         }
@@ -271,11 +271,11 @@ const getCachedPartnerIdsByTier = (
         let statePartnerCount = 0
         const targetState = state.toLowerCase()
 
-        for (const p of partners) {
-            allIds.add(p.id)
-            const addr = p.addresses?.[0] || p.addresses
+        for (const s of stores) {
+            allIds.add((s as any).partner_id)
+            const addr = (s as any).addresses?.[0] || (s as any).addresses
             if (addr?.state?.toLowerCase() === targetState) {
-                stateIds.add(p.id)
+                stateIds.add((s as any).partner_id)
                 statePartnerCount++
             }
         }
@@ -289,10 +289,10 @@ const getCachedPartnerIdsByTier = (
         } else {
             cityIds = new Set<string>()
             const targetCitySlug = normalizeCitySlug(city)
-            for (const p of partners) {
-                const addr = p.addresses?.[0] || p.addresses
+            for (const s of stores) {
+                const addr = (s as any).addresses?.[0] || (s as any).addresses
                 if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug) {
-                    cityIds.add(p.id)
+                    cityIds.add((s as any).partner_id)
                     cityPartnerCount++
                 }
             }
@@ -367,8 +367,7 @@ const BASE_FIELDS = `id, name, price, promotional_price, images, rating`
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
-    id, store_name, store_image_url, latitude, longitude, is_showcase_active,
-    addresses!inner(city, state)
+    id, is_showcase_active
 ),
 stores!inner(
     id, name, description, logo_url, banner_url,
@@ -380,7 +379,7 @@ stores!inner(
 function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
     const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
-    const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+    const storeName = rawStore?.name || "Vendedor"
     const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
     const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
     const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
@@ -843,7 +842,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         if (item._itemType === "servico") {
             const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
             const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
-            const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+            const storeName = rawStore?.name || "Vendedor"
             const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
             const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
             const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
@@ -1455,7 +1454,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const serviceMapper = (item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
-        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
+        const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
         const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
         const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
@@ -1513,7 +1512,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             id, name, description, logo_url, banner_url,
             phone, rating, is_showcase_active, partner_id,
             addresses!store_id!left(city, state),
-            partners!inner(store_name, store_image_url, latitude, longitude)
+            partners!inner(id)
         `)
         .eq("is_active", true)
         .in("partner_id", allIds)

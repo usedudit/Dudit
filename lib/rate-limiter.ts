@@ -318,7 +318,7 @@ export function getLimiter(category: RateLimitCategory): Ratelimit {
   const limiter = new Ratelimit({
     redis: redis,
     limiter: Ratelimit.slidingWindow(config.maxRequests, config.window as any),
-    analytics: true,
+    analytics: false,
     prefix: `@rl/${category}`,
   })
 

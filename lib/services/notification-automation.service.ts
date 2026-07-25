@@ -209,8 +209,17 @@ export async function runScheduledNotificationJob(job: {
 
   const { data: partner } = await admin
     .from("partners")
-    .select("store_name")
+    .select("id")
     .eq("id", appointment.partner_id)
+    .maybeSingle()
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", appointment.partner_id)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const reminderLabel =
@@ -226,7 +235,7 @@ export async function runScheduledNotificationJob(job: {
     variant: job.job_type,
     ctx: {
       serviceName: appointment.service_name,
-      storeName: partner?.store_name || undefined,
+      storeName: hqStore?.name || undefined,
       date: appointment.start_date,
       time: String(appointment.start_time).slice(0, 5),
       reminderLabel,
@@ -251,8 +260,17 @@ export async function onAppointmentCreated(
   const admin = getAdminClient()
   const { data: partner } = await admin
     .from("partners")
-    .select("store_name")
+    .select("id")
     .eq("id", partnerId)
+    .maybeSingle()
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   await notifyPartnerTeam({
@@ -265,7 +283,7 @@ export async function onAppointmentCreated(
       serviceName: String(appointment.service_name),
       date: String(appointment.start_date),
       time: String(appointment.start_time).slice(0, 5),
-      storeName: partner?.store_name || undefined,
+      storeName: hqStore?.name || undefined,
     },
     origin,
   })
@@ -278,7 +296,7 @@ export async function onAppointmentCreated(
     customerId: appointment.customer_id as string | null,
     marketplaceOrderId: appointment.marketplace_order_id as string | null | undefined,
     serviceName: String(appointment.service_name),
-    storeName: partner?.store_name || undefined,
+    storeName: hqStore?.name || undefined,
   })
 }
 
@@ -297,13 +315,22 @@ export async function onAppointmentStatusChanged(
   const admin = getAdminClient()
   const { data: partner } = await admin
     .from("partners")
-    .select("store_name")
+    .select("id")
     .eq("id", partnerId)
+    .maybeSingle()
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const ctx = {
     serviceName: String(appointment.service_name),
-    storeName: partner?.store_name || undefined,
+    storeName: hqStore?.name || undefined,
     customerName: String(appointment.customer_name || "Cliente"),
     date: String(appointment.start_date),
     time: String(appointment.start_time).slice(0, 5),
@@ -370,13 +397,22 @@ export async function onAppointmentRescheduled(
 
   const { data: partner } = await admin
     .from("partners")
-    .select("store_name")
+    .select("id")
     .eq("id", partnerId)
+    .maybeSingle()
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const ctx = {
     serviceName: String(appointment.service_name),
-    storeName: partner?.store_name || undefined,
+    storeName: hqStore?.name || undefined,
     customerName: String(appointment.customer_name || "Cliente"),
     date: String(appointment.start_date),
     time: String(appointment.start_time).slice(0, 5),
@@ -416,7 +452,7 @@ export async function onAppointmentRescheduled(
     customerId: appointment.customer_id as string | null,
     marketplaceOrderId: appointment.marketplace_order_id as string | null | undefined,
     serviceName: String(appointment.service_name),
-    storeName: partner?.store_name || undefined,
+    storeName: hqStore?.name || undefined,
   })
 }
 
@@ -472,13 +508,22 @@ export async function onOrderStatusChanged(
   const admin = getAdminClient()
   const { data: partner } = await admin
     .from("partners")
-    .select("store_name")
+    .select("id")
     .eq("id", partnerId)
+    .maybeSingle()
+
+  // Get store name from stores table
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const ctx = {
     orderNumber,
-    storeName: partner?.store_name || undefined,
+    storeName: hqStore?.name || undefined,
     customerName: String(order.customer_name || "Cliente"),
     amount: formatCurrency(order.total_amount as number | null),
     cancellationNote: cancellationReason,

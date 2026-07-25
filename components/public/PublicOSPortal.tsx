@@ -109,7 +109,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
     // Resolve Partner Details
     const partner = order?.partners || null
-    const partnerName = partner?.store_name || "Parceiro"
+    const partnerName = partner?.stores?.[0]?.name || partner?.store_name || "Parceiro"
     const partnerLogo = partner?.store_image_url ? buildImageUrl(partner.store_image_url) : null
     const partnerPlan = partner?.plan_tier || "free"
 

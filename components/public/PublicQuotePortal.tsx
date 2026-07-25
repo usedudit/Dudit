@@ -196,7 +196,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const partnerName = useMemo(() => {
         const snapName = snapshot?.partner?.name
         if (snapName && snapName !== "Parceiro") return snapName
-        return resolvedPartner?.store_name || snapName || "Parceiro"
+        return resolvedPartner?.stores?.[0]?.name || resolvedPartner?.store_name || snapName || "Parceiro"
     }, [snapshot, resolvedPartner])
 
     const partnerLogo = useMemo(() => {

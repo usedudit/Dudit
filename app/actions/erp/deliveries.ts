@@ -373,13 +373,15 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
     return { success: false as const, error: error?.message || "Entrega não encontrada." }
   }
 
-  const { data: partner } = await supabase
-    .from("partners")
+  const { data: store } = await supabase
+    .from("stores")
     .select("latitude, longitude")
-    .eq("id", params.partnerId)
+    .eq("partner_id", params.partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
-  const origin = partner?.latitude && partner?.longitude
-    ? { lat: Number(partner.latitude), lng: Number(partner.longitude) }
+  const origin = store?.latitude && store?.longitude
+    ? { lat: Number(store.latitude), lng: Number(store.longitude) }
     : null
 
   const links = Array.isArray((delivery as any).delivery_orders) ? (delivery as any).delivery_orders : []

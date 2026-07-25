@@ -88,7 +88,7 @@ async function handler(request: NextRequest) {
     const adminClient = createAdminClient()
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
-      .select("id, store_name, mp_accepted_payment_methods")
+      .select("id, mp_accepted_payment_methods")
       .eq("id", partnerId)
       .single()
 

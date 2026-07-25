@@ -218,12 +218,12 @@ export async function createAddressAction(data: {
 
   if (error) return { error: error.message }
 
-  // Keep partner coordinates synchronized for marketplace/map queries.
-  if (data.entityType === "partner" && insertData.latitude != null && insertData.longitude != null) {
+  // Keep store coordinates synchronized for marketplace/map queries.
+  if ((data.entityType === "partner" || data.entityType === "store") && insertData.latitude != null && insertData.longitude != null) {
     await supabase
-      .from("partners")
+      .from("stores")
       .update({ latitude: insertData.latitude, longitude: insertData.longitude })
-      .eq("id", data.entityId)
+      .eq(data.entityType === "store" ? "id" : "partner_id", data.entityId)
   }
 
   // Limpa Cache
@@ -318,12 +318,12 @@ export async function updateAddressAction(data: {
 
   if (error) return { error: error.message }
 
-  // Keep partner coordinates synchronized
-  if (data.entityType === "partner" && updateData.latitude != null && updateData.longitude != null) {
+  // Keep store coordinates synchronized
+  if ((data.entityType === "partner" || data.entityType === "store") && updateData.latitude != null && updateData.longitude != null) {
     await supabase
-      .from("partners")
+      .from("stores")
       .update({ latitude: updateData.latitude, longitude: updateData.longitude })
-      .eq("id", data.entityId)
+      .eq(data.entityType === "store" ? "id" : "partner_id", data.entityId)
   }
 
   await revalidateAddresses(data.entityType, data.entityId)

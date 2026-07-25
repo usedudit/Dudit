@@ -24,7 +24,7 @@ export const getCachedStoreBySlug = async (slug: string) => {
                     .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
-                        partners!inner(id, store_name, store_description, store_image_url, rating, phone, opening_hours, business_info, created_at, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default), payment_methods(*))
+                        partners!inner(id, business_info, created_at, payment_methods(*))
                     `)
                     .eq("slug", slug)
                     .eq("is_active", true)
@@ -46,7 +46,7 @@ export async function getStoreBySlug(slug: string) {
         .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
-                        partners!inner(id, store_name, store_description, store_image_url, rating, phone, opening_hours, business_info, created_at, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default), payment_methods(*))
+                        partners!inner(id, business_info, created_at, payment_methods(*))
         `)
         .eq("slug", slug)
         .eq("is_active", true)
@@ -65,7 +65,7 @@ export const getCachedStoreById = async (storeId: string) => {
                     .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
-                        partners!left(id, store_name, store_description, store_image_url, rating, phone, opening_hours, business_info, created_at, marketplace_reputation, vendas_totais, vendas_produtos, vendas_servicos, vendas_assinaturas, addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default), payment_methods(*))
+                        partners!left(id, business_info, created_at, payment_methods(*))
                     `)
                     .eq("id", storeId)
                     .maybeSingle()

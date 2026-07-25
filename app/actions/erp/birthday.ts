@@ -53,14 +53,16 @@ export async function sendBirthdayNotificationAction(
 
   const supabase = await getSupabaseServerClient()
 
-  // Fetch partner profile/name
-  const { data: partner } = await supabase
-    .from("partners")
+  // Fetch store name
+  const { data: store } = await supabase
+    .from("stores")
     .select("name")
-    .eq("id", partnerId)
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
     .maybeSingle()
 
-  const partnerName = partner?.name || "Nosso parceiro"
+  const partnerName = store?.name || "Nosso parceiro"
 
   // Fetch customer details
   const { data: customer } = await supabase

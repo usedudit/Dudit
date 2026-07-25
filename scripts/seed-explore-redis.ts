@@ -81,7 +81,8 @@ async function seedRedis() {
             id, name, description, price, promotional_price, images, rating, status,
             category_id, category:product_categories!category_id(name), created_at,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
-            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+            partners(id),
+            stores(id, name, logo_url, addresses!store_id!left(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("status", "ativo")
@@ -126,7 +127,8 @@ async function seedRedis() {
         .select(`
             id, name, description, price, images, rating, created_at,
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
+            partners(id),
+            stores(id, name, logo_url, addresses!store_id!left(city, state))
         `)
         .eq("status", "ativo")
 
@@ -157,12 +159,11 @@ async function seedRedis() {
     // --- VITRINES (Partners) ---
     console.log("Buscando Vitrines...")
     const { data: vitrines } = await supabase
-        .from("partners")
+        .from("stores")
         .select(`
-            id, store_name, store_description, store_image_url, banner_url, rating, latitude, longitude, created_at,
-            category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
-            addresses(city, state),
-            reviews(count)
+            id, name, description, logo_url, banner_url, rating, created_at, partner_id,
+            addresses!store_id!left(city, state),
+            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
 

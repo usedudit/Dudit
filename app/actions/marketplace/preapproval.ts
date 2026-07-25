@@ -34,7 +34,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     // 1. Fetch partner OAuth to confirm ownership before executing API requests
     const { data: partner, error: partnerErr } = await admin
       .from("partners")
-      .select("id, user_id, store_name, mp_access_token_encrypted")
+      .select("id, user_id, mp_access_token_encrypted")
       .eq("id", input.partnerId)
       .single()
 

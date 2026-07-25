@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import type { RoleId, RbacPermissions } from "@/lib/permissions/rbac-types"
 import type { PartnerRole } from "@/lib/permissions/types"
-import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ──────────────────────────────────────────────────────────────
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
 const ACTIVE_PARTNER_COOKIE = "active_partner_id"
@@ -161,10 +161,10 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
             admin.from("partner_users").select(`
                     partner_id, user_id, role_id,
                     roles:roles!inner (id, permissions),
-                    partners!inner (store_name, user_id, business_info, is_active, erp_disabled)
+                    partners!inner (id, user_id, business_info, is_active, erp_disabled, stores(name))
                 `).eq("user_id", userId),
             admin.from("partners").select(`
-                    id, user_id, store_name, business_info, is_active, erp_disabled
+                    id, user_id, business_info, is_active, erp_disabled, stores(name)
                 `).eq("user_id", userId)
         ])
 
@@ -175,19 +175,20 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
         const ownerUserIds = new Set<string>()
 
         if (ownedData) {
-            for (const store of ownedData) {
-                if (store.is_active === false || store.erp_disabled === true) {
+            for (const partner of ownedData) {
+                if (partner.is_active === false || partner.erp_disabled === true) {
                     continue
                 }
-                accessRecords[store.id] = {
-                    partnerId: store.id,
+                const storeName = partner.stores?.[0]?.name || "Loja sem nome"
+                accessRecords[partner.id] = {
+                    partnerId: partner.id,
                     userId: userId,
                     role: "OWNER" as PartnerRole,
                     roleId: "owner",
                     permissions: normalizePermissions(template, {}),
-                    storeName: store.store_name || "Loja sem nome",
+                    storeName,
                     ownerName: "Você",
-                    businessInfo: normalizeBusinessInfo(store.business_info),
+                    businessInfo: normalizeBusinessInfo(partner.business_info),
                 }
             }
         }
@@ -203,6 +204,7 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
 
                     const roleId = (String(record.role_id || "delivery").toLowerCase() as RoleId)
                     const dbPerms = record.roles?.permissions
+                    const storeName = record.partners?.stores?.[0]?.name || "Loja sem nome"
 
                     accessRecords[record.partner_id] = {
                         partnerId: record.partner_id,
@@ -210,7 +212,7 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                         role: String(roleId).toUpperCase() as PartnerRole,
                         roleId,
                         permissions: normalizePermissions(template, dbPerms),
-                        storeName: record.partners.store_name || "Loja sem nome",
+                        storeName,
                         ownerName: ownerId, // temporary
                         businessInfo: normalizeBusinessInfo(record.partners.business_info),
                     }

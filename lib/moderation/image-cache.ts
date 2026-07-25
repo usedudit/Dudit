@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { Redis } from '@upstash/redis'
+import { redis } from "@/lib/redis"
 
 export interface ImageCache {
   hash: string
@@ -10,18 +10,6 @@ export interface ImageCache {
 }
 
 const CACHE_TTL = 60 * 60 * 24 * 30 // 30 dias em segundos
-
-let redis: Redis | null = null
-
-function getRedisClient(): Redis {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.KV_REST_API_URL || 'https://build.stub',
-      token: process.env.KV_REST_API_TOKEN || 'build-stub-token',
-    })
-  }
-  return redis
-}
 
 /**
  * Calcula hash SHA256 de um buffer de imagem (mais rápido e seguro que MD5)
@@ -42,9 +30,8 @@ export async function calculateImageHash(buffer: Buffer): Promise<string> {
  */
 export async function getImageFromCache(hash: string): Promise<ImageCache | null> {
   try {
-    const client = getRedisClient()
     const cacheKey = `moderation:image:v3:${hash}`
-    const cached = await client.get(cacheKey)
+    const cached = await redis.get(cacheKey)
 
     if (cached) {
       console.log('Image found in Redis cache:', {
@@ -75,7 +62,6 @@ export async function cacheImageModeration(
   status: 'APPROVED' | 'FLAGGED' | 'BLOCKED',
 ): Promise<void> {
   try {
-    const client = getRedisClient()
     const cacheKey = `moderation:image:v3:${hash}`
 
     const cacheData: ImageCache = {
@@ -86,7 +72,7 @@ export async function cacheImageModeration(
       status,
     }
 
-    await client.setex(cacheKey, CACHE_TTL, cacheData)
+    await redis.setex(cacheKey, CACHE_TTL, cacheData)
 
     console.log('Image moderation cached in Redis:', {
       status,

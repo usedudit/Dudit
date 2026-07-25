@@ -214,7 +214,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                         )}
 
                                         <p className="text-xs text-brand-inactive-text mt-0.5">
-                                            Vendido por: <span className="font-semibold text-brand-dark dark:text-dark-heading">{review.partners?.store_name || "Loja Parceira"}</span>
+                                            Vendido por: <span className="font-semibold text-brand-dark dark:text-dark-heading">{review.partners?.stores?.[0]?.name || review.partners?.store_name || "Loja Parceira"}</span>
                                         </p>
 
                                         {/* Rating stars */}

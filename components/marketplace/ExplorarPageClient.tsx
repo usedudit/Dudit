@@ -440,7 +440,7 @@ export function ExplorarPageClient({
             if (rawType === "servico" || rawType === "serviço" || rawType === "service") return "servico"
             if (rawType === "plano" || rawType === "plan" || rawType === "recorrente" || rawType === "recurring") return "plano"
 
-            if (item?.store_name || item?.partners?.store_name) return "loja"
+            if (item?.store_name || item?.name || item?.partners?.store_name) return "loja"
             return rawType
         }
 
@@ -945,7 +945,7 @@ export function ExplorarPageClient({
                         </div>
                     )}
                     <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-brand-inactive-text">
-                        {partner?.store_name && <span className="font-bold text-brand-dark">{partner.store_name}</span>}
+                        {partner?.name || partner?.store_name && <span className="font-bold text-brand-dark">{partner.name || partner.store_name}</span>}
                         {(item.rating ?? 0) > 0 && <span>{Number(item.rating).toFixed(1)} estrela</span>}
                         {partner?.city && <span>{partner.city}{partner.state ? ` - ${partner.state}` : ""}</span>}
                     </div>

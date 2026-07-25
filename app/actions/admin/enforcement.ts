@@ -29,16 +29,18 @@ async function incrementRiskScore(partnerId: string, points: number): Promise<vo
     try {
         const adminClient: any = getAdminClient()
         const { data } = await adminClient
-            .from("partners")
+            .from("stores")
             .select("risk_score")
-            .eq("id", partnerId)
-            .single() as { data: { risk_score: number } | null }
+            .eq("partner_id", partnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle() as { data: { risk_score: number } | null }
         const current = data?.risk_score || 0
         const newScore = Math.min(current + points, 100)
         await adminClient
-            .from("partners")
+            .from("stores")
             .update({ risk_score: newScore } as any)
-            .eq("id", partnerId)
+            .eq("partner_id", partnerId)
     } catch (e) {
         console.error("[RISK_SCORE] Failed to increment:", partnerId, e)
     }
@@ -120,7 +122,7 @@ export async function getUsers(
     if (userIds.length > 0) {
         const { data: partners } = await supabase
             .from("partners")
-            .select("id, user_id, store_name, is_active, suspended_at, erp_disabled")
+            .select("id, user_id, is_active, suspended_at, erp_disabled, stores(name)")
             .in("user_id", userIds)
         partnerMap = new Map((partners || []).map((p: any) => [p.user_id, p]))
     }
@@ -136,7 +138,7 @@ export async function getUsers(
         partner: partnerMap.get(p.user_id)
             ? {
                 id: partnerMap.get(p.user_id)!.id,
-                store_name: partnerMap.get(p.user_id)!.store_name,
+                store_name: partnerMap.get(p.user_id)!.stores?.[0]?.name,
                 is_active: partnerMap.get(p.user_id)!.is_active,
                 suspended_at: partnerMap.get(p.user_id)!.suspended_at,
                 erp_disabled: partnerMap.get(p.user_id)!.erp_disabled,
@@ -208,7 +210,7 @@ export async function getPartners(
     if (partnerIds.length > 0) {
         const { data: partners } = await supabase
             .from("partners")
-            .select("id, store_name, user_id, is_active, erp_disabled, suspended_at, suspended_until, risk_score, created_at")
+            .select("id, user_id, is_active, erp_disabled, suspended_at, suspended_until, created_at, stores(name, risk_score)")
             .in("id", partnerIds)
         if (partners) {
             partnerMap = new Map(partners.map((p: any) => [p.id, p]))
@@ -294,13 +296,23 @@ export async function enableTenantAccess(
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, store_name, erp_disabled")
+        .select("id, erp_disabled")
         .eq("id", partnerId)
         .single()
 
     if (fetchError || !partner) {
         return { success: false, error: "Parceiro não encontrado" }
     }
+
+    // Get store name from stores table
+    const { data: hqStore } = await supabase
+        .from("stores")
+        .select("name")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    const storeName = hqStore?.name || "Loja"
 
     if (!partner.erp_disabled) {
         return { success: false, error: "Acesso ERP já está habilitado" }
@@ -325,7 +337,7 @@ export async function enableTenantAccess(
         actionType: AdminActionType.PARTNER_ENABLE_ERP,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: reason.trim(), storeName: partner.store_name },
+        metadata: { reason: reason.trim(), storeName },
     })
 
     return { success: true }
@@ -485,13 +497,23 @@ export async function suspendPartner(
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, user_id, store_name, is_active, suspended_at")
+        .select("id, user_id, is_active, suspended_at")
         .eq("id", partnerId)
         .single()
 
     if (fetchError || !partner) {
         return { success: false, error: "Parceiro não encontrado" }
     }
+
+    // Get store name from stores table
+    const { data: hqStore } = await supabase
+        .from("stores")
+        .select("name")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    const storeName = hqStore?.name || "Loja"
 
     assertNotSelf(admin.userId, partner.user_id)
     await assertNotProtected(partner.user_id)
@@ -531,7 +553,7 @@ export async function suspendPartner(
         actionType: AdminActionType.PARTNER_SUSPEND,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: reason.trim(), storeName: partner.store_name },
+        metadata: { reason: reason.trim(), storeName },
     })
 
     return { success: true }
@@ -555,13 +577,23 @@ export async function unsuspendPartner(
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, store_name, suspended_at")
+        .select("id, suspended_at")
         .eq("id", partnerId)
         .single()
 
     if (fetchError || !partner) {
         return { success: false, error: "Parceiro não encontrado" }
     }
+
+    // Get store name from stores table
+    const { data: hqStore } = await supabase
+        .from("stores")
+        .select("name")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    const storeName = hqStore?.name || "Loja"
 
     if (!partner.suspended_at) {
         return { success: false, error: "Parceiro não está suspenso" }
@@ -597,7 +629,7 @@ export async function unsuspendPartner(
         actionType: AdminActionType.PARTNER_UNSUSPEND,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: reason.trim(), storeName: partner.store_name },
+        metadata: { reason: reason.trim(), storeName },
     })
 
     return { success: true }
@@ -734,7 +766,7 @@ export async function disableTenantAccess(
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, user_id, store_name, erp_disabled")
+        .select("id, user_id, erp_disabled")
         .eq("id", partnerId)
         .single()
 

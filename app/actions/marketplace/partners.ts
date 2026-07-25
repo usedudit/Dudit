@@ -33,19 +33,37 @@ async function _getPartnerProfile(partnerId: string) {
     .from("partners")
     .select(`
       *,
-      addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
       payment_methods(*)
     `)
     .eq("id", partnerId)
     .eq("is_active", true)
     .single()
 
-  if (error) {
-    console.error(`[Partner] Profile fetch error for ${partnerId}:`, error.message)
+  if (error || !data) {
+    if (error) console.error(`[Partner] Profile fetch error for ${partnerId}:`, error.message)
     return null
   }
 
-  if (data && typeof data.business_info === "string") {
+  const { data: store } = await supabase
+    .from("stores")
+    .select("*, addresses(*)")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (store) {
+    data.store = store
+    data.store_name = store.name
+    data.store_description = store.description
+    data.store_image_url = store.logo_url
+    data.banner_url = store.banner_url
+    data.opening_hours = store.opening_hours
+    data.phone = store.phone
+    data.addresses = store.addresses || []
+  }
+
+  if (typeof data.business_info === "string") {
     try {
       data.business_info = JSON.parse(data.business_info)
     } catch (e) {
@@ -53,7 +71,7 @@ async function _getPartnerProfile(partnerId: string) {
     }
   }
 
-  if (data && data.cpf) {
+  if (data.cpf) {
     try {
       data.cpf = await decryptCPF(data.cpf)
     } catch (e) {
@@ -61,12 +79,13 @@ async function _getPartnerProfile(partnerId: string) {
     }
   }
 
-  if (data && !data.banner_url) {
-    const bannerUrl = await getDefaultPartnerBannerUrl(data.store_name || "Vendedor", data.store_image_url)
+  if (!data.banner_url && store) {
+    const storeName = store.name || "Vendedor"
+    const bannerUrl = await getDefaultPartnerBannerUrl(storeName, store.logo_url)
     const { error: bannerError } = await supabase
-      .from("partners")
+      .from("stores")
       .update({ banner_url: bannerUrl })
-      .eq("id", partnerId)
+      .eq("id", store.id)
 
     if (!bannerError) {
       data.banner_url = bannerUrl
@@ -228,18 +247,18 @@ async function _getPartnerReviews(partnerId: string) {
 
 async function _getPartnerStats(partnerId: string) {
   const supabase = getAdminClient()
-  const [partner, reviews] = await Promise.all([
-    supabase.from("partners").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("id", partnerId).single(),
-    supabase.from("reviews").select("*", { count: "exact", head: true }).eq("partner_id", partnerId)
+  const [store, reviews] = await Promise.all([
+    supabase.from("stores").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("reviews").select("*", { count: "exact", head: true }).or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
   ])
 
   return {
-    salesCount: partner.data?.vendas_totais || 0,
+    salesCount: store.data?.vendas_totais || 0,
     reviewsCount: reviews.count || 0,
-    marketplaceReputation: partner.data?.marketplace_reputation || 0,
-    productSales: partner.data?.vendas_produtos || 0,
-    serviceSales: partner.data?.vendas_servicos || 0,
-    subscriptionSales: partner.data?.vendas_assinaturas || 0,
+    marketplaceReputation: store.data?.marketplace_reputation || 0,
+    productSales: store.data?.vendas_produtos || 0,
+    serviceSales: store.data?.vendas_servicos || 0,
+    subscriptionSales: store.data?.vendas_assinaturas || 0,
   }
 }
 
@@ -300,14 +319,33 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
         .from("partners")
         .select(`
           *,
-          addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
           payment_methods(*)
         `)
         .eq("id", partnerId)
         .eq("is_active", true)
         .single()
 
-      if (error) return null
+      if (error || !data) return null
+
+      const { data: store } = await supabase
+        .from("stores")
+        .select("*, addresses(*)")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (store) {
+        data.store = store
+        data.store_name = store.name
+        data.store_description = store.description
+        data.store_image_url = store.logo_url
+        data.banner_url = store.banner_url
+        data.opening_hours = store.opening_hours
+        data.phone = store.phone
+        data.addresses = store.addresses || []
+      }
+
       if (data && typeof data.business_info === "string") {
         try {
           data.business_info = JSON.parse(data.business_info)
@@ -418,18 +456,18 @@ export const getCachedPartnerStats = async (partnerId: string) => {
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const [partner, reviews] = await Promise.all([
-        supabase.from("partners").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("id", partnerId).single(),
-        supabase.from("reviews").select("*", { count: "exact", head: true }).eq("partner_id", partnerId)
+      const [store, reviews] = await Promise.all([
+        supabase.from("stores").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("reviews").select("*", { count: "exact", head: true }).or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
       ])
 
       return {
-        salesCount: partner.data?.vendas_totais || 0,
+        salesCount: store.data?.vendas_totais || 0,
         reviewsCount: reviews.count || 0,
-        marketplaceReputation: partner.data?.marketplace_reputation || 0,
-        productSales: partner.data?.vendas_produtos || 0,
-        serviceSales: partner.data?.vendas_servicos || 0,
-        subscriptionSales: partner.data?.vendas_assinaturas || 0,
+        marketplaceReputation: store.data?.marketplace_reputation || 0,
+        productSales: store.data?.vendas_produtos || 0,
+        serviceSales: store.data?.vendas_servicos || 0,
+        subscriptionSales: store.data?.vendas_assinaturas || 0,
       }
     },
     [`partner-stats-${partnerId}`],

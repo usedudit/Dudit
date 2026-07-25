@@ -89,8 +89,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         if (!partnerImage && partnerId) {
             const fetchPartnerImage = async () => {
                 const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
-                const { data } = await supabase.from("partners").select("store_image_url").eq("id", partnerId).maybeSingle();
-                if (data?.store_image_url) setPartnerImage(data.store_image_url);
+                const { data } = await supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle();
+                if (data?.logo_url) setPartnerImage(data.logo_url);
             };
             fetchPartnerImage();
         }

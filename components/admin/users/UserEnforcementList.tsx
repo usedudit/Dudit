@@ -216,7 +216,7 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                                             {user.full_name || "Sem nome"}
                                                         </span>
                                                         <span className="text-xs font-medium text-brand-inactive-text">
-                                                            {user.partner?.store_name}
+                                                            {user.partner?.store_name || user.partner?.stores?.[0]?.name}
                                                         </span>
                                                     </div>
                                                 </div>

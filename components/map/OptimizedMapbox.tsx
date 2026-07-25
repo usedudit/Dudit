@@ -6,7 +6,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface PartnerMapData {
   id: string
-  store_name: string
+  name: string
   store_image_url?: string
   latitude: number
   longitude: number

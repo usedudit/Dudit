@@ -32,7 +32,6 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       partners!partner_id (
         id,
         user_id,
-        store_name,
         store_image_url,
         store_description,
         phone,
@@ -88,7 +87,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   const rawStore: any = Array.isArray(data.stores) ? data.stores[0] : data.stores
   if (rawStore && rawPartner) {
     rawPartner.store_id = rawStore.id
-    rawPartner.store_name = rawStore.name || rawPartner.store_name
+    rawPartner.store_name = rawStore.name
     rawPartner.store_description = rawStore.description || rawPartner.store_description
     rawPartner.store_image_url = rawStore.logo_url || rawStore.image_url || rawPartner.store_image_url
     rawPartner.banner_url = rawStore.banner_url || rawPartner.banner_url
@@ -298,12 +297,14 @@ export async function getPublicAvailableTimeSlots(
     }
 
     if (!rawOpeningHours) {
-      const { data: partnerData } = await supabase
-        .from("partners")
+      const { data: storeData } = await supabase
+        .from("stores")
         .select("opening_hours")
-        .eq("id", partnerId)
-        .single()
-      rawOpeningHours = partnerData?.opening_hours
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      rawOpeningHours = storeData?.opening_hours
     }
 
     // Determine day of the week
@@ -526,15 +527,15 @@ export async function validateServiceBookingAvailabilityAction(
   const supabase = getAdminClient()
 
   const partnerIds = [...new Set(items.map((i) => i.partnerId))]
-  const { data: partners } = await supabase
-    .from("partners")
-    .select("id, opening_hours")
-    .in("id", partnerIds)
+  const { data: stores } = await supabase
+    .from("stores")
+    .select("partner_id, opening_hours")
+    .in("partner_id", partnerIds)
 
   const hoursMap: Record<string, any> = {}
-  if (partners) {
-    for (const p of partners) {
-      hoursMap[p.id] = p.opening_hours
+  if (stores) {
+    for (const s of stores) {
+      hoursMap[s.partner_id] = s.opening_hours
     }
   }
 

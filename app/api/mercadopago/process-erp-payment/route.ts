@@ -59,7 +59,7 @@ async function handler(request: NextRequest) {
     const adminClient = createAdminClient()
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
-      .select("id, store_name, user_id")
+      .select("id, user_id")
       .eq("id", partnerId)
       .single()
 
@@ -67,6 +67,16 @@ async function handler(request: NextRequest) {
       SecureLogger.error("Partner not found for ERP payment", { partnerId })
       return NextResponse.json({ error: "Vendedor não encontrado" }, { status: 400 })
     }
+
+    // Buscar nome da loja na tabela stores
+    const { data: partnerStore } = await adminClient
+      .from("stores")
+      .select("name")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const partnerStoreName = partnerStore?.name || "Loja"
 
     // Validate payment method against partner's accepted MP methods
     {
@@ -141,7 +151,7 @@ async function handler(request: NextRequest) {
           },
         } : {}),
       },
-      description: description || `Venda ERP - ${partner.store_name || "Loja"}`,
+      description: description || `Venda ERP - ${partnerStoreName}`,
     }
 
     // Token para cartão de crédito

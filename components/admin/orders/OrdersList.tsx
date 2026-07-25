@@ -154,7 +154,7 @@ const OrdersList = ({ initialData }: OrdersListProps) => {
 
                                                 <div className="flex items-center gap-2 text-xs text-brand-inactive-text">
                                                     <StoreIcon size={12} />
-                                                    <span>{order.partners?.store_name || order.partners?.business_type || "-"}</span>
+                                                    <span>{order.partners?.stores?.[0]?.name || order.partners?.store_name || order.partners?.business_type || "-"}</span>
                                                     <span className="ml-auto">{order.order_items?.length || 0} itens</span>
                                                     {returns.length > 0 && (
                                                         <span className="text-brand-orange">{returns.length} troca(s)</span>
@@ -285,7 +285,7 @@ function OrderDetailsSheet({ order, isOpen, onClose }: OrderDetailsSheetProps) {
                         <StoreIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                         <div>
                             <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Vendedor</span>
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{order.partners?.store_name || order.partners?.business_type || "-"}</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{order.partners?.stores?.[0]?.name || order.partners?.store_name || order.partners?.business_type || "-"}</span>
                         </div>
                     </div>
 

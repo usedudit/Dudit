@@ -23,7 +23,7 @@ export async function adminListPurchasesAction(
     const admin = getAdminClient()
     let query = admin
         .from("billing_purchases")
-        .select("*, partners!billing_purchases_partner_id_fkey(store_name)")
+        .select("*, partners!billing_purchases_partner_id_fkey(stores(name))")
         .order("created_at", { ascending: false })
         .limit(limit + 1)
 
@@ -46,7 +46,7 @@ export async function adminListPurchasesAction(
     return {
         data: items.map((item: any) => ({
             ...item,
-            partner_name: item.partners?.store_name || null,
+            partner_name: item.partners?.stores?.[0]?.name || null,
         })),
         nextCursor: items.length > 0 ? items[items.length - 1].created_at : null,
         hasMore,

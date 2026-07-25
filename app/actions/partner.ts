@@ -69,9 +69,9 @@ export async function createPartnerAction(data: CreatePartnerData) {
     }
 
     const { data: duplicateName } = await supabaseAdmin
-      .from("partners")
+      .from("stores")
       .select("id")
-      .ilike("store_name", data.storeName)
+      .ilike("name", data.storeName)
       .maybeSingle()
 
     if (duplicateName) {
@@ -280,20 +280,31 @@ export async function updatePartnerAction(
   // Verify this partner belongs to the current user
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id, store_name, last_seo_update_at, addresses(street, number, neighborhood, city, state)")
+    .select("user_id, last_seo_update_at")
     .eq("id", partnerId)
-    .eq("addresses.is_default", true)
     .single()
 
   if (!partnerCheck || partnerCheck.user_id !== currentUser.id) {
     return { error: "Não autorizado" }
   }
 
+  // Get current store and address from stores table
+  const { data: currentStore } = await supabase
+    .from("stores")
+    .select("name, addresses(*)")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const currentStoreName = currentStore?.name || ""
+  const storeAddress = currentStore?.addresses?.find((a: any) => a.is_default) || currentStore?.addresses?.[0]
+
   // Verificar se há mudanças sensíveis a SEO (nome da loja, cidade, estado)
   const isSeoSensitiveChange =
-    (data.storeName && data.storeName !== partnerCheck.store_name) ||
-    (data.city !== undefined && data.city !== partnerCheck.addresses?.[0]?.city) ||
-    (data.state !== undefined && data.state !== partnerCheck.addresses?.[0]?.state)
+    (data.storeName && data.storeName !== currentStoreName) ||
+    (data.city !== undefined && data.city !== storeAddress?.city) ||
+    (data.state !== undefined && data.state !== storeAddress?.state)
 
   if (isSeoSensitiveChange) {
     if (partnerCheck.last_seo_update_at) {
@@ -386,7 +397,7 @@ export async function updatePartnerAction(
   if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
 
   if (hasAddressData) {
-    const currentAddr = (partnerCheck?.addresses as any)?.[0] || {}
+    const currentAddr = storeAddress || {}
     const fullAddressString = [
       data.street ?? currentAddr.street,
       data.number ?? currentAddr.number,
@@ -415,23 +426,25 @@ export async function updatePartnerAction(
 
   // Atualizar endereço na tabela addresses se houver dados
   if (hasAddressData) {
+    const storeRes = await supabase.from("stores").select("id").eq("partner_id", partnerId).limit(1).maybeSingle()
+    const storeId = storeRes.data?.id
+
     const existingAddress = await supabase
       .from("addresses")
       .select("id")
-      .eq("partner_id", partnerId)
-      .eq("is_default", true)
+      .or(storeId ? `store_id.eq.${storeId},partner_id.eq.${partnerId}` : `partner_id.eq.${partnerId}`)
+      .limit(1)
       .maybeSingle()
 
     if (existingAddress?.data?.id) {
-      // Atualizar endereço existente
       await supabase
         .from("addresses")
-        .update(addressData)
+        .update({ ...addressData, store_id: storeId || null })
         .eq("id", existingAddress.data.id)
     } else {
-      // Criar novo endereço
       await supabase.from("addresses").insert({
         partner_id: partnerId,
+        store_id: storeId || null,
         ...addressData,
         country: "BR",
         is_default: true,

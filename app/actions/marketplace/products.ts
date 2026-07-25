@@ -41,7 +41,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
-        id, store_name, store_description, rating, user_id, phone,
+        id, store_description, rating, user_id, phone,
         store_image_url, banner_url,
         opening_hours,
         vendas_totais, created_at,
@@ -105,7 +105,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     const store = Array.isArray(s) ? s[0] : s
     if (store) {
       p.store_id = store.id
-      p.store_name = store.name || p.store_name
+      p.store_name = store.name
       p.store_description = store.description || p.store_description
       p.store_image_url = store.logo_url || store.image_url || p.store_image_url
       p.banner_url = store.banner_url || p.banner_url
@@ -314,7 +314,8 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
         .select(`
           id, name, price, promotional_price, images, video_thumbnail, rating,
           category_id, category:product_categories!category_id(name),
-          partners(id, store_name, store_image_url, addresses(city, state)),
+          partners(id),
+          stores(id, name, logo_url, addresses!store_id!left(city, state)),
           product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("status", "ativo")
@@ -391,8 +392,8 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
   const price = priceAdj && priceAdj > 0 ? priceAdj : null
   return { fallback_variant_image: image, fallback_variant_price: price }
 }
-
 const cityResolveCache = new Map<string, { city: string; state: string } | null>()
+
 
 /**
  * Resolves a city-uf slug to capitalized/accented city name and state.
@@ -442,16 +443,16 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
 }
 
 /**
- * Fetches products and vitrines (partners) located in the specified city and state.
+ * Fetches products and vitrines (stores) located in the specified city and state.
  */
 export async function getHomeDataByCity(city: string, state: string, stateOnly?: boolean) {
   const supabase = getAdminClient()
 
-  // 1. Fetch all active partners in the state (filtering state on database)
-  const partnersRes = await supabase
-    .from("partners")
+  // 1. Fetch all active stores in the state
+  const storesRes = await supabase
+    .from("stores")
     .select(`
-      id, store_name, store_description, store_image_url, banner_url,
+      id, partner_id, name, description, logo_url, banner_url,
       rating, latitude, longitude,
       created_at,
       addresses!inner(city, state)
@@ -459,13 +460,12 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     .eq("is_active", true)
     .ilike("addresses.state", state)
 
-  if (partnersRes.error) {
-    console.error("[getHomeDataByCity] Error fetching partners:", partnersRes.error)
+  if (storesRes.error) {
+    console.error("[getHomeDataByCity] Error fetching stores:", storesRes.error)
   }
 
-  const rawPartners = partnersRes.data || []
+  const rawStores = storesRes.data || []
 
-  // Normalize target city slug
   const targetCitySlug = city
     .toLowerCase()
     .normalize("NFD")
@@ -473,10 +473,9 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
 
-  // Filter partners in JS to match target city (case-insensitive and accent-insensitive)
-  const filteredPartners = stateOnly
-    ? rawPartners
-    : rawPartners.filter((item: any) => {
+  const filteredStores = stateOnly
+    ? rawStores
+    : rawStores.filter((item: any) => {
         const addr = item.addresses?.[0] || item.addresses
         if (!addr || !addr.city) return false
         const itemCitySlug = addr.city
@@ -488,7 +487,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
         return itemCitySlug === targetCitySlug
       })
 
-  const partnerIds = filteredPartners.map((p: any) => p.id)
+  const partnerIds = [...new Set(filteredStores.map((s: any) => s.partner_id))]
 
   // 2. Fetch products only for the matching partners in this city
   let rawProducts: any[] = []
@@ -499,10 +498,8 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
         id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
         marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
         category_id, category:product_categories!category_id(name), created_at,
-        partners!inner(
-          id, store_name, store_image_url, latitude, longitude,
-          addresses!inner(city, state)
-        ),
+        partners!inner(id, is_showcase_active),
+        stores!inner(id, name, logo_url, addresses!store_id!left(city, state)),
         product_variants(variant_options, price_adjustment, is_active)
       `)
       .eq("status", "ativo")
@@ -528,10 +525,8 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       .select(`
         id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
         marketplace_score, signups_last_30_days, favorites_count, views_count,
-        partners!inner(
-          id, store_name, store_image_url, latitude, longitude,
-          addresses!inner(city, state)
-        ),
+        partners!inner(id, is_showcase_active),
+        stores(id, name, logo_url, addresses!store_id!left(city, state)),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, name, price, images),
@@ -552,13 +547,14 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
   // Normalize products data
   const normalizedProducts = rawProducts.map((item: any) => {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const partner = rawPartner ? {
       ...rawPartner,
-      store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-      latitude: rawPartner.latitude,
-      longitude: rawPartner.longitude,
-      city: rawPartner.addresses?.[0]?.city || null,
-      state: rawPartner.addresses?.[0]?.state || null
+      store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+      latitude: rawStore?.addresses?.[0]?.latitude || null,
+      longitude: rawStore?.addresses?.[0]?.longitude || null,
+      city: rawStore?.addresses?.[0]?.city || null,
+      state: rawStore?.addresses?.[0]?.state || null
     } : null
     const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
     const { product_variants, ...rest } = item
@@ -574,13 +570,14 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
   // Normalize plans data
   const normalizedPlans = rawPlans.map((item: any) => {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const partner = rawPartner ? {
       ...rawPartner,
-      store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-      latitude: rawPartner.latitude,
-      longitude: rawPartner.longitude,
-      city: rawPartner.addresses?.[0]?.city || null,
-      state: rawPartner.addresses?.[0]?.state || null
+      store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+      latitude: rawStore?.addresses?.[0]?.latitude || null,
+      longitude: rawStore?.addresses?.[0]?.longitude || null,
+      city: rawStore?.addresses?.[0]?.city || null,
+      state: rawStore?.addresses?.[0]?.state || null
     } : null
 
     let computedPrice = 0
@@ -599,17 +596,10 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
           }
         }
         computedPrice += qty * itemPrice
-
-        if (!firstImage && planItem.item_type === 'product' && planItem.products?.images) {
-          const imgs = planItem.products.images
-          if (Array.isArray(imgs) && imgs.length > 0) {
-            firstImage = imgs[0]
-          }
-        }
       }
     }
 
-    const image = firstImage || rawPartner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const image = firstImage || rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
 
     return {
       id: item.id,
@@ -625,20 +615,20 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     }
   })
 
-  // Normalize partners (vitrines) data
-  const normalizedVitrines = filteredPartners.map((item: any) => {
+  // Normalize vitrines data
+  const normalizedVitrines = filteredStores.map((item: any) => {
     return {
       id: item.id,
-      name: item.store_name,
-      description: item.store_description,
-      images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+      name: item.name,
+      description: item.description,
+      images: [item.banner_url || item.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
       rating: item.rating,
       itemType: 'loja',
       category: 'Loja Parceira',
       partners: {
-        id: item.id,
-        store_name: item.store_name,
-        store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+        id: item.partner_id,
+        store_name: item.name,
+        store_avatar: item.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
         banner_url: item.banner_url || null,
         latitude: item.latitude,
         longitude: item.longitude,
@@ -661,4 +651,3 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     plans: trendingPlans,
   }
 }
-
