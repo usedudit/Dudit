@@ -1874,11 +1874,42 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
 
     const result = finalSections.slice(0, 6)
 
+    // ─── Batch fetch promotions for all items across all sections ────────
+    const partnerIds = new Set<string>()
+    for (const section of result) {
+        for (const item of section.items) {
+            const pid = getPartnerId(item)
+            if (pid) partnerIds.add(pid)
+        }
+    }
+    if (partnerIds.size > 0) {
+        const { listActivePromotionsForMarketplaceAction } = await import("@/app/actions/shared/promotions")
+        const promoResults = await Promise.allSettled(
+            [...partnerIds].map(pid => listActivePromotionsForMarketplaceAction(pid))
+        )
+        const promoMap = new Map<string, any[]>()
+        let idx = 0
+        for (const pid of partnerIds) {
+            const res = promoResults[idx++]
+            promoMap.set(pid, res.status === "fulfilled" ? res.value : [])
+        }
+        for (const section of result) {
+            for (const item of section.items) {
+                const pid = getPartnerId(item)
+                if (pid && promoMap.has(pid)) {
+                    ;(item as any)._promotions = promoMap.get(pid)
+                }
+            }
+        }
+    }
+
     const t1 = performance.now()
-    dLog(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
-    dLog(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
+    console.log(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
+    console.log(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
     if (result.length > 0) {
-        dLog(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
+        console.log(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
+    } else {
+        console.log(`[Discover] EMPTY - no sections returned!`)
     }
 
     return result

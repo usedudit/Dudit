@@ -284,8 +284,10 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
     const partnerId = partner?.id || null
 
+    const preloadedPromos = (product as any)._promotions || preloadedPromotions
+
     const [activePromotions, setActivePromotions] = useState<any[]>(() => {
-        if (preloadedPromotions) return preloadedPromotions
+        if (preloadedPromos) return preloadedPromos
         if (partnerId && promotionsValueCache[partnerId]) {
             return promotionsValueCache[partnerId]
         }
@@ -293,8 +295,8 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     })
 
     useEffect(() => {
-        if (preloadedPromotions) {
-            setActivePromotions(preloadedPromotions)
+        if (preloadedPromos) {
+            setActivePromotions(preloadedPromos)
             return
         }
         if (partnerId) {
@@ -304,7 +306,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                 getCachedPartnerPromotions(partnerId).then(setActivePromotions)
             }
         }
-    }, [partnerId, preloadedPromotions])
+    }, [partnerId, preloadedPromos])
 
     const variantLowestPrice = useMemo(() => {
         const variants = (product as any).product_variants || (product as any).variants
