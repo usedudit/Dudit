@@ -60,29 +60,31 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const storeAvatar = rawStoreAvatar ? getR2ImageUrl(rawStoreAvatar) : null
     const hasPartnerLogo = !!rawStoreAvatar && !String(rawStoreAvatar).includes("Placeholder.png")
 
-    // Resolve banner logic using the same R2 URL helper used by products/logos.
-    const bannerUrl = partner.banner_url || (Array.isArray(vitrine.images) ? vitrine.images[0] : null)
+    // Resolve banner logic strictly using banner_url (never logo_url)
+    const rawBanner = vitrine.banner_url || partner.banner_url || null
+    const bannerUrl = rawBanner && !rawBanner.includes("Placeholder.png") ? rawBanner : null
     const fallbackBanner = hasPartnerLogo
         ? getRandomDefaultBanner()
         : getBannerUrlByColor(getAvatarColor(storeName))
     const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl) : fallbackBanner
-    const distance = partner.distance_km_formatted || null
-    const city = partner.city || ""
-    const state = partner.state || ""
-    const category = vitrine.category || partner.category || null
+    const rawDistance = partner.distance_km_formatted || vitrine.distance_km_formatted || null
+    const distance = rawDistance && !rawDistance.includes("Infinity") ? rawDistance : null
+    const city = partner.city || vitrine.city || ""
+    const state = partner.state || vitrine.state || ""
+    const category = vitrine.category || partner.category || (typeof partner.category === "string" ? partner.category : null)
     const reviewsCount = partner.reviewsCount ?? vitrine.reviewsCount ?? 0
     const showRating = (vitrine.rating ?? partner.rating ?? 0) > 0 && reviewsCount >= 3
 
     return (
         <Link
-            href={getStoreUrl(partner)}
+            href={getStoreUrl({ ...partner, ...vitrine })}
             prefetch={false}
             className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
         >
             <div className="relative w-full aspect-[16/7] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 transition-all duration-300">
                 <img
                     src={bannerImage}
-                    alt={vitrine.name}
+                    alt={storeName}
                     className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
                     loading="lazy"
                 />
@@ -108,18 +110,18 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                         )}
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-brand-inactive-text mt-0.5">
-                        {!hideCity && (
-                            <span className="truncate">{city}{city && state ? " - " : ""}{state}</span>
+                        {!hideCity && city && (
+                            <span className="truncate">{city}{state ? ` - ${state}` : ""}</span>
                         )}
-                        {!hideCity && distance && (
+                        {!hideCity && city && distance && (
                             <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
                         )}
                         {distance && (
                             <span className="font-medium">{distance}</span>
                         )}
-                        {category && category !== "Loja Parceira" && (
+                        {category && (
                             <>
-                                {(distance || !hideCity) && (
+                                {(distance || (!hideCity && city)) && (
                                     <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
                                 )}
                                 <span className="font-medium truncate">{category}</span>

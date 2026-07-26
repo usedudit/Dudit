@@ -82,7 +82,7 @@ export function getStoreUrl(store: any): string {
 export function getServiceUrl(service: any, partner?: any): string {
     if (!service) return "/"
 
-    const serviceSlug = createSlug(service.name || "")
+    const serviceSlug = service.slug || createSlug(service.name || "")
     const serviceId = service.id || ""
 
     const p = partner || (Array.isArray(service.partners) ? service.partners[0] : service.partners) || {}

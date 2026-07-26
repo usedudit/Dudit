@@ -46,7 +46,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
         payment_methods(*)
       ),
       stores!left(
-        id, name, description, logo_url, banner_url,
+        id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
         is_showcase_active, latitude, longitude, business_info,
         addresses!store_id!left(city, state)
@@ -103,6 +103,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     if (store) {
       p.store_id = store.id
       p.store_name = store.name
+      p.slug = store.slug || p.slug || null
       p.store_description = store.description || p.store_description
       p.store_image_url = store.logo_url || store.image_url || p.store_image_url
       p.banner_url = store.banner_url || p.banner_url

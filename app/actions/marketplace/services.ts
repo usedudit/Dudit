@@ -40,8 +40,8 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       ),
       service_categories:service_categories!category_id (name),
       marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-      stores!inner(
-        id, name, description, logo_url, banner_url,
+      stores!left(
+        id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
         is_showcase_active, latitude, longitude, business_info,
         addresses!store_id!left(city, state)
@@ -81,6 +81,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   if (rawStore && rawPartner) {
     rawPartner.store_id = rawStore.id
     rawPartner.store_name = rawStore.name
+    rawPartner.slug = rawStore.slug || rawPartner.slug || null
     rawPartner.store_description = rawStore.description || rawPartner.store_description
     rawPartner.store_image_url = rawStore.logo_url || rawStore.image_url || rawPartner.store_image_url
     rawPartner.banner_url = rawStore.banner_url || rawPartner.banner_url

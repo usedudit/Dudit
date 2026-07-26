@@ -973,7 +973,7 @@ async function searchMarketplaceByCity(
             console.error("[searchMarketplaceByCity] Partner fetch error:", partnersRes.error)
         }
         const allPartners = partnersRes.data || []
-        let partnerIds = allPartners.map((p: any) => p.id)
+        let partnerIds: string[] = [...new Set(allPartners.flatMap((p: any) => [p.partner_id, p.id]).filter(Boolean))] as string[]
 
         // Filtro por Raio
         let centerCoords = limits.centerCoords || null
@@ -992,7 +992,7 @@ async function searchMarketplaceByCity(
                 }
                 return true
             })
-            partnerIds = partnersInRadius.map((p: any) => p.id)
+            partnerIds = [...new Set(partnersInRadius.flatMap((p: any) => [p.partner_id, p.id]).filter(Boolean))] as string[]
         }
 
         if (!partnerIds.length) {

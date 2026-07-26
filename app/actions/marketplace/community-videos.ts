@@ -17,6 +17,7 @@ type ActionResult<T = void> = { success: true; data?: T } | { success: false; er
 export interface CommunityVideoItem {
   id: string
   partner_id: string
+  store_id?: string | null
   title: string | null
   description: string | null
   video_url: string
@@ -30,7 +31,7 @@ export interface CommunityVideoItem {
   orders_origin_count: number
   published_at: string | null
   created_at: string
-  partner?: { name: string; store_image_url: string | null }
+  partner?: { name: string; store_name: string; store_image_url: string | null }
 }
 
 export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
@@ -56,22 +57,37 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
   const items = data ? data.slice(0, limit) as CommunityVideoItem[] : []
   const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].published_at : null
 
-  // Fetch partner data separately to avoid PostgREST schema cache issues
+  // Fetch store data separately to avoid PostgREST schema cache issues
   if (items.length > 0) {
     const partnerIds = [...new Set(items.map((i) => i.partner_id).filter(Boolean))]
-    if (partnerIds.length > 0) {
-      const { data: partners } = await supabase
+    const storeIds = [...new Set(items.map((i) => i.store_id).filter(Boolean))]
+    if (partnerIds.length > 0 || storeIds.length > 0) {
+      let storeQuery = supabase
         .from("stores")
         .select("id, name, logo_url, partner_id")
-        .in("partner_id", partnerIds)
+        .eq("is_active", true)
 
-      type PartnerRow = { id: string; name: string | null; logo_url: string | null; partner_id: string }
-      const partnerMap = new Map<string, PartnerRow>((partners || []).map((p: PartnerRow) => [p.partner_id, p]))
+      if (storeIds.length > 0) {
+        storeQuery = storeQuery.or(`id.in.(${storeIds.join(",")}),partner_id.in.(${partnerIds.join(",")})`)
+      } else {
+        storeQuery = storeQuery.in("partner_id", partnerIds)
+      }
+
+      const { data: stores } = await storeQuery
+
+      type StoreRow = { id: string; name: string | null; logo_url: string | null; partner_id: string }
+      const storeByPartnerMap = new Map<string, StoreRow>()
+      const storeByIdMap = new Map<string, StoreRow>()
+
+      for (const s of (stores || [])) {
+        if (s.id) storeByIdMap.set(s.id, s)
+        if (s.partner_id && !storeByPartnerMap.has(s.partner_id)) storeByPartnerMap.set(s.partner_id, s)
+      }
+
       for (const item of items) {
-        const p = partnerMap.get(item.partner_id)
-        if (p) {
-          item.partner = { name: p.name ?? "", store_image_url: p.logo_url }
-        }
+        const s = (item.store_id ? storeByIdMap.get(item.store_id) : null) || storeByPartnerMap.get(item.partner_id)
+        const storeName = s?.name || "Loja parceira"
+        item.partner = { name: storeName, store_name: storeName, store_image_url: s?.logo_url || null }
       }
     }
   }
@@ -111,6 +127,7 @@ export async function createCommunityVideo(data: {
   videoUrl: string
   videoThumbnail: string
   duration: number
+  storeId?: string | null
   linkedItemType?: "product" | "service" | "collection" | null
   linkedItemId?: string | null
 }): Promise<ActionResult<{ id: string }>> {
@@ -163,6 +180,7 @@ export async function createCommunityVideo(data: {
       .from("community_videos")
       .insert({
         partner_id: partner.id,
+        store_id: data.storeId || null,
         title: data.title?.trim() || null,
         description: data.description?.trim() || null,
         video_url: data.videoUrl,
