@@ -50,8 +50,8 @@ export default async function AdminReturnDetailPage({
             <h3 className="font-semibold pt-2">Cliente / Parceiro</h3>
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div><dt className="text-brand-inactive-text">Cliente</dt><dd>{request.customer_name_snapshot || "-"}</dd></div>
-              <div><dt className="text-brand-inactive-text">Parceiro</dt><dd>{String(partner?.store_name || "-")}</dd></div>
-              <div><dt className="text-brand-inactive-text">Risk score</dt><dd>{String(partner?.risk_score ?? 0)}</dd></div>
+              <div><dt className="text-brand-inactive-text">Parceiro</dt><dd>{String((request.stores as any)?.name || "-")}</dd></div>
+              <div><dt className="text-brand-inactive-text">Risk score</dt><dd>{String((request.stores as any)?.risk_score ?? 0)}</dd></div>
               <div><dt className="text-brand-inactive-text">Pedido</dt><dd>{request.order_number_snapshot || String(order?.order_number || "-")}</dd></div>
             </dl>
 

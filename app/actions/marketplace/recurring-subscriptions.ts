@@ -358,7 +358,16 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       }
     }
 
-    const partner = data.partners || {}
+    const rawPartner = data.partners || {}
+    const rawStore = Array.isArray(data.stores) ? data.stores[0] : data.stores
+    const partner = rawPartner ? {
+      ...rawPartner,
+      store_id: rawStore?.id,
+      store_name: rawStore?.name,
+      store_image_url: rawStore?.logo_url,
+      banner_url: rawStore?.banner_url,
+      store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+    } : {}
     const planImages = Array.isArray(data.images) && data.images.length > 0
       ? data.images
       : (firstImage ? [firstImage] : [partner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"]);
@@ -367,7 +376,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       ...mapPlanRow(data as Record<string, unknown>),
       frequencyLabel: getRecurringFrequencyLabel(data.frequency_type, data.frequency_interval),
       items: data.recurring_plan_items || [],
-      partners: data.partners,
+      partners: partner,
       price: computedPrice,
       images: planImages,
     }

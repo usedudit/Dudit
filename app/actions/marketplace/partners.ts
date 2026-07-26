@@ -615,6 +615,19 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.categoryId !== undefined) updateData.category_id = data.categoryId
   if (data.subcategoryId !== undefined) updateData.subcategory_id = data.subcategoryId
 
+  if (data.gallery !== undefined) {
+    if (!Array.isArray(data.gallery)) {
+      return { error: "Formato de galeria inválido" }
+    }
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+    const plan = await getPartnerPlan(partnerId)
+    const limit = plan.slug === "free" ? 1 : plan.slug === "crescer" ? 5 : plan.slug === "escalar" ? 10 : 10
+    if (data.gallery.length > limit) {
+      return { error: `Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.` }
+    }
+    storeUpdateData.gallery = data.gallery
+  }
+
   if (Object.keys(storeUpdateData).length > 0) {
     storeUpdateData.updated_at = new Date().toISOString()
     const admin = getAdminClient()
@@ -628,19 +641,6 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     if (hqStore?.id) {
       await admin.from("stores").update(storeUpdateData).eq("id", hqStore.id)
     }
-  }
-
-  if (data.gallery !== undefined) {
-    if (!Array.isArray(data.gallery)) {
-      return { error: "Formato de galeria inválido" }
-    }
-    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
-    const plan = await getPartnerPlan(partnerId)
-    const limit = plan.slug === "free" ? 1 : plan.slug === "crescer" ? 5 : plan.slug === "escalar" ? 10 : 10
-    if (data.gallery.length > limit) {
-      return { error: `Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.` }
-    }
-    updateData.gallery = data.gallery
   }
 
   if (data.orderFlow !== undefined) {
@@ -729,7 +729,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
       try {
         const coords = await geocodeAddress(addressString)
         if (coords) {
-          await supabase.from('partners').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', partnerId)
+          await supabase.from('stores').update({ latitude: coords.lat, longitude: coords.lng }).eq('partner_id', partnerId)
           // Also persist coordinates to the addresses record
           if (currentAddress) {
             await supabase.from('addresses').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', currentAddress.id)

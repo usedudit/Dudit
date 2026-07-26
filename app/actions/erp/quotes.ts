@@ -2030,7 +2030,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         addresses (*)
                     ),
                     partners (
-                        id, store_name, store_image_url, user_id, phone
+                        id, user_id
                     )
                 `)
                 .eq("public_token", publicToken)
@@ -2047,7 +2047,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                             addresses (*)
                         ),
                         partners (
-                            id, store_name, store_image_url, user_id, phone
+                            id, user_id
                         )
                     `)
                     .eq("id", publicToken)
@@ -2163,7 +2163,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             // Fetch store details to resolve partner name/logo override
             const { data: store } = await admin
                 .from("stores")
-                .select("name, image_url")
+                .select("name, image_url, logo_url, phone")
                 .eq("partner_id", quote.partner_id)
                 .limit(1)
                 .maybeSingle()
@@ -2282,10 +2282,10 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     additional_costs: Number(quote.additional_costs || 0),
                     total: Number(quote.total || 0),
                     partner: {
-                        name: store?.name || quote.partners?.store_name || "Parceiro",
-                        image_url: store?.image_url || quote.partners?.store_image_url || null,
+                        name: store?.name || "Parceiro",
+                        image_url: store?.image_url || store?.logo_url || null,
                         email: partnerEmail,
-                        phone: quote.partners?.phone || null,
+                        phone: store?.phone || null,
                         address: partnerAddressFormatted
                     },
                     seller: sellerInfo,
@@ -2307,11 +2307,11 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             if (resolvedSnapshot && resolvedSnapshot.partner) {
                 if (!resolvedSnapshot.partner.name || resolvedSnapshot.partner.name === "Parceiro") {
                     const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
-                    resolvedSnapshot.partner.name = store?.name || partnerObj?.store_name || "Parceiro"
+                    resolvedSnapshot.partner.name = store?.name || "Parceiro"
                 }
                 if (!resolvedSnapshot.partner.image_url) {
                     const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
-                    resolvedSnapshot.partner.image_url = store?.image_url || partnerObj?.store_image_url || null
+                    resolvedSnapshot.partner.image_url = store?.image_url || store?.logo_url || null
                 }
             }
 

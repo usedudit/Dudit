@@ -312,12 +312,12 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
           id, name, price, promotional_price, images, video_thumbnail, rating,
           category_id, category:product_categories!category_id(name),
           partners(id),
-          stores(id, name, logo_url, addresses!store_id!left(city, state)),
-          product_variants(variant_options, price_adjustment, is_active)
-        `)
-        .eq("status", "ativo")
-        .eq("show_in_marketplace", true)
-        .eq("partner_id", partnerId)
+        stores(id, name, logo_url, banner_url, phone, addresses!store_id!left(city, state)),
+        product_variants(variant_options, price_adjustment, is_active)
+      `)
+      .eq("status", "ativo")
+      .eq("show_in_marketplace", true)
+      .eq("partner_id", partnerId)
       if (storeId) q = q.eq("store_id", storeId)
       const result = await q.order("created_at", { ascending: false }).limit(10)
 
@@ -331,11 +331,14 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
 
       const safeData = data.map((item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const partner = rawPartner ? {
           ...rawPartner,
-          store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-          city: rawPartner.addresses?.[0]?.city || null,
-          state: rawPartner.addresses?.[0]?.state || null
+          store_name: rawStore?.name,
+          store_image_url: rawStore?.logo_url,
+          store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+          city: rawStore?.addresses?.[0]?.city || null,
+          state: rawStore?.addresses?.[0]?.state || null
         } : {
           store_name: "Vendedor Parceiro",
           store_avatar: "https://img.dudit.com.br/static/Placeholder.png",
@@ -496,7 +499,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
         marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
         category_id, category:product_categories!category_id(name), created_at,
         partners!inner(id, is_showcase_active),
-        stores!inner(id, name, logo_url, addresses!store_id!left(city, state)),
+        stores!inner(id, name, description, logo_url, banner_url, phone, opening_hours, addresses!store_id!left(city, state)),
         product_variants(variant_options, price_adjustment, is_active)
       `)
       .eq("status", "ativo")
@@ -523,7 +526,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
         id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
         marketplace_score, signups_last_30_days, favorites_count, views_count,
         partners!inner(id, is_showcase_active),
-        stores(id, name, logo_url, addresses!store_id!left(city, state)),
+        stores(id, name, description, logo_url, banner_url, phone, opening_hours, addresses!store_id!left(city, state)),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, name, price, images),
@@ -547,6 +550,12 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const partner = rawPartner ? {
       ...rawPartner,
+      store_name: rawStore?.name,
+      store_image_url: rawStore?.logo_url,
+      store_description: rawStore?.description,
+      banner_url: rawStore?.banner_url,
+      phone: rawStore?.phone,
+      opening_hours: rawStore?.opening_hours,
       store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
       latitude: rawStore?.addresses?.[0]?.latitude || null,
       longitude: rawStore?.addresses?.[0]?.longitude || null,
@@ -570,6 +579,12 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const partner = rawPartner ? {
       ...rawPartner,
+      store_name: rawStore?.name,
+      store_image_url: rawStore?.logo_url,
+      store_description: rawStore?.description,
+      banner_url: rawStore?.banner_url,
+      phone: rawStore?.phone,
+      opening_hours: rawStore?.opening_hours,
       store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
       latitude: rawStore?.addresses?.[0]?.latitude || null,
       longitude: rawStore?.addresses?.[0]?.longitude || null,

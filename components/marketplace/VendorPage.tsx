@@ -76,7 +76,7 @@ const normalizeItemForCard = (item: any, partner: any) => {
         return {
             ...item,
             partners: {
-                store_name: partner.store_name,
+                store_name: partner.storeName,
                 store_avatar: partner.storeImageUrl,
                 profile_image_url: partner.profile_image_url,
                 city: partner.city,
@@ -97,7 +97,7 @@ const normalizeItemForCard = (item: any, partner: any) => {
         images: getProductDisplayImages(item),
         partners: {
             id: partner.id,
-            store_name: partner.store_name,
+            store_name: partner.storeName,
             store_avatar: partner.storeImageUrl,
             profile_image_url: partner.profile_image_url,
             city: partner.city,
@@ -370,7 +370,7 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
             {partner.storeDescription && (
                 <>
                     <div>
-                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Sobre {partner.store_name}</h3>
+                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Sobre {partner.storeName}</h3>
                         <p className="text-[15px] text-brand-inactive-text leading-relaxed whitespace-pre-wrap">{partner.storeDescription}</p>
                     </div>
                     <div className="h-[1px] bg-brand-border w-full" />
@@ -459,7 +459,7 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                     </div>
                 </div>
                 <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 shrink-0">
-                    <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.store_name} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} isActive={isActive} />
+                    <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.storeName} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} isActive={isActive} />
                 </div>
             </div>
         </div>
@@ -741,12 +741,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     const bestCampaignSection = useMemo(() => pickBestSection(campaignSections), [campaignSections])
 
-    const partnerRawImage = partner.store_avatar || partner.store_image_url || partner.profile_image_url || partner.storeImageUrl || null
+    const partnerRawImage = partner.storeImageUrl || null
     const partnerProfileImageUrl = getImageUrl(partnerRawImage)
     const bannerImage = useMemo(() => {
         if (partner.banner_url) return getImageUrl(partner.banner_url)
-        return partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.store_name || "Vendedor"))
-    }, [partner.banner_url, partnerRawImage, partner.store_name])
+        return partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
+    }, [partner.banner_url, partnerRawImage, partner.storeName])
 
     const hasPlans = plans && plans.length > 0
     const currentItems = activeContext === "Produtos" ? products : (activeContext === "Servicos" ? services : plans)
@@ -858,7 +858,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
     }, [updateTabsScrollState, allTabs.length])
 
-    const handleWhatsApp = useCallback(() => openWhatsApp(partner.phone, partner.store_name), [partner.phone, partner.store_name])
+    const handleWhatsApp = useCallback(() => openWhatsApp(partner.phone, partner.storeName), [partner.phone, partner.storeName])
     const updateCategoryUrl = useCallback((tag: string | null) => {
         const params = new URLSearchParams(window.location.search)
         if (tag) params.set("categoria", tag)
@@ -973,13 +973,13 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         return sorted
     }, [categoryItems, categoryPromoOn, categorySelectedBrands, categoryMinPrice, categoryMaxPrice, categorySortBy])
 
-    const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.store_name}*\nConfere aqui os produtos:`, [partner.store_name])
+    const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
         <div className="container mx-auto px-0 lg:px-4 max-w-[1400px] animate-fade-in lg:mt-6">
             <MarketplaceHeader
-                productName={partner.store_name}
-                storeSearchPlaceholder={`Buscar em ${partner.store_name}`}
+                productName={partner.storeName}
+                storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
                 storeSearchValue={searchValue}
                 onStoreSearchChange={setSearchValue}
                 onShare={() => setShowShareModal(true)}
@@ -998,9 +998,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div className={`hidden lg:block fixed top-[108px] left-0 right-0 bg-white border-b border-brand-border z-[80] transition-all duration-200 ${isStickyVisible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"}`}>
                 <div className="max-w-[1400px] mx-auto h-[76px] flex items-center gap-4">
-                    <UserProfileImage fullName={partner.store_name} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50" />
+                    <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50" />
                     <div className="min-w-0">
-                        <h2 className="text-[17px] font-bold text-brand-dark truncate">{partner.store_name}</h2>
+                        <h2 className="text-[17px] font-bold text-brand-dark truncate">{partner.storeName}</h2>
                         <div className="flex items-center gap-2 text-[12px] text-brand-inactive-text">
                             <span>{partner.city}, {partner.state}</span>
                             {partner.distance_km_formatted && <span>{partner.distance_km_formatted}</span>}
@@ -1008,7 +1008,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </div>
                     </div>
                     <div className="ml-auto w-[420px]">
-                        <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.store_name}`} prefix={<Search size={17} />} />
+                        <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                     </div>
                 </div>
             </div>
@@ -1030,10 +1030,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {/* Desktop Layout */}
                     <div className="hidden lg:flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.store_name} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[80px] h-[80px] border border-brand-border shrink-0 bg-gray-50" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[80px] h-[80px] border border-brand-border shrink-0 bg-gray-50" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                                    <h1 className="text-[24px] font-semibold text-brand-dark leading-tight truncate">{partner.store_name}</h1>
+                                    <h1 className="text-[24px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
                                     {displayReviewsCount > 0 && (
                                         <div className="flex items-center gap-1 text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
                                             <StarIcon size={11} className="fill-brand-green text-brand-green" />
@@ -1050,7 +1050,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </div>
 
                         <div className="w-[360px]">
-                            <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.store_name}`} prefix={<Search size={17} />} />
+                            <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                         </div>
 
                         <div className="flex items-start gap-3">
@@ -1068,10 +1068,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {/* Mobile/Tablet Layout (lg:hidden) */}
                     <div className="lg:hidden flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.store_name} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] border border-brand-border shrink-0 bg-gray-50" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] border border-brand-border shrink-0 bg-gray-50" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                                    <h1 className="text-[16px] font-semibold text-brand-dark leading-tight truncate">{partner.store_name}</h1>
+                                    <h1 className="text-[16px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
                                     <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} short />
                                 </div>
                                 <p className="text-[12px] text-brand-inactive-text font-normal leading-tight">{partner.city}, {partner.state}</p>
@@ -1235,7 +1235,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     ) : (
                         <div>
                             <div className="mb-8">
-                                <h3 className="font-normal text-brand-dark text-[16px] mb-3">Sobre {partner.store_name}</h3>
+                                <h3 className="font-normal text-brand-dark text-[16px] mb-3">Sobre {partner.storeName}</h3>
                                 <div className="flex flex-col gap-1">
                                     {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
                                         <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
@@ -1413,7 +1413,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div style={{ display: activeSection === "info" ? "block" : "none" }}>
                             {infoHasBeenOpened && (
                                 <>
-                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informações de {partner.store_name}</h2>
+                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informações de {partner.storeName}</h2>
                                     <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={activeSection === "info"} />
                                 </>
                             )}
@@ -1438,8 +1438,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </main>
             </div>
 
-            <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? window.location.href : ""} title={partner.store_name} shareMessage={shareMessage} label="Link da vitrine" />
-            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.id} targetName={partner.store_name} />
+            <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? window.location.href : ""} title={partner.storeName} shareMessage={shareMessage} label="Link da vitrine" />
+            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.id} targetName={partner.storeName} />
 
             <DefaultModal isOpen={!!selectedCoupon} onClose={() => setSelectedCoupon(null)} title={selectedCoupon?.code || "Cupom"} maxWidth="sm">
                 {selectedCoupon && (
@@ -1477,10 +1477,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 <div className="flex flex-col">
                     <div className="px-1 py-2 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.store_name} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[50px] h-[50px] border border-brand-border shrink-0 bg-gray-50" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[50px] h-[50px] border border-brand-border shrink-0 bg-gray-50" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                                    <h2 className="text-[16px] font-bold text-brand-dark leading-tight truncate">{partner.store_name}</h2>
+                                    <h2 className="text-[16px] font-bold text-brand-dark leading-tight truncate">{partner.storeName}</h2>
                                     <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} short />
                                 </div>
                                 <p className="text-[13px] text-brand-inactive-text font-normal leading-tight mt-0.5">{partner.city}, {partner.state}</p>

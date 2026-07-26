@@ -114,13 +114,15 @@ export async function syncToExploreRedis({
 
         // Normalização básica idêntica ao que o marketplace espera
         const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
+        const rawStore = Array.isArray(dbData.stores) ? dbData.stores[0] : dbData.stores
         const partner = rawPartner ? {
           ...rawPartner,
-          store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-          latitude: rawPartner.latitude,
-          longitude: rawPartner.longitude,
-          city: rawPartner.addresses?.[0]?.city || null,
-          state: rawPartner.addresses?.[0]?.state || null
+          store_name: rawStore?.name,
+          store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+          latitude: rawStore?.latitude,
+          longitude: rawStore?.longitude,
+          city: rawStore?.addresses?.[0]?.city || null,
+          state: rawStore?.addresses?.[0]?.state || null
         } : null
 
         const variantFallback = extractFirstVariantFallback(dbData.product_variants, Number(dbData.price))
@@ -164,11 +166,11 @@ export async function syncToExploreRedis({
         const partner = rawPartner ? {
           ...rawPartner,
           store_name: rawStore?.name,
-          store_avatar: rawStore?.logo_url || rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-          latitude: rawPartner.latitude,
-          longitude: rawPartner.longitude,
-          city: rawPartner.addresses?.[0]?.city || null,
-          state: rawPartner.addresses?.[0]?.state || null
+          store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+          latitude: rawStore?.latitude,
+          longitude: rawStore?.longitude,
+          city: rawStore?.addresses?.[0]?.city || null,
+          state: rawStore?.addresses?.[0]?.state || null
         } : null
         const catName = dbData.marketplace_category?.parent?.name || dbData.marketplace_category?.name || null
         finalData = { ...dbData, category: catName, partners: partner, subcategoryName: dbData.marketplace_category?.parent ? dbData.marketplace_category.name : null }
@@ -188,13 +190,12 @@ export async function syncToExploreRedis({
           const city = dbData.addresses?.[0]?.city || null
           const state = dbData.addresses?.[0]?.state || null
           const reviewsCount = dbData.reviews?.[0]?.count || 0
-          const hqStore = dbData.stores?.find((s: any) => s.is_headquarters) || dbData.stores?.[0]
           const categoryName = dbData.category?.parent?.name || dbData.category?.name || 'Loja Parceira'
           finalData = {
             id: dbData.id,
-            name: hqStore?.name || "Loja",
-            description: hqStore?.description || dbData.store_description,
-            images: [hqStore?.banner_url || dbData.banner_url || hqStore?.logo_url || dbData.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+            name: dbData.name || "Loja",
+            description: dbData.description || "",
+            images: [dbData.banner_url || dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
             rating: dbData.rating,
             category: categoryName,
             partners: {
@@ -202,7 +203,7 @@ export async function syncToExploreRedis({
               city,
               state,
               reviewsCount,
-              store_avatar: dbData.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+              store_avatar: dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
             },
             created_at: dbData.created_at,
             updated_at: dbData.updated_at

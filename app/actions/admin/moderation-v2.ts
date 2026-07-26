@@ -222,7 +222,7 @@ export async function fetchModerationTarget(
                 // Get store name from stores table
                 const { data: hqStore } = await admin
                     .from("stores")
-                    .select("name, description, logo_url, banner_url, gallery")
+                    .select("name, description, logo_url, banner_url, gallery, risk_score")
                     .eq("partner_id", id)
                     .order("is_headquarters", { ascending: false })
                     .limit(1)
@@ -258,6 +258,7 @@ export async function fetchModerationTarget(
                         store_image_url: hqStore?.logo_url || null,
                         banner_url: hqStore?.banner_url || null,
                         gallery: hqStore?.gallery || [],
+                        risk_score: hqStore?.risk_score ?? 0,
                         owner
                     } as FetchedPartner
                 }
@@ -336,7 +337,7 @@ export async function editField(
                 store_image_url: "logo_url"
             }
             const actualField = storeFieldMap[field] || field
-            const isStoreField = ["name", "description", "logo_url", "banner_url", "gallery", "opening_hours", "phone", "risk_score"].includes(actualField)
+            const isStoreField = ["name", "description", "logo_url", "banner_url", "gallery", "opening_hours", "phone", "risk_score", "rating", "marketplace_reputation", "vendas_totais", "vendas_produtos", "vendas_servicos", "vendas_assinaturas", "completed_orders_count", "completed_appointments_count", "active_subscriptions_count", "cancellation_rate", "timezone", "pickup_payment_policy"].includes(actualField)
             
             if (isStoreField) {
                 const { data } = await fetchAdmin.from("stores").select(actualField).eq("partner_id", targetId).limit(1).maybeSingle()

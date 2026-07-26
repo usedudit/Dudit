@@ -649,9 +649,9 @@ function ProductGeneral({ data, isPending, onRefresh }: { data: FetchedProduct; 
 <SidebarCard title="Parceiro">
                         {data.partner ? (
                             <>
-                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.partner.store_name || data.partner.stores?.[0]?.name}</p>
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.store?.name || data.partner?.id}</p>
                                 <p className="text-sm text-brand-inactive-text">ID: {data.partner.id}</p>
-                                <p className="text-sm text-brand-inactive-text">Risk Score: {data.partner.risk_score}</p>
+                                <p className="text-sm text-brand-inactive-text">Risk Score: {data.store?.risk_score ?? 0}</p>
                             </>
                         ) : <p className="text-sm text-brand-inactive-text">Nenhum</p>}
                     </SidebarCard>
@@ -749,9 +749,9 @@ function ServiceGeneral({ data, isPending, onRefresh }: { data: FetchedService; 
                     <SidebarCard title="Parceiro">
                         {data.partner ? (
                             <>
-                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.partner.store_name}</p>
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.store?.name || data.partner?.id}</p>
                                 <p className="text-sm text-brand-inactive-text">ID: {data.partner.id}</p>
-                                <p className="text-sm text-brand-inactive-text">Risk Score: {data.partner.risk_score}</p>
+                                <p className="text-sm text-brand-inactive-text">Risk Score: {data.store?.risk_score ?? 0}</p>
                             </>
                         ) : <p className="text-sm text-brand-inactive-text">Nenhum</p>}
                     </SidebarCard>
@@ -835,9 +835,9 @@ function RecurringPlanGeneral({ data, isPending, onRefresh }: { data: FetchedRec
                     <SidebarCard title="Parceiro">
                         {data.partner ? (
                             <>
-                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.partner.store_name}</p>
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.store?.name || data.partner?.id}</p>
                                 <p className="text-sm text-brand-inactive-text">ID: {data.partner.id}</p>
-                                <p className="text-sm text-brand-inactive-text">Risk Score: {data.partner.risk_score}</p>
+                                <p className="text-sm text-brand-inactive-text">Risk Score: {data.store?.risk_score ?? 0}</p>
                             </>
                         ) : <p className="text-sm text-brand-inactive-text">Nenhum</p>}
                     </SidebarCard>
@@ -890,8 +890,8 @@ function PartnerGeneral({ data, isPending, onRefresh }: { data: FetchedPartner; 
                         <div>
                             <label className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 block">Risk Score</label>
                             <div className="flex items-center gap-2">
-                                <Badge variant={data.risk_score >= 50 ? "red" : data.risk_score >= 20 ? "orange" : data.risk_score >= 10 ? "blue" : "green"}>
-                                    {data.risk_score}
+                                <Badge variant={(data.risk_score ?? 0) >= 50 ? "red" : (data.risk_score ?? 0) >= 20 ? "orange" : (data.risk_score ?? 0) >= 10 ? "blue" : "green"}>
+                                    {data.risk_score ?? 0}
                                 </Badge>
                                 <Button variant="outline" size="sm" onClick={() => setShowRiskEditor(!showRiskEditor)}>Alterar</Button>
                             </div>
@@ -1061,7 +1061,7 @@ function ReviewGeneral({ data, isPending, onRefresh }: { data: FetchedReview; is
                     <SidebarCard title="Informações">
                         {data.user && <p className="text-sm text-brand-inactive-text">Por: <strong className="text-brand-dark dark:text-dark-heading">{data.user.full_name || "Anônimo"}</strong></p>}
                         {data.product && <p className="text-sm text-brand-inactive-text">Produto: <strong className="text-brand-dark dark:text-dark-heading">{data.product.name}</strong></p>}
-                        {data.partner && <p className="text-sm text-brand-inactive-text">Parceiro: <strong className="text-brand-dark dark:text-dark-heading">{data.partner.store_name || data.partner.stores?.[0]?.name}</strong></p>}
+                        {data.store && <p className="text-sm text-brand-inactive-text">Parceiro: <strong className="text-brand-dark dark:text-dark-heading">{data.store.name}</strong></p>}
                     </SidebarCard>
                     <SaveFooter riskScore={riskScore} onRiskScoreChange={setRiskScore} notes={notes} onNotesChange={setNotes}
                         onSave={handleSave} onDelete={handleDelete} isPending={saving || deleting} showDelete

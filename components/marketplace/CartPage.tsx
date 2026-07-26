@@ -346,8 +346,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 paymentMethods: partnerData.paymentMethods || ["Dinheiro"],
                 mpConnected: !!partnerData.partner?.mp_user_id,
                 mpPublicKey: partnerData.partner?.mp_public_key,
-                store_name: partnerData.store?.name || partnerData.partner?.store_name,
-                openingHours: partnerData.store?.opening_hours || partnerData.partner?.opening_hours || null,
+                store_name: partnerData.store?.name || "Loja",
+                openingHours: partnerData.store?.opening_hours || null,
             },
             cartItems: partnerItems.map((item: any) => ({
                 cartItemId: item.id,
@@ -459,8 +459,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 const expanded = isExpanded(storeKey)
                                 const inStockItems = data.items.filter((item: any) => !isItemOutOfStock(item))
                                 const allSelected = inStockItems.length > 0 && inStockItems.every((item: any) => getItemSelected(item))
-                                const sellerName = data.store?.name || data.partner?.store_name || "Loja"
-                                const sellerImage = data.store?.logo_url || data.store?.image_url || data.partner?.store_image_url
+                                const sellerName = data.store?.name || "Loja"
+                                const sellerImage = data.store?.logo_url
                                 const storeObj = data.store ? { ...data.store, id: data.store.id, store_name: data.store.name } : data.partner
 
                                 return (

@@ -141,10 +141,10 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const sellsProducts = businessInfo.sells.includes("products");
   const sellsServices = businessInfo.sells.includes("services");
 
-  const hasPhone = !!partner.phone;
+  const hasPhone = !!store?.phone;
   const hasCategory = !!partner.category_id;
   const hasAddress = (addressRes.data || []).length > 0;
-  const hasHours = !!partner.opening_hours && Object.keys(partner.opening_hours).length > 0;
+  const hasHours = !!store?.opening_hours && Object.keys(store.opening_hours).length > 0;
   const hasPix = (paymentMethodsRes.data || []).some(
     (m: any) => (m.type === "pix" || m.payment_type === "pix") && m.is_active
   );
@@ -153,8 +153,8 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const activeServices = servicesCountRes.count || 0;
   const hasItems = (activeProducts + activeServices) > 0;
 
-  const logoUrl = store?.logo_url || partner?.store_image_url
-  const bannerUrl = store?.banner_url || partner?.banner_url
+  const logoUrl = store?.logo_url
+  const bannerUrl = store?.banner_url
   const hasLogoAndBanner = !!logoUrl && !!bannerUrl && !bannerUrl.includes("default/");
 
   const isWhatsAppConnected = (whatsappConnRes.data || []).length > 0;
@@ -174,7 +174,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   // 3. Monta o objeto de Contexto
   const context: DashboardContext = {
     partnerId,
-    storeName: store?.name || partner?.store_name || "Sua Loja",
+    storeName: store?.name || "Sua Loja",
     isQuickMode: businessInfo.mode === "quick",
     sellsProducts,
     sellsServices,
@@ -220,7 +220,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
   // 6. Gera saudação e mensagens baseadas no modo e preenchimento
   const greeting = {
-    title: `Olá, ${store?.name || partner?.store_name || "Sua Loja"}! 👋`,
+    title: `Olá, ${store?.name || "Sua Loja"}! 👋`,
     subtitle: checklist
       ? "Complete o onboarding para começar a vender na Dudit."
       : "Veja como está seu negócio hoje no Marketplace."
@@ -239,13 +239,13 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
       }
     : {
         id: partnerId,
-        store_name: storeData?.name || partner?.store_name || "",
+        store_name: storeData?.name || "",
         addresses: addressRes.data || [],
       };
   const partnerUrl = getStoreUrl(partnerForUrl);
 
   return {
-    storeName: storeData?.name || partner?.store_name || "Sua Loja",
+    storeName: storeData?.name || "Sua Loja",
     partnerUrl,
     isQuickMode: context.isQuickMode,
     planSlug: context.planSlug,

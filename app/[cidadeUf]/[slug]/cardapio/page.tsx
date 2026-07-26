@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const store = await getCachedStoreBySlug(slug)
     if (!store || !isStoreInCity(store, cidadeUf)) return { title: "Cardápio não encontrado | Dudit" }
 
-    const storeName = store.name || store.partners?.store_name || "Loja"
+    const storeName = store.name || "Loja"
     return {
         title: `Cardápio - ${storeName} | Dudit`,
         description: `Veja o cardápio completo de ${storeName} com produtos e serviços.`,
@@ -52,7 +52,7 @@ export default async function StoreMenuPage({ params }: Props) {
     const filteredProducts = (products || []).filter((p: any) => p.store_is_active !== false)
     const filteredServices = (services || []).filter((s: any) => s.store_is_active !== false)
 
-    const storeName = store.name || store.partners?.store_name || "Loja"
+    const storeName = store.name || "Loja"
 
     return (
         <div className="min-h-screen bg-gray-50">

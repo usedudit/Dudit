@@ -30,8 +30,8 @@ function applyShowcasePenalty(items: any[]): any[] {
     const active: any[] = []
     const inactive: any[] = []
     for (const item of items) {
-        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-        if (rawPartner?.is_showcase_active === false) {
+        const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        if (rawStore?.is_showcase_active === false) {
             inactive.push(item)
         } else {
             active.push(item)
@@ -44,11 +44,12 @@ function normalizePlan(item: any) {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
     const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const storeAddr = rawStore?.addresses?.[0] || rawPartner?.addresses?.[0]
+    const storeImage = rawStore?.logo_url || rawStore?.image_url
     const partner = rawPartner ? {
         ...rawPartner,
         store_name: rawStore?.name,
-        store_avatar: rawStore?.logo_url || rawPartner?.store_image_url || rawPartner?.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
-        store_image_url: rawStore?.logo_url || rawPartner?.store_image_url,
+        store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+        store_image_url: storeImage,
         city: storeAddr?.city || null,
         state: storeAddr?.state || null
     } : null
@@ -79,7 +80,7 @@ function normalizePlan(item: any) {
         }
     }
 
-    const image = firstImage || rawStore?.logo_url || rawPartner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const image = firstImage || rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
 
     return {
         id: item.id,
@@ -603,15 +604,15 @@ async function _searchMarketplaceInternal(
             })
 
             const normalizeRecord = (item: any) => {
-                if (item.name && item.store_description !== undefined) {
+                if (item.name && item.description !== undefined && item.logo_url !== undefined) {
                     // This is a store record from stores table
                     return {
                         id: item.id, name: item.name, description: item.description,
-                        images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+                        images: [item.banner_url || item.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
                         rating: item.rating, itemType: 'loja', category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
                         partners: {
                             id: item.id, store_name: item.name,
-                            store_avatar: item.store_image_url || item.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+                            store_avatar: item.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
                             banner_url: item.banner_url || null,
                             latitude: item.latitude, longitude: item.longitude,
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
@@ -625,11 +626,17 @@ async function _searchMarketplaceInternal(
                 }
 
                 const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+                const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+                const storeImage = rawStore?.logo_url || rawStore?.image_url
                 const partner = rawPartner ? {
                     ...rawPartner,
-                    store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
-                    latitude: rawPartner.latitude, longitude: rawPartner.longitude,
-                    city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
+                    store_name: rawStore?.name,
+                    store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                    store_image_url: storeImage,
+                    latitude: rawStore?.latitude,
+                    longitude: rawStore?.longitude,
+                    city: rawStore?.addresses?.[0]?.city || null,
+                    state: rawStore?.addresses?.[0]?.state || null
                 } : null
 
                 if (item.product_variants !== undefined) {
@@ -789,11 +796,11 @@ async function hydrateMarketplaceSearchHits(
             const store = Array.isArray(item.stores) ? item.stores[0] : item.stores
             const storeId = store?.id || item.id
             const storeName = store?.name || "Vendedor"
-            const storeImage = store?.logo_url || store?.image_url || item.store_image_url
+            const storeImage = store?.logo_url || store?.image_url || item.logo_url
             results.push({
                 id: storeId,
                 name: storeName,
-                description: store?.description || item.store_description,
+                description: store?.description || item.description,
                 images: [store?.banner_url || item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
                 rating: item.rating,
                 itemType: "loja",
@@ -803,7 +810,7 @@ async function hydrateMarketplaceSearchHits(
                     store_id: storeId,
                     store_name: storeName,
                     store_image_url: storeImage,
-                    store_avatar: storeImage || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                     banner_url: store?.banner_url || item.banner_url || null,
                     latitude: item.latitude,
                     longitude: item.longitude,
@@ -826,17 +833,17 @@ async function hydrateMarketplaceSearchHits(
         const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeId = rawStore?.id || rawPartner?.id
         const storeName = rawStore?.name || "Vendedor"
-        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+        const storeImage = rawStore?.logo_url || rawStore?.image_url
+        const storeCity = rawStore?.addresses?.[0]?.city || null
+        const storeState = rawStore?.addresses?.[0]?.state || null
         const partner = rawPartner ? {
             ...rawPartner,
             store_id: storeId,
             store_name: storeName,
             store_image_url: storeImage,
-            store_avatar: storeImage || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
-            latitude: rawPartner.latitude,
-            longitude: rawPartner.longitude,
+            store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+            latitude: rawStore?.latitude,
+            longitude: rawStore?.longitude,
             city: storeCity,
             state: storeState,
         } : null
@@ -894,7 +901,7 @@ async function searchMarketplacePostgresFTS(
                     : servLimit
 
     try {
-        const { data: hits, error } = await supabase.rpc("search_marketplace", {
+        const { data: hits, error } = await supabase.rpc("search_marketplace_fts", {
             p_query: query,
             p_type: type,
             p_limit: limitCount,
@@ -1206,18 +1213,18 @@ async function searchMarketplaceByCity(
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeId = rawStore?.id || rawPartner?.id
-        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
-        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+        const storeName = rawStore?.name || "Vendedor"
+        const storeImage = rawStore?.logo_url || rawStore?.image_url
+        const storeCity = rawStore?.addresses?.[0]?.city || null
+        const storeState = rawStore?.addresses?.[0]?.state || null
         const partner = rawPartner ? {
             ...rawPartner,
             store_id: storeId,
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-            latitude: rawPartner.latitude,
-            longitude: rawPartner.longitude,
+            latitude: rawStore?.latitude,
+            longitude: rawStore?.longitude,
             city: storeCity,
             state: storeState
         } : null
@@ -1237,18 +1244,18 @@ async function searchMarketplaceByCity(
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeId = rawStore?.id || rawPartner?.id
-        const storeName = rawStore?.name || rawPartner?.store_name || "Vendedor"
-        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+        const storeName = rawStore?.name || "Vendedor"
+        const storeImage = rawStore?.logo_url || rawStore?.image_url
+        const storeCity = rawStore?.addresses?.[0]?.city || null
+        const storeState = rawStore?.addresses?.[0]?.state || null
         const partner = rawPartner ? {
             ...rawPartner,
             store_id: storeId,
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-            latitude: rawPartner.latitude,
-            longitude: rawPartner.longitude,
+            latitude: rawStore?.latitude,
+            longitude: rawStore?.longitude,
             city: storeCity,
             state: storeState
         } : null

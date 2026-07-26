@@ -115,7 +115,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
         }
       }
     }
-    const image = firstImage || store.logo_url || partner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const image = firstImage || store.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
     return {
       id: item.id,
       name: item.name,
@@ -130,7 +130,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     }
   })
 
-  normalizeBusinessInfo(store.business_info || partner?.business_info)
+  normalizeBusinessInfo(store.business_info || partner?.business_info || { sells: ["products"] })
 
   const productCategories = Array.from(new Set(filteredProducts?.map((p: any) => p.category).filter(Boolean))) as string[]
   const serviceCategories = Array.from(new Set(filteredServices?.map((s: any) => s.category).filter(Boolean))) as string[]
@@ -139,7 +139,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const yearsOnPlatform = new Date().getFullYear() - createdDate.getFullYear() || 1
 
   const stats = {
-    salesCount: Number(store.vendas_totais ?? partner?.vendas_totais ?? 0),
+    salesCount: Number(store.vendas_totais ?? 0),
     reviewsCount: statsBase?.reviewsCount || 0,
     yearsOnPlatform,
     itemsCount: (filteredProducts?.length || 0) + (filteredServices?.length || 0),
@@ -153,14 +153,14 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const address = store.addresses?.[0]
   const storeCity = address?.city || store.city || ""
   const storeState = address?.state || store.state || ""
-  const storeRating = Number(store.rating ?? partner?.rating ?? 0)
+  const storeRating = Number(store.rating ?? 0)
 
   const schemaJsonLd = {
     '@context': 'https://schema.org',
     '@type': ['Store', 'LocalBusiness', 'Organization'],
     name: store.name,
-    image: store.logo_url || store.image_url || partner?.store_image_url || 'https://img.dudit.com.br/static/Logo.png',
-    description: store.description || partner?.store_description,
+    image: store.logo_url || store.image_url || 'https://img.dudit.com.br/static/Logo.png',
+    description: store.description || '',
     address: {
       '@type': 'PostalAddress',
       streetAddress: address?.street || '',
@@ -169,7 +169,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       postalCode: address?.zip_code || '',
       addressCountry: 'BR',
     },
-    telephone: store.phone || store.whatsapp_phone || partner?.phone || '',
+    telephone: store.phone || store.whatsapp_phone || '',
     aggregateRating: storeRating > 0 ? {
       '@type': 'AggregateRating',
       ratingValue: storeRating.toFixed(1),
@@ -214,8 +214,8 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const partnerData = {
     id: store.id,
     storeName: store.name || "Loja",
-    storeDescription: store.description || partner?.store_description || "",
-    storeImageUrl: store.logo_url || store.image_url || partner?.store_image_url || null,
+    storeDescription: store.description || "",
+    storeImageUrl: store.logo_url || store.image_url || null,
     profile_image_url: null,
     city: address?.city || store.city || "",
     state: address?.state || store.state || "",
@@ -225,17 +225,17 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     zipCode: address?.zip_code || "",
     rating: storeRating,
     createdAt: store.created_at || partner?.created_at,
-    offeringType: (() => { const sells = (store.business_info as any)?.sells || (partner?.business_info as any)?.sells || ['products']; return sells.includes('products') && sells.includes('services') ? 'both' : sells.includes('services') ? 'services' : 'products' })(),
-    openingHours: store.opening_hours || partner?.opening_hours || null,
-    phone: store.phone || store.whatsapp_phone || partner?.phone || "",
+    offeringType: (() => { const sells = (store.business_info as any)?.sells || ['products']; return sells.includes('products') && sells.includes('services') ? 'both' : sells.includes('services') ? 'services' : 'products' })(),
+    openingHours: store.opening_hours || null,
+    phone: store.phone || store.whatsapp_phone || "",
     lat: store.latitude || null,
     lng: store.longitude || null,
-    businessInfo: store.business_info || partner?.business_info || null,
-    paymentMethods: store.payment_methods?.length ? store.payment_methods : (partner?.payment_methods || []),
-    banner_url: store.banner_url || partner?.banner_url || null,
+    businessInfo: store.business_info || null,
+    paymentMethods: store.payment_methods?.length ? store.payment_methods : [],
+    banner_url: store.banner_url || null,
     gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',
-    isShowcaseActive: store.is_showcase_active ?? partner?.is_showcase_active ?? true,
+    isShowcaseActive: store.is_showcase_active ?? true,
   }
 
   return (

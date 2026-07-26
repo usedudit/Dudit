@@ -410,8 +410,7 @@ export async function updatePartnerAction(
     try {
       const coords = await geocodeAddress(fullAddressString)
       if (coords) {
-        updateData.latitude = coords.lat
-        updateData.longitude = coords.lng
+        await supabase.from("stores").update({ latitude: coords.lat, longitude: coords.lng }).eq("partner_id", partnerId)
       }
     } catch (e) {
       console.error("[updatePartnerAction] Geocoding failed:", e)

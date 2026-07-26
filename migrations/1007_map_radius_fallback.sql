@@ -23,38 +23,39 @@ SECURITY INVOKER
 AS $$
     SELECT 
         p.id,
-        p.store_name,
-        p.store_image_url,
-        p.store_description,
+        s.name AS store_name,
+        s.logo_url AS store_image_url,
+        s.description AS store_description,
         p.business_type,
-        p.latitude,
-        p.longitude,
-        p.opening_hours,
-        p.rating,
+        s.latitude,
+        s.longitude,
+        s.opening_hours,
+        s.rating,
         COALESCE(
            (SELECT CONCAT(a.street, ', ', a.number, ' - ', a.city) 
             FROM public.addresses a 
-            WHERE a.partner_id = p.id AND a.is_default = true 
+            WHERE a.store_id = s.id AND a.is_default = true 
             LIMIT 1), 
            'Sem endereço cadastrado'
         ) AS address_display,
-        -- Haversine formula
         (6371 * acos(
             cos(radians(center_lat)) 
-            * cos(radians(p.latitude)) 
-            * cos(radians(p.longitude) - radians(center_lng)) 
-            + sin(radians(center_lat)) * sin(radians(p.latitude))
+            * cos(radians(s.latitude)) 
+            * cos(radians(s.longitude) - radians(center_lng)) 
+            + sin(radians(center_lat)) * sin(radians(s.latitude))
         )) AS distance_km
     FROM public.partners p
+    JOIN public.stores s ON s.partner_id = p.id AND s.is_headquarters = true
     WHERE 
         p.is_active = true AND
-        p.latitude IS NOT NULL AND
-        p.longitude IS NOT NULL AND
+        s.is_active = true AND
+        s.latitude IS NOT NULL AND
+        s.longitude IS NOT NULL AND
         (6371 * acos(
             cos(radians(center_lat)) 
-            * cos(radians(p.latitude)) 
-            * cos(radians(p.longitude) - radians(center_lng)) 
-            + sin(radians(center_lat)) * sin(radians(p.latitude))
+            * cos(radians(s.latitude)) 
+            * cos(radians(s.longitude) - radians(center_lng)) 
+            + sin(radians(center_lat)) * sin(radians(s.latitude))
         )) <= radius_km
     ORDER BY distance_km ASC
     LIMIT max_limit;

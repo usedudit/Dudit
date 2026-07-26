@@ -545,14 +545,14 @@ export async function getSmartDeliverySuggestionsAction(input: {
 
   if (error) return { success: false as const, error: error.message }
 
-  // origin coords: partners table has persisted latitude/longitude (used elsewhere)
-  const { data: partner } = await supabase
-    .from("partners")
+  // origin coords: stores table has persisted latitude/longitude
+  const { data: store } = await supabase
+    .from("stores")
     .select("latitude, longitude")
-    .eq("id", input.partnerId)
+    .eq("partner_id", input.partnerId)
     .maybeSingle()
-  const originCoords = partner?.latitude && partner?.longitude
-    ? { lat: Number(partner.latitude), lng: Number(partner.longitude) }
+  const originCoords = store?.latitude && store?.longitude
+    ? { lat: Number(store.latitude), lng: Number(store.longitude) }
     : null
 
   const eligible = (orders || [])

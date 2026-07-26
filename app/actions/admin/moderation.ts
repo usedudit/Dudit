@@ -160,7 +160,7 @@ export async function getModerationQueue(
             store_logo_url: st?.logo_url || undefined,
             owner_user_id: p.partner?.user_id || undefined,
             moderation_status: p.moderation_status,
-            risk_score: st?.risk_score ?? p.partner?.risk_score ?? 0,
+            risk_score: st?.risk_score ?? 0,
             created_at: p.created_at,
         }
     })
@@ -360,7 +360,7 @@ export async function approveModeration(
 
     const { data: entity, error: fetchError } = await supabase
         .from(type === "product" ? "products" : "partners")
-        .select(type === "product" ? "id, name, moderation_status, images" : "id, store_name")
+        .select(type === "product" ? "id, name, moderation_status, images" : "id, stores!left(name)")
         .eq("id", entityId)
         .single()
 
@@ -390,7 +390,7 @@ export async function approveModeration(
         targetId: entityId,
         metadata: {
             previousStatus: type === "product" ? entity.moderation_status : "approved",
-            name: type === "product" ? entity.name : entity.store_name
+            name: type === "product" ? entity.name : entity.stores?.[0]?.name
         },
     })
 
@@ -614,7 +614,7 @@ export async function rejectModeration(
     // Anti-IDOR
     const { data: entity, error: fetchError } = await supabase
         .from(type === "product" ? "products" : "partners")
-        .select(type === "product" ? "id, name, moderation_status, partner_id" : "id, store_name")
+        .select(type === "product" ? "id, name, moderation_status, partner_id" : "id, stores!left(name)")
         .eq("id", entityId)
         .single()
 
@@ -650,7 +650,7 @@ export async function rejectModeration(
         metadata: {
             reason: reason.trim(),
             previousStatus: type === "product" ? entity.moderation_status : "approved",
-            name: type === "product" ? entity.name : entity.store_name,
+            name: type === "product" ? entity.name : entity.stores?.[0]?.name,
             riskScoreAdded: type === "product" ? 3 : 0
         },
     })

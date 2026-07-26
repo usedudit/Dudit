@@ -930,8 +930,8 @@ export async function getServiceOrderByTokenAction(
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
         customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
         public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
-        partners (
-          id, store_name, store_image_url, phone
+        stores!left (
+          id, name, logo_url, phone
         )
       `)
       .eq("public_token", token)
@@ -946,8 +946,8 @@ export async function getServiceOrderByTokenAction(
           total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
           customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
           public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
-          partners (
-            id, store_name, store_image_url, phone
+          stores!left (
+            id, name, logo_url, phone
           )
         `)
         .eq("id", token)
@@ -1037,8 +1037,8 @@ export async function getServiceOrderByTokenAction(
       priority: row.priority,
       estimated_hours: row.estimated_hours,
       expected_completion_time: row.expected_completion_time,
-      partners: row.partners ? {
-        ...(Array.isArray(row.partners) ? row.partners[0] : row.partners),
+      partners: row.stores ? {
+        ...(Array.isArray(row.stores) ? row.stores[0] : row.stores),
         address: partnerAddress,
         plan_tier: planTier,
       } : null,

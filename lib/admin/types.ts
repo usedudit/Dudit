@@ -180,7 +180,8 @@ export interface FetchedProduct {
     moderation_status: string
     is_active: boolean
     created_at: string
-    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
+    partner: { id: string; store_name?: string } | null
+    store?: { id: string; name: string; risk_score: number } | null
     variants: FetchedVariant[] | null
 }
 
@@ -210,7 +211,8 @@ export interface FetchedService {
     moderation_status: string
     is_active: boolean
     created_at: string
-    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
+    partner: { id: string; store_name?: string } | null
+    store?: { id: string; name: string; risk_score: number } | null
 }
 
 export interface FetchedRecurringPlan {
@@ -221,7 +223,8 @@ export interface FetchedRecurringPlan {
     frequency_type: string
     show_in_marketplace: boolean
     created_at: string
-    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
+    partner: { id: string; store_name?: string } | null
+    store?: { id: string; name: string; risk_score: number } | null
     items: FetchedRecurringPlanItem[] | null
 }
 
@@ -241,10 +244,10 @@ export interface FetchedPartner {
     store_image_url: string | null
     banner_url: string | null
     gallery: string[] | null
-    risk_score: number
+    risk_score?: number
     is_active: boolean
     created_at: string
-    owner: { full_name: string; email: string; risk_score: number } | null
+    owner: { full_name: string; email: string; risk_score?: number } | null
 }
 
 export interface FetchedReview {
@@ -254,7 +257,8 @@ export interface FetchedReview {
     is_hidden: boolean
     created_at: string
     user: { full_name: string | null } | null
-    partner: { id: string; store_name: string; stores?: { name: string }[]; risk_score: number } | null
+    partner: { id: string; store_name?: string } | null
+    store?: { id: string; name: string; risk_score: number } | null
     product: { id: string; name: string } | null
 }
 
