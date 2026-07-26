@@ -253,7 +253,7 @@ const getCachedPartnerIdsByTier = (
 
         const { data: stores, error } = await supabase
             .from("stores")
-            .select("partner_id, addresses!inner(city, state)")
+            .select("partner_id, addresses!store_id!inner(city, state)")
             .eq("is_active", true)
 
         if (error) {
@@ -369,7 +369,7 @@ const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days,
 const PARTNER_JOIN = `partners!inner(
     id, is_showcase_active
 ),
-stores!inner(
+stores!left(
     id, name, description, logo_url, banner_url,
     phone, is_showcase_active,
     addresses!store_id!left(city, state, latitude, longitude)

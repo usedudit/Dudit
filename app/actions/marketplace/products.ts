@@ -455,7 +455,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       id, partner_id, name, description, logo_url, banner_url,
       rating, latitude, longitude,
       created_at,
-      addresses!inner(city, state)
+      addresses!store_id!inner(city, state)
     `)
     .eq("is_active", true)
     .ilike("addresses.state", state)

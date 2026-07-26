@@ -18,6 +18,56 @@ ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS active_subscriptions_count IN
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS cancellation_rate NUMERIC DEFAULT 0;
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'America/Sao_Paulo';
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS pickup_payment_policy TEXT;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS fts tsvector;
+
+CREATE OR REPLACE FUNCTION public.refresh_store_marketplace_fts(p_store_id UUID DEFAULT NULL)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.stores st
+  SET fts = public.build_marketplace_tsvector(
+    st.name,
+    pt.mp_search_category_text,
+    NULL,
+    NULL,
+    st.description,
+    st.name,
+    NULL
+  )
+  FROM public.partners pt
+  WHERE pt.id = st.partner_id
+    AND (p_store_id IS NULL OR st.id = p_store_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.trg_stores_marketplace_fts()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.refresh_store_marketplace_fts(NEW.id);
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_stores_marketplace_fts ON public.stores;
+CREATE TRIGGER trg_stores_marketplace_fts
+  AFTER INSERT OR UPDATE OF name, description, partner_id
+  ON public.stores
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trg_stores_marketplace_fts();
+
+-- Backfill stores.fts
+SELECT public.refresh_store_marketplace_fts(NULL);
+
+CREATE INDEX IF NOT EXISTS idx_stores_fts ON public.stores USING GIN (fts);
+CREATE INDEX IF NOT EXISTS idx_stores_active_fts ON public.stores (is_active) WHERE is_active = true;
 
 -- ─── 2. Backfill stores metrics & settings from partners if stores column is default/null ─────
 DO $$
@@ -689,7 +739,25 @@ BEGIN
       AND rp.show_in_marketplace = true
       AND NOT public.mp_store_risk_is_hidden(st.risk_score)
       AND (p_partner_ids IS NULL OR rp.partner_id = ANY(p_partner_ids))
-      AND (p_store_ids IS NULL OR (rp.store_id IS NOT NULL AND rp.store_id = ANY(p_store_ids)))
+      UNION ALL
+
+    SELECT
+      'loja'::TEXT,
+      st.id,
+      (st.marketplace_reputation::REAL
+        * CASE WHEN st.is_showcase_active = false THEN 0.01 ELSE 1.0 END
+        * public.mp_store_risk_rank_multiplier(st.risk_score)
+      ),
+      st.created_at,
+      st.partner_id,
+      st.id AS store_id
+    FROM public.stores st
+    JOIN public.partners pt ON pt.id = st.partner_id
+    WHERE p_type IN ('tudo', 'vitrines')
+      AND st.is_active = true
+      AND NOT public.mp_store_risk_is_hidden(st.risk_score)
+      AND (p_partner_ids IS NULL OR st.partner_id = ANY(p_partner_ids))
+      AND (p_store_ids IS NULL OR st.id = ANY(p_store_ids))
   )
   SELECT c.item_type, c.id, c.score, c.created_at, c.partner_id, c.store_id
   FROM combined c
@@ -698,6 +766,106 @@ BEGIN
     OR p_cursor_id IS NULL
     OR (c.score < p_cursor_score OR (c.score = p_cursor_score AND c.id < p_cursor_id))
   ORDER BY c.score DESC, c.id DESC
+  LIMIT greatest(p_limit, 1);
+END;
+$$;
+
+-- Autocomplete RPC update for stores
+CREATE OR REPLACE FUNCTION public.marketplace_search_autocomplete(
+  p_query TEXT,
+  p_type TEXT DEFAULT 'tudo',
+  p_limit INT DEFAULT 10,
+  p_partner_ids UUID[] DEFAULT NULL
+)
+RETURNS TABLE (
+  item_type TEXT,
+  id UUID,
+  label TEXT,
+  score REAL
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+DECLARE
+  v_norm TEXT;
+BEGIN
+  v_norm := public.normalize_search_text(p_query);
+  IF length(v_norm) < 2 THEN RETURN; END IF;
+
+  RETURN QUERY
+  WITH combined AS (
+    SELECT
+      'produto'::TEXT AS item_type,
+      p.id,
+      p.name AS label,
+      GREATEST(
+        CASE WHEN public.normalize_search_text(p.name) LIKE v_norm || '%' THEN 1.0 ELSE 0 END,
+        word_similarity(v_norm, public.normalize_search_text(p.name))
+      )::REAL AS score
+    FROM public.products p
+    WHERE (p_type IN ('tudo', 'produtos'))
+      AND p.is_active = TRUE AND p.show_in_marketplace = TRUE
+      AND (p_partner_ids IS NULL OR p.partner_id = ANY(p_partner_ids))
+      AND (
+        public.normalize_search_text(p.name) LIKE v_norm || '%'
+        OR public.normalize_search_text(p.name) % v_norm
+      )
+
+    UNION ALL
+
+    SELECT
+      'servico'::TEXT, s.id, s.name,
+      GREATEST(
+        CASE WHEN public.normalize_search_text(s.name) LIKE v_norm || '%' THEN 1.0 ELSE 0 END,
+        word_similarity(v_norm, public.normalize_search_text(s.name))
+      )::REAL
+    FROM public.services s
+    WHERE (p_type IN ('tudo', 'servicos'))
+      AND s.is_active = TRUE AND s.show_in_marketplace = TRUE
+      AND (p_partner_ids IS NULL OR s.partner_id = ANY(p_partner_ids))
+      AND (
+        public.normalize_search_text(s.name) LIKE v_norm || '%'
+        OR public.normalize_search_text(s.name) % v_norm
+      )
+
+    UNION ALL
+
+    SELECT
+      'plano'::TEXT, rp.id, rp.name,
+      GREATEST(
+        CASE WHEN public.normalize_search_text(rp.name) LIKE v_norm || '%' THEN 1.0 ELSE 0 END,
+        word_similarity(v_norm, public.normalize_search_text(rp.name))
+      )::REAL
+    FROM public.recurring_plans rp
+    WHERE (p_type IN ('tudo', 'planos'))
+      AND rp.status = 'active' AND rp.show_in_marketplace = TRUE
+      AND (p_partner_ids IS NULL OR rp.partner_id = ANY(p_partner_ids))
+      AND (
+        public.normalize_search_text(rp.name) LIKE v_norm || '%'
+        OR public.normalize_search_text(rp.name) % v_norm
+      )
+
+    UNION ALL
+
+    SELECT
+      'loja'::TEXT, st.id, st.name AS label,
+      GREATEST(
+        CASE WHEN public.normalize_search_text(st.name) LIKE v_norm || '%' THEN 1.0 ELSE 0 END,
+        word_similarity(v_norm, public.normalize_search_text(st.name))
+      )::REAL
+    FROM public.stores st
+    WHERE (p_type IN ('tudo', 'vitrines'))
+      AND st.is_active = TRUE
+      AND (p_partner_ids IS NULL OR st.partner_id = ANY(p_partner_ids))
+      AND (
+        public.normalize_search_text(st.name) LIKE v_norm || '%'
+        OR public.normalize_search_text(st.name) % v_norm
+      )
+  )
+  SELECT c.item_type, c.id, c.label, c.score
+  FROM combined c
+  ORDER BY c.score DESC, c.label ASC
   LIMIT greatest(p_limit, 1);
 END;
 $$;

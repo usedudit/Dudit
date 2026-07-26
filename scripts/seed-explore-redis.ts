@@ -81,21 +81,31 @@ async function seedRedis() {
             id, name, description, price, promotional_price, images, rating, status,
             category_id, category:product_categories!category_id(name), created_at,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
-            partners(id),
-            stores(id, name, logo_url, addresses!store_id!left(city, state)),
+            partners(id, is_showcase_active),
+            stores(id, name, logo_url, banner_url, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("status", "ativo")
         .eq("show_in_marketplace", true)
 
     if (produtos) {
-        for (const item of produtos) {
+        for (const item of (produtos as any[])) {
             const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-            const partner = rawPartner ? {
-                ...rawPartner,
-                store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                latitude: rawPartner.latitude, longitude: rawPartner.longitude,
-                city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
+            const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+            const storeName = rawStore?.name || "Vendedor"
+            const storeImage = rawStore?.logo_url || null
+            const storeCity = rawStore?.addresses?.[0]?.city || null
+            const storeState = rawStore?.addresses?.[0]?.state || null
+            const partner = rawPartner || rawStore ? {
+                id: rawPartner?.id || rawStore?.id,
+                store_id: rawStore?.id || rawPartner?.id,
+                store_name: storeName,
+                store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                store_image_url: storeImage,
+                banner_url: rawStore?.banner_url || null,
+                city: storeCity,
+                state: storeState,
+                is_showcase_active: rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true
             } : null
             const variantFallback = extractFirstVariantFallback((item as any).product_variants)
             const { product_variants, ...rest } = item
@@ -127,19 +137,29 @@ async function seedRedis() {
         .select(`
             id, name, description, price, images, rating, created_at,
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-            partners(id),
-            stores(id, name, logo_url, addresses!store_id!left(city, state))
+            partners(id, is_showcase_active),
+            stores(id, name, logo_url, banner_url, addresses(city, state))
         `)
         .eq("status", "ativo")
 
     if (servicos) {
-        for (const item of servicos) {
+        for (const item of (servicos as any[])) {
             const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-            const partner = rawPartner ? {
-                ...rawPartner,
-                store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                latitude: rawPartner.latitude, longitude: rawPartner.longitude,
-                city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
+            const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+            const storeName = rawStore?.name || "Vendedor"
+            const storeImage = rawStore?.logo_url || null
+            const storeCity = rawStore?.addresses?.[0]?.city || null
+            const storeState = rawStore?.addresses?.[0]?.state || null
+            const partner = rawPartner || rawStore ? {
+                id: rawPartner?.id || rawStore?.id,
+                store_id: rawStore?.id || rawPartner?.id,
+                store_name: storeName,
+                store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                store_image_url: storeImage,
+                banner_url: rawStore?.banner_url || null,
+                city: storeCity,
+                state: storeState,
+                is_showcase_active: rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true
             } : null
             
             const servicoNormalizado = { ...item, itemType: 'servico', partners: partner }
@@ -162,27 +182,38 @@ async function seedRedis() {
         .from("stores")
         .select(`
             id, name, description, logo_url, banner_url, rating, created_at, partner_id,
-            addresses!store_id!left(city, state),
-            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
+            addresses(city, state),
+            partners(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
 
     if (vitrines) {
-        for (const item of vitrines) {
+        for (const item of (vitrines as any[])) {
             const city = item.addresses?.[0]?.city || null
             const state = item.addresses?.[0]?.state || null
-            const reviewsCount = item.reviews?.[0]?.count || 0
-            const cat = item.category as any
+            const p = item.partners as any
+            const reviewsCount = p?.reviews?.[0]?.count || 0
+            const cat = p?.category as any
             const categoryName = cat?.parent?.name || cat?.name || 'Loja Parceira'
+            const storeName = item.name || "Loja"
+            const storeImage = item.logo_url
             const vitrineNormalizada = {
-                id: item.id, name: item.store_name, description: item.store_description,
-                images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
-                rating: item.rating, itemType: 'loja', category: categoryName,
+                id: item.id,
+                name: storeName,
+                description: item.description || "",
+                images: [item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
+                rating: item.rating || 0,
+                itemType: 'loja',
+                category: categoryName,
                 partners: {
-                    id: item.id, store_name: item.store_name,
-                    store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    id: item.partner_id || item.id,
+                    store_id: item.id,
+                    store_name: storeName,
+                    store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+                    store_image_url: storeImage,
                     banner_url: item.banner_url || null,
-                    latitude: item.latitude, longitude: item.longitude,
+                    latitude: (item as any).latitude || null,
+                    longitude: (item as any).longitude || null,
                     city, state, reviewsCount
                 }
             }

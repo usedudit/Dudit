@@ -189,21 +189,27 @@ export async function syncToExploreRedis({
         if (dbData) {
           const city = dbData.addresses?.[0]?.city || null
           const state = dbData.addresses?.[0]?.state || null
-          const reviewsCount = dbData.reviews?.[0]?.count || 0
-          const categoryName = dbData.category?.parent?.name || dbData.category?.name || 'Loja Parceira'
+          const p = dbData.partners as any
+          const reviewsCount = p?.reviews?.[0]?.count || 0
+          const cat = p?.category
+          const categoryName = cat?.parent?.name || cat?.name || 'Loja Parceira'
           finalData = {
             id: dbData.id,
             name: dbData.name || "Loja",
             description: dbData.description || "",
             images: [dbData.banner_url || dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
-            rating: dbData.rating,
+            rating: dbData.rating || 0,
             category: categoryName,
             partners: {
-              ...dbData,
+              id: dbData.partner_id || dbData.id,
+              store_id: dbData.id,
+              store_name: dbData.name || "Loja",
+              store_avatar: dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+              store_image_url: dbData.logo_url,
+              banner_url: dbData.banner_url || null,
               city,
               state,
-              reviewsCount,
-              store_avatar: dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
+              reviewsCount
             },
             created_at: dbData.created_at,
             updated_at: dbData.updated_at
