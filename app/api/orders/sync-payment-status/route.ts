@@ -125,12 +125,27 @@ export async function POST(request: NextRequest) {
       ? Number(paymentData.transaction_amount) - Number(paymentData.transaction_details.net_received_amount)
       : null;
 
+    const feeDetailsRaw = Array.isArray(paymentData.fee_details) ? paymentData.fee_details : []
+    const mpFeeDetails = feeDetailsRaw.map((fd: any) => ({
+      type: String(fd.type || ""),
+      amount: Number(fd.amount || 0),
+      fee_payer: String(fd.fee_payer || ""),
+    }))
+
+    const cardData = paymentData.card || null
+    const mpCardLastDigits = cardData?.last_four_digits ? String(cardData.last_four_digits) : null
+    const mpCardFirstDigits = cardData?.first_six_digits ? String(cardData.first_six_digits) : null
+    const mpCardholderName = cardData?.cardholder?.name ? String(cardData.cardholder.name) : null
+    const mpInstallmentAmount = paymentData.transaction_details?.installment_amount != null
+      ? Number(paymentData.transaction_details.installment_amount)
+      : null
+
     const paymentMethodName =
       String(paymentData.payment_method_id || "").toLowerCase() === "pix"
         ? "Pix"
         : paymentData.payment_method?.type || order.payment_method || "Mercado Pago"
 
-    const mpLeg = {
+    const mpLeg: Record<string, unknown> = {
       method: paymentMethodName,
       amount: Number(paymentData.transaction_amount || 0),
       effectiveAmount: Number(paymentData.transaction_amount || 0),
@@ -141,10 +156,25 @@ export async function POST(request: NextRequest) {
       adjustmentAmount: 0,
       installmentNumber: paymentData.installments ?? 1,
       feeAmount: totalFeeAmount ?? 0,
+      fixedFeeAmount: 0,
+      interestAmount: 0,
+      feeBearer: "merchant",
       paymentMethodId: paymentData.payment_method_id ?? null,
       paymentTypeId: paymentData.payment_type_id ?? null,
       paymentStatus: paymentData.status ?? null,
       paymentStatusDetail: paymentData.status_detail ?? null,
+    }
+
+    if (mpFeeDetails.length > 0) {
+      mpLeg.feeDetails = mpFeeDetails
+    }
+    if (mpInstallmentAmount != null) {
+      mpLeg.installmentAmount = mpInstallmentAmount
+    }
+    if (mpCardLastDigits) {
+      mpLeg.cardLastDigits = mpCardLastDigits
+      mpLeg.cardFirstDigits = mpCardFirstDigits
+      mpLeg.cardholderName = mpCardholderName
     }
 
     const oldBreakdown = Array.isArray(order.payment_breakdown) ? [...order.payment_breakdown] : []
@@ -174,6 +204,11 @@ export async function POST(request: NextRequest) {
         mpPaymentTypeId: paymentData.payment_type_id ?? null,
         mpPaymentStatus: paymentData.status ?? null,
         mpPaymentStatusDetail: paymentData.status_detail ?? null,
+        mpFeeDetails: mpFeeDetails.length > 0 ? mpFeeDetails : null,
+        mpCardLastDigits: mpCardLastDigits,
+        mpCardFirstDigits: mpCardFirstDigits,
+        mpCardholderName: mpCardholderName,
+        mpInstallmentAmount: mpInstallmentAmount,
       })
       newOrderStatus = approvedUpdate.situation as string
     } else if (paymentData.status === "in_process") {

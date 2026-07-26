@@ -67,6 +67,16 @@ export type PaymentBreakdownEntry = {
   interestAmount?: number
   feeAmount?: number
   fixedFeeAmount?: number
+  /** Mercado Pago specific fields */
+  provider?: string
+  paymentTypeId?: string | null
+  paymentStatus?: string | null
+  paymentStatusDetail?: string | null
+  feeDetails?: Array<{ type: string; amount: number; feePayer: string }>
+  installmentAmount?: number
+  cardLastDigits?: string | null
+  cardFirstDigits?: string | null
+  cardholderName?: string | null
 }
 
 export type PaymentBreakdownResult = {

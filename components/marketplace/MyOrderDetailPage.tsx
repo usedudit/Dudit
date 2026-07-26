@@ -712,10 +712,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (pm.includes("boleto")) baseLabel = "Boleto";
             else baseLabel = order.payment_method || order.payment_provider || "Pix";
         }
-        const mpLeg = breakdown.find((e: any) => String(e?.provider || "").toLowerCase().includes("mercado pago") || String(e?.method || "").toLowerCase().includes("mercado pago"));
-        const mpInstallments = mpLeg?.installmentNumber || order.installments || 1;
-        if (mpInstallments > 1) {
-            baseLabel = `${baseLabel} - ${mpInstallments}x`;
+        const paymentEntry = breakdown.find((e: any) => e?.method && !e?.checkoutPricing);
+        const installmentCount = paymentEntry?.installmentNumber || order.installments || 1;
+        if (installmentCount > 1) {
+            baseLabel = `${baseLabel} - ${installmentCount}x`;
         }
         if (order.payment_provider === "Mercado Pago") {
             return `Mercado Pago (${baseLabel})`;

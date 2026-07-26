@@ -261,11 +261,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const hasPendingPayment = order.situation !== "paid" && order.situation !== "cancelled" && remainingPaymentAmount > 0.009
 
     const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+    const paymentEntry = breakdown.find((e: any) => e?.method && !e?.checkoutPricing);
+    const installmentCount = paymentEntry?.installmentNumber || 1;
     const mpLeg = breakdown.find((e: any) => String(e?.provider || "").toLowerCase().includes("mercado pago") || String(e?.method || "").toLowerCase().includes("mercado pago"));
-    const mpInstallments = mpLeg?.installmentNumber || 1;
     const mpPaymentStatus = mpLeg?.paymentStatus;
     const mpPaymentStatusDetail = mpLeg?.paymentStatusDetail;
     const mpTotalFeeAmount = mpLeg?.feeAmount;
+    const mpFeeDetails: Array<{ type: string; amount: number; feePayer: string }> | undefined = mpLeg?.feeDetails;
     const mpNetReceivedAmount = mpLeg?.amountReceived;
 
     const getPaymentTypeLabel = () => {
@@ -276,10 +278,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         let label = formatPaymentMethodLabel(rawMethod, null);
         if (!label) label = "Não informado";
 
+        if (installmentCount && installmentCount > 1) {
+            label = `${label} - ${installmentCount}x`;
+        }
         if (order.payment_provider === "Mercado Pago") {
-            if (mpInstallments && mpInstallments > 1) {
-                label = `${label} - ${mpInstallments}x`;
-            }
             if (!label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
                 return `${label} (Mercado Pago)`;
             }
@@ -919,16 +921,29 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             label="Status do Pagamento (MP)"
                                                                             value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{mpPaymentStatus} {mpPaymentStatusDetail ? `(${mpPaymentStatusDetail})` : ""}</span>} />
                                                                     )}
-                                                                    {mpInstallments && mpInstallments > 1 && (
+                                                                    {installmentCount > 1 && (
                                                                         <PaymentRow
                                                                             label="Parcelas"
-                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{mpInstallments}x</span>} />
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{installmentCount}x</span>} />
                                                                     )}
                                                                     {mpTotalFeeAmount != null && (
                                                                         <PaymentRow
                                                                             label="Taxa do Mercado Pago"
                                                                             value={<span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">{formatCurrency(mpTotalFeeAmount)}</span>} />
                                                                     )}
+                                                                    {Array.isArray(mpFeeDetails) && mpFeeDetails.length > 0 && mpFeeDetails.map((fd, i) => {
+                                                                        const feeTypeLabel = fd.type === "mercadopago_fee" ? "Taxa MP"
+                                                                            : fd.type === "installment_fee" ? "Taxa de Parcelamento"
+                                                                            : fd.type === "coupon_fee" ? "Taxa de Cupom"
+                                                                            : fd.type === "application_fee" ? "Taxa de Aplicação"
+                                                                            : fd.type || `Taxa ${i + 1}`
+                                                                        return (
+                                                                            <PaymentRow
+                                                                                key={i}
+                                                                                label={feeTypeLabel}
+                                                                                value={<span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">{formatCurrency(fd.amount)}</span>} />
+                                                                        )
+                                                                    })}
                                                                     {mpNetReceivedAmount != null && (
                                                                         <PaymentRow
                                                                             label="Valor Líquido Recebido"

@@ -108,6 +108,10 @@ const OrderListItem = React.memo(
                                             if (methods.length > 0) {
                                                 pmLabel = methods.join(", ")
                                             }
+                                            const inst = breakdown.find((b: any) => b.installmentNumber && !b.checkoutPricing)
+                                            if (inst && inst.installmentNumber > 1) {
+                                                pmLabel = `${pmLabel} - ${inst.installmentNumber}x`
+                                            }
                                         }
                                         if (order.payment_provider === "Mercado Pago" && pmLabel) {
                                             pmLabel = `Mercado Pago (${pmLabel})`

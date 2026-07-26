@@ -34,6 +34,11 @@ export function buildMpApprovedPaymentUpdate(params: {
   mpPaymentTypeId?: string | null
   mpPaymentStatus?: string | null
   mpPaymentStatusDetail?: string | null
+  mpFeeDetails?: Array<{ type: string; amount: number | string; fee_payer: string }> | null
+  mpCardLastDigits?: string | null
+  mpCardFirstDigits?: string | null
+  mpCardholderName?: string | null
+  mpInstallmentAmount?: number | null
 }): {
   situation: string
   paid_amount: number
@@ -61,21 +66,42 @@ export function buildMpApprovedPaymentUpdate(params: {
       String(entry?.method || "").toLowerCase().includes("mercado pago"),
   )
 
-  const mpLeg = {
+  const mpLeg: Record<string, unknown> = {
     method: params.paymentMethodName,
     amount: chargeAmount,
     effectiveAmount: chargeAmount,
     amountReceived: params.mpNetReceivedAmount ?? chargeAmount,
     provider: "Mercado Pago",
-    adjustmentType: "none" as const,
+    adjustmentType: "none",
     adjustmentPercent: 0,
     adjustmentAmount: 0,
     installmentNumber: params.mpInstallments ?? 1,
     feeAmount: params.mpTotalFeeAmount ?? 0,
+    fixedFeeAmount: 0,
+    interestAmount: 0,
+    feeBearer: "merchant",
     paymentMethodId: params.mpPaymentMethodId ?? null,
     paymentTypeId: params.mpPaymentTypeId ?? null,
     paymentStatus: params.mpPaymentStatus ?? null,
     paymentStatusDetail: params.mpPaymentStatusDetail ?? null,
+  }
+
+  if (params.mpFeeDetails && params.mpFeeDetails.length > 0) {
+    mpLeg.feeDetails = params.mpFeeDetails.map((fd) => ({
+      type: fd.type,
+      amount: Number(fd.amount),
+      feePayer: fd.fee_payer,
+    }))
+  }
+
+  if (params.mpInstallmentAmount != null) {
+    mpLeg.installmentAmount = Number(params.mpInstallmentAmount)
+  }
+
+  if (params.mpCardLastDigits) {
+    mpLeg.cardLastDigits = params.mpCardLastDigits
+    mpLeg.cardFirstDigits = params.mpCardFirstDigits ?? null
+    mpLeg.cardholderName = params.mpCardholderName ?? null
   }
 
   const payment_breakdown =

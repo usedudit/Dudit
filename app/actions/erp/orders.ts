@@ -100,7 +100,11 @@ let ordersHasPosSaleColumn: boolean | null = null
 function isMissingOrdersPaymentMethodDeltaColumnsError(error: unknown): boolean {
     const message = String((error as any)?.message || "").toLowerCase()
     return (
-        (message.includes("payment_method_discount_amount") || message.includes("payment_method_extra_amount")) &&
+        (message.includes("payment_method_discount_amount") ||
+            message.includes("payment_method_extra_amount") ||
+            message.includes("payment_method_interest_amount") ||
+            message.includes("payment_method_fee_amount") ||
+            message.includes("payment_method_fixed_fee_amount")) &&
         message.includes("orders")
     )
 }
@@ -1460,6 +1464,15 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const discountBase = hasBreakdown ? Math.max(0, Number(data.subtotal || 0) || serverComputedTotal) : Math.max(serverComputedTotal, finalTotal)
     const paymentMethodDiscountAmount = Math.max(0, discountBase - finalTotal)
     const paymentMethodExtraAmount = Math.max(0, finalTotal - discountBase)
+    // Extract individual adjustment totals from payment breakdown for separate columns
+    let paymentMethodInterestAmount = 0
+    let paymentMethodFeeAmount = 0
+    let paymentMethodFixedFeeAmount = 0
+    for (const entry of sanitizedPaymentBreakdown) {
+        paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + Number(entry.interestAmount || 0))
+        paymentMethodFeeAmount = Math.max(0, paymentMethodFeeAmount + Number(entry.feeAmount || 0))
+        paymentMethodFixedFeeAmount = Math.max(0, paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+    }
     let serverTotalAmount = finalTotal
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
@@ -1530,6 +1543,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         discount_amount: couponDiscountAmount,
         payment_method_discount_amount: paymentMethodDiscountAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
+        payment_method_interest_amount: paymentMethodInterestAmount,
+        payment_method_fee_amount: paymentMethodFeeAmount,
+        payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
         coupon_id: couponIdToSave,
         delivery_fee: serverShippingCost,
         additional_costs: data.additionalCosts,
@@ -1557,6 +1573,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         const fallbackInsertPayload = { ...orderInsertPayload }
         delete (fallbackInsertPayload as any).payment_method_discount_amount
         delete (fallbackInsertPayload as any).payment_method_extra_amount
+        delete (fallbackInsertPayload as any).payment_method_interest_amount
+        delete (fallbackInsertPayload as any).payment_method_fee_amount
+        delete (fallbackInsertPayload as any).payment_method_fixed_fee_amount
         orderInsertResult = await supabase
             .from("orders")
             .insert(fallbackInsertPayload)
@@ -2312,6 +2331,15 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const updatePricingBase = hasUpdateBreakdown ? updateServerTotal : Math.max(updateServerTotal, updateFinalTotal)
     const updatePaymentMethodDiscountAmount = Math.max(0, updatePricingBase - updateFinalTotal)
     const updatePaymentMethodExtraAmount = Math.max(0, updateFinalTotal - updatePricingBase)
+    // Extract individual adjustment totals from payment breakdown for separate columns
+    let updatePaymentMethodInterestAmount = 0
+    let updatePaymentMethodFeeAmount = 0
+    let updatePaymentMethodFixedFeeAmount = 0
+    for (const entry of sanitizedPaymentBreakdown) {
+        updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + Number(entry.interestAmount || 0))
+        updatePaymentMethodFeeAmount = Math.max(0, updatePaymentMethodFeeAmount + Number(entry.feeAmount || 0))
+        updatePaymentMethodFixedFeeAmount = Math.max(0, updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+    }
     updateServerTotal = updateFinalTotal
     const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
@@ -2339,6 +2367,9 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         discount_amount: couponDiscountAmount,
         payment_method_discount_amount: updatePaymentMethodDiscountAmount,
         payment_method_extra_amount: updatePaymentMethodExtraAmount,
+        payment_method_interest_amount: updatePaymentMethodInterestAmount,
+        payment_method_fee_amount: updatePaymentMethodFeeAmount,
+        payment_method_fixed_fee_amount: updatePaymentMethodFixedFeeAmount,
         delivery_fee: updateServerShipping,
         additional_costs: data.additionalCosts,
         notes: sanitizeNotes(data.notes),
@@ -2361,6 +2392,9 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         const fallbackUpdatePayload = { ...orderUpdatePayload }
         delete (fallbackUpdatePayload as any).payment_method_discount_amount
         delete (fallbackUpdatePayload as any).payment_method_extra_amount
+        delete (fallbackUpdatePayload as any).payment_method_interest_amount
+        delete (fallbackUpdatePayload as any).payment_method_fee_amount
+        delete (fallbackUpdatePayload as any).payment_method_fixed_fee_amount
         orderUpdateResult = await supabase
             .from("orders")
             .update(fallbackUpdatePayload)

@@ -376,7 +376,22 @@ async function processWebhookWithRetry(
       ? Number(paymentInfo.transaction_amount) - Number(paymentInfo.transaction_details.net_received_amount)
       : null;
 
-    const mpLeg = {
+    const feeDetailsRaw = Array.isArray(paymentInfo.fee_details) ? paymentInfo.fee_details : []
+    const mpFeeDetails = feeDetailsRaw.map((fd: any) => ({
+      type: String(fd.type || ""),
+      amount: Number(fd.amount || 0),
+      fee_payer: String(fd.fee_payer || ""),
+    }))
+
+    const cardData = paymentInfo.card || null
+    const mpCardLastDigits = cardData?.last_four_digits ? String(cardData.last_four_digits) : null
+    const mpCardFirstDigits = cardData?.first_six_digits ? String(cardData.first_six_digits) : null
+    const mpCardholderName = cardData?.cardholder?.name ? String(cardData.cardholder.name) : null
+    const mpInstallmentAmount = paymentInfo.transaction_details?.installment_amount != null
+      ? Number(paymentInfo.transaction_details.installment_amount)
+      : null
+
+    const mpLeg: Record<string, unknown> = {
       method: paymentMethodName,
       amount: Number(paymentInfo.transaction_amount || 0),
       effectiveAmount: Number(paymentInfo.transaction_amount || 0),
@@ -387,10 +402,25 @@ async function processWebhookWithRetry(
       adjustmentAmount: 0,
       installmentNumber: paymentInfo.installments ?? 1,
       feeAmount: totalFeeAmount ?? 0,
+      fixedFeeAmount: 0,
+      interestAmount: 0,
+      feeBearer: "merchant",
       paymentMethodId: paymentInfo.payment_method_id ?? null,
       paymentTypeId: paymentInfo.payment_type_id ?? null,
       paymentStatus: paymentInfo.status ?? null,
       paymentStatusDetail: paymentInfo.status_detail ?? null,
+    }
+
+    if (mpFeeDetails.length > 0) {
+      mpLeg.feeDetails = mpFeeDetails
+    }
+    if (mpInstallmentAmount != null) {
+      mpLeg.installmentAmount = mpInstallmentAmount
+    }
+    if (mpCardLastDigits) {
+      mpLeg.cardLastDigits = mpCardLastDigits
+      mpLeg.cardFirstDigits = mpCardFirstDigits
+      mpLeg.cardholderName = mpCardholderName
     }
 
     const oldBreakdown = Array.isArray(orderData.payment_breakdown) ? [...orderData.payment_breakdown] : []
@@ -420,6 +450,11 @@ async function processWebhookWithRetry(
         mpPaymentTypeId: paymentInfo.payment_type_id ?? null,
         mpPaymentStatus: paymentInfo.status ?? null,
         mpPaymentStatusDetail: paymentInfo.status_detail ?? null,
+        mpFeeDetails: mpFeeDetails.length > 0 ? mpFeeDetails : null,
+        mpCardLastDigits: mpCardLastDigits,
+        mpCardFirstDigits: mpCardFirstDigits,
+        mpCardholderName: mpCardholderName,
+        mpInstallmentAmount: mpInstallmentAmount,
       })
       orderStatus = approvedUpdate.situation
       updateData = { ...updateData, ...approvedUpdate }
