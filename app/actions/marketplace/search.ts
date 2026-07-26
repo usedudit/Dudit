@@ -633,8 +633,8 @@ async function _searchMarketplaceInternal(
                     store_name: rawStore?.name,
                     store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                     store_image_url: storeImage,
-                    latitude: rawStore?.latitude,
-                    longitude: rawStore?.longitude,
+            latitude: rawStore?.addresses?.[0]?.latitude ?? null,
+            longitude: rawStore?.addresses?.[0]?.longitude ?? null,
                     city: rawStore?.addresses?.[0]?.city || null,
                     state: rawStore?.addresses?.[0]?.state || null
                 } : null
@@ -812,8 +812,8 @@ async function hydrateMarketplaceSearchHits(
                     store_image_url: storeImage,
                     store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                     banner_url: store?.banner_url || item.banner_url || null,
-                    latitude: item.latitude,
-                    longitude: item.longitude,
+                    latitude: store?.addresses?.[0]?.latitude || item.addresses?.[0]?.latitude || null,
+                    longitude: store?.addresses?.[0]?.longitude || item.addresses?.[0]?.longitude || null,
                     city: store?.city || item.addresses?.[0]?.city || null,
                     state: store?.state || item.addresses?.[0]?.state || null,
                     reviewsCount: item.reviews?.[0]?.count || 0,

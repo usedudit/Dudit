@@ -510,10 +510,6 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       console.error("[getHomeDataByCity] Error fetching products:", productsRes.error)
     } else {
       rawProducts = productsRes.data || []
-      if (rawProducts.length > 0) {
-        const visibleIds = await filterMarketplaceVisibleProducts(rawProducts.map((p: any) => p.id))
-        rawProducts = rawProducts.filter((p: any) => visibleIds.has(p.id))
-      }
     }
   }
 

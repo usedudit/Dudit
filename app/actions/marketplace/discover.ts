@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { calculateDistance } from "@/lib/services/location.service"
-import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
+
 
 const DISCOVER_DEBUG = false
 
@@ -371,7 +371,8 @@ const PARTNER_JOIN = `partners!inner(
 ),
 stores!inner(
     id, name, description, logo_url, banner_url,
-    phone, is_showcase_active, addresses!store_id!left(city, state)
+    phone, is_showcase_active,
+    addresses!store_id!left(city, state, latitude, longitude)
 )`
 
 // ─── Process product into ItemCard shape ────────────────────────────────────
@@ -380,9 +381,10 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
     const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const storeName = rawStore?.name || "Vendedor"
-    const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-    const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
-    const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
+    const storeImage = rawStore?.logo_url || rawStore?.image_url
+    const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+    const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+    const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
     const partner = rawPartner
         ? {
             id: rawPartner.id,
@@ -390,8 +392,8 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-            latitude: rawPartner.latitude,
-            longitude: rawPartner.longitude,
+            latitude: addr?.latitude ?? null,
+            longitude: addr?.longitude ?? null,
             city: storeCity,
             state: storeState,
         }
@@ -439,12 +441,6 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         dError(`[DISCOVER][TRENDING] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP trending reason=error`)
         return null
-    }
-
-    if (trendingData && trendingData.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(trendingData.map((p: any) => p.id))
-      const filtered = trendingData.filter((p: any) => visibleIds.has(p.id))
-      trendingData = filtered as any
     }
 
     if (!trendingData || trendingData.length === 0) {
@@ -593,12 +589,6 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    if (products && products.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(products.map((p: any) => p.id))
-      const filtered = products.filter((p: any) => visibleIds.has(p.id))
-      products = filtered as any
-    }
-
     if (!products || products.length === 0) {
         dLog(`[Discover] SKIP endingSoon reason=no_products_found`)
         return null
@@ -661,8 +651,6 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
-        .not("partners.latitude", "is", null)
-        .not("partners.longitude", "is", null)
         .limit(60)
 
     if (error) {
@@ -671,22 +659,17 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
-    }
-
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP nearby reason=no_products`)
         return null
     }
 
     const withDistance = (data as RawProduct[]).map(item => {
-        const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const store = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        const storeAddr = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses
         let distKm = Infinity
-        if (partner?.latitude && partner?.longitude) {
-            distKm = calculateDistance(ctx.coords!, { lat: partner.latitude, lng: partner.longitude })
+        if (storeAddr?.latitude && storeAddr?.longitude) {
+            distKm = calculateDistance(ctx.coords!, { lat: Number(storeAddr.latitude), lng: Number(storeAddr.longitude) })
         }
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const pid = rawPartner?.id
@@ -789,15 +772,6 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         dError(`[DISCOVER][RECENT] Services Error:`, servResult.error, `city=${ctx.city} state=${ctx.state}`)
     }
 
-    if (prodResult.data && prodResult.data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(prodResult.data.map((p: any) => p.id))
-      prodResult.data = prodResult.data.filter((p: any) => visibleIds.has(p.id))
-    }
-    if (servResult.data && servResult.data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleServices(servResult.data.map((s: any) => s.id))
-      servResult.data = servResult.data.filter((s: any) => visibleIds.has(s.id))
-    }
-
     const products = (prodResult.data || []) as RawProduct[]
     const services = (servResult.data || []) as any[]
 
@@ -843,17 +817,18 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
             const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
             const storeName = rawStore?.name || "Vendedor"
-            const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-            const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
-            const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
+            const storeImage = rawStore?.logo_url || rawStore?.image_url
+            const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+            const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+            const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
             const partner = rawPartner ? {
                 id: rawPartner.id,
                 store_id: rawStore?.id || rawPartner.id,
                 store_name: storeName,
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-                latitude: rawPartner.latitude,
-                longitude: rawPartner.longitude,
+                latitude: addr?.latitude ?? null,
+                longitude: addr?.longitude ?? null,
                 city: storeCity,
                 state: storeState,
             } : null
@@ -908,12 +883,6 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         dError(`[DISCOVER][GEMS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP gems reason=error`)
         return null
-    }
-
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1036,10 +1005,8 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
             dError(`[DISCOVER][PERSONALIZED] Category error:`, catErr)
         } else if (favProducts) {
             if (favProducts.length > 0) {
-              const visibleIds = await filterMarketplaceVisibleProducts(favProductIds)
-              const filtered = favProducts.filter((_: any, i: number) => visibleIds.has(favProductIds[i]))
               const counts = new Map<string, number>()
-              for (const p of filtered) {
+              for (const p of favProducts) {
                   if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
               }
               preferredCatIds = [...counts.entries()]
@@ -1069,12 +1036,6 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         dError(`[DISCOVER][PERSONALIZED] Products error:`, error)
         dLog(`[Discover] SKIP personalized reason=products_error`)
         return null
-    }
-
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1134,12 +1095,6 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         dError(`[DISCOVER][BEST_SELLERS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP bestSellers reason=error`)
         return null
-    }
-
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1206,12 +1161,6 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
-    }
-
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP topRated reason=no_products`)
         return null
@@ -1272,12 +1221,6 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         dError(`[DISCOVER][PROMOS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP promos reason=error`)
         return null
-    }
-
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
     }
 
     const discounted = (data || []).filter(
@@ -1351,12 +1294,6 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
-    }
-
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP mostViewed reason=no_products`)
         return null
@@ -1420,12 +1357,6 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleServices(data.map((s: any) => s.id))
-      const filtered = data.filter((s: any) => visibleIds.has(s.id))
-      data = filtered as any
-    }
-
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP services reason=no_products`)
         return null
@@ -1455,9 +1386,10 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeName = rawStore?.name || "Vendedor"
-        const storeImage = rawStore?.logo_url || rawStore?.image_url || rawPartner?.store_image_url
-        const storeCity = rawStore?.city || rawPartner?.city || rawPartner?.addresses?.[0]?.city || null
-        const storeState = rawStore?.state || rawPartner?.state || rawPartner?.addresses?.[0]?.state || null
+        const storeImage = rawStore?.logo_url || rawStore?.image_url
+        const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
+        const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
+        const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
         const partner = rawPartner
             ? {
                 id: rawPartner.id,
@@ -1465,8 +1397,8 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                 store_name: storeName,
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-                latitude: rawPartner.latitude,
-                longitude: rawPartner.longitude,
+                latitude: addr?.latitude ?? null,
+                longitude: addr?.longitude ?? null,
                 city: storeCity,
                 state: storeState,
             }
@@ -1576,8 +1508,8 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                 store_image_url: storeImage,
                 banner_url: store.banner_url || null,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-                latitude: p?.latitude || null,
-                longitude: p?.longitude || null,
+                latitude: addr?.latitude || null,
+                longitude: addr?.longitude || null,
                 city: addr?.city || "",
                 state: addr?.state || "",
             },
@@ -1621,12 +1553,6 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
         dError(`[DISCOVER][POPULAR] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP popular reason=error`)
         return null
-    }
-
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
     }
 
     if (!data || data.length === 0) {
@@ -1682,12 +1608,6 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         dError(`[DISCOVER][ALL_PRODUCTS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         dLog(`[Discover] SKIP allProducts reason=error`)
         return null
-    }
-
-    if (data && data.length > 0) {
-      const visibleIds = await filterMarketplaceVisibleProducts(data.map((p: any) => p.id))
-      const filtered = data.filter((p: any) => visibleIds.has(p.id))
-      data = filtered as any
     }
 
     if (!data || data.length === 0) {
