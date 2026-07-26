@@ -7,7 +7,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
 import { calculateDistance } from "@/lib/services/location.service"
 
 
-const DISCOVER_DEBUG = false
+const DISCOVER_DEBUG = true
 
 function dLog(...args: unknown[]) {
     if (DISCOVER_DEBUG) console.log(...args)
@@ -1005,14 +1005,14 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
             dError(`[DISCOVER][PERSONALIZED] Category error:`, catErr)
         } else if (favProducts) {
             if (favProducts.length > 0) {
-              const counts = new Map<string, number>()
-              for (const p of favProducts) {
-                  if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
-              }
-              preferredCatIds = [...counts.entries()]
-                  .sort((a, b) => b[1] - a[1])
-                  .slice(0, 3)
-                  .map(([id]) => id)
+                const counts = new Map<string, number>()
+                for (const p of favProducts) {
+                    if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
+                }
+                preferredCatIds = [...counts.entries()]
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([id]) => id)
             }
         }
     }
@@ -1897,7 +1897,7 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
             for (const item of section.items) {
                 const pid = getPartnerId(item)
                 if (pid && promoMap.has(pid)) {
-                    ;(item as any)._promotions = promoMap.get(pid)
+                    ; (item as any)._promotions = promoMap.get(pid)
                 }
             }
         }
