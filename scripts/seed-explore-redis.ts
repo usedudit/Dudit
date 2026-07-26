@@ -181,7 +181,7 @@ async function seedRedis() {
     const { data: vitrines } = await supabase
         .from("stores")
         .select(`
-            id, name, description, logo_url, banner_url, rating, created_at, partner_id,
+            id, name, slug, description, logo_url, banner_url, rating, created_at, partner_id, latitude, longitude,
             addresses(city, state),
             partners(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
@@ -200,6 +200,7 @@ async function seedRedis() {
             const vitrineNormalizada = {
                 id: item.id,
                 name: storeName,
+                slug: item.slug || undefined,
                 description: item.description || "",
                 images: [item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
                 rating: item.rating || 0,
@@ -209,11 +210,12 @@ async function seedRedis() {
                     id: item.partner_id || item.id,
                     store_id: item.id,
                     store_name: storeName,
+                    slug: item.slug || null,
                     store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                     store_image_url: storeImage,
                     banner_url: item.banner_url || null,
-                    latitude: (item as any).latitude || null,
-                    longitude: (item as any).longitude || null,
+                    latitude: item.latitude || null,
+                    longitude: item.longitude || null,
                     city, state, reviewsCount
                 }
             }

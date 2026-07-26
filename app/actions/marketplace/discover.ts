@@ -370,8 +370,8 @@ const PARTNER_JOIN = `partners!inner(
     id, is_showcase_active
 ),
 stores!left(
-    id, name, description, logo_url, banner_url,
-    phone, is_showcase_active,
+    id, name, slug, description, logo_url, banner_url,
+    phone, is_showcase_active, latitude, longitude,
     addresses!store_id!left(city, state, latitude, longitude)
 )`
 
@@ -382,10 +382,14 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const storeName = rawStore?.name || "Vendedor"
     const storeImage = rawStore?.logo_url || rawStore?.image_url
-    const storeCity = rawStore?.city || rawPartner?.addresses?.[0]?.city || null
-    const storeState = rawStore?.state || rawPartner?.addresses?.[0]?.state || null
     const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
-    const partner = rawPartner
+    const storeCity = addr?.city || rawStore?.city || null
+    const storeState = addr?.state || rawStore?.state || null
+    const storeLat = addr?.latitude ?? rawStore?.latitude ?? null
+    const storeLng = addr?.longitude ?? rawStore?.longitude ?? null
+    const storeSlug = rawStore?.slug || null
+
+    const partner = rawPartner || rawStore
         ? {
             id: rawPartner.id,
             store_id: rawStore?.id || rawPartner.id,
@@ -665,11 +669,13 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     }
 
     const withDistance = (data as RawProduct[]).map(item => {
-        const store = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        const store: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeAddr = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses
+        const lat = storeAddr?.latitude ?? store?.latitude ?? null
+        const lng = storeAddr?.longitude ?? store?.longitude ?? null
         let distKm = Infinity
-        if (storeAddr?.latitude && storeAddr?.longitude) {
-            distKm = calculateDistance(ctx.coords!, { lat: Number(storeAddr.latitude), lng: Number(storeAddr.longitude) })
+        if (lat != null && lng != null && ctx.coords) {
+            distKm = calculateDistance(ctx.coords, { lat: Number(lat), lng: Number(lng) })
         }
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const pid = rawPartner?.id
@@ -712,15 +718,17 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     const items = chosen.pool.slice(0, 20).map(item => {
         const dist = item._distKm
-        let distText = ""
-        if (dist < 1) distText = `A ${Math.round(dist * 1000)}m`
-        else if (dist <= 10) distText = `A ${dist.toFixed(1)} km`
-        else distText = `A ${Math.round(dist)} km`
+        let distText: string | null = null
+        if (Number.isFinite(dist) && dist >= 0 && dist !== Infinity) {
+            if (dist < 1) distText = `A ${Math.round(dist * 1000)}m`
+            else if (dist <= 10) distText = `A ${dist.toFixed(1)} km`
+            else distText = `A ${Math.round(dist)} km`
+        }
 
         const p = processProduct(item, { _distanceText: distText })
         if (p.partners) {
-            (p.partners as Record<string, any>).distance_km = dist
-                ; (p.partners as Record<string, any>).distance_km_formatted = distText
+            (p.partners as Record<string, any>).distance_km = Number.isFinite(dist) ? dist : null
+            ; (p.partners as Record<string, any>).distance_km_formatted = distText
         }
         return p
     })

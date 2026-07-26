@@ -179,7 +179,7 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("stores")
           .select(`
-            id, name, description, logo_url, banner_url, rating, marketplace_reputation, created_at, updated_at, partner_id,
+            id, name, slug, description, logo_url, banner_url, rating, marketplace_reputation, created_at, updated_at, partner_id,
             addresses!store_id!left(city, state),
             partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
           `)
@@ -196,6 +196,7 @@ export async function syncToExploreRedis({
           finalData = {
             id: dbData.id,
             name: dbData.name || "Loja",
+            slug: dbData.slug || undefined,
             description: dbData.description || "",
             images: [dbData.banner_url || dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
             rating: dbData.rating || 0,
@@ -204,6 +205,7 @@ export async function syncToExploreRedis({
               id: dbData.partner_id || dbData.id,
               store_id: dbData.id,
               store_name: dbData.name || "Loja",
+              slug: dbData.slug || null,
               store_avatar: dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
               store_image_url: dbData.logo_url,
               banner_url: dbData.banner_url || null,

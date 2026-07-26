@@ -415,12 +415,14 @@ export async function middleware(request: NextRequest) {
                 .eq("id", activePartnerId!)
                 .maybeSingle()
               : Promise.resolve({ data: null }),
-            supabase
-              .from("account_deletions")
-              .select("status, grace_period_ends_at")
-              .eq("user_id", user.id)
-              .not("status", "eq", "completed")
-              .maybeSingle(),
+            isProtected || pathname.startsWith("/cart") || pathname.startsWith("/checkout")
+              ? supabase
+                .from("account_deletions")
+                .select("status, grace_period_ends_at")
+                .eq("user_id", user.id)
+                .not("status", "eq", "completed")
+                .maybeSingle()
+              : Promise.resolve({ data: null }),
             needsPartnerCheck
               ? supabase
                 .from("account_deletions")

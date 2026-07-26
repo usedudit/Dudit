@@ -265,7 +265,8 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
     const imageUrl = getPrimaryProductDisplayImage(product)
-    const distance = product.partners?.distance_km_formatted || null
+    const rawDistance = product.partners?.distance_km_formatted || null
+    const distance = rawDistance && !rawDistance.includes("Infinity") ? rawDistance : null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
     const partnerUserId = (partner as any)?.user_id
     const isOwner = !!(user && partnerUserId && user.id === partnerUserId)
@@ -283,6 +284,9 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
     const partnerId = partner?.id || null
+    const sellerCity = partner?.city || (product.partners as any)?.city || null
+    const sellerState = partner?.state || (product.partners as any)?.state || null
+    const sellerName = partner?.store_name || (product.partners as any)?.store_name || 'Vendedor'
 
     const preloadedPromos = (product as any)._promotions || preloadedPromotions
 
@@ -456,17 +460,17 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
 
                     {showSeller && <div className="flex items-start gap-2 pt-1">
                         <UserProfileImage
-                            fullName={partner?.store_name || 'Vendedor'}
+                            fullName={sellerName}
                             imageUrl={partnerImageUrl && !partnerImageUrl.includes("Placeholder.png") ? partnerImageUrl : null}
                             className="w-8 h-8 border border-gray-100 shrink-0 bg-gray-50"
                         />
                         <div className="flex flex-col min-w-0">
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
-                                {product.partners?.store_name || 'Vendedor'}
+                                {sellerName}
                             </p>
                             <p className="text-[11px] text-gray-500 font-normal truncate">
-                                {product.partners?.city ? `${product.partners.city}${product.partners.state ? ` - ${product.partners.state}` : ''}` : ''}
-                                {distance && product.partners?.city ? ' • ' : ''}
+                                {sellerCity ? `${sellerCity}${sellerState ? ` - ${sellerState}` : ''}` : ''}
+                                {distance && sellerCity ? ' • ' : ''}
                                 {distance}
                             </p>
                         </div>
