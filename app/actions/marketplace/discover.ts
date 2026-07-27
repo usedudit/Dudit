@@ -371,7 +371,7 @@ const PARTNER_JOIN = `partners!inner(
 ),
 stores!left(
     id, name, slug, description, logo_url, banner_url,
-    phone, is_showcase_active, latitude, longitude,
+    phone, is_showcase_active,
     addresses!store_id!left(city, state, latitude, longitude)
 )`
 
@@ -385,8 +385,8 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
     const storeCity = addr?.city || rawStore?.city || null
     const storeState = addr?.state || rawStore?.state || null
-    const storeLat = addr?.latitude ?? rawStore?.latitude ?? null
-    const storeLng = addr?.longitude ?? rawStore?.longitude ?? null
+    const storeLat = addr?.latitude ?? null
+    const storeLng = addr?.longitude ?? null
     const storeSlug = rawStore?.slug || null
 
     const partner = rawPartner || rawStore
@@ -671,8 +671,8 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     const withDistance = (data as RawProduct[]).map(item => {
         const store: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeAddr = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses
-        const lat = storeAddr?.latitude ?? store?.latitude ?? null
-        const lng = storeAddr?.longitude ?? store?.longitude ?? null
+        const lat = storeAddr?.latitude ?? null
+        const lng = storeAddr?.longitude ?? null
         let distKm = Infinity
         if (lat != null && lng != null && ctx.coords) {
             distKm = calculateDistance(ctx.coords, { lat: Number(lat), lng: Number(lng) })

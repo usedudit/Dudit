@@ -375,13 +375,14 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
 
   const { data: store } = await supabase
     .from("stores")
-    .select("latitude, longitude")
+    .select("id, addresses!store_id!left(latitude, longitude)")
     .eq("partner_id", params.partnerId)
     .order("is_headquarters", { ascending: false })
     .limit(1)
     .maybeSingle()
-  const origin = store?.latitude && store?.longitude
-    ? { lat: Number(store.latitude), lng: Number(store.longitude) }
+  const addr = Array.isArray(store?.addresses) ? store.addresses[0] : null
+  const origin = addr?.latitude && addr?.longitude
+    ? { lat: Number(addr.latitude), lng: Number(addr.longitude) }
     : null
 
   const links = Array.isArray((delivery as any).delivery_orders) ? (delivery as any).delivery_orders : []
@@ -545,14 +546,15 @@ export async function getSmartDeliverySuggestionsAction(input: {
 
   if (error) return { success: false as const, error: error.message }
 
-  // origin coords: stores table has persisted latitude/longitude
+  // origin coords from addresses (single source of truth)
   const { data: store } = await supabase
     .from("stores")
-    .select("latitude, longitude")
+    .select("id, addresses!store_id!left(latitude, longitude)")
     .eq("partner_id", input.partnerId)
     .maybeSingle()
-  const originCoords = store?.latitude && store?.longitude
-    ? { lat: Number(store.latitude), lng: Number(store.longitude) }
+  const addr = Array.isArray(store?.addresses) ? store.addresses[0] : null
+  const originCoords = addr?.latitude && addr?.longitude
+    ? { lat: Number(addr.latitude), lng: Number(addr.longitude) }
     : null
 
   const eligible = (orders || [])

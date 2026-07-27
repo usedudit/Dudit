@@ -572,7 +572,7 @@ async function _searchMarketplaceInternal(
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("stores").select(`
-                        id, name, slug, description, logo_url, banner_url, phone, rating, is_showcase_active, partner_id, addresses!store_id!left(city, state),
+                        id, name, slug, description, logo_url, banner_url, phone, rating, is_showcase_active, partner_id, addresses!store_id!left(city, state, latitude, longitude),
                         partners!inner(id, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
                     `).in("id", lojasIds)
                         .eq("is_active", true)
@@ -614,7 +614,8 @@ async function _searchMarketplaceInternal(
                             id: item.id, store_name: item.name,
                             store_avatar: item.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
                             banner_url: item.banner_url || null,
-                            latitude: item.latitude, longitude: item.longitude,
+                            latitude: item.addresses?.[0]?.latitude,
+                            longitude: item.addresses?.[0]?.longitude,
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
                             reviewsCount: item.reviews?.[0]?.count || 0
                         }, created_at: item.created_at
@@ -834,16 +835,19 @@ async function hydrateMarketplaceSearchHits(
         const storeId = rawStore?.id || rawPartner?.id
         const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url || rawStore?.image_url
-        const storeCity = rawStore?.addresses?.[0]?.city || null
-        const storeState = rawStore?.addresses?.[0]?.state || null
+        const storeAddr = rawStore?.addresses?.[0]
+        const storeCity = storeAddr?.city || null
+        const storeState = storeAddr?.state || null
+        const storeLat = storeAddr?.latitude || null
+        const storeLng = storeAddr?.longitude || null
         const partner = rawPartner ? {
             ...rawPartner,
             store_id: storeId,
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-            latitude: rawStore?.latitude,
-            longitude: rawStore?.longitude,
+            latitude: storeLat,
+            longitude: storeLng,
             city: storeCity,
             state: storeState,
         } : null
@@ -956,7 +960,7 @@ async function searchMarketplaceByCity(
     if (query.trim()) {
         let partnersQuery = supabase
             .from("stores")
-            .select("id, partner_id, latitude, longitude, addresses!store_id!inner(city, state)")
+            .select("id, partner_id, addresses!store_id!inner(city, state, latitude, longitude)")
             .eq("is_active", true)
             .eq("addresses.state", dbState)
 
@@ -986,8 +990,9 @@ async function searchMarketplaceByCity(
 
         if (centerCoords && limits.radius && partnerIds.length > 0) {
             const partnersInRadius = allPartners.filter((p: any) => {
-                if (p.latitude !== null && p.longitude !== null) {
-                    const dist = calculateDistance(centerCoords!, { lat: p.latitude, lng: p.longitude })
+                const addr = Array.isArray(p.addresses) ? p.addresses[0] : p.addresses
+                if (addr?.latitude !== null && addr?.longitude !== null) {
+                    const dist = calculateDistance(centerCoords!, { lat: addr.latitude, lng: addr.longitude })
                     return dist <= limits.radius!
                 }
                 return true
@@ -1027,9 +1032,8 @@ async function searchMarketplaceByCity(
         .from("stores")
         .select(`
             id, partner_id, name, description, logo_url, banner_url,
-            rating, latitude, longitude,
-            created_at,
-            addresses!store_id!inner(city, state),
+            rating, created_at,
+            addresses!store_id!inner(city, state, latitude, longitude),
             partners!inner(
                 id, is_active, category_id,
                 category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name))
@@ -1069,8 +1073,9 @@ async function searchMarketplaceByCity(
 
     if (centerCoords && limits.radius && partnerIds.length > 0) {
         const partnersInRadius = allPartners.filter((p: any) => {
-            if (p.latitude !== null && p.longitude !== null) {
-                const dist = calculateDistance(centerCoords!, { lat: p.latitude, lng: p.longitude })
+            const addr = Array.isArray(p.addresses) ? p.addresses[0] : p.addresses
+            if (addr?.latitude !== null && addr?.longitude !== null) {
+                const dist = calculateDistance(centerCoords!, { lat: addr.latitude, lng: addr.longitude })
                 return dist <= limits.radius!
             }
             return true
@@ -1120,7 +1125,7 @@ async function searchMarketplaceByCity(
                     id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id, is_showcase_active),
-                    stores!left(id, name, logo_url, banner_url, addresses!store_id!left(city, state)),
+                    stores!left(id, name, logo_url, banner_url, addresses!store_id!left(city, state, latitude, longitude)),
                     show_price_in_store
                 `)
                 .eq("status", "ativo")
@@ -1180,8 +1185,11 @@ async function searchMarketplaceByCity(
     const normalizedPartners = filteredPartners.map((item: any) => {
         const storeName = item.name || "Vendedor"
         const storeImage = item.logo_url
-        const storeCity = item.addresses?.[0]?.city || null
-        const storeState = item.addresses?.[0]?.state || null
+        const addr = item.addresses?.[0]
+        const storeCity = addr?.city || null
+        const storeState = addr?.state || null
+        const storeLat = addr?.latitude
+        const storeLng = addr?.longitude
         const storeId = item.id
         const categoryName = item.partners?.category?.parent?.name || item.partners?.category?.name || 'Loja Parceira'
         return {
@@ -1199,8 +1207,8 @@ async function searchMarketplaceByCity(
                 store_image_url: storeImage,
                 store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                 banner_url: item.banner_url || null,
-                latitude: item.latitude,
-                longitude: item.longitude,
+                latitude: storeLat,
+                longitude: storeLng,
                 city: storeCity,
                 state: storeState,
                 reviewsCount: 0
@@ -1215,16 +1223,19 @@ async function searchMarketplaceByCity(
         const storeId = rawStore?.id || rawPartner?.id
         const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url || rawStore?.image_url
-        const storeCity = rawStore?.addresses?.[0]?.city || null
-        const storeState = rawStore?.addresses?.[0]?.state || null
+        const storeAddr = rawStore?.addresses?.[0]
+        const storeCity = storeAddr?.city || null
+        const storeState = storeAddr?.state || null
+        const storeLat = storeAddr?.latitude
+        const storeLng = storeAddr?.longitude
         const partner = rawPartner ? {
             ...rawPartner,
             store_id: storeId,
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-            latitude: rawStore?.latitude,
-            longitude: rawStore?.longitude,
+            latitude: storeLat,
+            longitude: storeLng,
             city: storeCity,
             state: storeState
         } : null
@@ -1246,16 +1257,19 @@ async function searchMarketplaceByCity(
         const storeId = rawStore?.id || rawPartner?.id
         const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url || rawStore?.image_url
-        const storeCity = rawStore?.addresses?.[0]?.city || null
-        const storeState = rawStore?.addresses?.[0]?.state || null
+        const storeAddr = rawStore?.addresses?.[0]
+        const storeCity = storeAddr?.city || null
+        const storeState = storeAddr?.state || null
+        const storeLat = storeAddr?.latitude
+        const storeLng = storeAddr?.longitude
         const partner = rawPartner ? {
             ...rawPartner,
             store_id: storeId,
             store_name: storeName,
             store_image_url: storeImage,
             store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-            latitude: rawStore?.latitude,
-            longitude: rawStore?.longitude,
+            latitude: storeLat,
+            longitude: storeLng,
             city: storeCity,
             state: storeState
         } : null

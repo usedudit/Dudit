@@ -206,7 +206,7 @@ export async function quoteDeliveryFeeAction(input: {
     supabase.from("delivery_fee_rules").select("*").eq("partner_id", input.partnerId).eq("is_active", true).order("start_time"),
     supabase
       .from("stores")
-      .select("latitude, longitude")
+      .select("id, addresses!store_id!left(latitude, longitude)")
       .eq("partner_id", input.partnerId)
       .order("is_headquarters", { ascending: false })
       .limit(1)
@@ -226,8 +226,9 @@ export async function quoteDeliveryFeeAction(input: {
   let distanceKm = 0
   if (shouldCalculateDistance) {
     let originCoords = null;
-    if (store?.latitude && store?.longitude) {
-      originCoords = { lat: store.latitude, lng: store.longitude };
+    const addr = Array.isArray(store?.addresses) ? store.addresses[0] : null
+    if (addr?.latitude && addr?.longitude) {
+      originCoords = { lat: Number(addr.latitude), lng: Number(addr.longitude) };
     }
 
     if (!originCoords) {

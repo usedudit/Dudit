@@ -78,6 +78,8 @@ export async function createComprehensiveCustomerAction(data: {
   cnpj?: string | null
   nomeFantasia?: string | null
   inscricaoEstadual?: string | null
+  ieIsento?: boolean
+  inscricaoMunicipal?: string | null
   regimeTributario?: string | null
   contribuinteIcms?: string | null
   country?: string | null
@@ -193,7 +195,9 @@ export async function createComprehensiveCustomerAction(data: {
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia || null,
-    inscricao_estadual: data.inscricaoEstadual || null,
+    inscricao_estadual: data.ieIsento ? "" : (data.inscricaoEstadual || null),
+    ie_isento: data.ieIsento ?? false,
+    inscricao_municipal: data.inscricaoMunicipal || null,
     regime_tributario: data.regimeTributario || null,
     contribuinte_icms: data.contribuinteIcms || null,
     store_credit: 0,
@@ -308,6 +312,8 @@ export async function updateComprehensiveCustomerAction(data: {
   cnpj?: string | null
   nomeFantasia?: string | null
   inscricaoEstadual?: string | null
+  ieIsento?: boolean
+  inscricaoMunicipal?: string | null
   regimeTributario?: string | null
   contribuinteIcms?: string | null
   country?: string | null
@@ -405,7 +411,9 @@ export async function updateComprehensiveCustomerAction(data: {
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia || null,
-      inscricao_estadual: data.inscricaoEstadual || null,
+      inscricao_estadual: data.ieIsento ? "" : (data.inscricaoEstadual || null),
+      ie_isento: data.ieIsento ?? false,
+      inscricao_municipal: data.inscricaoMunicipal || null,
       status: data.status || "ativo",
       notes: sanitizeNotes(data.notes),
       birth_date: data.birthDate || null,

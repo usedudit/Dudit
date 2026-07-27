@@ -796,7 +796,8 @@ export async function registerPartner(data: any) {
         city: data.city,
         state: data.state,
         country: "BR",
-        is_default: true
+        is_default: true,
+        municipio_codigo_ibge: data.municipioCodigoIbge || null,
       }
 
       const { error: addressError } = await supabaseAdmin
@@ -813,7 +814,7 @@ export async function registerPartner(data: any) {
         try {
           const coords = await geocodeAddress(addressString)
           if (coords) {
-            await supabaseAdmin.from('stores').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', newStore.id)
+            await supabaseAdmin.from("addresses").update({ latitude: coords.lat, longitude: coords.lng }).eq("store_id", newStore.id)
           }
         } catch(e) { console.error("Geocoding failed on register", e) }
       }

@@ -91,7 +91,7 @@ export async function syncToExploreRedis({
             category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id),
-            stores(id, name, logo_url, addresses!store_id!left(city, state)),
+            stores(id, name, logo_url, latitude, longitude, addresses!store_id!left(city, state, latitude, longitude)),
             product_variants(variant_options, price_adjustment, is_active),
             show_price_in_store
           `)
@@ -147,7 +147,7 @@ export async function syncToExploreRedis({
             category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
             partners(id),
-            stores(id, name, logo_url, addresses!store_id!left(city, state)),
+            stores(id, name, logo_url, addresses!store_id!left(city, state, latitude, longitude)),
             show_price_in_store
           `)
           .eq("id", id)
@@ -167,8 +167,8 @@ export async function syncToExploreRedis({
           ...rawPartner,
           store_name: rawStore?.name,
           store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
-          latitude: rawStore?.latitude,
-          longitude: rawStore?.longitude,
+          latitude: rawStore?.addresses?.[0]?.latitude,
+          longitude: rawStore?.addresses?.[0]?.longitude,
           city: rawStore?.addresses?.[0]?.city || null,
           state: rawStore?.addresses?.[0]?.state || null
         } : null
@@ -180,15 +180,18 @@ export async function syncToExploreRedis({
           .from("stores")
           .select(`
             id, name, slug, description, logo_url, banner_url, rating, marketplace_reputation, created_at, updated_at, partner_id,
-            addresses!store_id!left(city, state),
+            addresses!store_id!left(city, state, latitude, longitude),
             partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
           `)
           .eq("id", id)
           .single()
 
         if (dbData) {
-          const city = dbData.addresses?.[0]?.city || null
-          const state = dbData.addresses?.[0]?.state || null
+          const addr = dbData.addresses?.[0]
+          const city = addr?.city || null
+          const state = addr?.state || null
+          const latitude = addr?.latitude || null
+          const longitude = addr?.longitude || null
           const p = dbData.partners as any
           const reviewsCount = p?.reviews?.[0]?.count || 0
           const cat = p?.category
@@ -209,6 +212,8 @@ export async function syncToExploreRedis({
               store_avatar: dbData.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
               store_image_url: dbData.logo_url,
               banner_url: dbData.banner_url || null,
+              latitude,
+              longitude,
               city,
               state,
               reviewsCount

@@ -24,7 +24,6 @@ interface Store {
   whatsapp_phone?: string | null
   is_headquarters: boolean
   is_active: boolean
-  address_id: string | null
   business_type: string | null
   cnpj: string | null
   cpf: string | null

@@ -43,8 +43,8 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       stores!left(
         id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
-        is_showcase_active, latitude, longitude, business_info,
-        addresses!store_id!left(city, state)
+        is_showcase_active, business_info,
+        addresses!store_id!left(city, state, latitude, longitude)
       )
     `)
     .eq("id", serviceId)
@@ -90,8 +90,8 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
     rawPartner.city = addr?.city || rawStore.city || rawPartner.addresses?.[0]?.city || null
     rawPartner.state = addr?.state || rawStore.state || rawPartner.addresses?.[0]?.state || null
     rawPartner.opening_hours = rawStore.opening_hours || rawPartner.opening_hours
-    rawPartner.latitude = rawStore.latitude || rawPartner.latitude
-    rawPartner.longitude = rawStore.longitude || rawPartner.longitude
+    rawPartner.latitude = addr?.latitude || rawPartner.latitude
+    rawPartner.longitude = addr?.longitude || rawPartner.longitude
     rawPartner.business_info = rawStore.business_info || rawPartner.business_info
     rawPartner.gallery = rawStore.gallery || rawPartner.gallery
   }

@@ -13,6 +13,7 @@ interface CepResponse {
     municipio?: string
     uf?: string
     numero?: string
+    ibge?: string
     erro?: boolean
     error?: string
 }
@@ -20,7 +21,7 @@ interface CepResponse {
 interface CepInputProps extends Omit<React.ComponentProps<typeof Input>, "onChange" | "onBlur"> {
     value: string
     onChange: (value: string) => void
-    onAddressFetched?: (addressData: { street: string; neighborhood: string; city: string; state: string; number: string }) => void
+    onAddressFetched?: (addressData: { street: string; neighborhood: string; city: string; state: string; number: string; ibge?: string }) => void
 }
 
 export const CepInput: React.FC<CepInputProps> = ({
@@ -65,6 +66,7 @@ export const CepInput: React.FC<CepInputProps> = ({
                     city: data.localidade || data.municipio || "",
                     state: data.uf || "",
                     number: data.numero || "",
+                    ibge: data.ibge || "",
                 })
             } else {
                 fetchingCepRef.current = ""

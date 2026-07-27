@@ -98,6 +98,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const [imageFile, setImageFile] = useState<File | null>(null)
     const [status, setStatus] = useState("Ativo")
     const [contribuinte, setContribuinte] = useState("9")
+    const [ieIsento, setIeIsento] = useState(false)
+    const [inscricaoMunicipal, setInscricaoMunicipal] = useState("")
 
     // Address States
     const [cep, setCep] = useState("")
@@ -107,6 +109,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const [neighborhood, setNeighborhood] = useState("")
     const [city, setCity] = useState("")
     const [uf, setUf] = useState("SP")
+    const [municipioIbge, setMunicipioIbge] = useState("")
     const [noNumber, setNoNumber] = useState(false)
     const [addressType, setAddressType] = useState("Casa")
     const [hasDifferentBillingAddress, setHasDifferentBillingAddress] = useState(false)
@@ -129,8 +132,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const isDirty = useMemo(() => {
         return customerName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" || rg !== "" ||
             email !== "" || phone !== "" || mobile !== "" || website !== "" || birthDate !== "" || motherName !== "" || fatherName !== "" || observacoes !== "" ||
-            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== "" || imageFile !== null
-    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city, imageUrl, imageFile])
+            cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== "" || imageUrl !== "" || imageFile !== null ||
+            ieIsento !== false || inscricaoMunicipal !== ""
+    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city, imageUrl, imageFile, ieIsento, inscricaoMunicipal])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -152,6 +156,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         setStoreCredit(c.store_credit || 0)
         setStatus(c.status === "ativo" ? "Ativo" : c.status === "inativo" ? "Inativo" : "Bloqueado")
         setContribuinte(c.contribuinte || "9")
+        setIeIsento(c.ie_isento ?? false)
+        setInscricaoMunicipal(c.inscricao_municipal || "")
         setObservacoes(c.notes || "")
         setWebsite(c.website || "")
         setBirthDate(c.birth_date || "")
@@ -266,7 +272,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                     if (data.bairro) setNeighborhood(data.bairro)
                     if (data.municipio) setCity(data.municipio)
                     if (data.uf) setUf(data.uf)
+                    if (data.simples_optante) setContribuinte("1")
                     notifySuccess("Dados da empresa importados com sucesso!")
+
                 } else if (data?.error) {
                     notifyError("CNPJ não encontrado ou erro na consulta.")
                 }
@@ -360,7 +368,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 contribuinte: contribuinte,
                 cnpj: cnpj,
                 nomeFantasia: fantasia,
-                inscricaoEstadual: ie,
+                inscricaoEstadual: ieIsento ? "" : ie,
+                ieIsento: ieIsento,
+                inscricaoMunicipal: inscricaoMunicipal,
                 zipCode: cep,
                 street: street,
                 number: noNumber ? "S/N" : number,
@@ -368,6 +378,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 neighborhood: neighborhood,
                 city: city,
                 state: uf,
+                municipioCodigoIbge: municipioIbge || undefined,
                 csrf_token: token,
                 status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado",
                 notes: observacoes,
@@ -617,9 +628,25 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         />
                                                                         {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                                     </div>
-                                                                    <Input label="Inscrição Estadual" placeholder="Isento ou número da IE" value={ie} onChange={(e) => setIe(e.target.value)} />
+                                                                    <Input label="Inscrição Estadual" placeholder="Número da IE" value={ie} onChange={(e) => setIe(e.target.value)} disabled={ieIsento} />
                                                                 </div>
-                                                                <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
+                                                                <div className="flex items-center gap-3">
+                                                                    <Checkbox
+                                                                        id="customerIeIsento"
+                                                                        checked={ieIsento}
+                                                                        onChange={(e) => {
+                                                                            setIeIsento(e)
+                                                                            if (e) setIe("")
+                                                                        }}
+                                                                    />
+                                                                    <label htmlFor="customerIeIsento" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer select-none">
+                                                                        Inscrição Estadual isenta (IE Isento)
+                                                                    </label>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                    <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
+                                                                    <Input label="Inscrição Municipal" placeholder="Ex: 123456" value={inscricaoMunicipal} onChange={(e) => setInscricaoMunicipal(e.target.value)} />
+                                                                </div>
                                                                 <FormDropdown
                                                                     label="Contribuinte"
                                                                     value={contribuinte}
@@ -781,6 +808,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 setUf(data.state || "SP")
                                                                 setNumber(data.number || "")
                                                                 setNoNumber(data.number === "S/N")
+                                                                if (data.ibge) setMunicipioIbge(data.ibge)
                                                             }}
                                                             error={fieldErrors.has("cep")}
                                                             errorMessage={fieldErrors.has("cep") ? "CEP inválido" : undefined}

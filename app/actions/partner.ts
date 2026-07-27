@@ -139,8 +139,6 @@ export async function createPartnerAction(data: CreatePartnerData) {
         is_headquarters: true,
         is_active: true,
         is_showcase_active: true,
-        latitude: coords?.lat || null,
-        longitude: coords?.lng || null,
       })
       .select("id")
       .single()
@@ -163,6 +161,8 @@ export async function createPartnerAction(data: CreatePartnerData) {
         state: data.state || null,
         country: "BR",
         is_default: true,
+        latitude: coords?.lat || null,
+        longitude: coords?.lng || null,
       })
     }
 
@@ -396,6 +396,8 @@ export async function updatePartnerAction(
   if (data.ieIsento !== undefined) storeUpdateData.ie_isento = data.ieIsento
   if (data.inscricaoMunicipal !== undefined) storeUpdateData.inscricao_municipal = data.inscricaoMunicipal
 
+  // Geocode address to get lat/lng
+  let geocodedCoords: { lat: number; lng: number } | null = null
   if (hasAddressData) {
     const currentAddr = storeAddress || {}
     const fullAddressString = [
@@ -408,10 +410,7 @@ export async function updatePartnerAction(
     ].filter(Boolean).join(", ")
 
     try {
-      const coords = await geocodeAddress(fullAddressString)
-      if (coords) {
-        await supabase.from("stores").update({ latitude: coords.lat, longitude: coords.lng }).eq("partner_id", partnerId)
-      }
+      geocodedCoords = await geocodeAddress(fullAddressString)
     } catch (e) {
       console.error("[updatePartnerAction] Geocoding failed:", e)
     }
@@ -435,16 +434,22 @@ export async function updatePartnerAction(
       .limit(1)
       .maybeSingle()
 
+    const addressWithCoords = {
+      ...addressData,
+      store_id: storeId || null,
+      latitude: geocodedCoords?.lat || null,
+      longitude: geocodedCoords?.lng || null,
+    }
+
     if (existingAddress?.data?.id) {
       await supabase
         .from("addresses")
-        .update({ ...addressData, store_id: storeId || null })
+        .update(addressWithCoords)
         .eq("id", existingAddress.data.id)
     } else {
       await supabase.from("addresses").insert({
         partner_id: partnerId,
-        store_id: storeId || null,
-        ...addressData,
+        ...addressWithCoords,
         country: "BR",
         is_default: true,
       })

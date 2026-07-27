@@ -100,6 +100,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const [city, setCity] = useState("")
     const [uf, setUf] = useState("SP")
     const [noNumber, setNoNumber] = useState(false)
+    const [municipioIbge, setMunicipioIbge] = useState("")
 
     const [isSaving, setIsSaving] = useState(false)
     const [isSearchingCnpj, setIsSearchingCnpj] = useState(false)
@@ -198,6 +199,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                     if (data.bairro) setNeighborhood(data.bairro)
                     if (data.municipio) setCity(data.municipio)
                     if (data.uf) setUf(data.uf)
+                    if (data.municipio_codigo_ibge) setMunicipioIbge(data.municipio_codigo_ibge)
                     notifySuccess("Dados da empresa importados com sucesso!")
                 } else if (data?.error) {
                     notifyError("CNPJ não encontrado ou erro na consulta.")
@@ -288,6 +290,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                 neighborhood: neighborhood,
                 city: city,
                 state: uf,
+                municipioCodigoIbge: municipioIbge || undefined,
                 csrf_token: token,
                 notes: observacoes,
                 image_url: finalImageUrl || null,
@@ -607,6 +610,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                 setUf(data.state || "SP")
                                                                 setNumber(data.number || "")
                                                                 setNoNumber(data.number === "S/N")
+                                                                if (data.ibge) setMunicipioIbge(data.ibge)
                                                             }}
                                                             error={fieldErrors.has("cep")}
                                                             errorMessage={fieldErrors.has("cep") ? "CEP inválido" : undefined}

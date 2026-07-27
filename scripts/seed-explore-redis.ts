@@ -82,7 +82,7 @@ async function seedRedis() {
             category_id, category:product_categories!category_id(name), created_at,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id, is_showcase_active),
-            stores(id, name, logo_url, banner_url, addresses(city, state)),
+            stores(id, name, logo_url, banner_url, is_showcase_active, addresses!store_id!left(city, state, latitude, longitude)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("status", "ativo")
@@ -96,6 +96,8 @@ async function seedRedis() {
             const storeImage = rawStore?.logo_url || null
             const storeCity = rawStore?.addresses?.[0]?.city || null
             const storeState = rawStore?.addresses?.[0]?.state || null
+            const storeLat = rawStore?.addresses?.[0]?.latitude || null
+            const storeLng = rawStore?.addresses?.[0]?.longitude || null
             const partner = rawPartner || rawStore ? {
                 id: rawPartner?.id || rawStore?.id,
                 store_id: rawStore?.id || rawPartner?.id,
@@ -105,6 +107,8 @@ async function seedRedis() {
                 banner_url: rawStore?.banner_url || null,
                 city: storeCity,
                 state: storeState,
+                latitude: storeLat,
+                longitude: storeLng,
                 is_showcase_active: rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true
             } : null
             const variantFallback = extractFirstVariantFallback((item as any).product_variants)
@@ -138,7 +142,7 @@ async function seedRedis() {
             id, name, description, price, images, rating, created_at,
             marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
             partners(id, is_showcase_active),
-            stores(id, name, logo_url, banner_url, addresses(city, state))
+            stores(id, name, logo_url, banner_url, addresses(city, state, latitude, longitude))
         `)
         .eq("status", "ativo")
 
@@ -150,6 +154,8 @@ async function seedRedis() {
             const storeImage = rawStore?.logo_url || null
             const storeCity = rawStore?.addresses?.[0]?.city || null
             const storeState = rawStore?.addresses?.[0]?.state || null
+            const storeLat = rawStore?.addresses?.[0]?.latitude || null
+            const storeLng = rawStore?.addresses?.[0]?.longitude || null
             const partner = rawPartner || rawStore ? {
                 id: rawPartner?.id || rawStore?.id,
                 store_id: rawStore?.id || rawPartner?.id,
@@ -159,6 +165,8 @@ async function seedRedis() {
                 banner_url: rawStore?.banner_url || null,
                 city: storeCity,
                 state: storeState,
+                latitude: storeLat,
+                longitude: storeLng,
                 is_showcase_active: rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true
             } : null
             
@@ -181,8 +189,8 @@ async function seedRedis() {
     const { data: vitrines } = await supabase
         .from("stores")
         .select(`
-            id, name, slug, description, logo_url, banner_url, rating, created_at, partner_id, latitude, longitude,
-            addresses(city, state),
+            id, name, slug, description, logo_url, banner_url, rating, created_at, partner_id,
+            addresses(city, state, latitude, longitude),
             partners(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
@@ -191,6 +199,8 @@ async function seedRedis() {
         for (const item of (vitrines as any[])) {
             const city = item.addresses?.[0]?.city || null
             const state = item.addresses?.[0]?.state || null
+            const latitude = item.addresses?.[0]?.latitude || null
+            const longitude = item.addresses?.[0]?.longitude || null
             const p = item.partners as any
             const reviewsCount = p?.reviews?.[0]?.count || 0
             const cat = p?.category as any
@@ -214,8 +224,8 @@ async function seedRedis() {
                     store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                     store_image_url: storeImage,
                     banner_url: item.banner_url || null,
-                    latitude: item.latitude || null,
-                    longitude: item.longitude || null,
+                    latitude,
+                    longitude,
                     city, state, reviewsCount
                 }
             }

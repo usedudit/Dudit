@@ -110,7 +110,7 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
                 .single()
 
             if (newAddr?.id) {
-                await supabase.from("stores").update({ address_id: newAddr.id }).eq("id", data.id)
+                // address is linked via addresses.store_id, no need for stores.address_id
             }
         }
 
@@ -146,13 +146,13 @@ interface UpdateStoreInput {
     business_info?: Record<string, unknown>
     category_id?: string | null
     subcategory_id?: string | null
-    latitude?: number | null
-    longitude?: number | null
     timezone?: string
     // Tax / fiscal fields (per store)
     business_type?: "pf" | "pj"
     cnpj?: string | null
     cpf?: string | null
+    razaoSocial?: string | null
+    nomeFantasia?: string | null
     crt?: string
     contribuinte?: string
     inscricaoEstadual?: string | null
@@ -167,6 +167,7 @@ interface UpdateStoreInput {
     complement?: string
     neighborhood?: string
     noNumber?: boolean
+    municipioCodigoIbge?: string | null
 }
 
 export async function updateStoreAction(input: UpdateStoreInput): Promise<ActionResponse<void>> {
@@ -194,11 +195,11 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.business_info !== undefined) updateData.business_info = input.business_info
         if (input.category_id !== undefined) updateData.category_id = input.category_id
         if (input.subcategory_id !== undefined) updateData.subcategory_id = input.subcategory_id
-        if (input.latitude !== undefined) updateData.latitude = input.latitude
-        if (input.longitude !== undefined) updateData.longitude = input.longitude
         if (input.timezone !== undefined) updateData.timezone = input.timezone
         // Tax / fiscal fields
         if (input.business_type !== undefined) updateData.business_type = input.business_type
+        if (input.razaoSocial !== undefined) updateData.razao_social = input.razaoSocial
+        if (input.nomeFantasia !== undefined) updateData.nome_fantasia = input.nomeFantasia
         if (input.cnpj !== undefined) {
             updateData.cnpj = input.cnpj ? input.cnpj.replace(/\D/g, "") : null
             if (updateData.cnpj === "") updateData.cnpj = null
@@ -219,7 +220,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = input.inscricaoMunicipal
         updateData.updated_at = new Date().toISOString()
 
-        // F5.5c: Handle address upsert
+        // Upsert address on addresses table (linked via store_id)
         const hasAddressFields = input.zip_code !== undefined || input.street !== undefined ||
             input.number !== undefined || input.complement !== undefined ||
             input.neighborhood !== undefined || input.city !== undefined ||
@@ -236,46 +237,26 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
                 state: input.state ?? null,
                 country: "BR",
                 store_id: input.storeId,
+                municipio_codigo_ibge: input.municipioCodigoIbge ?? null,
             }
 
-            // Check if store already has an address_id
-            const { data: existingStore } = await admin
-                .from("stores")
-                .select("address_id")
-                .eq("id", input.storeId)
-                .single()
+            const { data: addrByStore } = await admin
+                .from("addresses")
+                .select("id")
+                .eq("store_id", input.storeId)
+                .maybeSingle()
 
-            if (existingStore?.address_id) {
-                // Update existing address
+            if (addrByStore?.id) {
                 const { error: addrError } = await admin
                     .from("addresses")
                     .update(addressPayload)
-                    .eq("id", existingStore.address_id)
+                    .eq("id", addrByStore.id)
                 if (addrError) throw new Error(addrError.message)
             } else {
-                // Check if there's an address with this store_id
-                const { data: addrByStore } = await admin
+                const { error: addrError } = await admin
                     .from("addresses")
-                    .select("id")
-                    .eq("store_id", input.storeId)
-                    .maybeSingle()
-                if (addrByStore?.id) {
-                    const { error: addrError } = await admin
-                        .from("addresses")
-                        .update(addressPayload)
-                        .eq("id", addrByStore.id)
-                    if (addrError) throw new Error(addrError.message)
-                    updateData.address_id = addrByStore.id
-                } else {
-                    // Create new address
-                    const { data: newAddr, error: addrError } = await admin
-                        .from("addresses")
-                        .insert({ ...addressPayload, id: undefined })
-                        .select("id")
-                        .single()
-                    if (addrError) throw new Error(addrError.message)
-                    updateData.address_id = newAddr.id
-                }
+                    .insert(addressPayload)
+                if (addrError) throw new Error(addrError.message)
             }
         }
 

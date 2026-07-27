@@ -23,7 +23,7 @@ export const getCachedStoreBySlug = async (slug: string) => {
                     .from("stores")
                     .select(`
                         *,
-                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
+                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         partners!inner(id, business_info, created_at, payment_methods(*))
                     `)
                     .eq("slug", slug)
@@ -45,7 +45,7 @@ export async function getStoreBySlug(slug: string) {
         .from("stores")
         .select(`
                         *,
-                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
+                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         partners!inner(id, business_info, created_at, payment_methods(*))
         `)
         .eq("slug", slug)
@@ -64,7 +64,7 @@ export const getCachedStoreById = async (storeId: string) => {
                     .from("stores")
                     .select(`
                         *,
-                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
+                        addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         partners!left(id, business_info, created_at, payment_methods(*))
                     `)
                     .eq("id", storeId)

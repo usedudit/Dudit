@@ -24,7 +24,7 @@ const initialPartnerData = {
     phone: "",
     address: {
         cep: "", street: "", number: "", complement: "",
-        neighborhood: "", city: "", state: "", noNumber: false, type: "home",
+        neighborhood: "", city: "", state: "", noNumber: false, type: "home", ibge: "",
     },
     description: "",
     storeImageUrl: "",
@@ -252,6 +252,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 neighborhood: partnerData.address.neighborhood,
                 city: partnerData.address.city,
                 state: partnerData.address.state,
+                municipioCodigoIbge: partnerData.address.ibge || undefined,
                 storeDescription: partnerData.description || "",
                 storeImageUrl: partnerData.storeImageUrl || "",
             })
@@ -394,7 +395,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         neighborhood: addr.neighborhood || partnerData.address.neighborhood,
                                         city: addr.city || partnerData.address.city,
                                         state: addr.state || partnerData.address.state,
-                                        noNumber: addr.number === "S/N"
+                                        noNumber: addr.number === "S/N",
+                                        ibge: addr.ibge || partnerData.address.ibge,
                                     })}
                                 />
                                 <Input name="street" label="Rua/Avenida" placeholder="Rua, Avenida, etc." value={partnerData.address.street} onChange={e => patchAddress({ street: e.target.value })} />

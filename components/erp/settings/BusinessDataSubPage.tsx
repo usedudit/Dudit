@@ -38,6 +38,7 @@ import { useStore } from "@/lib/store-context"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 
 const SELLS_OPTIONS = [
     {
@@ -94,6 +95,7 @@ export const BusinessDataSubPage = ({
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
     const [showValidationModal, setShowValidationModal] = useState(false)
+    const [isSearchingCnpj, setIsSearchingCnpj] = useState(false)
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -108,6 +110,8 @@ export const BusinessDataSubPage = ({
         storeDescription: store?.description || partner.store_description || "",
         businessType: store?.business_type || "pf",
         cnpj: store?.cpf || store?.cnpj || "",
+        razaoSocial: store?.razao_social || "",
+        nomeFantasia: store?.nome_fantasia || "",
         sells: store?.business_info?.sells || partnerBusinessInfo?.sells || ["products"],
         mode: ((store?.business_info?.mode || partnerBusinessInfo?.mode || "erp")) as BusinessMode,
         phone: store?.phone ? formatE164ToDisplay(store.phone) : (partner.phone ? formatE164ToDisplay(partner.phone) : ""),
@@ -175,6 +179,7 @@ export const BusinessDataSubPage = ({
         city: effectiveCity,
         state: effectiveState,
         noNumber: effectiveNumber === "S/N",
+        ibge: store?.addresses?.[0]?.municipio_codigo_ibge || "",
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
@@ -210,6 +215,48 @@ export const BusinessDataSubPage = ({
     const handleBack = useCallback(() => {
         handleNavigation(onBack)
     }, [handleNavigation, onBack])
+
+    const handleCnpjBlur = useCallback(async () => {
+        const cleanCnpj = generalInfo.cnpj.replace(/\D/g, "")
+        if (cleanCnpj.length === 14) {
+            setIsSearchingCnpj(true)
+            try {
+                const data = await consultarCNPJ(cleanCnpj)
+                if (data && !data.error) {
+                    setGeneralInfo(prev => ({
+                        ...prev,
+                        razaoSocial: data.razao_social || prev.razaoSocial,
+                        nomeFantasia: data.nome_fantasia || prev.nomeFantasia,
+                    }))
+                    setAddresses(prev => {
+                        if (data.logradouro && !prev.street) {
+                            return {
+                                ...prev,
+                                street: data.logradouro || prev.street,
+                                neighborhood: data.bairro || prev.neighborhood,
+                                city: data.municipio || prev.city,
+                                state: data.uf || prev.state,
+                                zipCode: data.cep || prev.zipCode,
+                            }
+                        }
+                        return prev
+                    })
+                    setFiscalInfo(prev => {
+                        if (data.simples_optante) return { ...prev, crt: "1" }
+                        if (data.simei_optante) return { ...prev, crt: "4" }
+                        return prev
+                    })
+                    notifySuccess("Dados da empresa importados com sucesso!")
+                } else if (data?.error) {
+                    notifyError("CNPJ não encontrado ou erro na consulta.")
+                }
+            } catch (error) {
+                console.error("Erro ao consultar CNPJ:", error)
+            } finally {
+                setIsSearchingCnpj(false)
+            }
+        }
+    }, [generalInfo.cnpj, notifySuccess, notifyError])
 
     const toggleArrayItem = (key: "sells", value: string) =>
         setGeneralInfo((prev: any) => {
@@ -278,8 +325,6 @@ export const BusinessDataSubPage = ({
                         opening_hours: normalizeOpeningHours(hours) as any,
                         category_id: generalInfo.categoryId,
                         subcategory_id: generalInfo.subcategoryId,
-                        latitude: undefined,
-                        longitude: undefined,
                         zip_code: addresses.zipCode,
                         street: addresses.street,
                         number: addresses.number,
@@ -288,9 +333,12 @@ export const BusinessDataSubPage = ({
                         city: addresses.city,
                         state: addresses.state,
                         noNumber: addresses.noNumber,
+                        municipioCodigoIbge: addresses.ibge || undefined,
                         business_type: generalInfo.businessType as "pf" | "pj",
                         cnpj: generalInfo.businessType === "pj" ? (generalInfo.cnpj || null) : null,
                         cpf: generalInfo.businessType === "pf" ? (generalInfo.cnpj || null) : null,
+                        razaoSocial: generalInfo.businessType === "pj" ? (generalInfo.razaoSocial || null) : null,
+                        nomeFantasia: generalInfo.businessType === "pj" ? (generalInfo.nomeFantasia || null) : null,
                         crt: fiscalInfo.crt,
                         contribuinte: fiscalInfo.contribuinte,
                         inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
@@ -499,17 +547,35 @@ export const BusinessDataSubPage = ({
                                                     </div>
 
                                                     <motion.div initial={false} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                        <CpfCnpjInput
-                                                            label={generalInfo.businessType === "pj" ? "CNPJ" : "CPF"}
-                                                            placeholder={generalInfo.businessType === "pj" ? "00.000.000/0000-00" : "000.000.000-00"}
-                                                            value={generalInfo.cnpj}
-                                                            onChange={(e) => setGeneralInfo({ ...generalInfo, cnpj: e.target.value })}
-                                                            name="cnpj"
-                                                        />
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <CpfCnpjInput
+                                                                label={generalInfo.businessType === "pj" ? "CNPJ" : "CPF"}
+                                                                placeholder={generalInfo.businessType === "pj" ? "00.000.000/0000-00" : "000.000.000-00"}
+                                                                value={generalInfo.cnpj}
+                                                                onChange={(e) => setGeneralInfo({ ...generalInfo, cnpj: e.target.value })}
+                                                                onBlur={generalInfo.businessType === "pj" ? handleCnpjBlur : undefined}
+                                                                name="cnpj"
+                                                            />
+                                                            {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
+                                                        </div>
                                                     </motion.div>
 
                                                     {generalInfo.businessType === "pj" && (
                                                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                <Input
+                                                                    label="Razão Social"
+                                                                    placeholder="Razão social da empresa"
+                                                                    value={generalInfo.razaoSocial}
+                                                                    onChange={(e) => setGeneralInfo({ ...generalInfo, razaoSocial: e.target.value })}
+                                                                />
+                                                                <Input
+                                                                    label="Nome Fantasia"
+                                                                    placeholder="Nome comercial"
+                                                                    value={generalInfo.nomeFantasia}
+                                                                    onChange={(e) => setGeneralInfo({ ...generalInfo, nomeFantasia: e.target.value })}
+                                                                />
+                                                            </div>
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                 <FormDropdown
                                                                     label="CRT - Código de Regime Tributário"
@@ -647,7 +713,8 @@ export const BusinessDataSubPage = ({
                                                                 neighborhood: data.neighborhood || prev.neighborhood,
                                                                 city: data.city || prev.city,
                                                                 state: data.state || prev.state,
-                                                                noNumber: data.number === "S/N"
+                                                                noNumber: data.number === "S/N",
+                                                                ibge: data.ibge || prev.ibge,
                                                             }))
                                                             setFieldErrors(prev => {
                                                                 const n = new Set(prev)

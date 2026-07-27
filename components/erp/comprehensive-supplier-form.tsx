@@ -344,6 +344,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
                       neighborhood: data.neighborhood || prev.neighborhood,
                       city: data.city || prev.city,
                       state: data.state || prev.state,
+                      municipioCodigoIbge: data.ibge || prev.municipioCodigoIbge,
                     }))
                   }}
                 />

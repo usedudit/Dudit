@@ -48,8 +48,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       stores!left(
         id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
-        is_showcase_active, latitude, longitude, business_info,
-        addresses!store_id!left(city, state)
+        is_showcase_active, business_info,
+        addresses!store_id!left(city, state, latitude, longitude)
       )
     `)
     .eq("id", id)
@@ -111,8 +111,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       p.city = store.addresses?.[0]?.city || store.city || p.addresses?.[0]?.city || null
       p.state = store.addresses?.[0]?.state || store.state || p.addresses?.[0]?.state || null
       p.opening_hours = store.opening_hours || p.opening_hours
-      p.latitude = store.latitude || p.latitude
-      p.longitude = store.longitude || p.longitude
+      p.latitude = store.addresses?.[0]?.latitude || p.latitude
+      p.longitude = store.addresses?.[0]?.longitude || p.longitude
       p.business_info = store.business_info || p.business_info
       p.gallery = store.gallery || p.gallery
       p.is_showcase_active = store.is_showcase_active !== false
@@ -454,9 +454,8 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     .from("stores")
     .select(`
       id, partner_id, name, description, logo_url, banner_url,
-      rating, latitude, longitude,
-      created_at,
-      addresses!store_id!inner(city, state)
+      rating, created_at,
+      addresses!store_id!inner(city, state, latitude, longitude)
     `)
     .eq("is_active", true)
     .ilike("addresses.state", state)
@@ -634,13 +633,13 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       rating: item.rating,
       itemType: 'loja',
       category: 'Loja Parceira',
-      partners: {
+partners: {
         id: item.partner_id,
         store_name: item.name,
         store_avatar: item.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
         banner_url: item.banner_url || null,
-        latitude: item.latitude,
-        longitude: item.longitude,
+        latitude: item.addresses?.[0]?.latitude,
+        longitude: item.addresses?.[0]?.longitude,
         city: item.addresses?.[0]?.city || null,
         state: item.addresses?.[0]?.state || null
       }

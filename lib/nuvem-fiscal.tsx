@@ -149,10 +149,12 @@ export const consultarCNPJ = async (cnpj: string) => {
           cep: data.endereco?.cep,
           uf: data.endereco?.uf,
           municipio: data.endereco?.municipio,
-          municipio_codigo_ibge: data.endereco?.codigo_municipio, // Mapeado para uso futuro
+          municipio_codigo_ibge: data.endereco?.codigo_municipio,
           telefone: data.telefone,
           email: data.email,
           cnae_fiscal: data.cnae_principal?.codigo,
+          simples_optante: data.simples?.optante ?? false,
+          simei_optante: data.simei?.optante ?? false,
         }
       } catch (error: any) {
         console.error("[Nuvem Fiscal] CNPJ Error:", error)
