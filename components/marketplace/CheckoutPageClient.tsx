@@ -963,6 +963,7 @@ export function CheckoutPageClient() {
                 setDeliveryQuoteLoading(true)
                 const quote = await quoteDeliveryFeeAction({
                     partnerId,
+                    storeId,
                     destinationAddress: formData.deliveryAddress,
                     freeDeliveryCoupon: hasFreeDeliveryCoupon,
                     orderSubtotal,
@@ -985,9 +986,8 @@ export function CheckoutPageClient() {
                     if (quote.error?.toLowerCase().includes("raio")) {
                         setShowOutsideRadiusModal(true)
                     }
-                    const baseFee = Number(deliverySettings?.baseFee || 0)
-                    setDeliveryFee(baseFee)
-                    setDeliveryDistanceKm(null)
+                    setDeliveryFee(0)
+                    setDeliveryDistanceKm(quote.distanceKm != null ? Number(quote.distanceKm) : null)
                     setDeliveryBreakdown(null)
                 }
                 setDeliveryQuoteLoading(false)
@@ -1312,28 +1312,30 @@ export function CheckoutPageClient() {
                                             Qtd: {line.quantity}
                                         </div>
                                         {serviceAvailability[line.lineId]?.checked && !serviceAvailability[line.lineId]?.available && (
-                                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                                                <InfoCard message="Este horário não está mais disponível" color="orange" />
-                                                <Button
+                                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                                <span>Este horário não está mais disponível</span>
+                                                <span className="text-brand-inactive-text/40">•</span>
+                                                <button
                                                     onClick={() => {
                                                         const service = { id: line.serviceId, name: line.baseName || line.displayName }
                                                         const p = checkoutContext?.partner
                                                         if (service.id && p) window.location.href = getServiceUrl(service, p)
                                                     }}
-                                                    variant="link"
+                                                    className="font-semibold text-brand-green hover:underline"
                                                 >
                                                     Remarcar
-                                                </Button>
-                                                <Button
+                                                </button>
+                                                <span className="text-brand-inactive-text/40">•</span>
+                                                <button
                                                     onClick={async () => {
                                                         await deleteCartItemsAction([line.lineId])
                                                         window.location.reload()
                                                     }}
-                                                    variant="link"
-                                                    className="text-brand-red"
+                                                    className="font-semibold text-brand-red hover:underline"
                                                 >
                                                     Remover
-                                                </Button>
+                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -1474,18 +1476,29 @@ export function CheckoutPageClient() {
                 {showDeliveryFeeRow && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                         <span>Entrega</span>
-                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller"))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                             {isPickup
                                 ? "Grátis"
                                 : deliveryQuoteLoading
                                     ? "Calculando..."
-                                    : deliveryFee > 0
-                                        ? formatCurrency(deliveryFee)
-                                        : hasFreeDeliveryCoupon
-                                            ? "Grátis"
-                                            : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress
-                                                ? "A combinar"
-                                                : "Grátis"
+                                    : (deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller")
+                                        ? (
+                                            <span className="flex items-center gap-1.5 justify-end">
+                                                {(deliveryBreakdown as any)?.originalFee != null && Number((deliveryBreakdown as any).originalFee) > 0 && (
+                                                    <span className="text-xs line-through text-brand-inactive-text font-normal">
+                                                        {formatCurrency(Number((deliveryBreakdown as any).originalFee))}
+                                                    </span>
+                                                )}
+                                                <span className="text-brand-green font-semibold">Grátis (Pago pela loja)</span>
+                                            </span>
+                                        )
+                                        : deliveryFee > 0
+                                            ? formatCurrency(deliveryFee)
+                                            : hasFreeDeliveryCoupon
+                                                ? "Grátis"
+                                                : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress
+                                                    ? "A combinar"
+                                                    : "Grátis"
                             }
                         </span>
                     </div>

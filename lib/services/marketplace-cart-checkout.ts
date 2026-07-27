@@ -72,9 +72,12 @@ export async function priceMarketplaceCartCheckout(
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
 
+  const targetStoreId = resolvedLines.find((l) => l.storeId)?.storeId || null
+
   if (hasDeliveryLines && params.deliveryAddress) {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
+      storeId: targetStoreId,
       destinationAddress: params.deliveryAddress,
       freeDeliveryCoupon: false,
       orderSubtotal: subtotal,
@@ -133,6 +136,7 @@ export async function priceMarketplaceCartCheckout(
   if (hasDeliveryLines && isFreeShippingCoupon) {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
+      storeId: targetStoreId,
       destinationAddress: params.deliveryAddress,
       freeDeliveryCoupon: true,
       orderSubtotal: subtotal,

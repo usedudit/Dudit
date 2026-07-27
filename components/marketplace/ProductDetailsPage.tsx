@@ -178,6 +178,7 @@ export function ProductDetailsPageClient({
     const [showPaymentMethodsModal, setShowPaymentMethodsModal] = useState(false)
     const [showPoliciesModal, setShowPoliciesModal] = useState(false)
     const [deliveryFee, setDeliveryFee] = useState<number | null>(null)
+    const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, any> | null>(null)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [deliveryLoading, setDeliveryLoading] = useState(false)
     const [calculatedAddress, setCalculatedAddress] = useState<string | null>(null)
@@ -417,12 +418,14 @@ export function ProductDetailsPageClient({
 
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: partner.id,
+                    storeId: (product as any)?.store_id || (product as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
                 if (!active) return
                 if (quote.success) {
                     setDeliveryFee(Number(quote.fee || 0))
+                    setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
                     setDeliveryError(null)
                 } else {
                     setDeliveryFee(null)
@@ -479,12 +482,14 @@ export function ProductDetailsPageClient({
 
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: partner.id,
+                    storeId: (product as any)?.store_id || (product as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
                 if (!active) return
                 if (quote.success) {
                     setDeliveryFee(Number(quote.fee || 0))
+                    setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
                     setDeliveryError(null)
                 } else {
                     setDeliveryFee(null)
@@ -1331,6 +1336,15 @@ export function ProductDetailsPageClient({
                                         <div className="text-right">
                                             {deliveryLoading ? (
                                                 <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
+                                            ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller") ? (
+                                                <div className="flex flex-col items-end">
+                                                    {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
+                                                        <span className="text-xs line-through text-brand-inactive-text font-normal">
+                                                            {formatMoney(Number(deliveryBreakdown.originalFee))}
+                                                        </span>
+                                                    )}
+                                                    <span className="text-sm font-bold text-brand-green">Grátis (Pago pela loja)</span>
+                                                </div>
                                             ) : deliveryFee !== null ? (
                                                 <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
                                                     {deliveryFee > 0 ? formatMoney(deliveryFee) : "Grátis"}

@@ -57,9 +57,16 @@ export async function getPartnerDeliveryConfigAction(partnerId: string, storeId?
   const plan = await getPartnerPlan(partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
 
+  let rulesQuery = supabase.from("delivery_fee_rules").select("*").eq("partner_id", partnerId)
+  if (storeId) {
+    rulesQuery = rulesQuery.or(`store_id.eq.${storeId},store_id.is.null`)
+  } else {
+    rulesQuery = rulesQuery.is("store_id", null)
+  }
+
   const [settingsRow, { data: rules }] = await Promise.all([
     resolveDeliverySettingsRow(supabase, partnerId, storeId),
-    supabase.from("delivery_fee_rules").select("*").eq("partner_id", partnerId).order("start_time"),
+    rulesQuery.order("start_time"),
   ])
 
   const normalizedSettings = mapSettingsRow(settingsRow)
@@ -149,10 +156,14 @@ export async function upsertPartnerDeliveryConfigAction(input: {
 
 export async function upsertDeliveryFeeRuleAction(input: {
   partnerId: string
+  storeId?: string | null
   rule: Partial<DeliveryFeeRule> & Pick<DeliveryFeeRule, "startTime" | "endTime" | "type" | "value">
 }) {
   await requireUser()
   await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_delivery")
+  if (input.storeId) {
+    await requireStoreAccess(input.storeId, input.partnerId)
+  }
   const supabase = await getSupabaseServerClient()
   const plan = await getPartnerPlan(input.partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
@@ -163,6 +174,7 @@ export async function upsertDeliveryFeeRuleAction(input: {
   const payload = {
     id: input.rule.id || undefined,
     partner_id: input.partnerId,
+    store_id: input.storeId || null,
     start_time: input.rule.startTime,
     end_time: input.rule.endTime,
     type: input.rule.type,
@@ -201,16 +213,29 @@ export async function quoteDeliveryFeeAction(input: {
     return { success: false as const, error: "Entrega não disponível no plano atual." }
   }
 
+  let rulesQuery = supabase.from("delivery_fee_rules").select("*").eq("partner_id", input.partnerId).eq("is_active", true)
+  if (input.storeId) {
+    rulesQuery = rulesQuery.or(`store_id.eq.${input.storeId},store_id.is.null`)
+  } else {
+    rulesQuery = rulesQuery.is("store_id", null)
+  }
+
   const [settingsRow, { data: rulesRows }, { data: store }] = await Promise.all([
     resolveDeliverySettingsRow(supabase, input.partnerId, input.storeId),
-    supabase.from("delivery_fee_rules").select("*").eq("partner_id", input.partnerId).eq("is_active", true).order("start_time"),
-    supabase
-      .from("stores")
-      .select("id, addresses!store_id!left(latitude, longitude)")
-      .eq("partner_id", input.partnerId)
-      .order("is_headquarters", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    rulesQuery.order("start_time"),
+    input.storeId
+      ? supabase
+        .from("stores")
+        .select("id, addresses!store_id!left(latitude, longitude)")
+        .eq("id", input.storeId)
+        .maybeSingle()
+      : supabase
+        .from("stores")
+        .select("id, addresses!store_id!left(latitude, longitude)")
+        .eq("partner_id", input.partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
   ])
 
   const settings = mapSettingsRow(settingsRow)
@@ -218,17 +243,44 @@ export async function quoteDeliveryFeeAction(input: {
     return { success: false as const, error: "Entrega desativada para esta loja." }
   }
 
-  const shouldCalculateDistance = capability.advancedEnabled && (
+  const shouldCalculateDistance = (
     settings.maxDeliveryKm != null ||
-    settings.extraKmPrice > 0
+    settings.extraKmPrice > 0 ||
+    settings.includedKm > 0
   )
 
   let distanceKm = 0
   if (shouldCalculateDistance) {
     let originCoords = null;
-    const addr = Array.isArray(store?.addresses) ? store.addresses[0] : null
-    if (addr?.latitude && addr?.longitude) {
-      originCoords = { lat: Number(addr.latitude), lng: Number(addr.longitude) };
+    const storeAddr = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses
+    if (storeAddr?.latitude != null && storeAddr?.longitude != null) {
+      originCoords = { lat: Number(storeAddr.latitude), lng: Number(storeAddr.longitude) };
+    }
+
+    if (!originCoords && input.storeId) {
+      const { data: directAddr } = await supabase
+        .from("addresses")
+        .select("latitude, longitude")
+        .eq("store_id", input.storeId)
+        .not("latitude", "is", null)
+        .limit(1)
+        .maybeSingle()
+      if (directAddr?.latitude != null && directAddr?.longitude != null) {
+        originCoords = { lat: Number(directAddr.latitude), lng: Number(directAddr.longitude) }
+      }
+    }
+
+    if (!originCoords) {
+      const { data: partnerAddr } = await supabase
+        .from("addresses")
+        .select("latitude, longitude")
+        .eq("partner_id", input.partnerId)
+        .not("latitude", "is", null)
+        .limit(1)
+        .maybeSingle()
+      if (partnerAddr?.latitude != null && partnerAddr?.longitude != null) {
+        originCoords = { lat: Number(partnerAddr.latitude), lng: Number(partnerAddr.longitude) }
+      }
     }
 
     if (!originCoords) {
@@ -236,7 +288,7 @@ export async function quoteDeliveryFeeAction(input: {
     }
 
     let destinationCoords = input.destinationCoords;
-    if (!destinationCoords) {
+    if (!destinationCoords && input.destinationAddress) {
       destinationCoords = await geocodeAddress(input.destinationAddress)
     }
 
@@ -251,7 +303,7 @@ export async function quoteDeliveryFeeAction(input: {
     distanceKm = Number(calculatedDistance.toFixed(2))
   }
 
-  const rules = capability.advancedEnabled ? (rulesRows || []).map(mapRuleRow) : []
+  const rules = (rulesRows || []).map(mapRuleRow)
 
   try {
     const priced = calculateDeliveryFee({
@@ -271,6 +323,10 @@ export async function quoteDeliveryFeeAction(input: {
       capability,
     }
   } catch (error: any) {
-    return { success: false as const, error: error.message || "Erro ao calcular taxa de entrega" }
+    return {
+      success: false as const,
+      distanceKm,
+      error: error.message || "Erro ao calcular taxa de entrega",
+    }
   }
 }

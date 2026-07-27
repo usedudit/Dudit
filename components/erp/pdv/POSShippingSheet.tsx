@@ -36,6 +36,7 @@ interface POSShippingSheetProps {
   customerDetails: ShippingCustomerDetails
   currentShippingFee: number
   partnerId: string
+  storeId?: string | null
   onCreateAddress: (payload: {
     customerId: string
     address: {
@@ -58,6 +59,7 @@ export default function POSShippingSheet({
   customerDetails,
   currentShippingFee,
   partnerId,
+  storeId,
   onCreateAddress,
   onApply,
 }: POSShippingSheetProps) {
@@ -97,8 +99,8 @@ export default function POSShippingSheet({
     setZipCode(customerDetails.address.zipCode || "")
     setStreet(customerDetails.address.street || "")
     const isNoNumber = customerDetails.address.number === "S/N"
-    setNumber(isNoNumber ? "" : customerDetails.address.number || "")
     setNoNumber(isNoNumber)
+    setNumber(isNoNumber ? "" : customerDetails.address.number || "")
     setComplement(customerDetails.address.complement || "")
     setNeighborhood(customerDetails.address.neighborhood || "")
     setCity(customerDetails.address.city || "")
@@ -145,6 +147,7 @@ export default function POSShippingSheet({
     ;(async () => {
       const quote = await quoteDeliveryFeeAction({
         partnerId,
+        storeId,
         destinationAddress,
       })
       if (!active) return
@@ -161,7 +164,7 @@ export default function POSShippingSheet({
       setIsQuoteLoading(false)
     })()
     return () => { active = false }
-  }, [isOpen, hasSelectedCustomer, hasStreet, customerDetails?.id, customerDetails?.address?.street, customerDetails?.address?.number, customerDetails?.address?.city, customerDetails?.address?.state, customerDetails?.address?.zipCode, customerDetails?.address?.neighborhood, partnerId, shippingFree])
+  }, [isOpen, hasSelectedCustomer, hasStreet, customerDetails?.id, customerDetails?.address?.street, customerDetails?.address?.number, customerDetails?.address?.city, customerDetails?.address?.state, customerDetails?.address?.zipCode, customerDetails?.address?.neighborhood, partnerId, storeId, shippingFree])
 
   const content = (
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">

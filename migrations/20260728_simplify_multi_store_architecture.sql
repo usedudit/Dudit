@@ -33,6 +33,18 @@ CREATE INDEX IF NOT EXISTS idx_promotions_store_id ON public.promotions(store_id
 ALTER TABLE public.installment_groups ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_installment_groups_store_id ON public.installment_groups(store_id);
 
+-- Delivery Fee Rules
+ALTER TABLE public.delivery_fee_rules ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_delivery_fee_rules_store_id ON public.delivery_fee_rules(store_id);
+
+-- Deliveries
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_deliveries_store_id ON public.deliveries(store_id);
+
+-- Delivery Orders
+ALTER TABLE public.delivery_orders ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_delivery_orders_store_id ON public.delivery_orders(store_id);
+
 -- ─── 3. Add store_ids UUID[] to Shared Cadastros & Payment Methods ──────────
 -- product_categories
 ALTER TABLE public.product_categories ADD COLUMN IF NOT EXISTS store_ids UUID[] DEFAULT NULL;

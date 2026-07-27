@@ -27,11 +27,9 @@ import {
     removeCouponFromPreSaleAction,
 } from "@/app/actions/erp/pdv"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
-
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
-
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pdv/SelectSellerSheet"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
@@ -2192,6 +2190,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         customerDetails={shippingCustomerDetails}
                         currentShippingFee={shippingFee}
                         partnerId={partnerId}
+                        storeId={activeStoreId || null}
                         onCreateAddress={handleCreateShippingAddress}
                         onApply={({ shippingFee: fee, distanceKm, breakdown }) => {
                             setShippingFee(Math.max(0, Number(fee || 0)))

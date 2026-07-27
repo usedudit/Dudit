@@ -31,6 +31,8 @@ export type DeliveryBreakdown = {
   timeAdjustmentTotal: number
   appliedRuleIds: string[]
   distanceKm: number
+  originalFee?: number
+  deliveryPayer?: "customer" | "seller"
 }
 
 export type CalculateDeliveryFeeInput = {
@@ -127,6 +129,23 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
   const roundedFee = roundMoney(fee)
   const preTimeFee = baseFee + distanceFee
 
+  if (input.settings.deliveryPayer === "seller") {
+    return {
+      fee: 0,
+      breakdown: {
+        baseFee: roundMoney(baseFee),
+        distanceFee: roundMoney(distanceFee),
+        timeFixedAdjustments: roundMoney(timeFixedAdjustments),
+        timeMultiplierFactor: roundMoney(timeMultiplierFactor),
+        timeAdjustmentTotal: roundMoney(roundedFee - preTimeFee),
+        appliedRuleIds: [...activeRules.map((r) => r.id), "seller:subsidized_delivery"],
+        distanceKm: roundMoney(distanceKm),
+        originalFee: roundedFee,
+        deliveryPayer: "seller",
+      },
+    }
+  }
+
   return {
     fee: roundedFee,
     breakdown: {
@@ -137,6 +156,8 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
       timeAdjustmentTotal: roundMoney(roundedFee - preTimeFee),
       appliedRuleIds: activeRules.map((r) => r.id),
       distanceKm: roundMoney(distanceKm),
+      originalFee: roundedFee,
+      deliveryPayer: "customer",
     },
   }
 }

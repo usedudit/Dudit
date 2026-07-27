@@ -20,7 +20,6 @@ import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
-import { InfoCard } from "@/components/reusable"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -369,7 +368,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0) => {
         const settings = partnerData.deliverySettings
-        if (!settings || settings.is_delivery_enabled === false) return 0
+        if (!settings || settings.is_delivery_enabled === false || settings.delivery_payer === "seller") return 0
         if (settings.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) {
             return 0
         }
@@ -409,6 +408,15 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const getDeliveryLabel = (partnerData: any, selectedItemsTotal: number = 0) => {
         const settings = partnerData.deliverySettings
         if (!settings) return "A combinar"
+        if (settings.delivery_payer === "seller") {
+            const fee = Number(settings.base_fee || 0)
+            return (
+                <span className="flex items-center gap-1.5 justify-end">
+                    {fee > 0 && <span className="text-xs line-through text-brand-inactive-text font-normal">{formatCurrency(fee)}</span>}
+                    <span className="text-brand-green font-semibold">Grátis (Pago pela loja)</span>
+                </span>
+            )
+        }
         if (settings.is_delivery_enabled === false) {
             return settings.is_pickup_enabled !== false ? "Apenas retirada (Grátis)" : "Indisponível"
         }
@@ -593,17 +601,20 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     <p className="text-[12px] text-brand-inactive-text mt-0.5">{getItemBooking(item)}</p>
                                                                                                 )}
                                                                                                 {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
-                                                                                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                                                                                        <InfoCard message="Este horário não está mais disponível" color="orange" />
+                                                                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                                                                                        <span>Este horário não está mais disponível</span>
+                                                                                                        <span className="text-brand-inactive-text/40">•</span>
                                                                                                         <Link
                                                                                                             href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
-                                                                                                            className="text-xs font-semibold text-brand-green hover:underline"
+                                                                                                            className="font-semibold text-brand-green hover:underline"
                                                                                                         >
                                                                                                             Remarcar
                                                                                                         </Link>
+                                                                                                        <span className="text-brand-inactive-text/40">•</span>
                                                                                                         <button
                                                                                                             onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                                            className="text-xs font-semibold text-brand-red hover:underline"
+                                                                                                            className="font-semibold text-brand-red hover:underline"
                                                                                                         >
                                                                                                             Remover
                                                                                                         </button>
@@ -720,17 +731,20 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         <p className="text-[13px] text-brand-inactive-text mb-1">{getItemBooking(item)}</p>
                                                                                                     )}
                                                                                                     {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
-                                                                                                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                                                                                                            <InfoCard message="Este horário não está mais disponível" color="orange" />
+                                                                                                        <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                                                                                            <span>Este horário não está mais disponível</span>
+                                                                                                            <span className="text-brand-inactive-text/40">•</span>
                                                                                                             <Link
                                                                                                                 href={getServiceUrl({ id: item.service_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
-                                                                                                                className="text-xs font-semibold text-brand-green hover:underline"
+                                                                                                                className="font-semibold text-brand-green hover:underline"
                                                                                                             >
                                                                                                                 Remarcar
                                                                                                             </Link>
+                                                                                                            <span className="text-brand-inactive-text/40">•</span>
                                                                                                             <button
                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                                                className="text-xs font-semibold text-brand-red hover:underline"
+                                                                                                                className="font-semibold text-brand-red hover:underline"
                                                                                                             >
                                                                                                                 Remover
                                                                                                             </button>

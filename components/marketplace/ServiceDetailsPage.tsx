@@ -457,6 +457,7 @@ export function ServiceDetailsPageClient({
 
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: partner.id,
+                    storeId: (service as any)?.store_id || (service as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
@@ -519,6 +520,7 @@ export function ServiceDetailsPageClient({
 
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: partner.id,
+                    storeId: (service as any)?.store_id || (service as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
